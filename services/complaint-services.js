@@ -1,0 +1,159 @@
+const Complaint = require('../models/complaint.model');
+const { getFileDuration } = require('../utils/complaint-helper');
+const { createNotification } = require('../utils/notification-jobs'); // Import notification service
+const PushNotificationService  = require('../utils/push-notification-jobs');
+
+class ComplaintService {
+  static async createComplaint(complaintData, files) {
+    try {
+      // Process all media files
+      const mediaFiles = await Promise.all(files.map(async (file) => {
+        // Convert backslashes to forward slashes for consistency
+        const filePath = file.path.replace(/\\/g, '/');
+
+        // Remove 'public' prefix from path to create URL
+        const urlPath = filePath.replace('public', '');
+
+        // Determine file type (photo or video)
+        const fileType = file.mimetype.startsWith('video/') ? 'video' : 'photo';
+
+        // Base file data
+        const fileData = {
+          fileName: file.filename,
+          originalName: file.originalname,
+          filePath: urlPath, // Store path without 'public'
+          fileSize: file.size,
+          mimeType: file.mimetype,
+          fieldName: file.fieldname,
+          type: fileType,
+          url: urlPath, // Same as filePath for URL access
+          uploadDate: new Date()
+        };
+
+        // Add duration for video files
+        if (fileType === 'video') {
+          fileData.duration = await getFileDuration(file.path);
+        }
+
+        return fileData;
+      }));
+
+      // Create new complaint document
+      const complaint = new Complaint({
+        uniqueCode: complaintData.uniqueCode,
+        regNo: complaintData.regNo || 'no-reg',
+        name: complaintData.name || 'no-name',
+        mediaFiles,
+        status: 'pending',
+        // createdAt and updatedAt will be set automatically by Mongoose
+      });
+
+      await createNotification({
+        title: `New Complaint - ${complaint.regNo}`,
+        description:`${complaint.uniqueCode} is registered complaint for equipment - ${complaint.regNo}`,
+        priority: "high",
+        sourceId: 'from applications',
+        time: new Date()
+      });
+
+      await PushNotificationService.sendGeneralNotification(
+        null, // broadcast to all users
+        `New Complaint - ${complaint.regNo}`, //title
+        `${complaint.uniqueCode} is registered complaint for equipment - ${complaint.regNo}`, //decription
+        'high', //priority
+        'normal' // type
+      );
+
+      // Save to database
+      await complaint.save();
+
+      return complaint;
+    } catch (error) {
+      console.error('Error creating complaint:', error);
+      throw error;
+    }
+  }
+
+  static async addSolutionToComplaint(complaintId, files, regNo) {
+    try {
+      // Process all solution files
+      const solutionFiles = await Promise.all(files.map(async (file) => {
+        // Convert backslashes to forward slashes for consistency
+        const filePath = file.path.replace(/\\/g, '/');
+
+        // Remove 'public' prefix from path to create URL
+        const urlPath = filePath.replace('public', '');
+
+        // Determine file type (photo or video)
+        const fileType = file.mimetype.startsWith('video/') ? 'video' : 'photo';
+
+        // Base file data
+        const fileData = {
+          fileName: file.filename,
+          originalName: file.originalname,
+          filePath: urlPath,
+          fileSize: file.size,
+          mimeType: file.mimetype,
+          fieldName: file.fieldname,
+          type: fileType,
+          url: urlPath,
+          uploadDate: new Date()
+        };
+
+        // Add duration for video files
+        if (fileType === 'video') {
+          fileData.duration = await getFileDuration(file.path);
+        }
+
+        return fileData;
+      }));
+
+      // Update complaint with solution files
+      const complaint = await Complaint.findByIdAndUpdate(
+        complaintId,
+        {
+          $push: { solutions: { $each: solutionFiles } },
+          $set: { status: 'resolved', updatedAt: new Date() }
+        },
+        { new: true }
+      );
+
+      if (!complaint) {
+        throw new Error('Complaint not found');
+      }
+
+      return complaint;
+    } catch (error) {
+      console.error('Error adding solution:', error);
+      throw error;
+    }
+  }
+
+  static async getComplaintsByUser(uniqueCode) {
+    try {
+      return await Complaint.find({ uniqueCode }).sort({ createdAt: -1 });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  static async getComplaintById(id) {
+    try {
+      return await Complaint.findById(id);
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  static async getFullComplaints() {
+    try {
+      return await Complaint.find({});
+    } catch (error) {
+      throw error;
+    }
+  }
+}
+
+
+
+module.exports = ComplaintService;
