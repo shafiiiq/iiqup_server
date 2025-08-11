@@ -11,7 +11,8 @@ const Equipment = require('../models/equip.model.js');
 const Handover = require('../models/equip-hand-over-stock.model.js');
 const Toolkit = require('../models/toolkit.model.js');
 const Stokcs = require('../models/stocks.model.js');
-
+const mongoose = require('mongoose');
+const { ObjectId } = require('mongoose').Types;
 
 // Add service report
 router.post('/add-service-report', userController.addServiceReport)
@@ -29,7 +30,7 @@ router.get('/histories/:regNo/maintenance', userController.getAllMaintenanceServ
 router.get('/histories/:regNo/tyre', userController.getAllTyreServices)
 router.get('/histories/:regNo/battery', userController.getAllBatteryServices)
 
-// Date filtering
+// Date filtering  
 router.get('/histories/:regNo/date-range/:startDate/:endDate', userController.getServicesByDateRange)
 router.get('/histories/:regNo/last-months/:monthsCount', userController.getServicesByLastMonths)
 
@@ -148,56 +149,46 @@ router.delete('/deleteuser/:id', userController.deleteServiceReport)
 
 router.post('/fix-id', async (req, res) => {
   try {
-    var Model
+    var Modell
     if (req.body.type === 'tyre') {
-      Model = TyreModel
+      Modell = TyreModel
     } else if (req.body.type === 'equipments') {
-      Model = Equipment
+      Modell = Equipment
     } else if (req.body.type === 'reports') {
-      Model = serviceReportModel
+      Modell = serviceReportModel
     } else if (req.body.type === 'histories') {
-      Model = serviceHistoryModel
+      Modell = serviceHistoryModel
     } else if (req.body.type === 'maintanance') {
-      Model = MaintananceModel
+      Modell = MaintananceModel
     } else if (req.body.type === 'handover') {
-      Model = Handover
+      Modell = Handover
     } else if (req.body.type === 'toolkit') {
-      Model = Toolkit
+      Modell = Toolkit
     } else if (req.body.type === 'stocks') {
-      Model = Stokcs
+      Modell = Stokcs
+    }else if (req.body.type === 'battery') {
+      Modell = BatteryModel
     }
-
-    const result = await Model.updateMany(
-      { _id: { $type: "string" } },
-      [
-        {
-          $set: {
-            _id: { $toObjectId: "$_id" }
-          }
-        }
-      ],
-      { timestamps: false }
-    );
-
-    console.log(`Updated ${result.modifiedCount} documents successfully`);
-    res.status(200).json({
-      success: true,
-      message: `Updated ${result.modifiedCount} documents successfully`,
-      modifiedCount: result.modifiedCount,
-      processedAt: new Date().toISOString()
-    });
-
+    const docs = await Modell.find({ _id: { $type: "string" } });
+    
+    for (const doc of docs) {
+      const data = doc.toObject();
+      const oldId = data._id;
+      data._id = new mongoose.Types.ObjectId(data._id);
+      
+      // Delete old document first to avoid duplicates
+      await Modell.deleteOne({ _id: oldId });
+      
+      // Insert directly without validation
+      await Modell.collection.insertOne(data);
+    }
+    
+    res.json({ success: true, count: docs.length });
+    
   } catch (error) {
-    console.error('Error updating documents:', error);
-    res.status(500).json({
-      success: false,
-      message: 'An error occurred while updating documents',
-      error: error.message
-    });
+    res.status(500).json({ error: error.message });
   }
 });
-
-
 
 
 module.exports = router;
