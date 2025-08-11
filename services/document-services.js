@@ -1,6 +1,8 @@
 const documentModel = require('../models/document.model');
 const path = require('path');
 const fs = require('fs');
+const { createNotification } = require('../utils/notification-jobs'); // Import notification service
+const PushNotificationService = require('../utils/push-notification-jobs');
 
 module.exports = {
   saveDocument: async (regNo, documentType, file, description, category) => {
@@ -22,6 +24,22 @@ module.exports = {
         path: file.path,
         mimetype: file.mimetype || file.originalname.split('.').pop() // Fallback to file extension if mimetype is not available
       });
+
+      await createNotification({
+        title: `New document added`,
+        description: `Document ${documentType} is uploaded for ${regNo}, Now you can access new one`,
+        priority: "high",
+        sourceId: 'from applications',
+        time: new Date()
+      });
+
+      await PushNotificationService.sendGeneralNotification(
+        null, // broadcast to all users
+        `New document added`, //title
+        `Document ${documentType} is uploaded for ${regNo}, Now you can access new one`, //decription
+        'high', //priority
+        'normal' // type
+      );
 
       await document.save();
 
@@ -78,8 +96,8 @@ module.exports = {
   getDocumentById: async (documentId) => {
     try {
       // Find document that contains the file with this ID
-      const document = await documentModel.findOne({ 
-        'files._id': documentId 
+      const document = await documentModel.findOne({
+        'files._id': documentId
       });
 
       if (!document) {
@@ -91,7 +109,7 @@ module.exports = {
 
       // Find the specific file within the document
       const file = document.files.find(f => f._id.toString() === documentId);
-      
+
       if (!file) {
         return {
           status: 404,

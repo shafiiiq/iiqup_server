@@ -29,6 +29,9 @@ const solutionFileSchema = new mongoose.Schema({
 const complaintSchema = new mongoose.Schema({
   uniqueCode: { type: String, required: true },
   regNo: { type: String },
+  brand: { type: String },
+  machine: { type: String },
+  mechanic: { type: String },
   name: { type: String },
   mediaFiles: [mediaFileSchema],
   solutions: [solutionFileSchema], // Add this line

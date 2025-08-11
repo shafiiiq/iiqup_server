@@ -1,7 +1,7 @@
 const { promises } = require('fs');
 const equipmentModel = require('../models/equip.model');
 const { createNotification } = require('../utils/notification-jobs'); // Import notification service
-const  PushNotificationService  = require('../utils/push-notification-jobs');
+const PushNotificationService = require('../utils/push-notification-jobs');
 
 module.exports = {
 
@@ -35,6 +35,14 @@ module.exports = {
             sourceId: equipment._id,
             time: new Date()
           });
+
+          await PushNotificationService.sendGeneralNotification(
+            null, // broadcast to all users
+            "New Equipment Added", //title
+            `Congratulations! We have bought a brand new ${equipment.machine} (${equipment.brand}) today`, //decription
+            'high', //priority
+            'normal' // type
+          );
         } catch (notificationError) {
           console.error('Failed to send notification for new equipment:', notificationError);
           // Don't reject the main operation if notification fails
@@ -108,10 +116,10 @@ module.exports = {
           const changes = [];
 
           console.log(originalEquipment.site);
-          
+
 
           // Check if site changed
-          if (updatedData.site && JSON.stringify(originalEquipment.site) !== JSON.stringify(updatedData.site)) {            
+          if (updatedData.site && JSON.stringify(originalEquipment.site) !== JSON.stringify(updatedData.site)) {
             changes.push(`site is: ${updatedData.site.join(', ')}`);
           }
 

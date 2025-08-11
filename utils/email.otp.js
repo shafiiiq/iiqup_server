@@ -31,15 +31,18 @@ const getAccessToken = async () => {
 };
 
 // Email configuration using OAuth2
-const createTransporter = async () => {
+const createTransporter = async () => { 
   try {
     const accessToken = await getAccessToken();
-    
+
+    console.log('Raw OTP_MAILER:', JSON.stringify(process.env.OTP_MAILER));
+    console.log('Cleaned OTP_MAILER:', process.env.OTP_MAILER.replace(/"/g, ''));
+
     const emailConfig = {
       service: 'gmail',
       auth: {
         type: 'OAuth2',
-        user: process.env.OTP_MAILER,
+        user: process.env.OTP_MAILER.replace(/"/g, ''),
         clientId: process.env.GMAIL_CLIENT_ID,
         clientSecret: process.env.GMAIL_CLIENT_SECRET,
         refreshToken: process.env.GMAIL_REFRESH_TOKEN,
@@ -259,12 +262,10 @@ module.exports = generateOTPTemplate;
  * @returns {Promise} - Promise with the result of the operation
  */
 const sendOTPEmail = async (email, otp, username = '') => {
-  console.log(`Attempting to send OTP email to: ${email}`);
-  
   try {
     // Get transporter with OAuth credentials
     const transporter = await createTransporter();
-    
+
     // Email options
     const mailOptions = {
       from: `"Al Ansari" <adminatnewo@gmail.com>`,
@@ -287,7 +288,7 @@ const sendOTPEmail = async (email, otp, username = '') => {
     console.log('Accepted recipients:', info.accepted);
     console.log('Rejected recipients:', info.rejected);
     console.log('===============================');
-    
+
     return {
       success: true,
       message: 'OTP email sent successfully',
@@ -299,13 +300,13 @@ const sendOTPEmail = async (email, otp, username = '') => {
     console.error('Error name:', error.name);
     console.error('Error message:', error.message);
     console.error('Error code:', error.code);
-    
+
     // Log more details if available
     if (error.command) console.error('Error command:', error.command);
     if (error.responseCode) console.error('Error response code:', error.responseCode);
     if (error.response) console.error('Error response:', error.response);
     console.error('============================');
-    
+
     throw {
       success: false,
       message: 'Failed to send OTP email',

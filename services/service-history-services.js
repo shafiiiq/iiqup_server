@@ -5,6 +5,8 @@ const serviceReportModel = require('../models/service-report.model.js');
 const maintananceHistoryModel = require('../models/maintanance-history.model.js');
 const tyreModel = require('../models/tyre.model.js');
 const batteryModel = require('../models/batery.model.js');
+const { createNotification } = require('../utils/notification-jobs'); // Import notification service
+const PushNotificationService  = require('../utils/push-notification-jobs');
 
 module.exports = {
 
@@ -407,6 +409,44 @@ module.exports = {
                 });
             }
         });
+    },
+
+    deleteServiceHistory: async (id, type) => {
+        try {
+
+            let deletedToolkit
+            if (type == 'oil') {
+                deletedToolkit = await serviceHistoryModel.findByIdAndDelete(id)
+            } else if (type == 'tyre') {
+                deletedToolkit = await tyreModel.findByIdAndDelete(id)
+            } else if (type == 'battery') {
+                deletedToolkit = await batteryModel.findByIdAndDelete(id)
+            } else {
+               deletedToolkit = await maintananceHistoryModel.findByIdAndDelete(id)
+            }
+
+            if (!deletedToolkit) {
+                return {
+                    status: 404,
+                    success: false,
+                    message: `Service with ID ${id} not found`
+                };
+            }
+
+            return {
+                status: 200,
+                success: true,
+                message: 'Service deleted successfully',
+                data: deletedToolkit
+            };
+        } catch (error) {
+            return {
+                status: 400,
+                success: false,
+                message: 'Failed to delete Service',
+                error: error.message
+            };
+        }
     }
 
 }

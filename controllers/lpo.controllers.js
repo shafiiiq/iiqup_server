@@ -6,8 +6,6 @@ class LPOController {
     try {
       const lpoData = req.body;
 
-      console.log(lpoData);
-
       // Validate required fields
       if (!lpoData.lpoRef || !lpoData.date || !lpoData.equipments || !lpoData.quoteNo) {
         return res.status(400).json({

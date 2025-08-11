@@ -1,4 +1,6 @@
 const LPO = require('../models/lpo.model');
+const { createNotification } = require('../utils/notification-jobs'); // Import notification service
+const PushNotificationService = require('../utils/push-notification-jobs');
 
 class LPOService {
   // Create a new LPO
@@ -33,6 +35,26 @@ class LPOService {
       };
 
       const lpo = new LPO(lpoWithTotal);
+
+      console.log(lpoData);
+      
+
+      await createNotification({
+        title: `New LPO`,
+        description: `LPO: ${lpoData.lpoRef} for ${lpoData.company.vendor} for ${lpoData.equipments}`,
+        priority: "high",
+        sourceId: 'from applications',
+        time: new Date()
+      });
+
+      await PushNotificationService.sendGeneralNotification(
+        null, // broadcast to all users
+        `New LPO`, //title
+        `LPO: ${lpoData.lpoRef} for ${lpoData.company.vendor} for ${lpoData.equipments}`, //decription
+        'high', //priority
+        'normal' // type
+      );
+
       return await lpo.save();
     } catch (error) {
       throw new Error(`Error creating LPO: ${error.message}`);

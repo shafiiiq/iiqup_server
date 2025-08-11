@@ -138,6 +138,16 @@ const checkIstimaraExpiry = async () => {
 
         // Send notification
         const result = await createNotification(notificationData);
+
+        await PushNotificationService.sendGeneralNotification(
+          null, // broadcast to all users
+          "Istimara Expiry Alert", // title
+          `${message},\nExpiry date : ${expiryDate.format('YYYY-MM-DD')}`, // description
+          daysUntilExpiry <= 7 ? "HIGH" : "MEDIUM", // priority
+          notificationType == 'MONTHLY' ? 'high' 
+          : notificationType == 'WEEKLY' ? 'medium'
+          : 'normal' // type
+        );
         
         if (result.success) {
           console.log(`✅ [${notificationType}] Notification sent for ${equipment.regNo}: ${message}`);

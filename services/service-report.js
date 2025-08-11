@@ -1,5 +1,7 @@
 const serviceHistoryModel = require('../models/service-history.model.js');
 const serviceReportModel = require('../models/service-report.model.js');
+const { createNotification } = require('../utils/notification-jobs'); // Import notification service
+const PushNotificationService = require('../utils/push-notification-jobs');
 
 module.exports = {
 
@@ -18,6 +20,22 @@ module.exports = {
         if (!result) {
           throw new Error(`Failed to create service report for regNo: ${data.regNo}`);
         }
+
+        await createNotification({
+          title: `${data.machine} - ${data.regNo} serviced`,
+          description: `At ${data.location}\nServiced Hours: ${data.serviceHrs}\nNext Service: ${data.nextServiceHrs}\n${data.remarks}\nMechanics: ${data.mechanics}`,
+          priority: "high",
+          sourceId: 'from applications',
+          time: new Date()
+        });
+
+        await PushNotificationService.sendGeneralNotification(
+          null, // broadcast to all users
+          `${data.machine} - ${data.regNo} serviced`, //title
+          `At ${data.location}\nServiced Hours: ${data.serviceHrs}\nNext Service: ${data.nextServiceHrs}\n${data.remarks}\nMechanics: ${data.mechanics}`, //decription
+          'high', //priority
+          'normal' // type
+        );
 
         resolve({
           status: 200,

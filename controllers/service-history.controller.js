@@ -152,6 +152,23 @@ const getBatteryHistory = async (req, res) => {
     })
 }
 
+const deleteServiceHistory = async (req, res) => {
+  const { id, type } = req.params;
+
+  serviceHistoryServices.deleteServiceHistory(id, type)
+    .then((result) => {
+      console.log(result);
+      
+      if (result) {
+        res.status(result.status).json(result);
+      }
+    })
+    .catch((err) => {
+       console.log(err);
+      res.status(err.status || 500).json({ error: err.message });
+    });
+};
+
 module.exports = {
   addServiceHistory,
   getServiceHistory,
@@ -163,5 +180,6 @@ module.exports = {
   addMaintananceHistory,
   getMaintananceHistory,
   getBatteryHistory,
-  addBatteryHistory
+  addBatteryHistory,
+  deleteServiceHistory
 };

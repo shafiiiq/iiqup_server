@@ -6,6 +6,8 @@ const config = {
   // Add other configuration options as needed
 }
 const userServices = require('../services/user-services.js')
+const { createNotification } = require('../utils/notification-jobs'); // Import notification service
+const PushNotificationService = require('../utils/push-notification-jobs');
 
 module.exports = {
   insertEquipmentStocks: (data) => {
@@ -271,6 +273,21 @@ module.exports = {
 
         const savedStock = await newStock.save();
 
+        await createNotification({
+          title: "New Stock Added",
+          description: `${data.stockCount} new ${data.serialNumber} - ${data.product} added to stock ${newStock.equipments ? `for ${newStock.equipments}` : ''}`,
+          priority: "high",
+          type: 'normal'
+        });
+
+        await PushNotificationService.sendGeneralNotification(
+          null, // broadcast to all users
+          "New Stock Added", //title
+          `${data.stockCount} new ${data.serialNumber} - ${data.product} added to stock ${newStock.equipments ? `for ${newStock.equipments}` : ''}`, //decription
+          'high', //priority
+          'normal' // type
+        );
+
         resolve({
           status: 201,
           success: true,
@@ -394,7 +411,7 @@ module.exports = {
     });
   },
 
-  updateProduct: (stockId, updateData) => {    
+  updateProduct: (stockId, updateData) => {
 
     return new Promise(async (resolve, reject) => {
       try {
@@ -491,24 +508,24 @@ module.exports = {
         }
 
         let updatedStock;
+        // Calculate the quantity change
+        let quantityChange = 0;
 
         // Check if this is a movement-based update (stock quantity change with tracking)
         if (updateData.type && ['add', 'deduct', 'adjustment', 'initial'].includes(updateData.type)) {
 
-          // Calculate the quantity change
-          let quantityChange = 0;
           let newQuantity
 
           if (updateData.type === 'deduct') {
             newQuantity = currentStock.stockCount - updateData.stockCount;
           } else if (updateData.type === 'add') {
-            newQuantity  = updateData.stockCount + currentStock.stockCount;
+            newQuantity = updateData.stockCount + currentStock.stockCount;
           }
 
           if (updateData.type === 'add') {
             quantityChange = updateData.stockCount;
           } else if (updateData.type === 'deduct') {
-            quantityChange = updateData.stockCount;            
+            quantityChange = updateData.stockCount;
           } else if (updateData.type === 'adjustment') {
             quantityChange = Math.abs(updateData.stockCount - currentStock.stockCount);
           } else if (updateData.type === 'initial') {
@@ -593,21 +610,64 @@ module.exports = {
             { ...regularUpdateData, updatedAt: new Date() },
             { new: true, runValidators: true }
           );
+
+          await createNotification({
+            title: "Stock Update",
+            description: `${quantityChange} ${currentStock.product} with part number ${currentStock.serialNumber} is used by ${mechanicName} for ${equipmentName} ${equipmentNumber}`,
+            priority: "high",
+            type: 'normal'
+          });
+
+          await PushNotificationService.sendGeneralNotification(
+            null, // broadcast to all users
+            "Stock Update", //title
+            `${quantityChange} ${currentStock.product} with part number ${currentStock.serialNumber} is used by ${mechanicName} for ${equipmentName} ${equipmentNumber}`, //decription
+            'high', //priority
+            'normal' // type
+          );
         }
 
         // Check for low stock notification
         if (updatedStock.stockCount < 10) {
+          let message = `Urgent Requirement : ${currentStock.product} with part number ${currentStock.serialNumber} is in low stock, only ${currentStock.stockCount} items left`
+          if (updatedStock.stockCount == 0) {
+            message = `Urgent Requirement : ${currentStock.product} with part number ${currentStock.serialNumber} is in out of stock`
+          }
+
           try {
-            // Send notification (wrapped in try-catch so it doesn't break the main operation)
+            // Send notification to special user 
             await userServices.pushSpecialNotification(
               process.env.JALEEL_KA,
               updatedStock.stockCount,
-              stockId
+              stockId,
+              message
             );
           } catch (notificationError) {
             console.error('Error sending low stock notification:', notificationError);
-            // Continue without failing the main operation
           }
+
+          await PushNotificationService.sendGeneralNotification(
+            null, // broadcast to all users
+            "Low Stock", //title
+            message,
+            'high', //priority
+            'normal' // type
+          );
+        } else {
+          await createNotification({
+            title: "Stock Update",
+            description: `${quantityChange} ${currentStock.product} with part number ${currentStock.serialNumber} is used by ${updateData.mechanicName} for ${updateData.equipmentName} ${updateData.equipmentNumber}`,
+            priority: "high",
+            type: 'normal'
+          });
+
+          await PushNotificationService.sendGeneralNotification(
+            null, // broadcast to all users
+            "Stock Update", //title
+            `${quantityChange} ${currentStock.product} with part number ${currentStock.serialNumber} is used by ${updateData.mechanicName} for ${updateData.equipmentName} ${updateData.equipmentNumber}`, //decription
+            'high', //priority
+            'normal' // type
+          );
         }
 
         resolve({

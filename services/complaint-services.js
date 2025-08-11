@@ -1,7 +1,8 @@
 const Complaint = require('../models/complaint.model');
+const Equipment = require('../models/equip.model');
 const { getFileDuration } = require('../utils/complaint-helper');
 const { createNotification } = require('../utils/notification-jobs'); // Import notification service
-const PushNotificationService  = require('../utils/push-notification-jobs');
+const PushNotificationService = require('../utils/push-notification-jobs');
 
 class ComplaintService {
   static async createComplaint(complaintData, files) {
@@ -38,19 +39,23 @@ class ComplaintService {
         return fileData;
       }));
 
+      const equipment = await Equipment.findOne({ regNo: complaintData.regNo })
+
       // Create new complaint document
       const complaint = new Complaint({
         uniqueCode: complaintData.uniqueCode,
         regNo: complaintData.regNo || 'no-reg',
         name: complaintData.name || 'no-name',
+
         mediaFiles,
         status: 'pending',
         // createdAt and updatedAt will be set automatically by Mongoose
       });
 
+
       await createNotification({
         title: `New Complaint - ${complaint.regNo}`,
-        description:`${complaint.uniqueCode} is registered complaint for equipment - ${complaint.regNo}`,
+        description: `${complaintData.name} is registered complaint for ${equipment.brand} ${equipment.machine} - ${complaint.regNo}`,
         priority: "high",
         sourceId: 'from applications',
         time: new Date()
@@ -59,7 +64,7 @@ class ComplaintService {
       await PushNotificationService.sendGeneralNotification(
         null, // broadcast to all users
         `New Complaint - ${complaint.regNo}`, //title
-        `${complaint.uniqueCode} is registered complaint for equipment - ${complaint.regNo}`, //decription
+        `${complaintData.name} is registered complaint for ${equipment.brand} ${equipment.machine} - ${complaint.regNo}`, //decription
         'high', //priority
         'normal' // type
       );
@@ -74,7 +79,7 @@ class ComplaintService {
     }
   }
 
-  static async addSolutionToComplaint(complaintId, files, regNo) {
+  static async addSolutionToComplaint(complaintId, files, regNo, mechanic) {
     try {
       // Process all solution files
       const solutionFiles = await Promise.all(files.map(async (file) => {
@@ -113,7 +118,7 @@ class ComplaintService {
         complaintId,
         {
           $push: { solutions: { $each: solutionFiles } },
-          $set: { status: 'resolved', updatedAt: new Date() }
+          $set: { status: 'resolved', updatedAt: new Date(), mechanic: mechanic }
         },
         { new: true }
       );
@@ -121,6 +126,24 @@ class ComplaintService {
       if (!complaint) {
         throw new Error('Complaint not found');
       }
+
+      const equipment = await Equipment.findOne({ regNo: complaint.regNo })
+
+      await createNotification({
+        title: `Complaint Rectified - ${complaint.regNo}`,
+        description: `${mechanic} is rectified complaint for ${equipment.brand} ${equipment.machine} - ${complaint.regNo} Equipment ready to work`,
+        priority: "high",
+        sourceId: 'from applications',
+        time: new Date()
+      });
+
+      await PushNotificationService.sendGeneralNotification(
+        null, // broadcast to all users
+        `Complaint Rectified - ${complaint.regNo}`, //title
+        `${mechanic} is rectified complaint for ${equipment.brand} ${equipment.machine} - ${complaint.regNo}, Equipment ready to work`, //decription
+        'high', //priority
+        'normal' // type
+      );
 
       return complaint;
     } catch (error) {

@@ -1,4 +1,6 @@
 const Toolkit = require('../models/toolkit.model');
+const { createNotification } = require('../utils/notification-jobs'); // Import notification service
+const PushNotificationService = require('../utils/push-notification-jobs');
 
 /**
  * Helper function to add stock history entry
@@ -29,10 +31,10 @@ const addStockHistoryEntry = (variant, action, previousStock, newStock, reason =
 const insertToolkit = async (toolkitData) => {
   try {
     const { name, type, size, color, stockCount, minStockLevel, reason, updatedBy } = toolkitData;
-    
+
     // Normalize the name for comparison
     const normalizedName = name.trim().toLowerCase();
-    
+
     // Check if a toolkit with similar name already exists
     const existingToolkit = await Toolkit.findOne({
       name: { $regex: new RegExp(`^${normalizedName}$`, 'i') }
@@ -41,8 +43,8 @@ const insertToolkit = async (toolkitData) => {
     if (existingToolkit) {
       // Check if this exact variant (size + color) already exists
       const existingVariant = existingToolkit.variants.find(
-        variant => variant.size?.toLowerCase() === size?.toLowerCase() && 
-                  variant.color?.toLowerCase() === color?.toLowerCase()
+        variant => variant.size?.toLowerCase() === size?.toLowerCase() &&
+          variant.color?.toLowerCase() === color?.toLowerCase()
       );
 
       if (existingVariant) {
@@ -50,7 +52,7 @@ const insertToolkit = async (toolkitData) => {
         const previousStock = existingVariant.stockCount;
         existingVariant.stockCount += stockCount;
         existingVariant.minStockLevel = minStockLevel || existingVariant.minStockLevel;
-        
+
         // Add stock history entry
         addStockHistoryEntry(
           existingVariant,
@@ -72,7 +74,7 @@ const insertToolkit = async (toolkitData) => {
           lastUpdatedDate: new Date(),
           stockHistory: []
         };
-        
+
         // Add initial stock history entry
         addStockHistoryEntry(
           newVariant,
@@ -82,12 +84,28 @@ const insertToolkit = async (toolkitData) => {
           reason || `New variant added: ${size} - ${color}`,
           updatedBy || 'System'
         );
-        
+
         existingToolkit.variants.push(newVariant);
       }
 
       const savedToolkit = await existingToolkit.save();
-      
+
+      await createNotification({
+        title: "New Safety items Added",
+        description: `New ${equipment.stockCount} ${equipment.name} added to stock`,
+        priority: "high",
+        sourceId: equipment._id,
+        time: new Date()
+      });
+
+      await PushNotificationService.sendGeneralNotification(
+        null, // broadcast to all users
+        "New Safety items Added", //title
+        `New ${equipment.stockCount} ${equipment.name} added to stock`, //decription
+        'high', //priority
+        'normal' // type
+      );
+
       return {
         status: 200,
         success: true,
@@ -106,7 +124,7 @@ const insertToolkit = async (toolkitData) => {
         lastUpdatedDate: new Date(),
         stockHistory: []
       };
-      
+
       // Add initial stock history entry
       addStockHistoryEntry(
         newVariant,
@@ -124,7 +142,7 @@ const insertToolkit = async (toolkitData) => {
       });
 
       const savedToolkit = await newToolkit.save();
-      
+
       return {
         status: 201,
         success: true,
@@ -170,12 +188,17 @@ const updateVariant = async (toolkitId, variantId, updateData) => {
       };
     }
 
+    let action
+    let previousStock
+
     // Track stock changes if stockCount is being updated
     if (updateData.stockCount !== undefined && updateData.stockCount !== variant.stockCount) {
-      const previousStock = variant.stockCount;
+      previousStock = variant.stockCount;
       const newStock = updateData.stockCount;
-      const action = newStock > previousStock ? 'added' : 'reduced';
+      action = newStock > previousStock ? 'added' : 'reduced';
       const reason = updateData.reason || `Stock ${action}: ${Math.abs(newStock - previousStock)} items`;
+
+      console.log(action);
 
       addStockHistoryEntry(
         variant,
@@ -195,6 +218,22 @@ const updateVariant = async (toolkitId, variantId, updateData) => {
     });
 
     const savedToolkit = await toolkit.save();
+
+    await createNotification({
+      title: "Safety items update",
+      description: `${updateData.stockCount < previousStock ? previousStock - updateData.stockCount : updateData.stockCount - previousStock} items ${action} in Size:${variant.size} - Color:${variant.color} - ${toolkit.name}`,
+      priority: "high",
+      sourceId: toolkit._id, // Changed from equipment._id to toolkit._id
+      time: new Date()
+    });
+
+    await PushNotificationService.sendGeneralNotification(
+      null, // broadcast to all users
+      "Safety items update", //title
+      `${updateData.stockCount < previousStock ? previousStock - updateData.stockCount : updateData.stockCount - previousStock} items ${action} in Size:${variant.size} - Color:${variant.color} - ${toolkit.name}`, //description
+      'high', //priority
+      'normal' // type
+    );
 
     return {
       status: 200,
@@ -265,6 +304,21 @@ const reduceStock = async (toolkitId, variantId, quantity, reason = '', updatedB
     );
 
     const savedToolkit = await toolkit.save();
+
+    await createNotification({
+      title: "Safety items update",
+      description: `${quantity} Size:${variant.size} Color:${variant.color} ${toolkit.name} handovered to ${person}`,
+      priority: "high", //priority
+      'type': 'normal'// type
+    });
+
+    await PushNotificationService.sendGeneralNotification(
+      null, // broadcast to all users
+      "Safety items update", //title
+      `${quantity} Size:${variant.size} Color:${variant.color} ${toolkit.name} handovered to ${person}`, //decription
+      'high', //priority
+      'normal' // type
+    );
 
     return {
       status: 200,
@@ -420,16 +474,10 @@ const fetchToolkits = async () => {
  */
 const updateToolkit = async (toolkitId, updateData) => {
   try {
-    const updatedToolkit = await Toolkit.findByIdAndUpdate(
-      toolkitId,
-      {
-        ...updateData,
-        updatedAt: Date.now()
-      },
-      { new: true, runValidators: true }
-    );
+    // First, get the current toolkit to access variants
+    const currentToolkit = await Toolkit.findById(toolkitId);
 
-    if (!updatedToolkit) {
+    if (!currentToolkit) {
       return {
         status: 404,
         success: false,
@@ -437,13 +485,50 @@ const updateToolkit = async (toolkitId, updateData) => {
       };
     }
 
+    // Calculate total stock from all variants
+    let totalStock = 0;
+
+    // If updateData contains variants, use the updated variants
+    const variants = updateData.variants || currentToolkit.variants;
+
+    if (variants && Array.isArray(variants)) {
+      totalStock = variants.reduce((sum, variant) => {
+        return sum + (variant.stockCount || 0);
+      }, 0);
+    }
+
+    // Determine overall status based on total stock and variant statuses
+    let overallStatus = 'out';
+    if (totalStock > 0) {
+      const hasAvailable = variants.some(variant =>
+        variant.stockCount > 0 && variant.status === 'available'
+      );
+      overallStatus = hasAvailable ? 'available' : 'low';
+    }
+
+    // Update the toolkit with calculated values
+    const updatedToolkit = await Toolkit.findByIdAndUpdate(
+      toolkitId,
+      {
+        ...updateData,
+        totalStock: totalStock,
+        overallStatus: overallStatus,
+        updatedAt: Date.now()
+      },
+      { new: true, runValidators: true }
+    );
+
+    console.log('Updated toolkit:', updatedToolkit);
+
     return {
       status: 200,
       success: true,
       message: 'Toolkit updated successfully',
       data: updatedToolkit
     };
+
   } catch (error) {
+    console.error('Error updating toolkit:', error);
     return {
       status: 400,
       success: false,

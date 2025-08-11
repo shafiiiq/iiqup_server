@@ -223,6 +223,8 @@ class PushNotificationService {
      * @param {string} message - Custom message
      */
     static async sendStockAlert(uniqueCode, stockInfo, message) {
+        console.log("yessssssssssssssssssss hereeeeeeeeeeeeeeee");
+        
         const notification = {
             _id: `stock_${stockInfo._id}_${Date.now()}`,
             type: 'special',

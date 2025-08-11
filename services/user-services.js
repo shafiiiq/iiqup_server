@@ -5,9 +5,9 @@ const { v4: uuidv4 } = require('uuid');
 const Mechanic = require('../models/mechanic.model');
 const Operator = require('../models/operator.model');
 const { default: mongoose } = require('mongoose');
-const PushNotificationService = require('../utils/push-notification-jobs');
 const { renameFilesWithRequestId } = require('../multer/overtime-upload'); // Check this file too
 const { Expo } = require('expo-server-sdk');
+const { createNotification } = require('../utils/notification-jobs');
 
 // Create a new Expo SDK client
 const expo = new Expo();
@@ -718,6 +718,42 @@ const grantPermission = async (mechanicId, purpose, data, uploadedFiles = null) 
     grantReceiver.grantAccess.push(grantEntry);
     await grantReceiver.save();
 
+
+    try {
+      const PushNotificationService = require('../utils/push-notification-jobs');
+
+      // Just add this check before using the times
+      let notificationMessage;
+
+      const formattedDate = formatDate(data.date); // "August 10, 2025"
+
+      if (data.times && data.times[0].in && data.times[0].out) {
+        const inTime = convertToAMPM(data.times[0].in);
+        const outTime = convertToAMPM(data.times[0].out);
+        notificationMessage = `${mechanic.name} is requested to overtime from ${inTime} to ${outTime} for ${formattedDate}`;
+      } else {
+        notificationMessage = `${mechanic.name} has submitted an overtime request for ${formattedDate}`;
+      }
+
+      await createNotification({
+        title: "Mechanic overtime request",
+        description: notificationMessage,
+        priority: "high",
+        type: 'normal'
+      });
+
+      await PushNotificationService.sendGeneralNotification(
+        null, // broadcast to all users
+        "Mechanic overtime request", // title
+        notificationMessage, // description
+        'high', // priority
+        'normal' // type
+      );
+    } catch (notificationError) {
+      console.error('Error sending push notification:', notificationError);
+      // Don't fail the entire operation if notification fails
+    }
+
     return {
       status: 200,
       message: `Permission request for ${purpose} has been submitted successfully`,
@@ -1003,6 +1039,43 @@ const grantAccept = async (uniqueCode, dataId, purpose) => {
         console.error('Error removing grant access data:', error);
       }
 
+      try {
+        const PushNotificationService = require('../utils/push-notification-jobs');
+
+        const mechanic = await Mechanic.findById(mechanicId)
+
+        // Just add this check before using the times
+        let notificationMessage;
+
+        const formattedDate = formatDate(dataToSend.date); // "August 10, 2025"
+
+        if (dataToSend.times && dataToSend.times[0].in && dataToSend.times[0].out) {
+          const inTime = convertToAMPM(dataToSend.times[0].in);
+          const outTime = convertToAMPM(dataToSend.times[0].out);
+          notificationMessage = `Hamsa is accepted overtime of ${mechanic.name} from ${inTime} to ${outTime} for ${formattedDate}`;
+        } else {
+          notificationMessage = `Hamsa is accepted overtime of ${mechanic.name} has submitted an overtime request for ${formattedDate}`;
+        }
+
+        await createNotification({
+          title: "Mechanic overtime request",
+          description: notificationMessage,
+          priority: "high",
+          type: 'normal'
+        });
+
+        await PushNotificationService.sendGeneralNotification(
+          null, // broadcast to all users
+          "Mechanic overtime accepted", // title
+          notificationMessage, // description
+          'high', // priority
+          'normal' // type
+        );
+      } catch (notificationError) {
+        console.error('Error sending push notification:', notificationError);
+        // Don't fail the entire operation if notification fails
+      }
+
 
       return {
         status: 200,
@@ -1059,7 +1132,7 @@ const fetchAccessData = async (uniqueCode, purpose) => {
   }
 };
 
-const pushSpecialNotification = async (uniqueCode, stockCount, stockId) => {
+const pushSpecialNotification = async (uniqueCode, stockCount, stockId, message) => {
   try {
     const user = await User.findOne({ uniqueCode });
 
@@ -1071,44 +1144,18 @@ const pushSpecialNotification = async (uniqueCode, stockCount, stockId) => {
       };
     }
 
-    // Determine priority based on stock count
-    let priority;
-    if (stockCount === 0) {
-      priority = 'high';
-    } else if (stockCount >= 1 && stockCount <= 10) {
-      priority = 'medium';
-    } else {
-      priority = 'low'; // for stock count > 10
-    }
-
-    // Determine description based on stock count
-    let description;
-    if (stockCount === 0) {
-      description = {
-        message: 'The product is out of stock',
-        stockCount: stockCount,
-        status: 'out_of_stock'
-      };
-    } else if (stockCount <= 10) {
-      description = {
-        message: 'The product stock is low',
-        stockCount: stockCount,
-        status: 'low_stock'
-      };
-    } else {
-      description = {
-        message: 'Stock level is adequate',
-        stockCount: stockCount,
-        status: 'adequate'
-      };
+    let description = {
+      message: message,
+      stockCount: stockCount,
+      status: 'low_stock'
     }
 
     // Create notification object with current date
     const notification = {
-      title: 'Urgent Requirement',
+      title: 'Low stock',
       description: description,
       time: new Date(), // Store actual Date object
-      priority: priority,
+      priority: 'high',
       stockId: stockId
     };
 
@@ -1130,14 +1177,6 @@ const pushSpecialNotification = async (uniqueCode, stockCount, stockId) => {
 
     // Save the user
     await user.save();
-
-    if (stockCount < 10) {
-      await PushNotificationService.sendStockAlert(
-        null, // broadcast to all users
-        stockCount,
-        `Low stock alert: Only ${stockCount} units remaining`
-      );
-    }
 
     return {
       status: 200,
@@ -1681,6 +1720,32 @@ const getFileType = (mimeType) => {
     return 'audio';
   }
   return 'unknown';
+};
+
+const formatDate = (isoString) => {
+  if (!isoString) return 'Invalid Date';
+
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return 'Invalid Date';
+
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+};
+
+const convertToAMPM = (isoString) => {
+  if (!isoString) return 'Invalid Time';
+
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return 'Invalid Date';
+
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
 };
 
 module.exports = {

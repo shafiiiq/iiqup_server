@@ -6,9 +6,6 @@ const multer = require('multer');
 class ComplaintController {
   static async registerComplaint(req, res, next) {
     try {
-
-      console.log(req.body);
-      
       // Handle file upload
       uploadMediaFiles(req, res, async (err) => {
         if (err) {
@@ -55,7 +52,8 @@ class ComplaintController {
           const complaint = await ComplaintService.addSolutionToComplaint(
             req.params.complaintId,
             req.files,
-            req.body.regNo
+            req.body.regNo,
+            req.body.mechanic
           );
           res.status(200).json(complaint);
         } catch (error) {

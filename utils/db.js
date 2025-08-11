@@ -5,7 +5,7 @@ let indexFixed = false; // Flag to ensure we only run this once
 
 module.exports = mongoose.connect(process.env.MONGO_URI)
 .then(async (result) => {
-  console.log("mongoDB connected");
+  console.log("mongoDB connected"); 
   
   // One-time index fix
   if (!indexFixed) {
