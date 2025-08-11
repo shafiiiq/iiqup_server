@@ -28,7 +28,7 @@ const uploadDocument = async (req, res) => {
       });
     }
 
-    console.log(req.body);
+    console.log(req.body); 
     
 
     const { regNo, documentType, description, category } = req.body;
@@ -59,6 +59,9 @@ const uploadDocument = async (req, res) => {
 
     // Save to database
     const result = await documentServices.saveDocument(regNo, documentType, req.file, description, category);
+
+    console.log(result);
+    
 
     res.status(200).json({
       status: 200,
