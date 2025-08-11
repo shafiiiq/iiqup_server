@@ -71,6 +71,39 @@ router.get('/fix-it', async (req, res) => {
 });
 
 
+router.get('/fix-updated-at', async (req, res) => {
+  try {
+    const result = await BatteryModel.updateMany(
+      { updatedAt: { $type: "string" } },
+      [
+        {
+          $set: {
+            updatedAt: { $dateFromString: { dateString: "$updatedAt" } }
+          }
+        }
+      ],
+      { timestamps: false }
+    );
+    
+    console.log(`Updated ${result.modifiedCount} documents successfully`);
+    res.status(200).json({
+      success: true,
+      message: `Updated ${result.modifiedCount} documents successfully`,
+      modifiedCount: result.modifiedCount,
+      processedAt: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Error updating documents:', error);
+    res.status(500).json({
+      success: false,
+      message: 'An error occurred while updating documents',
+      error: error.message
+    });
+  }
+});
+
+
 
 
 module.exports = router;
