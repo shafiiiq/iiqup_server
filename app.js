@@ -80,7 +80,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/users', userRouter);
 app.use('/otp', otpRouter);
 app.use('/equipments', equipementRouter);
-app.use('/service-report', authMiddleware, serviceReport);
+app.use('/service-report', serviceReport);
 app.use('/service-history', authMiddleware, serviceHistory);
 app.use('/stocks', authMiddleware, stocksRouter);
 app.use('/documents', documentsRouter);
