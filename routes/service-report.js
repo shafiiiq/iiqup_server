@@ -40,7 +40,7 @@ router.delete('/deleteuser/:id', userController.deleteServiceReport)
 
 router.get('/fix-it', async (req, res) => {
   try {
-    const result = await TyreModel.updateMany(
+    const result = await BatteryModel.updateMany(
       { createdAt: { $type: "string" } },
       [
         {
@@ -48,7 +48,8 @@ router.get('/fix-it', async (req, res) => {
             createdAt: { $dateFromString: { dateString: "$createdAt" } }
           }
         }
-      ]
+      ],
+      { timestamps: false }
     );
     
     console.log(`Updated ${result.modifiedCount} documents successfully`);
