@@ -8,6 +8,7 @@ const { default: mongoose } = require('mongoose');
 const { renameFilesWithRequestId } = require('../multer/overtime-upload'); // Check this file too
 const { Expo } = require('expo-server-sdk');
 const { createNotification } = require('../utils/notification-jobs');
+const { cleanupFiles } = require('../controllers/users.controllers');
 
 // Create a new Expo SDK client
 const expo = new Expo();
