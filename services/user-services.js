@@ -8,7 +8,6 @@ const { default: mongoose } = require('mongoose');
 const { renameFilesWithRequestId } = require('../multer/overtime-upload'); // Check this file too
 const { Expo } = require('expo-server-sdk');
 const { createNotification } = require('../utils/notification-jobs');
-const { cleanupFiles } = require('../controllers/users.controllers');
 
 // Create a new Expo SDK client
 const expo = new Expo();
@@ -1697,6 +1696,22 @@ const cleanupInvalidTokens = async (uniqueCode = null) => {
       error: error.message
     };
   }
+};
+
+const cleanupFiles = (files) => {
+  if (!files || !Array.isArray(files)) return;
+
+  const fs = require('fs');
+  files.forEach(file => {
+    try {
+      if (fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+        console.log(`Cleaned up file: ${file.filename}`);
+      }
+    } catch (error) {
+      console.error(`Error cleaning up file ${file.filename}:`, error.message);
+    }
+  });
 };
 
 const getChannelId = (priority) => {
