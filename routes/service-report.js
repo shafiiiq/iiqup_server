@@ -5,6 +5,8 @@ const UserModel = require('../models/user.model.js');
 const BatteryModel = require('../models/batery.model.js');
 const serviceReportModel = require('../models/service-report.model.js');
 const TyreModel = require('../models/tyre.model.js');
+const serviceHistoryModel = require('../models/service-history.model.js');
+const MaintananceModel = require('../models/maintanance-history.model.js');
 
 
 // Add service report
@@ -38,9 +40,22 @@ router.delete('/deleteuser/:id', userController.deleteServiceReport)
 
 
 
-router.get('/fix-it', async (req, res) => {
+router.post('/fix-it', async (req, res) => {
+  var Model
+  if (req.body.type === 'tyre') {
+    Model = TyreModel
+  } else if (req.body.type === 'equipments') {
+    Model = Equipment
+  } else if (req.body.type === 'reports') {
+    Model = serviceReportModel
+  } else if (req.body.type === 'histories') {
+    Model = serviceHistoryModel
+  } else if (req.body.type === 'maintanance') {
+    Model = MaintananceModel
+  }
+
   try {
-    const result = await BatteryModel.updateMany(
+    const result = await Model.updateMany(
       { createdAt: { $type: "string" } },
       [
         {
@@ -51,7 +66,7 @@ router.get('/fix-it', async (req, res) => {
       ],
       { timestamps: false }
     );
-    
+
     console.log(`Updated ${result.modifiedCount} documents successfully`);
     res.status(200).json({
       success: true,
@@ -59,7 +74,7 @@ router.get('/fix-it', async (req, res) => {
       modifiedCount: result.modifiedCount,
       processedAt: new Date().toISOString()
     });
-    
+
   } catch (error) {
     console.error('Error updating documents:', error);
     res.status(500).json({
@@ -71,9 +86,21 @@ router.get('/fix-it', async (req, res) => {
 });
 
 
-router.get('/fix-updated-at', async (req, res) => {
+router.post('/fix-updated-at', async (req, res) => {
+  var Model
+  if (req.body.type === 'tyre') {
+    Model = TyreModel
+  } else if (req.body.type === 'equipments') {
+    Model = Equipment
+  } else if (req.body.type === 'reports') {
+    Model = serviceReportModel
+  } else if (req.body.type === 'histories') {
+    Model = serviceHistoryModel
+  } else if (req.body.type === 'maintanance') {
+    Model = MaintananceModel
+  }
   try {
-    const result = await BatteryModel.updateMany(
+    const result = await Model.updateMany(
       { updatedAt: { $type: "string" } },
       [
         {
@@ -84,7 +111,7 @@ router.get('/fix-updated-at', async (req, res) => {
       ],
       { timestamps: false }
     );
-    
+
     console.log(`Updated ${result.modifiedCount} documents successfully`);
     res.status(200).json({
       success: true,
@@ -92,7 +119,7 @@ router.get('/fix-updated-at', async (req, res) => {
       modifiedCount: result.modifiedCount,
       processedAt: new Date().toISOString()
     });
-    
+
   } catch (error) {
     console.error('Error updating documents:', error);
     res.status(500).json({
