@@ -7,6 +7,8 @@ const serviceReportModel = require('../models/service-report.model.js');
 const TyreModel = require('../models/tyre.model.js');
 const serviceHistoryModel = require('../models/service-history.model.js');
 const MaintananceModel = require('../models/maintanance-history.model.js');
+const Equipment = require('../models/equip.model.js');
+const Handover = require('../models/equip-hand-over-stock.model.js');
 
 
 // Add service report
@@ -52,6 +54,8 @@ router.post('/fix-it', async (req, res) => {
     Model = serviceHistoryModel
   } else if (req.body.type === 'maintanance') {
     Model = MaintananceModel
+  }else if (req.body.type === 'handover') {
+    Model = Handover
   }
 
   try {
@@ -98,6 +102,8 @@ router.post('/fix-updated-at', async (req, res) => {
     Model = serviceHistoryModel
   } else if (req.body.type === 'maintanance') {
     Model = MaintananceModel
+  }else if (req.body.type === 'handover') {
+    Model = Handover
   }
   try {
     const result = await Model.updateMany(
