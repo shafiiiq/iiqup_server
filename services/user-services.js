@@ -1699,22 +1699,6 @@ const cleanupInvalidTokens = async (uniqueCode = null) => {
   }
 };
 
-const cleanupFiles = (files) => {
-  if (!files || !Array.isArray(files)) return;
-
-  const fs = require('fs');
-  files.forEach(file => {
-    try {
-      if (fs.existsSync(file.path)) {
-        fs.unlinkSync(file.path);
-        console.log(`Cleaned up file: ${file.filename}`);
-      }
-    } catch (error) {
-      console.error(`Error cleaning up file ${file.filename}:`, error.message);
-    }
-  });
-};
-
 const getChannelId = (priority) => {
   switch (priority) {
     case 'high':
