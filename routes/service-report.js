@@ -166,29 +166,37 @@ router.post('/fix-id', async (req, res) => {
       Modell = Toolkit
     } else if (req.body.type === 'stocks') {
       Modell = Stokcs
-    }else if (req.body.type === 'battery') {
-      Modell = BatteryModel
     }
     const docs = await Modell.find({ _id: { $type: "string" } });
+    let processedCount = 0;
     
     for (const doc of docs) {
-      const data = doc.toObject();
-      const oldId = data._id;
-      data._id = new mongoose.Types.ObjectId(data._id);
-      
-      // Delete old document first to avoid duplicates
-      await Modell.deleteOne({ _id: oldId });
-      
-      // Insert directly without validation
-      await Modell.collection.insertOne(data);
+      try {
+        const data = doc.toObject();
+        const oldId = data._id;
+        data._id = new mongoose.Types.ObjectId(data._id);
+        
+        // Delete old document first
+        await Modell.deleteOne({ _id: oldId });
+        
+        // Insert new document - skip if duplicate
+        await Modell.collection.insertOne(data);
+        processedCount++;
+        
+      } catch (error) {
+        if (error.code === 11000) {
+          console.log(`Duplicate found, skipping document: ${doc._id}`);
+        } else {
+          console.log(`Error with document ${doc._id}: ${error.message}`);
+        }
+      }
     }
     
-    res.json({ success: true, count: docs.length });
+    res.json({ success: true, count: processedCount });
     
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
-
 
 module.exports = router;
