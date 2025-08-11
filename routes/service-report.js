@@ -44,84 +44,135 @@ router.delete('/deleteuser/:id', userController.deleteServiceReport)
 
 
 
-router.post('/fix-it', async (req, res) => {
-  var Model
-  if (req.body.type === 'tyre') {
-    Model = TyreModel
-  } else if (req.body.type === 'equipments') {
-    Model = Equipment
-  } else if (req.body.type === 'reports') {
-    Model = serviceReportModel
-  } else if (req.body.type === 'histories') {
-    Model = serviceHistoryModel
-  } else if (req.body.type === 'maintanance') {
-    Model = MaintananceModel
-  }else if (req.body.type === 'handover') {
-    Model = Handover
-  }else if (req.body.type === 'toolkit') {
-    Model = Toolkit
-  }else if (req.body.type === 'stocks') {
-    Model = Stokcs
-  }
+// router.post('/fix-it', async (req, res) => {
+//   var Model
+//   if (req.body.type === 'tyre') {
+//     Model = TyreModel
+//   } else if (req.body.type === 'equipments') {
+//     Model = Equipment
+//   } else if (req.body.type === 'reports') {
+//     Model = serviceReportModel
+//   } else if (req.body.type === 'histories') {
+//     Model = serviceHistoryModel
+//   } else if (req.body.type === 'maintanance') {
+//     Model = MaintananceModel
+//   }else if (req.body.type === 'handover') {
+//     Model = Handover
+//   }else if (req.body.type === 'toolkit') {
+//     Model = Toolkit
+//   }else if (req.body.type === 'stocks') {
+//     Model = Stokcs
+//   }
 
+//   try {
+//     const result = await Model.updateMany(
+//       { createdAt: { $type: "string" } },
+//       [
+//         {
+//           $set: {
+//             createdAt: { $dateFromString: { dateString: "$createdAt" } }
+//           }
+//         }
+//       ],
+//       { timestamps: false }
+//     );
+
+//     console.log(`Updated ${result.modifiedCount} documents successfully`);
+//     res.status(200).json({
+//       success: true,
+//       message: `Updated ${result.modifiedCount} documents successfully`,
+//       modifiedCount: result.modifiedCount,
+//       processedAt: new Date().toISOString()
+//     });
+
+//   } catch (error) {
+//     console.error('Error updating documents:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'An error occurred while updating documents',
+//       error: error.message
+//     });
+//   }
+// });
+
+
+// router.post('/fix-updated-at', async (req, res) => {
+//   var Model
+//   if (req.body.type === 'tyre') {
+//     Model = TyreModel
+//   } else if (req.body.type === 'equipments') {
+//     Model = Equipment
+//   } else if (req.body.type === 'reports') {
+//     Model = serviceReportModel
+//   } else if (req.body.type === 'histories') {
+//     Model = serviceHistoryModel
+//   } else if (req.body.type === 'maintanance') {
+//     Model = MaintananceModel
+//   }else if (req.body.type === 'handover') {
+//     Model = Handover
+//   }else if (req.body.type === 'toolkit') {
+//     Model = Toolkit
+//   }else if (req.body.type === 'stocks') {
+//     Model = Stokcs
+//   }
+//   try {
+//     const result = await Model.updateMany(
+//       { updatedAt: { $type: "string" } },
+//       [
+//         {
+//           $set: {
+//             updatedAt: { $dateFromString: { dateString: "$updatedAt" } }
+//           }
+//         }
+//       ],
+//       { timestamps: false }
+//     );
+
+//     console.log(`Updated ${result.modifiedCount} documents successfully`);
+//     res.status(200).json({
+//       success: true,
+//       message: `Updated ${result.modifiedCount} documents successfully`,
+//       modifiedCount: result.modifiedCount,
+//       processedAt: new Date().toISOString()
+//     });
+
+//   } catch (error) {
+//     console.error('Error updating documents:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'An error occurred while updating documents',
+//       error: error.message
+//     });
+//   }
+// });
+
+router.get('/fix-id', async (req, res) => {
   try {
+    var Model
+    if (req.body.type === 'tyre') {
+      Model = TyreModel
+    } else if (req.body.type === 'equipments') {
+      Model = Equipment
+    } else if (req.body.type === 'reports') {
+      Model = serviceReportModel
+    } else if (req.body.type === 'histories') {
+      Model = serviceHistoryModel
+    } else if (req.body.type === 'maintanance') {
+      Model = MaintananceModel
+    } else if (req.body.type === 'handover') {
+      Model = Handover
+    } else if (req.body.type === 'toolkit') {
+      Model = Toolkit
+    } else if (req.body.type === 'stocks') {
+      Model = Stokcs
+    }
+
     const result = await Model.updateMany(
-      { createdAt: { $type: "string" } },
+      { _id: { $type: "string" } },
       [
         {
           $set: {
-            createdAt: { $dateFromString: { dateString: "$createdAt" } }
-          }
-        }
-      ],
-      { timestamps: false }
-    );
-
-    console.log(`Updated ${result.modifiedCount} documents successfully`);
-    res.status(200).json({
-      success: true,
-      message: `Updated ${result.modifiedCount} documents successfully`,
-      modifiedCount: result.modifiedCount,
-      processedAt: new Date().toISOString()
-    });
-
-  } catch (error) {
-    console.error('Error updating documents:', error);
-    res.status(500).json({
-      success: false,
-      message: 'An error occurred while updating documents',
-      error: error.message
-    });
-  }
-});
-
-
-router.post('/fix-updated-at', async (req, res) => {
-  var Model
-  if (req.body.type === 'tyre') {
-    Model = TyreModel
-  } else if (req.body.type === 'equipments') {
-    Model = Equipment
-  } else if (req.body.type === 'reports') {
-    Model = serviceReportModel
-  } else if (req.body.type === 'histories') {
-    Model = serviceHistoryModel
-  } else if (req.body.type === 'maintanance') {
-    Model = MaintananceModel
-  }else if (req.body.type === 'handover') {
-    Model = Handover
-  }else if (req.body.type === 'toolkit') {
-    Model = Toolkit
-  }else if (req.body.type === 'stocks') {
-    Model = Stokcs
-  }
-  try {
-    const result = await Model.updateMany(
-      { updatedAt: { $type: "string" } },
-      [
-        {
-          $set: {
-            updatedAt: { $dateFromString: { dateString: "$updatedAt" } }
+            _id: { $toObjectId: "$_id" }
           }
         }
       ],
@@ -150,52 +201,3 @@ router.post('/fix-updated-at', async (req, res) => {
 
 
 module.exports = router;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// router.get('/add-that', async (req, res) => {
-//   try {
-//     const result = await serviceReportModel.updateMany(
-//       { serviceType: { $exists: false } }, // only update documents without phoneNumber
-//       {
-//         $set: {
-//           serviceType:
-//             'oil'
-//         }
-//       } // default value, change as needed
-//     );
-
-//     console.log(`Updated ${result.modifiedCount} documents successfully`);
-//     res.status(200).send(`Updated ${result.modifiedCount} documents successfully`);
-//   } catch (error) {
-//     console.error('Error updating documents:', error);
-//     res.status(500).send('An error occurred while updating documents');
-//   }
-// });
