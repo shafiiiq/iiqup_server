@@ -146,7 +146,7 @@ router.delete('/deleteuser/:id', userController.deleteServiceReport)
 //   }
 // });
 
-router.get('/fix-id', async (req, res) => {
+router.post('/fix-id', async (req, res) => {
   try {
     var Model
     if (req.body.type === 'tyre') {
