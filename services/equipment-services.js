@@ -86,6 +86,25 @@ module.exports = {
     });
   },
 
+  fetchEquipments: (regNo) => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const data = await equipmentModel.find({ outside: false, regNo: regNo });
+        resolve({
+          status: 200,
+          ok: true,
+          data: data
+        });
+      } catch (error) {
+        reject({
+          status: 500,
+          ok: false,
+          message: error.message || 'Error fetching users'
+        });
+      }
+    });
+  },
+
   updateEquipments: (regNo, updatedData) => {
     return new Promise(async (resolve, reject) => {
 

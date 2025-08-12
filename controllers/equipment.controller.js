@@ -24,6 +24,18 @@ const getEquipments = async (req, res) => {
     })
 }
 
+const getEquipmentsByReg = async (req, res) => {
+  userServices.fetchEquipmentByReg(req.body.regNo)
+    .then((fetchedUsers) => {
+      if (fetchedUsers) {
+        res.status(fetchedUsers.status).json(fetchedUsers)
+      }
+    })
+    .catch((err) => {
+      res.status(err.status || 500).json({ message: 'Cannot get all users', error: err.message })
+    })
+}
+
 const updateEquipments = async (req, res) => {
   const { regNo } = req.params;
   const updateData = req.body;
@@ -76,5 +88,6 @@ module.exports = {
   getEquipments,
   updateEquipments,
   deleteEquipments,
-  updateStatus
+  updateStatus,
+  getEquipmentsByReg
 };
