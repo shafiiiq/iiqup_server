@@ -3,59 +3,20 @@ const Equipment = require('../models/equip.model');
 const { getFileDuration } = require('../utils/complaint-helper');
 const { createNotification } = require('../utils/notification-jobs'); // Import notification service
 const PushNotificationService = require('../utils/push-notification-jobs');
+const {putObject} = require('../s3bucket/s3.bucket')
+const path = require('path');
 
 class ComplaintService {
-  static async createComplaint(complaintData, files) {
+  static async createComplaint(complaint) {
     try {
-      // Process all media files
-      const mediaFiles = await Promise.all(files.map(async (file) => {
-        // Convert backslashes to forward slashes for consistency
-        const filePath = file.path.replace(/\\/g, '/');
+     
+      // Get equipment details
+      const equipment = await Equipment.findOne({ regNo: complaint.regNo });
 
-        // Remove 'public' prefix from path to create URL
-        const urlPath = filePath.replace('public', '');
-
-        // Determine file type (photo or video)
-        const fileType = file.mimetype.startsWith('video/') ? 'video' : 'photo';
-
-        // Base file data
-        const fileData = {
-          fileName: file.filename,
-          originalName: file.originalname,
-          filePath: urlPath, // Store path without 'public'
-          fileSize: file.size,
-          mimeType: file.mimetype,
-          fieldName: file.fieldname,
-          type: fileType,
-          url: urlPath, // Same as filePath for URL access
-          uploadDate: new Date()
-        };
-
-        // Add duration for video files
-        if (fileType === 'video') {
-          fileData.duration = await getFileDuration(file.path);
-        }
-
-        return fileData;
-      }));
-
-      const equipment = await Equipment.findOne({ regNo: complaintData.regNo })
-
-      // Create new complaint document
-      const complaint = new Complaint({
-        uniqueCode: complaintData.uniqueCode,
-        regNo: complaintData.regNo || 'no-reg',
-        name: complaintData.name || 'no-name',
-
-        mediaFiles,
-        status: 'pending',
-        // createdAt and updatedAt will be set automatically by Mongoose
-      });
-
-
+      // Create notifications
       await createNotification({
         title: `New Complaint - ${complaint.regNo}`,
-        description: `${complaintData.name} is registered complaint for ${equipment.brand} ${equipment.machine} - ${complaint.regNo}`,
+        description: `${complaintData.name} registered complaint for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}`,
         priority: "high",
         sourceId: 'from applications',
         time: new Date()
@@ -63,15 +24,13 @@ class ComplaintService {
 
       await PushNotificationService.sendGeneralNotification(
         null, // broadcast to all users
-        `New Complaint - ${complaint.regNo}`, //title
-        `${complaintData.name} is registered complaint for ${equipment.brand} ${equipment.machine} - ${complaint.regNo}`, //decription
-        'high', //priority
-        'normal' // type
+        `New Complaint - ${complaint.regNo}`,
+        `${complaintData.name} registered complaint for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}`,
+        'high',
+        'normal'
       );
 
-      // Save to database
       await complaint.save();
-
       return complaint;
     } catch (error) {
       console.error('Error creating complaint:', error);

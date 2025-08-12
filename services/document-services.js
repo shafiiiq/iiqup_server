@@ -3,10 +3,36 @@ const path = require('path');
 const fs = require('fs');
 const { createNotification } = require('../utils/notification-jobs'); // Import notification service
 const PushNotificationService = require('../utils/push-notification-jobs');
+const {putObject} = require('../s3bucket/s3.bucket')
+
+const formatDateTime = () => {
+  const now = new Date();
+  const day = String(now.getDate()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const year = now.getFullYear().toString().slice(-2);
+
+  let hours = now.getHours();
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'pm' : 'am';
+
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  hours = String(hours).padStart(2, '0');
+
+  return `${day}-${month}-${year}-${hours}${minutes}${ampm}`;
+};
 
 module.exports = {
   saveDocument: async (regNo, documentType, file, description, category) => {
     try {
+      // Generate S3 key (path)
+      const ext = path.extname(file.fileName);
+      const finalFilename = `${regNo}-${documentType}-${formatDateTime()}${ext}`;
+      const s3Key = `documents/${regNo}/${documentType}/${finalFilename}`;
+
+      // Get presigned URL for upload
+      const uploadUrl = await putObject(file.fileName, s3Key, file.mimeType);
+
       let document = await documentModel.findOne({ regNo, documentType });
 
       if (!document) {
@@ -20,9 +46,9 @@ module.exports = {
       }
 
       document.files.push({
-        filename: file.filename,
-        path: file.path,
-        mimetype: file.mimetype || file.originalname.split('.').pop() // Fallback to file extension if mimetype is not available
+        filename: finalFilename,
+        path: s3Key,
+        mimetype: file.mimeType || file.fileName.split('.').pop()
       });
 
       await createNotification({
@@ -46,6 +72,9 @@ module.exports = {
       return {
         status: 200,
         message: 'Document uploaded successfully',
+        uploadUrl: uploadUrl,
+        finalFilename: finalFilename,
+        s3Key: s3Key,
         document: document
       };
     } catch (err) {

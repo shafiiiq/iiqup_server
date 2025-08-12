@@ -2,83 +2,47 @@ const documentServices = require('../services/document-services');
 const fs = require('fs');
 const path = require('path');
 
-const formatDateTime = () => {
-  const now = new Date();
-  const day = String(now.getDate()).padStart(2, '0');
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const year = now.getFullYear().toString().slice(-2);
-  
-  let hours = now.getHours();
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  const ampm = hours >= 12 ? 'pm' : 'am';
-  
-  hours = hours % 12;
-  hours = hours ? hours : 12;
-  hours = String(hours).padStart(2, '0');
-  
-  return `${day}-${month}-${year}-${hours}${minutes}${ampm}`;
-};
-
 const uploadDocument = async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({
-        status: 400,
-        message: 'No file uploaded'
-      });
-    }
-
-    console.log(req.body); 
-    
-
-    const { regNo, documentType, description, category } = req.body;
+    const { regNo, documentType, description, category, fileName, mimeType } = req.body;
 
     if (!regNo || !documentType) {
-      if (req.file?.path) fs.unlinkSync(req.file.path);
       return res.status(400).json({
         status: 400,
         message: 'Registration Number and Document Type are required'
       });
     }
 
-    // Create final directory structure
-    const finalDir = path.join(__dirname, '../public/documents', regNo, documentType);
-    fs.mkdirSync(finalDir, { recursive: true });
+    if (!fileName) {
+      return res.status(400).json({
+        status: 400,
+        message: 'File name is required'
+      });
+    }
 
-    // Generate final filename
-    const ext = path.extname(req.file.originalname);
-    const finalFilename = `${regNo}-${documentType}-${formatDateTime()}${ext}`;
-    const finalPath = path.join(finalDir, finalFilename);
+    console.log(req.body);
 
-    // Move file from temp to final location
-    fs.renameSync(req.file.path, finalPath);
-
-    // Update file object
-    req.file.filename = finalFilename;
-    req.file.path = finalPath;
-
-    // Save to database
-    const result = await documentServices.saveDocument(regNo, documentType, req.file, description, category);
+    // Save to database and get presigned URL
+    const result = await documentServices.saveDocument(regNo, documentType, { fileName, mimeType }, description, category);
 
     console.log(result);
-    
 
     res.status(200).json({
       status: 200,
-      message: 'Document uploaded successfully',
+      message: 'Presigned URL generated successfully',
+      uploadUrl: result.uploadUrl,
       document: {
-        filename: finalFilename,
-        path: `/documents/${regNo}/${documentType}/${finalFilename}`,
+        filename: result.finalFilename,
+        path: result.s3Key,
         type: documentType
       }
     });
 
   } catch (err) {
-    if (req.file?.path) fs.unlinkSync(req.file.path);
     console.error('Upload error:', err);
     res.status(500).json({
       status: 500,
-      message: 'Failed to upload document',
+      message: 'Failed to generate upload URL',
       error: err.message
     });
   }

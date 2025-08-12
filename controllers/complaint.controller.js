@@ -2,33 +2,72 @@ const ComplaintService = require('../services/complaint-services');
 const { uploadMediaFiles } = require('../multer/complaint-upload');
 const { uploadSolutionFiles } = require('../multer/solution-upload');
 const multer = require('multer');
+const path = require('path');
+const { putObject } = require('../s3bucket/s3.bucket');
 
 class ComplaintController {
-  static async registerComplaint(req, res, next) {
+  static async registerComplaint(req, res) {
     try {
-      // Handle file upload
-      uploadMediaFiles(req, res, async (err) => {
-        if (err) {
-          if (err instanceof multer.MulterError) {
-            return res.status(400).json({ error: err.message });
-          } else {
-            return res.status(400).json({ error: err.message });
-          }
-        }
+      const { regNo, name, uniqueCode, files } = req.body;
 
-        if (!req.files || req.files.length === 0) {
-          return res.status(400).json({ error: 'At least one media file is required' });
-        }
+      if (!files || files.length === 0) {
+        return res.status(400).json({
+          status: 400,
+          message: 'At least one media file is required'
+        });
+      }
 
-        try {
-          const complaint = await ComplaintService.createComplaint(req.body, req.files);
-          res.status(201).json(complaint);
-        } catch (error) {
-          res.status(500).json({ error: error.message });
+      // Generate presigned URLs and return them to the client
+      const filesWithUploadData = await Promise.all(
+        files.map(async (file) => {
+          const ext = path.extname(file.fileName);
+          const finalFilename = `${regNo || 'no-reg'}-${Date.now()}${ext}`;
+          const s3Key = `complaints/${regNo || 'no-reg'}/${uniqueCode}/complaint-${uniqueCode}-${finalFilename}`;
+
+          const uploadUrl = await putObject(
+            file.fileName,
+            s3Key,
+            file.mimeType
+          );
+
+          return {
+            fileName: finalFilename,
+            originalName: file.fileName,
+            filePath: s3Key,
+            mimeType: file.mimeType,
+            type: file.mimeType.startsWith('video/') ? 'video' : 'photo',
+            uploadUrl: uploadUrl,
+            uploadDate: new Date()
+          };
+        })
+      );
+
+      // Create complaint document (without saving yet)
+      const complaintData = {
+        uniqueCode,
+        regNo: regNo || 'no-reg',
+        name: name || 'no-name',
+        mediaFiles: filesWithUploadData,
+        status: 'pending'
+      };
+
+      const result = await ComplaintService.createComplaint(complaintData)
+
+      res.status(200).json({
+        status: 200,
+        message: 'Pre-signed URLs generated',
+        data: {
+          complaint: complaintData,
+          uploadData: filesWithUploadData
         }
       });
     } catch (error) {
-      next(error);
+      console.error('Error generating upload URLs:', error);
+      res.status(500).json({
+        status: 500,
+        message: 'Failed to generate upload URLs',
+        error: error.message
+      });
     }
   }
 

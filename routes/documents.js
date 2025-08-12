@@ -1,10 +1,9 @@
 const express = require('express');
 const documentController = require('../controllers/document.contoller')
-const upload = require('../multer/document-upload');
 const { authMiddleware } = require('../utils/jwt');
 const router = express.Router();
 
-router.post('/upload-document', authMiddleware, upload.single('document'), documentController.uploadDocument);
+router.post('/upload-document', authMiddleware, documentController.uploadDocument);
 router.get('/get-documents/:regNo', authMiddleware, documentController.getDocuments);
 router.get('/get-all-documents', authMiddleware, documentController.getAllDocuments);
 

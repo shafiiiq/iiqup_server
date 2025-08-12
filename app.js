@@ -144,6 +144,7 @@ var applicationRouter = require('./routes/applications');
 var securityRouter = require('./routes/security');
 var _0authRouter = require('./routes/0auth');
 const { autoBackup } = require('./utils/backup-data');
+const { getObjectUrl } = require('./s3bucket/s3.bucket');
 
 var app = express();
 
@@ -157,7 +158,8 @@ const corsOptions = {
     'http://localhost:3001', 
     'https://ansarigroup.online',
     'https://www.ansarigroup.online',
-    'http://localhost:4041'
+    'http://localhost:4041',
+    'http://192.168.100.53:3001'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [
@@ -180,7 +182,8 @@ const io = socketIo(server, {
       'http://localhost:3001', 
       'https://ansarigroup.online',
       'https://www.ansarigroup.online',
-      'http://localhost:4041'
+      'http://localhost:4041',
+      'http://192.168.100.53:3001'
     ],
     methods: ["GET", "POST"],
     credentials: true
@@ -227,7 +230,7 @@ app.use('/mechanics', mechanicsRouter);
 app.use('/notification', authMiddleware, notificationRouter);
 app.use('/lpo', authMiddleware, lpoRouter);
 app.use('/operators', operatorRouter);
-app.use('/complaints', authMiddleware, complaintsRouter);
+app.use('/complaints', complaintsRouter);
 app.use('/applications', authMiddleware, applicationRouter);
 app.use('/hunter-eye', securityRouter);
 app.use('/0auth', _0authRouter);
