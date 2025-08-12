@@ -86,7 +86,7 @@ module.exports = {
     });
   },
 
-  fetchEquipments: (regNo) => {
+  fetchEquipmentByReg: (regNo) => {
     return new Promise(async (resolve, reject) => {
       try {
         const data = await equipmentModel.find({ outside: false, regNo: regNo });
