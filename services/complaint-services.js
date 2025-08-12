@@ -30,8 +30,9 @@ class ComplaintService {
         'normal'
       );
 
-      await complaint.save();
-      return complaint;
+      const complaintDateToSave = new Complaint(complaint)
+      await complaintDateToSave.save();
+      return complaintDateToSave;
     } catch (error) {
       console.error('Error creating complaint:', error);
       throw error;
