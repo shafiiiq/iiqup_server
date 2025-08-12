@@ -159,7 +159,7 @@ const corsOptions = {
     'https://ansarigroup.online',
     'https://www.ansarigroup.online',
     'http://localhost:4041',
-    'http://192.168.100.53:3001'
+    'http://192.168.100.53:3000'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [
@@ -183,7 +183,7 @@ const io = socketIo(server, {
       'https://ansarigroup.online',
       'https://www.ansarigroup.online',
       'http://localhost:4041',
-      'http://192.168.100.53:3001'
+      'http://192.168.100.53:300'
     ],
     methods: ["GET", "POST"],
     credentials: true
