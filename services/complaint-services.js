@@ -16,7 +16,7 @@ class ComplaintService {
       // Create notifications
       await createNotification({
         title: `New Complaint - ${complaint.regNo}`,
-        description: `${complaintData.name} registered complaint for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}`,
+        description: `${complaint.name} registered complaint for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}`,
         priority: "high",
         sourceId: 'from applications',
         time: new Date()
@@ -25,7 +25,7 @@ class ComplaintService {
       await PushNotificationService.sendGeneralNotification(
         null, // broadcast to all users
         `New Complaint - ${complaint.regNo}`,
-        `${complaintData.name} registered complaint for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}`,
+        `${complaint.name} registered complaint for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}`,
         'high',
         'normal'
       );
