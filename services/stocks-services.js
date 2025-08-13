@@ -117,11 +117,10 @@ module.exports = {
     });
   },
 
-  addEquipmentImage: (equipmentId, imagePath, imageLabel) => {
+  addEquipmentImage: (equipmentNo, imagePath, imageLabel, fileName, mimeType) => {
     return new Promise(async (resolve, reject) => {
       try {
-        // Find equipment by ID
-        const equipment = await stockHandoverModel.findById(equipmentId);
+        const equipment = await stockHandoverModel.findOne({equipmentNo});
 
         if (!equipment) {
           return resolve({
@@ -131,25 +130,25 @@ module.exports = {
           });
         }
 
-        // Add image with label to the equipment's images array
         equipment.images.push({
           path: imagePath,
-          label: imageLabel
+          label: imageLabel,
+          fileName: fileName,
+          mimeType: mimeType
         });
 
         equipment.updatedAt = new Date();
-
-        // Save the updated equipment
         await equipment.save();
 
         resolve({
           status: 200,
           success: true,
-          message: 'Image added successfully',
+          message: 'Image added successfully', 
           data: {
-            equipmentId,
+            equipmentNo,
             imagePath,
-            imageLabel
+            imageLabel,
+            fileName
           }
         });
       } catch (error) {

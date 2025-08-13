@@ -627,15 +627,11 @@ const updateUserAuthMail = async (userId, authMail, type) => {
 };
 
 // Grant permission 
-const grantPermission = async (mechanicId, purpose, data, uploadedFiles = null) => {
+const grantPermission = async (mechanicId, purpose, data) => {
   try {
     const mechanic = await Mechanic.findById(mechanicId);
 
     if (!mechanic) {
-      // Clean up uploaded files if mechanic not found
-      if (uploadedFiles && uploadedFiles.length > 0) {
-        cleanupFiles(uploadedFiles);
-      }
       return {
         status: 404,
         message: 'Mechanic not found'
@@ -651,52 +647,27 @@ const grantPermission = async (mechanicId, purpose, data, uploadedFiles = null) 
     }
 
     if (!grantReceiver) {
-      // Clean up uploaded files if no grant receiver found
-      if (uploadedFiles && uploadedFiles.length > 0) {
-        cleanupFiles(uploadedFiles);
-      }
       return {
         status: 404,
         message: `No authorized user found to handle ${purpose} requests`
       };
     }
 
-    // Generate a temporary ObjectId for the request before processing files
     const tempRequestId = new mongoose.Types.ObjectId();
 
-    // Process and rename files first if files were uploaded
-    let finalMediaFiles = [];
-    if (uploadedFiles && uploadedFiles.length > 0) {
-      try {
-        const renamedFiles = await renameFilesWithRequestId(uploadedFiles, mechanicId, tempRequestId);
+    // Prepare media files data (files will be uploaded directly to S3 by client)
+    const finalMediaFiles = (data.mediaFiles || []).map(file => ({
+      fileName: file.fileName,
+      originalName: file.originalName,
+      filePath: file.filePath,
+      fileSize: 0, // Will be updated after upload
+      mimeType: file.mimeType,
+      type: file.type,
+      uploadDate: file.uploadDate,
+      url: file.filePath // Will be replaced with actual URL when needed
+    }));
 
-        // Process the renamed files
-        finalMediaFiles = renamedFiles.map(file => ({
-          fileName: file.filename,
-          originalName: file.originalname,
-          filePath: file.path,
-          fileSize: file.size,
-          mimeType: file.mimetype,
-          fieldName: file.fieldname,
-          uploadDate: new Date(),
-          type: getFileType(file.mimetype),
-          url: file.url || `/uploads/overtime/${file.filename}`
-        }));
-
-      } catch (error) {
-        console.error('Error renaming files:', error);
-        // If renaming fails, clean up the original files
-        cleanupFiles(uploadedFiles);
-
-        return {
-          status: 500,
-          message: 'Error processing uploaded files',
-          error: error.message
-        };
-      }
-    }
-
-    // Create the new grant access entry with the pre-generated ID and correct file data
+    // Create the new grant access entry
     const grantEntry = {
       _id: tempRequestId,
       purpose: purpose,
@@ -714,18 +685,15 @@ const grantPermission = async (mechanicId, purpose, data, uploadedFiles = null) 
       status: 'pending'
     };
 
-    // Add the grant entry and save once with all correct data
+    // Add the grant entry and save
     grantReceiver.grantAccess.push(grantEntry);
     await grantReceiver.save();
 
-
+    // Send notification (same as before)
     try {
       const PushNotificationService = require('../utils/push-notification-jobs');
-
-      // Just add this check before using the times
+      const formattedDate = formatDate(data.date);
       let notificationMessage;
-
-      const formattedDate = formatDate(data.date); // "August 10, 2025"
 
       if (data.times && data.times[0].in && data.times[0].out) {
         const inTime = convertToAMPM(data.times[0].in);
@@ -743,15 +711,14 @@ const grantPermission = async (mechanicId, purpose, data, uploadedFiles = null) 
       });
 
       await PushNotificationService.sendGeneralNotification(
-        null, // broadcast to all users
-        "Mechanic overtime request", // title
-        notificationMessage, // description
-        'high', // priority
-        'normal' // type
+        null,
+        "Mechanic overtime request",
+        notificationMessage,
+        'high',
+        'normal'
       );
     } catch (notificationError) {
       console.error('Error sending push notification:', notificationError);
-      // Don't fail the entire operation if notification fails
     }
 
     return {
@@ -766,19 +733,13 @@ const grantPermission = async (mechanicId, purpose, data, uploadedFiles = null) 
         mediaFiles: finalMediaFiles.map(f => ({
           fileName: f.fileName,
           type: f.type,
-          size: f.fileSize
+          uploadUrl: f.uploadUrl // Send back the presigned URL for client to upload
         }))
       }
     };
 
   } catch (error) {
     console.error('Error in grantPermission:', error);
-
-    // Clean up uploaded files if there's an error
-    if (uploadedFiles && uploadedFiles.length > 0) {
-      cleanupFiles(uploadedFiles);
-    }
-
     return {
       status: 500,
       message: 'Internal server error',

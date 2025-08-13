@@ -17,6 +17,27 @@ class ComplaintController {
         });
       }
 
+      // Helper function to determine if file is video
+      const isVideoFile = (mimeType, fileName) => {
+        // Check mimeType first
+        if (mimeType) {
+          const normalizedMimeType = mimeType.toLowerCase();
+          // Handle cases like 'video', 'video/mp4', 'video/webm', etc.
+          if (normalizedMimeType === 'video' || normalizedMimeType.startsWith('video/')) {
+            return true;
+          }
+        }
+
+        // Fallback to file extension if mimeType is not clear
+        if (fileName) {
+          const ext = path.extname(fileName).toLowerCase();
+          const videoExtensions = ['.mp4', '.webm', '.ogg', '.avi', '.mov', '.wmv', '.flv', '.m4v', '.3gp', '.mkv'];
+          return videoExtensions.includes(ext);
+        }
+
+        return false;
+      };
+
       // Generate presigned URLs and return them to the client
       const filesWithUploadData = await Promise.all(
         files.map(async (file) => {
@@ -30,17 +51,22 @@ class ComplaintController {
             file.mimeType
           );
 
+          // Determine the correct type
+          const isVideo = isVideoFile(file.mimeType, file.fileName);
+
           return {
             fileName: finalFilename,
             originalName: file.fileName,
             filePath: s3Key,
             mimeType: file.mimeType,
-            type: file.mimeType.startsWith('video/') ? 'video' : 'photo',
+            type: isVideo ? 'video' : 'photo',
             uploadUrl: uploadUrl,
             uploadDate: new Date()
           };
         })
       );
+
+      console.log('Files with upload data:', filesWithUploadData);
 
       // Create complaint document (without saving yet)
       const complaintData = {
@@ -51,7 +77,7 @@ class ComplaintController {
         status: 'pending'
       };
 
-      const result = await ComplaintService.createComplaint(complaintData)
+      const result = await ComplaintService.createComplaint(complaintData);
 
       res.status(200).json({
         status: 200,
@@ -73,34 +99,65 @@ class ComplaintController {
 
   static async addSolution(req, res, next) {
     try {
-      // Handle file upload
-      uploadSolutionFiles(req, res, async (err) => {
-        if (err) {
-          if (err instanceof multer.MulterError) {
-            return res.status(400).json({ error: err.message });
-          } else {
-            return res.status(400).json({ error: err.message });
-          }
-        }
+      const { complaintId } = req.params;
+      const { regNo, mechanic, files } = req.body;
 
-        if (!req.files || req.files.length === 0) {
-          return res.status(400).json({ error: 'At least one solution file is required' });
-        }
+      if (!files || files.length === 0) {
+        return res.status(400).json({
+          status: 400,
+          error: 'At least one solution file is required'
+        });
+      }
 
-        try {
-          const complaint = await ComplaintService.addSolutionToComplaint(
-            req.params.complaintId,
-            req.files,
-            req.body.regNo,
-            req.body.mechanic
+      // Generate presigned URLs for each file
+      const filesWithUploadData = await Promise.all(
+        files.map(async (file) => {
+          const ext = path.extname(file.fileName);
+          const finalFilename = `${complaintId}-${Date.now()}${ext}`;
+          const s3Key = `complaint-solutions/${complaintId}/${finalFilename}`;
+
+          const uploadUrl = await putObject(
+            file.fileName,
+            s3Key,
+            file.mimeType
           );
-          res.status(200).json(complaint);
-        } catch (error) {
-          res.status(500).json({ error: error.message });
+
+          return {
+            fileName: finalFilename,
+            originalName: file.fileName,
+            filePath: s3Key,
+            mimeType: file.mimeType,
+            type: file.mimeType.startsWith('video/') ? 'video' : 'photo',
+            uploadUrl: uploadUrl,
+            uploadDate: new Date()
+          };
+        })
+      );
+
+      // Call the service to update the complaint
+      const result = await ComplaintService.addSolutionToComplaint(
+        complaintId,
+        filesWithUploadData,
+        regNo,
+        mechanic
+      );
+
+      // Return both the service result and upload URLs
+      res.status(200).json({
+        status: 200,
+        message: 'Solution added successfully',
+        data: {
+          complaint: result.data,
+          uploadData: filesWithUploadData
         }
       });
+
     } catch (error) {
-      next(error);
+      console.error('Error in addSolution:', error);
+      res.status(error.status || 500).json({
+        status: error.status || 500,
+        error: error.message || 'Internal server error'
+      });
     }
   }
 

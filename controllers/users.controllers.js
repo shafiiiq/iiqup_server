@@ -1,7 +1,6 @@
-// Updated users.controllers.js with circular dependency fix
 const userServices = require('../services/user-services')
-// Remove this import that's causing circular dependency:
-// const { grantAccess } = require('../controllers/users.controllers');
+const path = require('path');
+const { putObject } = require('../s3bucket/s3.bucket')
 
 const addUsers = async (req, res) => {
   userServices.insertUser(req.body)
@@ -125,36 +124,19 @@ const updateAuthMail = async (req, res) => {
 const requestGrant = async (req, res) => {
   try {
     const { mechanicId } = req.params;
-    let purpose = 'overtime'
+    let purpose = 'overtime';
+
+    let overtimeData = req.body
 
     if (purpose === 'overtime') {
-      let overtimeData;
-      try {
-        overtimeData = JSON.parse(req.body.overtimeData);
-      } catch (error) {
-        if (req.files && req.files.length > 0) {
-          cleanupFiles(req.files);
-        }
-        return res.status(400).json({
-          error: 'Invalid overtime data format',
-          details: error.message
-        });
-      }
-
-      const { date, regNo, times, workDetails } = overtimeData;
+      const { date, regNo, times, workDetails, files } = req.body;
       if (!date || !regNo || !times || !workDetails) {
-        if (req.files && req.files.length > 0) {
-          cleanupFiles(req.files);
-        }
         return res.status(400).json({
           error: 'Missing required fields: date, regNo, times, and workDetails are required'
         });
       }
 
       if (!Array.isArray(times) || times.length === 0) {
-        if (req.files && req.files.length > 0) {
-          cleanupFiles(req.files);
-        }
         return res.status(400).json({
           error: 'Times must be a non-empty array'
         });
@@ -163,43 +145,56 @@ const requestGrant = async (req, res) => {
       for (let i = 0; i < times.length; i++) {
         const time = times[i];
         if (!time.in || !time.out) {
-          if (req.files && req.files.length > 0) {
-            cleanupFiles(req.files);
-          }
           return res.status(400).json({
             error: `Time entry ${i + 1} is missing 'in' or 'out' time`
           });
         }
       }
 
-      const tempMediaFiles = [];
-      if (req.files && req.files.length > 0) {
-        req.files.forEach(file => {
-          const mediaFile = {
-            fileName: file.filename,
-            originalName: file.originalname,
-            filePath: file.path,
-            fileSize: file.size,
-            mimeType: file.mimetype,
-            fieldName: file.fieldname,
-            uploadDate: new Date(),
-            type: getFileType(file.mimetype),
-            url: `/uploads/overtime/${file.filename}`
-          };
-          tempMediaFiles.push(mediaFile);
-        });
+      // Generate presigned URLs for each file
+      let filesWithUploadData = [];
+      if (files && files.length > 0) {
+        filesWithUploadData = await Promise.all(
+          files.map(async (file) => {
+            const ext = path.extname(file.fileName);
+            const finalFilename = `${mechanicId}-${Date.now()}${ext}`;
+            const s3Key = `overtime/${mechanicId}/${finalFilename}`;
+
+            const uploadUrl = await putObject(
+              file.fileName,
+              s3Key,
+              file.mimeType
+            );
+
+            return {
+              fileName: finalFilename,
+              originalName: file.fileName,
+              filePath: s3Key,
+              mimeType: file.mimeType,
+              type: file.mimeType.startsWith('video/') ? 'video' : 'photo',
+              uploadUrl: uploadUrl,
+              uploadDate: new Date()
+            };
+          })
+        );
       }
 
       const tempOvertimeData = {
         ...overtimeData,
-        mediaFiles: tempMediaFiles,
-        totalFiles: tempMediaFiles.length
+        mediaFiles: filesWithUploadData,
+        totalFiles: filesWithUploadData.length
       };
 
-      const response = await userServices.grantPermission(mechanicId, purpose, tempOvertimeData, req.files);
+      const response = await userServices.grantPermission(mechanicId, purpose, tempOvertimeData);
 
       if (response) {
-        res.status(response.status).json(response);
+        res.status(response.status).json({
+          status: response.status,
+          message: 'Pre-signed URLs generated',
+          data: {
+            uploadData: filesWithUploadData
+          }
+        });
       }
     } else {
       const response = await userServices.grantPermission(mechanicId, purpose, req.body);
@@ -209,11 +204,6 @@ const requestGrant = async (req, res) => {
     }
   } catch (err) {
     console.error('Error in requestGrant:', err);
-
-    if (req.files && req.files.length > 0) {
-      cleanupFiles(req.files);
-    }
-
     res.status(err.status || 500).json({
       error: err.message || 'Internal server error',
       details: err.details || 'An unexpected error occurred'
@@ -480,7 +470,7 @@ module.exports = {
   cleanupFiles,
   getFileType,
   requestService,
-  
+
   // Push notification functions
   addPushToken,
   removePushToken,

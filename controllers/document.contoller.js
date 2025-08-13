@@ -95,7 +95,7 @@ const getAllDocuments = async (req, res) => {
 const downloadDocument = async (req, res) => {
 
   console.log("not here");
-  
+
   try {
     const { documentId } = req.params;
 
@@ -108,35 +108,18 @@ const downloadDocument = async (req, res) => {
 
     // Get document info from database
     const result = await documentServices.getDocumentById(documentId);
-    
-    
+
     if (result.status !== 200) {
       return res.status(result.status).json(result);
     }
 
-    const { filePath, filename, mimetype } = result.document;
-
-    // Check if file exists
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({
-        status: 404,
-        message: 'File not found on server'
-      });
-    }
-
-    // Set headers for download
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Content-Type', mimetype || 'application/octet-stream');
-
-    // Send file
-    const fileStream = fs.createReadStream(filePath);
-    fileStream.pipe(res);
+    return res.status(result.status).json(result);
 
   } catch (err) {
     console.error('Download error:', err);
     res.status(500).json({
       status: 500,
-      message: 'Failed to download document',
+      message: 'Failed to download document', 
       error: err.message
     });
   }
@@ -156,28 +139,13 @@ const viewDocument = async (req, res) => {
 
     // Get document info from database
     const result = await documentServices.getDocumentById(documentId);
-    
+
     if (result.status !== 200) {
       return res.status(result.status).json(result);
     }
-
-    const { filePath, filename, mimetype } = result.document;
-
-    // Check if file exists
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({
-        status: 404,
-        message: 'File not found on server'
-      });
-    }
-
-    // Set headers for inline viewing
-    res.setHeader('Content-Type', mimetype || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
-
-    // Send file
-    const fileStream = fs.createReadStream(filePath);
-    fileStream.pipe(res);
+    
+    console.log(result);
+    res.status(200).json(result);
 
   } catch (err) {
     console.error('View error:', err);

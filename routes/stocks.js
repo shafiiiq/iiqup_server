@@ -5,7 +5,7 @@ const { processEquipmentData, uploadEquipmentImages } = require('../multer/hand_
 
 // ===== EQUIPMENT RELATED ROUTES =====
 router.post('/add-handover-report', processEquipmentData, stocksController.addEquipmentStocks);
-router.post('/add-equipment-image', uploadEquipmentImages, stocksController.addEquipmentImage);
+router.post('/add-equipment-image', stocksController.addEquipmentImage);
 router.get('/equipment/:regNo', stocksController.getEquipmentRegNo);
 
 // ===== BASIC STOCK ROUTES =====

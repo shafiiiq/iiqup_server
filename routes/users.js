@@ -13,10 +13,7 @@ router.delete('/deleteuser/:id', userController.deleteUser);
 router.post('/verify-ceo', userController.verifyCEO);
 
 // Updated route with multer middleware for overtime requests
-router.post('/request-grant/:mechanicId/overtime', 
-  overtimeUpload.any(), // This will handle any field names for files
-  userController.requestGrant
-);
+router.post('/request-grant/:mechanicId/overtime', userController.requestGrant);
 
 // Keep the original route for non-overtime requests    
 router.post('/request-service', userController.requestService);

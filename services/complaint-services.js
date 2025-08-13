@@ -3,15 +3,17 @@ const Equipment = require('../models/equip.model');
 const { getFileDuration } = require('../utils/complaint-helper');
 const { createNotification } = require('../utils/notification-jobs'); // Import notification service
 const PushNotificationService = require('../utils/push-notification-jobs');
-const {putObject} = require('../s3bucket/s3.bucket')
-const path = require('path');
 
 class ComplaintService {
   static async createComplaint(complaint) {
     try {
-     
+
       // Get equipment details
       const equipment = await Equipment.findOne({ regNo: complaint.regNo });
+
+      const complaintDateToSave = new Complaint(complaint)
+      console.log(complaintDateToSave);
+      await complaintDateToSave.save();
 
       // Create notifications
       await createNotification({
@@ -29,45 +31,30 @@ class ComplaintService {
         'high',
         'normal'
       );
-
-      const complaintDateToSave = new Complaint(complaint)
-      await complaintDateToSave.save();
       return complaintDateToSave;
+
     } catch (error) {
       console.error('Error creating complaint:', error);
       throw error;
     }
   }
 
-  static async addSolutionToComplaint(complaintId, files, regNo, mechanic) {
+  static async addSolutionToComplaint(complaintId, filesData, regNo, mechanic) {
     try {
       // Process all solution files
-      const solutionFiles = await Promise.all(files.map(async (file) => {
-        // Convert backslashes to forward slashes for consistency
-        const filePath = file.path.replace(/\\/g, '/');
-
-        // Remove 'public' prefix from path to create URL
-        const urlPath = filePath.replace('public', '');
-
-        // Determine file type (photo or video)
-        const fileType = file.mimetype.startsWith('video/') ? 'video' : 'photo';
-
-        // Base file data
+      const solutionFiles = await Promise.all(filesData.map(async (file) => {
         const fileData = {
-          fileName: file.filename,
-          originalName: file.originalname,
-          filePath: urlPath,
-          fileSize: file.size,
-          mimeType: file.mimetype,
-          fieldName: file.fieldname,
-          type: fileType,
-          url: urlPath,
+          fileName: file.fileName,
+          originalName: file.originalName,
+          filePath: file.filePath,
+          mimeType: file.mimeType,
+          type: file.type,
+          url: file.filePath,
           uploadDate: new Date()
         };
 
-        // Add duration for video files
-        if (fileType === 'video') {
-          fileData.duration = await getFileDuration(file.path);
+        if (file.type === 'video' && file.duration) {
+          fileData.duration = file.duration;
         }
 
         return fileData;
@@ -78,37 +65,49 @@ class ComplaintService {
         complaintId,
         {
           $push: { solutions: { $each: solutionFiles } },
-          $set: { status: 'resolved', updatedAt: new Date(), mechanic: mechanic }
+          $set: {
+            status: 'resolved',
+            updatedAt: new Date(),
+            mechanic: mechanic
+          }
         },
         { new: true }
       );
 
       if (!complaint) {
-        throw new Error('Complaint not found');
+        throw { status: 404, message: 'Complaint not found' };
       }
 
-      const equipment = await Equipment.findOne({ regNo: complaint.regNo })
+      const equipment = await Equipment.findOne({ regNo: complaint.regNo });
 
       await createNotification({
         title: `Complaint Rectified - ${complaint.regNo}`,
-        description: `${mechanic} is rectified complaint for ${equipment.brand} ${equipment.machine} - ${complaint.regNo} Equipment ready to work`,
+        description: `${mechanic} rectified complaint for ${equipment.brand} ${equipment.machine} - ${complaint.regNo} Equipment ready to work`,
         priority: "high",
         sourceId: 'from applications',
         time: new Date()
       });
 
       await PushNotificationService.sendGeneralNotification(
-        null, // broadcast to all users
-        `Complaint Rectified - ${complaint.regNo}`, //title
-        `${mechanic} is rectified complaint for ${equipment.brand} ${equipment.machine} - ${complaint.regNo}, Equipment ready to work`, //decription
-        'high', //priority
-        'normal' // type
+        null,
+        `Complaint Rectified - ${complaint.regNo}`,
+        `${mechanic} rectified complaint for ${equipment.brand} ${equipment.machine} - ${complaint.regNo}, Equipment ready to work`,
+        'high',
+        'normal'
       );
 
-      return complaint;
+      return {
+        status: 200,
+        message: 'Solution added successfully',
+        data: complaint
+      };
+
     } catch (error) {
-      console.error('Error adding solution:', error);
-      throw error;
+      console.error('Error in addSolutionToComplaint:', error);
+      throw {
+        status: error.status || 500,
+        message: error.message || 'Failed to add solution'
+      };
     }
   }
 

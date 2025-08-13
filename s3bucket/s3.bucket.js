@@ -10,14 +10,15 @@ const s3Client = new S3Client({
     }
 });
 
-const getObjectUrl = async (key) => {
+const getObjectUrl = async (key, isLong) => {
     // Use GetObjectCommand instead of GetObjectAclCommand for getting object URLs
     const command = new GetObjectCommand({
         Bucket: process.env.BUCKET_NAME,
         Key: key // Note: Capital 'K' in Key
     });
 
-    const url = await getSignedUrl(s3Client, command, { expiresIn: 3600 }); // 1 hour expiry
+    const expiresIn = !isLong ? 3600 : 86400; // 1 hour vs 24 hours
+    const url = await getSignedUrl(s3Client, command, { expiresIn });
     return url;
 };
 
@@ -27,7 +28,7 @@ const putObject = async (fileName, key, contentType) => {
         Key: key,
         ContentType: contentType
     })
-    const url = await getSignedUrl(s3Client,command, {expiresIn:60})
+    const url = await getSignedUrl(s3Client, command, { expiresIn: 60 })
     return url
 }
 

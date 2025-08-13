@@ -1,28 +1,28 @@
 const mongoose = require('mongoose');
 
 const mediaFileSchema = new mongoose.Schema({
-  fileName: { type: String, required: false },
-  originalName: { type: String, required: false },
-  filePath: { type: String, required: false },
-  fileSize: { type: Number, required: false },
-  mimeType: { type: String, required: false },
-  fieldName: { type: String, required: false },
+  fileName: { type: String, },
+  originalName: { type: String, },
+  filePath: { type: String, },
+  fileSize: { type: Number, },
+  mimeType: { type: String, },
+  fieldName: { type: String, },
   uploadDate: { type: Date, default: Date.now },
-  type: { type: String, enum: ['photo', 'video'], required: false },
-  url: { type: String, required: false },
+  type: { type: String, enum: ['photo', 'video'], },
+  url: { type: String, },
   duration: { type: Number }, // Only for videos
 });
 
 const solutionFileSchema = new mongoose.Schema({
-  fileName: { type: String, required: false },
-  originalName: { type: String, required: false },
-  filePath: { type: String, required: false },
-  fileSize: { type: Number, required: false },
-  mimeType: { type: String, required: false },
-  fieldName: { type: String, required: false },
+  fileName: { type: String, },
+  originalName: { type: String, },
+  filePath: { type: String, },
+  fileSize: { type: Number, },
+  mimeType: { type: String, },
+  fieldName: { type: String, },
   uploadDate: { type: Date, default: Date.now },
-  type: { type: String, enum: ['photo', 'video'], required: false },
-  url: { type: String, required: false },
+  type: { type: String, enum: ['photo', 'video'], },
+  url: { type: String, },
   duration: { type: Number }, // Only for videos
 });
 

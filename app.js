@@ -120,6 +120,7 @@ const { istimaraExpiryMiddleware } = require('./middleware/istimara-expiry-middl
 
 // Import WebSocket handler
 const { setupWebSocket } = require('./utils/websocket');
+const { autoBackup } = require('./utils/backup-data');
 
 // Start the cron jobs
 const cronJobs = setupCronJobs();
@@ -143,8 +144,7 @@ var complaintsRouter = require('./routes/compalints');
 var applicationRouter = require('./routes/applications');
 var securityRouter = require('./routes/security');
 var _0authRouter = require('./routes/0auth');
-const { autoBackup } = require('./utils/backup-data');
-const { getObjectUrl } = require('./s3bucket/s3.bucket');
+var s3Config = require('./routes/s3Config');
 
 var app = express();
 
@@ -234,6 +234,7 @@ app.use('/complaints', complaintsRouter);
 app.use('/applications', authMiddleware, applicationRouter);
 app.use('/hunter-eye', securityRouter);
 app.use('/0auth', _0authRouter);
+app.use('/s3Config', s3Config);
 
 // Overtime auto deleter after 2 months
 app.use(overtimeCleanupMiddleware);

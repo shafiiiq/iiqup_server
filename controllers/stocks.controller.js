@@ -1,4 +1,6 @@
 const stockServices = require('../services/stocks-services.js');
+const { putObject } = require('../s3bucket/s3.bucket');
+const path = require('path');
 
 const addEquipmentStocks = async (req, res) => {
   try {
@@ -14,33 +16,77 @@ const addEquipmentStocks = async (req, res) => {
 
 const addEquipmentImage = async (req, res) => {
   try {
-    // Check if file was uploaded
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'No image file provided'
-      });
-    }
+    const { equipmentNo, label, files } = req.body;
+    const imageLabel = label || 'Unlabeled';
 
-    const equipmentId = req.body.equipmentId;
-    const imageLabel = req.body.label || 'Unlabeled';
-
-    if (!equipmentId) {
+    if (!equipmentNo) {
       return res.status(400).json({
+        status: 400,
         success: false,
         message: 'Equipment ID is required'
       });
     }
 
-    // Save image path and label to equipment record
-    const imagePath = req.file.path;
-    const result = await stockServices.addEquipmentImage(equipmentId, imagePath, imageLabel);
+    if (!files || !files.length) {
+      return res.status(400).json({
+        status: 400,
+        success: false,
+        message: 'At least one file is required'
+      });
+    }
 
-    res.status(result.status).json(result);
+    // Generate presigned URLs for each file
+    const filesWithUploadData = await Promise.all(
+      files.map(async (file) => {
+        const ext = path.extname(file.fileName);
+        const finalFilename = `${equipmentNo}-${Date.now()}${ext}`;
+        const s3Key = `equipment-images/${equipmentNo}/${finalFilename}`;
+
+        const uploadUrl = await putObject(
+          file.fileName,
+          s3Key,
+          file.mimeType
+        );
+
+        // Save to database immediately after getting presigned URL
+        const saveResult = await stockServices.addEquipmentImage(
+          equipmentNo,
+          s3Key,
+          imageLabel,
+          finalFilename,
+          file.mimeType
+        );
+
+        if (!saveResult.success) {
+          throw new Error(`Failed to save image metadata: ${saveResult.message}`);
+        }
+
+        return {
+          fileName: finalFilename,
+          originalName: file.fileName,
+          filePath: s3Key,
+          mimeType: file.mimeType,
+          type: file.mimeType.startsWith('video/') ? 'video' : 'photo',
+          uploadUrl: uploadUrl,
+          uploadDate: new Date(),
+          dbSaveResult: saveResult
+        };
+      })
+    );
+
+    res.status(200).json({
+      status: 200,
+      message: 'Pre-signed URLs generated and metadata saved',
+      data: {
+        uploadData: filesWithUploadData
+      }
+    });
+
   } catch (err) {
     res.status(err.status || 500).json({
+      status: err.status || 500,
       success: false,
-      message: err.message
+      message: err.message || 'Internal server error'
     });
   }
 };

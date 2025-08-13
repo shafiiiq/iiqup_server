@@ -25,7 +25,8 @@ const getEquipments = async (req, res) => {
 }
 
 const getEquipmentsByReg = async (req, res) => {
-  userServices.fetchEquipmentByReg(req.body.regNo)
+  const { regNo } = req.params
+  userServices.fetchEquipmentByReg(regNo)
     .then((fetchedUsers) => {
       if (fetchedUsers) {
         res.status(fetchedUsers.status).json(fetchedUsers)
