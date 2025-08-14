@@ -44,6 +44,6 @@ router.post('/get-push-tokens', userController.getUserPushTokens);
 // Send test notification
 router.post('/send-test-notification', userController.sendTestNotification);
 
-router.get('/get-user-roles', authMiddleware, getUserRol)
+router.get('/get-user-roles', authMiddleware, userController.getUserRoles)
 
 module.exports = router;
