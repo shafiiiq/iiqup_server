@@ -1,6 +1,7 @@
 const userServices = require('../services/user-services')
 const path = require('path');
 const { putObject } = require('../s3bucket/s3.bucket')
+require('dotenv').config();
 
 const addUsers = async (req, res) => {
   userServices.insertUser(req.body)
@@ -454,6 +455,27 @@ const sendTestNotification = async (req, res) => {
   }
 }
 
+const getUserRoles = async (req, res) => {
+  if (process.env.MECHANIC &&
+    process.env.MAINTANANCE_HEAD &&
+    process.env.OPERATOR &&
+    process.env.CAMP_BOSS &&
+    process.env.MECHANIC_HEAD) {
+    res.json({
+      status: 200,
+      roles: {
+        MECHANIC: process.env.MECHANIC,
+        MAINTANANCE_HEAD: process.env.MAINTANANCE_HEAD,
+        OPERATOR: process.env.OPERATOR,
+        CAMP_BOSS: process.env.CAMP_BOSS,
+        MECHANIC: process.env.MECHANIC_HEAD
+      }
+    })
+  } else {
+    res.status(500).json({ message: 'Cannot get all roles' })
+  }
+}
+
 module.exports = {
   addUsers,
   getUsers,
@@ -475,5 +497,6 @@ module.exports = {
   addPushToken,
   removePushToken,
   getUserPushTokens,
-  sendTestNotification
+  sendTestNotification,
+  getUserRoles
 };

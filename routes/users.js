@@ -2,6 +2,7 @@ var express = require('express');
 var router = express.Router();
 const userController = require('../controllers/users.controllers');
 const overtimeUpload = require('../multer/overtime-upload'); // Import the multer config
+const { authMiddleware } = require('../utils/jwt');
 
 /* GET users listing. */
 router.post('/addusers', userController.addUsers);
@@ -42,5 +43,7 @@ router.post('/get-push-tokens', userController.getUserPushTokens);
 
 // Send test notification
 router.post('/send-test-notification', userController.sendTestNotification);
+
+router.get('/get-user-roles', authMiddleware, getUserRol)
 
 module.exports = router;
