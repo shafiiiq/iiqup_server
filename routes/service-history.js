@@ -8,7 +8,7 @@ router.post('/add-service-history', serviceHistoryController.addServiceHistory)
 router.post('/add-maintanance-history', serviceHistoryController.addMaintananceHistory)
 router.post('/add-tyre-history/', serviceHistoryController.addTyreHistory)
 router.post('/add-batery-history/', serviceHistoryController.addBatteryHistory)
-router.post('/add-full-service-notification/:regNo', serviceHistoryController.addNextFullService)
+router.post('/add-full-service-notification', serviceHistoryController.addNextFullService)
 
 router.get('/get-service-history/:regNo', serviceHistoryController.getServiceHistory)
 router.get('/get-maintanance-history/:regNo', serviceHistoryController.getMaintananceHistory)

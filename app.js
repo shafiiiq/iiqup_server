@@ -219,7 +219,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Routes
 app.use('/users', userRouter);
 app.use('/otp', otpRouter);
-app.use('/equipments', equipementRouter);
+app.use('/equipments', authMiddleware, equipementRouter);
 app.use('/service-report', serviceReport);
 app.use('/service-history', authMiddleware, serviceHistory);
 app.use('/stocks', authMiddleware, stocksRouter);

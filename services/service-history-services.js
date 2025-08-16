@@ -6,7 +6,8 @@ const maintananceHistoryModel = require('../models/maintanance-history.model.js'
 const tyreModel = require('../models/tyre.model.js');
 const batteryModel = require('../models/batery.model.js');
 const { createNotification } = require('../utils/notification-jobs'); // Import notification service
-const PushNotificationService  = require('../utils/push-notification-jobs');
+const PushNotificationService = require('../utils/push-notification-jobs');
+const Equipment = require('../models/equip.model');
 
 module.exports = {
 
@@ -191,22 +192,28 @@ module.exports = {
                     });
                 }
 
+                const equipment = await Equipment.findOne({ regNo: data.regNo });
 
-                // Create new service history record
-                const serviceHistory = await NotificationModel.create({
-                    regNo: data.regNo,
-                    lastServiceHrs: data.lastServiceHrs,
-                    nextFullServiceHrs: data.nextFullServiceHrs,
-                    mechine: data.mechine
+                await createNotification({
+                    title: `Time to full service - ${equipment.brand} ${equipment.machine} ${data.regNo}`,
+                    description: `${equipment.brand} ${equipment.machine} ${data.regNo}'s next service is full service`,
+                    priority: "high",
+                    sourceId: 'from applications',
+                    time: new Date()
                 });
 
-                // No need to call save() after create() as create() already saves the document
+                await PushNotificationService.sendGeneralNotification(
+                    null,
+                    `Time to full service - ${equipment.brand} ${equipment.machine} ${data.regNo}`,
+                    `${equipment.brand} ${equipment.machine} ${data.regNo}'s next service is full service`,
+                    'high',
+                    'normal'
+                );
 
                 resolve({
                     status: 200,
                     ok: true,
-                    message: 'Service History added successfully',
-                    data: serviceHistory
+                    message: 'Full Service History added successfully',
                 });
 
             } catch (err) {
@@ -422,7 +429,7 @@ module.exports = {
             } else if (type == 'battery') {
                 deletedToolkit = await batteryModel.findByIdAndDelete(id)
             } else {
-               deletedToolkit = await maintananceHistoryModel.findByIdAndDelete(id)
+                deletedToolkit = await maintananceHistoryModel.findByIdAndDelete(id)
             }
 
             if (!deletedToolkit) {
