@@ -6,11 +6,8 @@ const oAuthSchema = new mongoose.Schema({
   service: {
     type: String,
     required: true,
-    enum: ['gmail', 'outlook', 'smtp']
-  },
-  accountId: {
-    type: String,
-    required: true
+    enum: ['gmail', 'outlook', 'smtp'],
+    unique: true
   },
   encryptedRefreshToken: {
     type: String,
@@ -50,65 +47,62 @@ const oAuthSchema = new mongoose.Schema({
   }
 });
 
-// Create compound unique index
-oAuthSchema.index({ service: 1, accountId: 1 }, { unique: true });
-
 // Encryption configuration
 const ALGORITHM = 'aes-256-cbc';
+const ENCRYPTION_KEY = process.env.OAUTH_ENCRYPTION_KEY ? 
+  Buffer.from(process.env.OAUTH_ENCRYPTION_KEY, 'hex') : 
+  crypto.randomBytes(32); // 32 bytes key
 
-const getEncryptionKey = () => {
-  if (!process.env.OAUTH_ENCRYPTION_KEY) {
-    throw new Error('OAUTH_ENCRYPTION_KEY environment variable is required');
-  }
-  return Buffer.from(process.env.OAUTH_ENCRYPTION_KEY, 'hex');
-};
-
+/**
+ * Encrypt sensitive data using AES-256-CBC
+ */
 const encrypt = (text) => {
   if (!text) return null;
   
   try {
-    const key = getEncryptionKey();
-    const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+    const iv = crypto.randomBytes(16); // 16 bytes IV for AES
+    const cipher = crypto.createCipheriv(ALGORITHM, ENCRYPTION_KEY, iv);
     
     let encrypted = cipher.update(text, 'utf8', 'hex');
     encrypted += cipher.final('hex');
     
+    // Return IV + Encrypted data (both in hex)
     return iv.toString('hex') + ':' + encrypted;
   } catch (error) {
-    console.error('Encryption failed');
+    console.error('Encryption failed:', error.message);
     return null;
   }
 };
 
+/**
+ * Decrypt sensitive data using AES-256-CBC
+ */
 const decrypt = (encryptedData) => {
   if (!encryptedData) return null;
   
   try {
-    const key = getEncryptionKey();
     const parts = encryptedData.split(':');
-    if (parts.length !== 2) throw new Error('Invalid format');
+    if (parts.length !== 2) throw new Error('Invalid encrypted data format');
     
     const iv = Buffer.from(parts[0], 'hex');
     const encrypted = parts[1];
     
-    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+    const decipher = crypto.createDecipheriv(ALGORITHM, ENCRYPTION_KEY, iv);
     
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     
     return decrypted;
   } catch (error) {
-    console.error('Decryption failed');
+    console.error('Decryption failed:', error.message);
     return null;
   }
 };
 
-// Static methods - MUST be defined before creating the model
-oAuthSchema.statics.saveTokens = async function(service, accountId, tokens) {
+// Static methods for token management
+oAuthSchema.statics.saveTokens = async function(service, tokens) {
   const encryptedData = {
     service,
-    accountId,
     encryptedRefreshToken: encrypt(tokens.refresh_token),
     encryptedAccessToken: tokens.access_token ? encrypt(tokens.access_token) : null,
     tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
@@ -119,19 +113,20 @@ oAuthSchema.statics.saveTokens = async function(service, accountId, tokens) {
   };
 
   return await this.findOneAndUpdate(
-    { service, accountId },
+    { service },
     encryptedData,
     { upsert: true, new: true }
   );
 };
 
-oAuthSchema.statics.getTokens = async function(service, accountId) {
-  const record = await this.findOne({ service, accountId, isActive: true });
+oAuthSchema.statics.getTokens = async function(service) {
+  const record = await this.findOne({ service, isActive: true });
   
   if (!record) {
-    throw new Error(`No tokens found for ${service}:${accountId}`);
+    throw new Error(`No active tokens found for service: ${service}`);
   }
 
+  // Check if access token is expired
   const isExpired = record.tokenExpiry && new Date() >= record.tokenExpiry;
   
   return {
@@ -145,9 +140,9 @@ oAuthSchema.statics.getTokens = async function(service, accountId) {
   };
 };
 
-oAuthSchema.statics.updateAccessToken = async function(service, accountId, accessToken, expiryDate) {
+oAuthSchema.statics.updateAccessToken = async function(service, accessToken, expiryDate) {
   return await this.findOneAndUpdate(
-    { service, accountId, isActive: true },
+    { service, isActive: true },
     {
       encryptedAccessToken: encrypt(accessToken),
       tokenExpiry: new Date(expiryDate),
@@ -158,9 +153,9 @@ oAuthSchema.statics.updateAccessToken = async function(service, accountId, acces
   );
 };
 
-oAuthSchema.statics.revokeTokens = async function(service, accountId) {
+oAuthSchema.statics.revokeTokens = async function(service) {
   return await this.findOneAndUpdate(
-    { service, accountId },
+    { service },
     {
       isActive: false,
       updatedAt: new Date()
@@ -169,10 +164,9 @@ oAuthSchema.statics.revokeTokens = async function(service, accountId) {
   );
 };
 
-oAuthSchema.pre('save', function() {
-  this.updatedAt = new Date();
+// Middleware to update lastUsed on any query
+oAuthSchema.pre('findOne', function() {
+  this.populate = false; // Prevent population for security
 });
 
-// Create and export the model
-const GOAuth = mongoose.model('GOAuth', oAuthSchema);
-module.exports = GOAuth;
+module.exports = mongoose.model('GOAuth', oAuthSchema);

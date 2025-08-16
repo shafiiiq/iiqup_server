@@ -1,23 +1,15 @@
-
 // services/secure-oauth.service.js
 const nodemailer = require('nodemailer');
 const { google } = require('googleapis'); 
+const GOAuth = require('../models/GOAuth.model');
 
-// Ensure GOAuth model is available
-let GOAuth;
-try {
-  GOAuth = require('../models/GOAuth.model');
-  if (!GOAuth || typeof GOAuth.getTokens !== 'function') {
-    throw new Error('GOAuth model not properly loaded');
-  }
-} catch (error) {
-  console.error('Failed to load GOAuth model:', error.message);
-  throw error;
-}
-
-const getValidAccessToken = async (service = 'gmail', accountId = 'default') => {
+/**
+ * Get or refresh OAuth2 access token
+ */
+const getValidAccessToken = async (service = 'gmail') => {
   try {
-    const tokens = await GOAuth.getTokens(service, accountId);
+    // Get stored tokens
+    const tokens = await GOAuth.getTokens(service);
     
     const oauth2Client = new google.auth.OAuth2(
       tokens.client_id,
@@ -29,14 +21,15 @@ const getValidAccessToken = async (service = 'gmail', accountId = 'default') => 
       refresh_token: tokens.refresh_token
     });
 
+    // If access token is expired or missing, refresh it
     if (tokens.is_expired || !tokens.access_token) {
-      console.log('Refreshing access token...');
+      console.log('🔄 Refreshing expired access token...');
       
       const { credentials } = await oauth2Client.refreshAccessToken();
       
+      // Save new access token to database
       await GOAuth.updateAccessToken(
         service,
-        accountId,
         credentials.access_token,
         credentials.expiry_date
       );
@@ -51,13 +44,16 @@ const getValidAccessToken = async (service = 'gmail', accountId = 'default') => 
 
     return tokens;
   } catch (error) {
-    throw new Error(`Token error: ${error.message}`);
+    throw new Error(`OAuth token error: ${error.message}`);
   }
 };
 
-const createSecureOAuthTransporter = async (accountId = 'default') => {
+/**
+ * Create secure OAuth2 transporter
+ */
+const createSecureOAuthTransporter = async () => {
   try {
-    const tokens = await getValidAccessToken('gmail', accountId);
+    const tokens = await getValidAccessToken('gmail');
     
     return nodemailer.createTransport({
       service: 'gmail',
@@ -71,13 +67,16 @@ const createSecureOAuthTransporter = async (accountId = 'default') => {
       }
     });
   } catch (error) {
-    throw new Error(`Transporter failed: ${error.message}`);
+    throw new Error(`Failed to create OAuth transporter: ${error.message}`);
   }
 };
 
-const initializeOAuthTokens = async (tokens, accountId = 'default') => {
+/**
+ * Initialize OAuth tokens (run once during setup)
+ */
+const initializeOAuthTokens = async (tokens) => {
   try {
-    const savedTokens = await GOAuth.saveTokens('gmail', accountId, {
+    const savedTokens = await GOAuth.saveTokens('gmail', {
       refresh_token: tokens.refresh_token,
       access_token: tokens.access_token,
       expiry_date: tokens.expiry_date,
@@ -85,39 +84,47 @@ const initializeOAuthTokens = async (tokens, accountId = 'default') => {
       client_secret: tokens.client_secret || process.env.GMAIL_CLIENT_SECRET
     });
 
-    console.log('OAuth tokens saved');
+    console.log('✅ OAuth tokens encrypted and saved to database');
     return savedTokens;
   } catch (error) {
-    throw new Error(`Initialize failed: ${error.message}`);
+    throw new Error(`Failed to initialize tokens: ${error.message}`);
   }
 };
 
-const testOAuthSetup = async (accountId = 'default') => {
+/**
+ * Test OAuth setup
+ */
+const testOAuthSetup = async () => {
   try {
-    console.log('Testing OAuth...');
+    console.log('🔍 Testing OAuth setup...');
     
-    const tokens = await getValidAccessToken('gmail', accountId);
-    console.log('Tokens OK');
+    // Test token retrieval and refresh
+    const tokens = await getValidAccessToken('gmail');
+    console.log('✅ Tokens retrieved successfully');
     
-    const transporter = await createSecureOAuthTransporter(accountId);
+    // Test transporter creation
+    const transporter = await createSecureOAuthTransporter();
     await transporter.verify();
     transporter.close();
     
-    console.log('OAuth working');
-    return { success: true };
+    console.log('✅ OAuth transporter verified');
+    return { success: true, message: 'OAuth setup is working' };
     
   } catch (error) {
-    console.error('OAuth test failed:', error.message);
+    console.error('❌ OAuth test failed:', error.message);
     return { success: false, error: error.message };
   }
 };
 
-const revokeOAuthTokens = async (service = 'gmail', accountId = 'default') => {
+/**
+ * Revoke OAuth tokens (for security)
+ */
+const revokeOAuthTokens = async (service = 'gmail') => {
   try {
-    await GOAuth.revokeTokens(service, accountId);
-    console.log(`${service} tokens revoked`);
+    await GOAuth.revokeTokens(service);
+    console.log(`✅ ${service} tokens revoked`);
   } catch (error) {
-    throw new Error(`Revoke failed: ${error.message}`);
+    throw new Error(`Failed to revoke tokens: ${error.message}`);
   }
 };
 
