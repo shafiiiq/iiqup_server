@@ -63,9 +63,6 @@ const getEncryptionKey = () => {
   return Buffer.from(process.env.OAUTH_ENCRYPTION_KEY, 'hex');
 };
 
-/**
- * Encrypt sensitive data using AES-256-CBC
- */
 const encrypt = (text) => {
   if (!text) return null;
   
@@ -84,9 +81,6 @@ const encrypt = (text) => {
   }
 };
 
-/**
- * Decrypt sensitive data using AES-256-CBC
- */
 const decrypt = (encryptedData) => {
   if (!encryptedData) return null;
   
@@ -110,7 +104,7 @@ const decrypt = (encryptedData) => {
   }
 };
 
-// Static methods for token management
+// Static methods - MUST be defined before creating the model
 oAuthSchema.statics.saveTokens = async function(service, accountId, tokens) {
   const encryptedData = {
     service,
@@ -179,16 +173,26 @@ oAuthSchema.pre('save', function() {
   this.updatedAt = new Date();
 });
 
-module.exports = mongoose.model('GOAuth', oAuthSchema);
+// Create and export the model
+const GOAuth = mongoose.model('GOAuth', oAuthSchema);
+module.exports = GOAuth;
 
 // services/secure-oauth.service.js
 const nodemailer = require('nodemailer');
 const { google } = require('googleapis'); 
-const GOAuth = require('../models/GOAuth.model');
 
-/**
- * Get or refresh OAuth2 access token
- */
+// Ensure GOAuth model is available
+let GOAuth;
+try {
+  GOAuth = require('../models/GOAuth.model');
+  if (!GOAuth || typeof GOAuth.getTokens !== 'function') {
+    throw new Error('GOAuth model not properly loaded');
+  }
+} catch (error) {
+  console.error('Failed to load GOAuth model:', error.message);
+  throw error;
+}
+
 const getValidAccessToken = async (service = 'gmail', accountId = 'default') => {
   try {
     const tokens = await GOAuth.getTokens(service, accountId);
@@ -229,14 +233,11 @@ const getValidAccessToken = async (service = 'gmail', accountId = 'default') => 
   }
 };
 
-/**
- * Create secure OAuth2 transporter
- */
 const createSecureOAuthTransporter = async (accountId = 'default') => {
   try {
     const tokens = await getValidAccessToken('gmail', accountId);
     
-    return nodemailer.createTransporter({
+    return nodemailer.createTransport({
       service: 'gmail',
       auth: {
         type: 'OAuth2',
@@ -252,9 +253,6 @@ const createSecureOAuthTransporter = async (accountId = 'default') => {
   }
 };
 
-/**
- * Initialize OAuth tokens
- */
 const initializeOAuthTokens = async (tokens, accountId = 'default') => {
   try {
     const savedTokens = await GOAuth.saveTokens('gmail', accountId, {
@@ -272,9 +270,6 @@ const initializeOAuthTokens = async (tokens, accountId = 'default') => {
   }
 };
 
-/**
- * Test OAuth setup
- */
 const testOAuthSetup = async (accountId = 'default') => {
   try {
     console.log('Testing OAuth...');
@@ -295,9 +290,6 @@ const testOAuthSetup = async (accountId = 'default') => {
   }
 };
 
-/**
- * Revoke OAuth tokens
- */
 const revokeOAuthTokens = async (service = 'gmail', accountId = 'default') => {
   try {
     await GOAuth.revokeTokens(service, accountId);
