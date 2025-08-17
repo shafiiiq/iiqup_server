@@ -132,81 +132,54 @@ module.exports = {
           });
         }
 
-        // Try to find existing equipment
-        let equipment = await stockHandoverModel.findOne({ equipmentNo: equipmentNoStr });
-
-        if (equipment) {
-          // Equipment exists - add new image to existing array
-          equipment.images.push({
-            path: imagePath,
-            label: imageLabel,
-            fileName: fileName,
-            mimeType: mimeType
-          });
-
-          equipment.updatedAt = new Date();
-          await equipment.save();
-
-          resolve({
-            status: 200,
-            success: true,
-            message: 'Image added to existing equipment successfully',
-            data: {
-              equipmentNo: equipmentNoStr,
-              equipmentName: equipment.equipmentName,
-              totalImages: equipment.images.length,
-              imagePath,
-              imageLabel,
-              fileName,
-              isNewEquipment: false
+        // Use findOneAndUpdate with upsert to handle both create and update in one atomic operation
+        const equipment = await stockHandoverModel.findOneAndUpdate(
+          { equipmentNo: equipmentNoStr },
+          {
+            $push: {
+              images: {
+                path: imagePath,
+                label: imageLabel,
+                fileName: fileName,
+                mimeType: mimeType
+              }
+            },
+            $set: {
+              updatedAt: new Date()
+            },
+            $setOnInsert: {
+              equipmentName: `Equipment ${equipmentNoStr}`,
+              createdAt: new Date()
             }
-          });
+          },
+          {
+            upsert: true, // Create if doesn't exist
+            new: true,    // Return updated document
+            runValidators: true
+          }
+        );
 
-        } else {
-          // Equipment doesn't exist - create new one with image
-          equipment = new stockHandoverModel({
+        const isNewEquipment = equipment.images.length === 1;
+
+        resolve({
+          status: 200,
+          success: true,
+          message: isNewEquipment ? 'Equipment created with image successfully' : 'Image added to existing equipment successfully',
+          data: {
             equipmentNo: equipmentNoStr,
-            equipmentName: `Equipment ${equipmentNoStr}`, // Default name
-            images: [{
-              path: imagePath,
-              label: imageLabel,
-              fileName: fileName,
-              mimeType: mimeType
-            }],
-            createdAt: new Date(),
-            updatedAt: new Date()
-          });
-
-          await equipment.save();
-
-          resolve({
-            status: 200,
-            success: true,
-            message: 'Equipment created successfully with image',
-            data: {
-              equipmentNo: equipmentNoStr,
-              equipmentName: equipment.equipmentName,
-              totalImages: equipment.images.length,
-              imagePath,
-              imageLabel,
-              fileName,
-              isNewEquipment: true
-            }
-          });
-        }
+            equipmentName: equipment.equipmentName,
+            totalImages: equipment.images.length,
+            imagePath,
+            imageLabel,
+            fileName,
+            isNewEquipment
+          }
+        });
 
       } catch (error) {
         console.error('Error adding equipment image:', error);
 
-        // Handle duplicate key error specifically
-        if (error.code === 11000) {
-          reject({
-            status: 409,
-            success: false,
-            message: 'Equipment number already exists - there might be a race condition',
-            error: 'Duplicate key error'
-          });
-        } else if (error.name === 'ValidationError') {
+        if (error.name === 'ValidationError') {
           reject({
             status: 400,
             success: false,
