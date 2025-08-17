@@ -17,7 +17,6 @@ const addEquipmentStocks = async (req, res) => {
 const addEquipmentImage = async (req, res) => {
   try {
     const { equipmentNo, files } = req.body;
-    console.log(files);
 
     if (!equipmentNo) {
       return res.status(400).json({

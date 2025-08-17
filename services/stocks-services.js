@@ -117,24 +117,31 @@ module.exports = {
     });
   },
 
-  addEquipmentImage: (equipmentNo, images, equipmentName) => {
+  addEquipmentImage: (equipmentNo, imagePath, imageLabel, fileName, mimeType) => {
     return new Promise(async (resolve, reject) => {
       try {
-        // Ensure images is an array
-        const imageArray = Array.isArray(images) ? images : [images];
+        // Convert equipmentNo to string and ensure all required fields are present
+        const equipmentNoStr = equipmentNo.toString();
+
+        // Validate required fields
+        if (!imagePath || !imageLabel) {
+          return reject({
+            status: 400,
+            success: false,
+            message: 'Image path and label are required'
+          });
+        }
 
         // Try to find existing equipment
-        let equipment = await stockHandoverModel.findOne({ equipmentNo: equipmentNo.toString() });
+        let equipment = await stockHandoverModel.findOne({ equipmentNo: equipmentNoStr });
 
         if (equipment) {
-          // Equipment exists - add new images to existing array
-          imageArray.forEach(img => {
-            equipment.images.push({
-              path: img.imagePath,
-              label: img.imageLabel,
-              fileName: img.fileName,
-              mimeType: img.mimeType
-            });
+          // Equipment exists - add new image to existing array
+          equipment.images.push({
+            path: imagePath,
+            label: imageLabel,
+            fileName: fileName,
+            mimeType: mimeType
           });
 
           equipment.updatedAt = new Date();
@@ -143,29 +150,29 @@ module.exports = {
           resolve({
             status: 200,
             success: true,
-            message: `${imageArray.length} image(s) added to existing equipment successfully`,
+            message: 'Image added to existing equipment successfully',
             data: {
-              equipmentNo,
+              equipmentNo: equipmentNoStr,
               equipmentName: equipment.equipmentName,
               totalImages: equipment.images.length,
-              addedImages: imageArray.length,
+              imagePath,
+              imageLabel,
+              fileName,
               isNewEquipment: false
             }
           });
 
         } else {
-          // Equipment doesn't exist - create new one with images
-          const newImages = imageArray.map(img => ({
-            path: img.imagePath,
-            label: img.imageLabel,
-            fileName: img.fileName,
-            mimeType: img.mimeType
-          }));
-
+          // Equipment doesn't exist - create new one with image
           equipment = new stockHandoverModel({
-            equipmentNo: equipmentNo.toString(),
-            equipmentName: equipmentName || `Equipment ${equipmentNo}`,
-            images: newImages,
+            equipmentNo: equipmentNoStr,
+            equipmentName: `Equipment ${equipmentNoStr}`, // Default name
+            images: [{
+              path: imagePath,
+              label: imageLabel,
+              fileName: fileName,
+              mimeType: mimeType
+            }],
             createdAt: new Date(),
             updatedAt: new Date()
           });
@@ -175,12 +182,14 @@ module.exports = {
           resolve({
             status: 200,
             success: true,
-            message: `Equipment created successfully with ${imageArray.length} image(s)`,
+            message: 'Equipment created successfully with image',
             data: {
-              equipmentNo,
+              equipmentNo: equipmentNoStr,
               equipmentName: equipment.equipmentName,
               totalImages: equipment.images.length,
-              addedImages: imageArray.length,
+              imagePath,
+              imageLabel,
+              fileName,
               isNewEquipment: true
             }
           });
@@ -196,6 +205,13 @@ module.exports = {
             success: false,
             message: 'Equipment number already exists - there might be a race condition',
             error: 'Duplicate key error'
+          });
+        } else if (error.name === 'ValidationError') {
+          reject({
+            status: 400,
+            success: false,
+            message: 'Validation error: ' + error.message,
+            error: error.message
           });
         } else {
           reject({
