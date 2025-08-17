@@ -189,7 +189,7 @@ module.exports = {
           console.error('Failed to send notification for equipment update:', notificationError);
           // Don't reject the main operation if notification fails
         }
-        
+
         resolve({
           status: 200,
           ok: true,
@@ -301,8 +301,8 @@ module.exports = {
         // Send notification for status change
         try {
           await createNotification({
-            title: "Equipment Status Changed",
-            description: `Status of ${updatedEquipment.machine} - ${updatedEquipment.regNo} changed from ${originalStatus} to ${status}`,
+            title: `${updatedEquipment.machine} - ${updatedEquipment.regNo} - {status} now`,
+            description: `${updatedEquipment.machine} - ${updatedEquipment.regNo} is in ${status} now`,
             priority: "high",
             sourceId: updatedEquipment._id,
             time: new Date()
@@ -310,8 +310,8 @@ module.exports = {
 
           await PushNotificationService.sendGeneralNotification(
             null, // broadcast to all users
-            'Equipment Status Changed', //title
-            `Status of ${updatedEquipment.machine} - ${updatedEquipment.regNo} changed from ${originalStatus} to ${status}`, //decription
+            `${updatedEquipment.machine} - ${updatedEquipment.regNo} - {status} now`, //title
+            `${updatedEquipment.machine} - ${updatedEquipment.regNo} is in ${status} now`, //decription
             'high', //priority
             'normal' // type
           );
