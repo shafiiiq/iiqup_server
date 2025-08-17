@@ -17,7 +17,7 @@ const addEquipmentStocks = async (req, res) => {
 const addEquipmentImage = async (req, res) => {
   try {
     const { equipmentNo, files } = req.body;
-    const imageLabel = files.label || 'Unlabeled';
+    console.log(files);
 
     if (!equipmentNo) {
       return res.status(400).json({
@@ -38,6 +38,9 @@ const addEquipmentImage = async (req, res) => {
     // Generate presigned URLs for each file
     const filesWithUploadData = await Promise.all(
       files.map(async (file) => {
+        // Get the label for this specific file, or use default
+        const imageLabel = file.label || 'Unlabeled';
+        
         const ext = path.extname(file.fileName);
         const finalFilename = `${equipmentNo}-${Date.now()}${ext}`;
         const s3Key = `equipment-images/${equipmentNo}/${finalFilename}`;
@@ -49,10 +52,11 @@ const addEquipmentImage = async (req, res) => {
         );
 
         // Save to database immediately after getting presigned URL
+        // Use the specific file's label
         const saveResult = await stockServices.addEquipmentImage(
           equipmentNo,
           s3Key,
-          imageLabel,
+          imageLabel, // Use the individual file's label
           finalFilename,
           file.mimeType
         );
@@ -69,6 +73,7 @@ const addEquipmentImage = async (req, res) => {
           type: file.mimeType.startsWith('video/') ? 'video' : 'photo',
           uploadUrl: uploadUrl,
           uploadDate: new Date(),
+          label: imageLabel, // Include the label in the response
           dbSaveResult: saveResult
         };
       })

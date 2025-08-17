@@ -222,7 +222,7 @@ app.use('/otp', otpRouter);
 app.use('/equipments', authMiddleware, equipementRouter);
 app.use('/service-report', serviceReport);
 app.use('/service-history', authMiddleware, serviceHistory);
-app.use('/stocks', authMiddleware, stocksRouter);
+app.use('/stocks', stocksRouter);
 app.use('/documents', documentsRouter);
 app.use('/dashboard', authMiddleware, dashboardRouter);
 app.use('/toolkits', authMiddleware, toolkitsRouter);
