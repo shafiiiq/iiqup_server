@@ -39,7 +39,7 @@ const getEquipmentsByReg = async (req, res) => {
 
 const updateEquipments = async (req, res) => {
   const { regNo } = req.params;
-  const updateData = req.body;
+  const updateData = req.body;  
 
   userServices.updateEquipments(regNo, updateData)
     .then((updatedUser) => {

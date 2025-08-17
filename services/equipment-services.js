@@ -107,9 +107,7 @@ module.exports = {
 
   updateEquipments: (regNo, updatedData) => {
     return new Promise(async (resolve, reject) => {
-
       try {
-
         const equipment = await equipmentModel.findOne({ regNo: regNo });
         if (!equipment) {
           return reject({ status: 404, ok: false, message: 'Equipment not found' });
@@ -118,35 +116,53 @@ module.exports = {
         // Store original data for notification comparison
         const originalEquipment = { ...equipment.toObject() };
 
-        if (updatedData.operator) {
-          if (!equipment.certificationBody) equipment.certificationBody = [];
+        // Remove immutable fields that shouldn't be updated
+        const { _id, __v, createdAt, ...cleanUpdatedData } = updatedData;
 
-          equipment.certificationBody.push(updatedData.operator);
-          delete updatedData.operator;
+        // Handle operator addition to certificationBody
+        let addedOperator = null;
+        const updateData = { ...cleanUpdatedData };
+
+        if (cleanUpdatedData.operator) {
+          addedOperator = cleanUpdatedData.operator;
+          // Use $push to add to certificationBody array
+          updateData.$push = { certificationBody: cleanUpdatedData.operator };
+          delete updateData.operator;
         }
 
-        Object.assign(equipment, updatedData);
-
-        await equipment.save();
+        const result = await equipmentModel.findOneAndUpdate(
+          { regNo: regNo },
+          updateData,
+          { new: true, runValidators: true }
+        );
 
         // Send notification for equipment update
         try {
-          // Build update description based on what changed
           const changes = [];
 
-          console.log(originalEquipment.site);
+          console.log('Original updatedData.site:', updatedData.site);
+          console.log('Type of updatedData.site:', typeof updatedData.site);
 
-
-          // Check if site changed
+          // Check if site changed with proper type checking
           if (updatedData.site && JSON.stringify(originalEquipment.site) !== JSON.stringify(updatedData.site)) {
-            changes.push(`site is: ${updatedData.site.join(', ')}`);
+            let siteText;
+
+            if (Array.isArray(updatedData.site)) {
+              siteText = updatedData.site.join(', ');
+            } else {
+              siteText = String(updatedData.site); // Convert to string if it's not an array
+            }
+
+            changes.push(`site is: ${siteText}`);
           }
 
           // Check if certificationBody changed (compare array lengths or last item)
           if (JSON.stringify(originalEquipment.certificationBody) !== JSON.stringify(updatedData.certificationBody)) {
-            // Get the last item from the certificationBody array
-            const lastOperator = updatedData.certificationBody[updatedData.certificationBody.length - 1];
-            changes.push(`operator is: ${lastOperator}`);
+            // Ensure certificationBody is an array and has items
+            if (Array.isArray(updatedData.certificationBody) && updatedData.certificationBody.length > 0) {
+              const lastOperator = updatedData.certificationBody[updatedData.certificationBody.length - 1];
+              changes.push(`operator is: ${lastOperator}`);
+            }
           }
 
           if (changes.length > 0) {
@@ -161,27 +177,27 @@ module.exports = {
             });
 
             await PushNotificationService.sendGeneralNotification(
-              'SAD-c6e8d3', // broadcast to all users
+              null, // broadcast to all users
               'Equipment Updated', //title
-              `${equipment.machine} - ${equipment.regNo}'s new ${changesText}`, //decription
+              `${equipment.machine} - ${equipment.regNo}'s new ${changesText}`, //description
               'medium', //priority
               'normal' // type
             );
           }
 
-
         } catch (notificationError) {
           console.error('Failed to send notification for equipment update:', notificationError);
           // Don't reject the main operation if notification fails
         }
-
+        
         resolve({
           status: 200,
           ok: true,
           message: 'Equipment updated successfully',
-          data: equipment
+          data: result
         });
       } catch (error) {
+        console.error('Error in updateEquipments:', error); // Added logging
         reject({ status: 500, ok: false, message: 'Unable to update equipment' });
       }
     });
