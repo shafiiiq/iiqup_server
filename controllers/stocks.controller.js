@@ -16,8 +16,8 @@ const addEquipmentStocks = async (req, res) => {
 
 const addEquipmentImage = async (req, res) => {
   try {
-    const { equipmentNo, label, files } = req.body;
-    const imageLabel = label || 'Unlabeled';
+    const { equipmentNo, files } = req.body;
+    const imageLabel = files.label || 'Unlabeled';
 
     if (!equipmentNo) {
       return res.status(400).json({
