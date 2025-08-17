@@ -301,7 +301,7 @@ module.exports = {
         // Send notification for status change
         try {
           await createNotification({
-            title: `${updatedEquipment.machine} - ${updatedEquipment.regNo} - {status} now`,
+            title: `${updatedEquipment.machine} - ${updatedEquipment.regNo} - ${status} now`,
             description: `${updatedEquipment.machine} - ${updatedEquipment.regNo} is in ${status} now`,
             priority: "high",
             sourceId: updatedEquipment._id,
@@ -310,7 +310,7 @@ module.exports = {
 
           await PushNotificationService.sendGeneralNotification(
             null, // broadcast to all users
-            `${updatedEquipment.machine} - ${updatedEquipment.regNo} - {status} now`, //title
+            `${updatedEquipment.machine} - ${updatedEquipment.regNo} - ${status} now`, //title
             `${updatedEquipment.machine} - ${updatedEquipment.regNo} is in ${status} now`, //decription
             'high', //priority
             'normal' // type
