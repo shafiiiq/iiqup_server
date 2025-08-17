@@ -196,7 +196,7 @@ module.exports = {
 
                 await createNotification({
                     title: `Time to full service - ${equipment.brand} ${equipment.machine} ${data.regNo}`,
-                    description: `${equipment.brand} ${equipment.machine} ${data.regNo}'s next service is full service`,
+                    description: `${equipment.brand} ${equipment.machine} ${data.regNo}'s next service is full service, NEXT SERVICE HR/KM: ${data.nextServiceHrs}`,
                     priority: "high",
                     sourceId: 'from applications',
                     time: new Date()
@@ -205,7 +205,7 @@ module.exports = {
                 await PushNotificationService.sendGeneralNotification(
                     null,
                     `Time to full service - ${equipment.brand} ${equipment.machine} ${data.regNo}`,
-                    `${equipment.brand} ${equipment.machine} ${data.regNo}'s next service is full service`,
+                    `${equipment.brand} ${equipment.machine} ${data.regNo}'s next service is full service, NEXT SERVICE HR/KM: ${data.nextServiceHrs}`,
                     'high',
                     'normal'
                 );
