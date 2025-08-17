@@ -117,25 +117,32 @@ module.exports = {
     });
   },
 
-  addEquipmentImage: (equipmentNo, imagePath, imageLabel, fileName, mimeType) => {
+  addEquipmentImage: (equipmentNo, imagePath, imageLabel, fileName, mimeType, equipmentName) => {
     return new Promise(async (resolve, reject) => {
       try {
-        const equipment = await stockHandoverModel.findOne({equipmentNo});
+        let equipment = await stockHandoverModel.findOne({ equipmentNo });
 
         if (!equipment) {
-          return resolve({
-            status: 404,
-            success: false,
-            message: 'Equipment not found'
+          // Create new equipment if it doesn't exist
+          equipment = new stockHandoverModel({
+            equipmentNo,
+            equipmentName: equipmentName || `Equipment ${equipmentNo}`, // Default name if not provided
+            images: [{
+              path: imagePath,
+              label: imageLabel,
+              fileName: fileName,
+              mimeType: mimeType
+            }]
+          });
+        } else {
+          // Add image to existing equipment
+          equipment.images.push({
+            path: imagePath,
+            label: imageLabel,
+            fileName: fileName,
+            mimeType: mimeType
           });
         }
-
-        equipment.images.push({
-          path: imagePath,
-          label: imageLabel,
-          fileName: fileName,
-          mimeType: mimeType
-        });
 
         equipment.updatedAt = new Date();
         await equipment.save();
@@ -143,12 +150,14 @@ module.exports = {
         resolve({
           status: 200,
           success: true,
-          message: 'Image added successfully', 
+          message: equipment.isNew ? 'Equipment created and image added successfully' : 'Image added successfully',
           data: {
             equipmentNo,
+            equipmentName: equipment.equipmentName,
             imagePath,
             imageLabel,
-            fileName
+            fileName,
+            isNewEquipment: !equipment.isNew
           }
         });
       } catch (error) {
