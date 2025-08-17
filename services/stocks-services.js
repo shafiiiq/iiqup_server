@@ -117,57 +117,94 @@ module.exports = {
     });
   },
 
-  addEquipmentImage: (equipmentNo, imagePath, imageLabel, fileName, mimeType, equipmentName) => {
+  addEquipmentImage: (equipmentNo, images, equipmentName) => {
     return new Promise(async (resolve, reject) => {
       try {
-        let equipment = await stockHandoverModel.findOne({ equipmentNo });
+        // Ensure images is an array
+        const imageArray = Array.isArray(images) ? images : [images];
 
-        if (!equipment) {
-          // Create new equipment if it doesn't exist
-          equipment = new stockHandoverModel({
-            equipmentNo,
-            equipmentName: equipmentName || `Equipment ${equipmentNo}`, // Default name if not provided
-            images: [{
-              path: imagePath,
-              label: imageLabel,
-              fileName: fileName,
-              mimeType: mimeType
-            }]
+        // Try to find existing equipment
+        let equipment = await stockHandoverModel.findOne({ equipmentNo: equipmentNo.toString() });
+
+        if (equipment) {
+          // Equipment exists - add new images to existing array
+          imageArray.forEach(img => {
+            equipment.images.push({
+              path: img.imagePath,
+              label: img.imageLabel,
+              fileName: img.fileName,
+              mimeType: img.mimeType
+            });
           });
+
+          equipment.updatedAt = new Date();
+          await equipment.save();
+
+          resolve({
+            status: 200,
+            success: true,
+            message: `${imageArray.length} image(s) added to existing equipment successfully`,
+            data: {
+              equipmentNo,
+              equipmentName: equipment.equipmentName,
+              totalImages: equipment.images.length,
+              addedImages: imageArray.length,
+              isNewEquipment: false
+            }
+          });
+
         } else {
-          // Add image to existing equipment
-          equipment.images.push({
-            path: imagePath,
-            label: imageLabel,
-            fileName: fileName,
-            mimeType: mimeType
+          // Equipment doesn't exist - create new one with images
+          const newImages = imageArray.map(img => ({
+            path: img.imagePath,
+            label: img.imageLabel,
+            fileName: img.fileName,
+            mimeType: img.mimeType
+          }));
+
+          equipment = new stockHandoverModel({
+            equipmentNo: equipmentNo.toString(),
+            equipmentName: equipmentName || `Equipment ${equipmentNo}`,
+            images: newImages,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          });
+
+          await equipment.save();
+
+          resolve({
+            status: 200,
+            success: true,
+            message: `Equipment created successfully with ${imageArray.length} image(s)`,
+            data: {
+              equipmentNo,
+              equipmentName: equipment.equipmentName,
+              totalImages: equipment.images.length,
+              addedImages: imageArray.length,
+              isNewEquipment: true
+            }
           });
         }
 
-        equipment.updatedAt = new Date();
-        await equipment.save();
-
-        resolve({
-          status: 200,
-          success: true,
-          message: equipment.isNew ? 'Equipment created and image added successfully' : 'Image added successfully',
-          data: {
-            equipmentNo,
-            equipmentName: equipment.equipmentName,
-            imagePath,
-            imageLabel,
-            fileName,
-            isNewEquipment: !equipment.isNew
-          }
-        });
       } catch (error) {
         console.error('Error adding equipment image:', error);
-        reject({
-          status: 500,
-          success: false,
-          message: 'Failed to add equipment image',
-          error: error.message
-        });
+
+        // Handle duplicate key error specifically
+        if (error.code === 11000) {
+          reject({
+            status: 409,
+            success: false,
+            message: 'Equipment number already exists - there might be a race condition',
+            error: 'Duplicate key error'
+          });
+        } else {
+          reject({
+            status: 500,
+            success: false,
+            message: 'Failed to add equipment image',
+            error: error.message
+          });
+        }
       }
     });
   },
