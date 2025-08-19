@@ -155,11 +155,13 @@ var server = http.createServer(app);
 const corsOptions = {
   origin: [
     'http://localhost:3000',
-    'http://localhost:3001', 
+    'http://localhost:3001',
     'https://ansarigroup.online',
     'https://www.ansarigroup.online',
     'http://localhost:4041',
-    'http://192.168.100.53:3000'
+    'http://192.168.100.53:3000',
+    'https://localhost:3000',
+    'https://192.168.100.53:3000'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [
@@ -179,11 +181,13 @@ const io = socketIo(server, {
   cors: {
     origin: [
       'http://localhost:3000',
-      'http://localhost:3001', 
+      'http://localhost:3001',
       'https://ansarigroup.online',
       'https://www.ansarigroup.online',
       'http://localhost:4041',
-      'http://192.168.100.53:300'
+      'http://192.168.100.53:3000',
+      'https://localhost:3000',
+      'https://192.168.100.53:3000'
     ],
     methods: ["GET", "POST"],
     credentials: true
