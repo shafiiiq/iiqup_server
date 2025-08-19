@@ -413,6 +413,40 @@ const getUserPushTokens = async (req, res) => {
   }
 }
 
+const verifyDocAuthUser = async (req, res) => {
+  const { password } = req.body;
+
+  if (!password) {
+    return res.status(400).json({
+      success: false,
+      message: 'Email and password are required'
+    });
+  }
+
+  try {
+    const result = await userServices.verifyDocAuthUserCreds(password);
+    res.status(result.status).json(result);
+  } catch (err) {
+    res.status(err.status || 500).json({
+      success: false,
+      message: 'Authentication failed',
+      error: err.message
+    });
+  }
+}
+
+const getSignKey = async (req, res) => {
+  userServices.getAuthSignKey(req.body.password)
+    .then((data) => {
+      if (data) {
+        res.status(data.status).json(data)
+      }
+    })
+    .catch((err) => {
+      res.status(err.status || 500).json({ message: 'Cannot get all users', error: err.message })
+    })
+}
+
 const sendTestNotification = async (req, res) => {
   try {
     const { uniqueCode, title, message } = req.body;
@@ -456,8 +490,6 @@ const sendTestNotification = async (req, res) => {
 }
 
 const getUserRoles = async (req, res) => {
-  console.log("yesssssssssss");
-  
   // Debug: Log each environment variable to see which ones are missing
   console.log("Environment variables check:");
   console.log("MECHANIC:", process.env.MECHANIC);
@@ -465,7 +497,7 @@ const getUserRoles = async (req, res) => {
   console.log("OPERATOR:", process.env.OPERATOR);
   console.log("CAMP_BOSS:", process.env.CAMP_BOSS);
   console.log("MECHANIC_HEAD:", process.env.MECHANIC_HEAD);
-  
+
   if (process.env.MECHANIC &&
     process.env.MAINTANANCE_HEAD &&
     process.env.OPERATOR &&
@@ -489,9 +521,9 @@ const getUserRoles = async (req, res) => {
     if (!process.env.OPERATOR) missingVars.push('OPERATOR');
     if (!process.env.CAMP_BOSS) missingVars.push('CAMP_BOSS');
     if (!process.env.MECHANIC_HEAD) missingVars.push('MECHANIC_HEAD');
-    
+
     console.log("Missing environment variables:", missingVars);
-    res.status(500).json({ 
+    res.status(500).json({
       message: 'Cannot get all roles',
       missingVariables: missingVars
     });
@@ -520,5 +552,7 @@ module.exports = {
   removePushToken,
   getUserPushTokens,
   sendTestNotification,
-  getUserRoles
+  getUserRoles,
+  verifyDocAuthUser,
+  getSignKey
 };

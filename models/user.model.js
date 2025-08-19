@@ -120,6 +120,9 @@ const userSchema = new Schema({
     type: Date,
     required: true
   },
+  docAuthPasw: {
+    type: String
+  },
   pushTokens: [{
     token: {
       type: String,   // Expo push token

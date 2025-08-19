@@ -550,6 +550,62 @@ const verifyUserCredentials = async (email, password, type) => {
   }
 };
 
+
+/**
+ * Verify doc auth user credentials for login
+ * @param {string} email - User's email
+ * @param {string} password - User's password
+ * @returns {Promise} - Promise with the result of the operation
+ */
+const verifyDocAuthUserCreds = async (password) => {
+  try {
+
+    const user = await User.findOne({ email: process.env.AUTH_USER });
+
+    if (!user) {
+      return {
+        status: 401,
+        success: false,
+        message: 'Invalid email or password',
+      };
+    }
+
+    // Check if user is active
+    if (!user.isActive) {
+      return {
+        status: 403,
+        success: false,
+        message: 'Your account has been deactivated. Please contact an administrator.'
+      };
+    }
+
+    // Compare passwords
+    const isPasswordValid = await bcrypt.compare(password, user.docAuthPasw);
+
+    if (!isPasswordValid) {
+      return {
+        status: 401,
+        success: false,
+        message: 'Invalid email or password'
+      };
+    }
+
+    return {
+      status: 200,
+      success: true,
+      message: 'Authentication successful',
+    };
+  } catch (error) {
+    return {
+      status: 500,
+      success: false,
+      message: 'Authentication failed',
+      error: error.message
+    };
+  }
+};
+
+
 /**
  * Update user's phone number
  * @param {string} userId - User's ID
@@ -1617,6 +1673,35 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
   }
 };
 
+const getAuthSignKey = async (password) => {
+  console.log("yes  ",password);
+  
+  const response = await verifyDocAuthUserCreds(password)
+  try {
+    if (response.status !== 200) {
+      return {
+        status: 500,
+        message: 'Failed to fetch doc sign key',
+        error: response.message
+      }
+    }
+
+    return {
+      status: 200,
+      data: {
+        sign_key: process.env.DOC_SIGN_KEY,
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching doc sign key:', error);
+    throw {
+      status: 500,
+      message: 'Failed to fetch doc sign key',
+      error: error.message
+    };
+  }
+};
+
 const cleanupInvalidTokens = async (uniqueCode = null) => {
   try {
     const query = uniqueCode ? { uniqueCode } : {};
@@ -1751,6 +1836,8 @@ module.exports = {
   sendNotificationToUser,
   sendBulkNotifications,
   cleanupInvalidTokens,
+  verifyDocAuthUserCreds,
+  getAuthSignKey,
 
   // Also add the helper functions if needed:
   getFileType,

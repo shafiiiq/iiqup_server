@@ -10,14 +10,21 @@ const s3Client = new S3Client({
     }
 });
 
-const getObjectUrl = async (key, isLong) => {
+const getObjectUrl = async (key, isLong, isAuthSign = false) => {
     // Use GetObjectCommand instead of GetObjectAclCommand for getting object URLs
     const command = new GetObjectCommand({
         Bucket: process.env.BUCKET_NAME,
         Key: key // Note: Capital 'K' in Key
     });
 
-    const expiresIn = !isLong ? 3600 : 86400; // 1 hour vs 24 hours
+    let expiresIn;
+    if (!isLong) {
+        expiresIn = 3600; // 1 hour
+    } else if (isAuthSign) {
+        expiresIn = 10;  // 10 seconds
+    } else {
+        expiresIn = 86400; // 24 hours
+    }
     const url = await getSignedUrl(s3Client, command, { expiresIn });
     return url;
 };

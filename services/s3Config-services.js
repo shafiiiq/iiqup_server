@@ -1,11 +1,11 @@
 const { getObjectUrl } = require('../s3bucket/s3.bucket');
 
 module.exports = {
-    fetchPresignedURL: (s3key, isLong) => {
-        
+    fetchPresignedURL: (s3key, isLong, isAuthSign = false) => {
+
         return new Promise(async (resolve, reject) => {
             try {
-                const dataURL = await getObjectUrl(s3key, isLong);
+                const dataURL = await getObjectUrl(s3key, isLong, isAuthSign);
                 resolve({
                     status: 200,
                     ok: true,
