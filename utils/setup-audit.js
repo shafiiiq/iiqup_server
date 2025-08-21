@@ -1,9 +1,7 @@
 const { createAuditMiddleware } = require('../middleware/audit-middleware');
 const mongoose = require('mongoose');
 
-function setupAuditTracking() {
-  console.log('🔧 Starting audit tracking setup...');
-  
+function setupAuditTracking() {  
   try {
     // Define model paths and their collection names
     const modelConfigs = [
@@ -20,17 +18,13 @@ function setupAuditTracking() {
 
     modelConfigs.forEach(config => {
       try {
-        console.log(`🔍 Loading model: ${config.path}`);
         const Model = require(config.path);
         
         if (Model && Model.schema) {
           // Get the actual collection name from the model
-          const actualCollectionName = Model.collection.name;
-          console.log(`📝 Model collection name: ${actualCollectionName}`);
-          
+          const actualCollectionName = Model.collection.name;          
           // Apply audit middleware
           Model.schema.plugin(createAuditMiddleware(actualCollectionName));
-          console.log(`✅ Audit tracking enabled for ${actualCollectionName}`);
         } else {
           console.warn(`⚠️  Model ${config.path} does not have a schema`);
         }
@@ -39,7 +33,6 @@ function setupAuditTracking() {
       }
     });
     
-    console.log('✅ Audit tracking setup completed successfully');
   } catch (error) {
     console.error('❌ Error in setupAuditTracking:', error);
   }
@@ -48,7 +41,6 @@ function setupAuditTracking() {
 // Fixed test function with proper ObjectId usage
 async function testAuditLogging() {
   try {
-    console.log('🧪 Testing audit logging...');
     const AuditLog = require('../models/audit-log.model');
     
     // Create a test audit log with proper ObjectId instantiation
@@ -60,12 +52,9 @@ async function testAuditLogging() {
       source: 'test',
       timestamp: new Date()
     });
-    
-    console.log('✅ Test audit log created:', testLog._id);
-    
+        
     // Clean up test log
     await AuditLog.deleteOne({ _id: testLog._id });
-    console.log('🧹 Test log cleaned up');
     
     return true;
   } catch (error) {

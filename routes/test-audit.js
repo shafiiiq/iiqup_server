@@ -7,9 +7,7 @@ const mongoose = require('mongoose');
 
 // Test route to manually create audit logs
 router.post('/test-audit-create', async (req, res) => {
-  try {
-    console.log('🧪 Creating test audit log...');
-    
+  try {    
     const testLog = await AuditLog.create({
       documentId: new mongoose.Types.ObjectId(),
       collectionName: 'test-collection',
@@ -21,9 +19,7 @@ router.post('/test-audit-create', async (req, res) => {
       source: 'manual-test',
       timestamp: new Date()
     });
-    
-    console.log('✅ Test audit log created:', testLog);
-    
+        
     res.json({
       status: 200,
       message: 'Test audit log created successfully',
@@ -41,7 +37,6 @@ router.post('/test-audit-create', async (req, res) => {
 // Test route to try creating a document in one of your collections
 router.post('/test-collection-create', async (req, res) => {
   try {
-    console.log('🧪 Testing collection document creation...');
     
     // Try to create a test document in the equipment collection
     const Equipment = require('../models/equip.model');
@@ -54,12 +49,10 @@ router.post('/test-collection-create', async (req, res) => {
     });
     
     const saved = await testEquipment.save();
-    console.log('✅ Test equipment created:', saved._id);
     
     // Check if audit log was created
     setTimeout(async () => {
       const auditLogs = await AuditLog.find({ documentId: saved._id });
-      console.log('📋 Audit logs for test equipment:', auditLogs);
     }, 1000);
     
     res.json({
@@ -79,9 +72,7 @@ router.post('/test-collection-create', async (req, res) => {
 
 // Test route to update a document
 router.post('/test-collection-update/:id', async (req, res) => {
-  try {
-    console.log('🧪 Testing collection document update...');
-    
+  try {    
     const Equipment = require('../models/equip.model');
     
     const updated = await Equipment.findByIdAndUpdate(
@@ -99,13 +90,10 @@ router.post('/test-collection-update/:id', async (req, res) => {
         error: 'Equipment not found'
       });
     }
-    
-    console.log('✅ Test equipment updated:', updated._id);
-    
+        
     // Check if audit log was created
     setTimeout(async () => {
       const auditLogs = await AuditLog.find({ documentId: updated._id });
-      console.log('📋 Audit logs for updated equipment:', auditLogs);
     }, 1000);
     
     res.json({

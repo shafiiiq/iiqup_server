@@ -66,8 +66,6 @@ class ComplaintController {
         })
       );
 
-      console.log('Files with upload data:', filesWithUploadData);
-
       // Create complaint document (without saving yet)
       const complaintData = {
         uniqueCode,

@@ -158,6 +158,7 @@ const corsOptions = {
     'https://ansarigroup.online',
     'https://www.ansarigroup.online',
     'http://localhost:4041',
+    'http://localhost:3000',
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [

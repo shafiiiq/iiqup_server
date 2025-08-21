@@ -20,12 +20,8 @@ const uploadDocument = async (req, res) => {
       });
     }
 
-    console.log(req.body);
-
     // Save to database and get presigned URL
     const result = await documentServices.saveDocument(regNo, documentType, { fileName, mimeType }, description, category);
-
-    console.log(result);
 
     res.status(200).json({
       status: 200,
@@ -93,9 +89,6 @@ const getAllDocuments = async (req, res) => {
 
 // NEW: Download document endpoint
 const downloadDocument = async (req, res) => {
-
-  console.log("not here");
-
   try {
     const { documentId } = req.params;
 
@@ -144,7 +137,6 @@ const viewDocument = async (req, res) => {
       return res.status(result.status).json(result);
     }
     
-    console.log(result);
     res.status(200).json(result);
 
   } catch (err) {

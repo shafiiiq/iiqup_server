@@ -11,8 +11,6 @@ module.exports = {
       try {
         const existingUser = await equipmentModel.findOne({ regNo: data.regNo });
 
-
-
         if (existingUser) {
           return reject({
             status: 500,
@@ -139,10 +137,6 @@ module.exports = {
         // Send notification for equipment update
         try {
           const changes = [];
-
-          console.log('Original updatedData.site:', updatedData.site);
-          console.log('Type of updatedData.site:', typeof updatedData.site);
-
           // Check if site changed with proper type checking
           if (updatedData.site && JSON.stringify(originalEquipment.site) !== JSON.stringify(updatedData.site)) {
             let siteText;

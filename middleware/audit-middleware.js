@@ -6,9 +6,7 @@ const mongoose = require('mongoose');
  * Enhanced audit middleware with proper error handling and ObjectId fix
  */
 function createAuditMiddleware(collectionName) {
-  return function(schema) {
-    console.log(`🔧 Applying audit middleware to ${collectionName}`);
-    
+  return function(schema) {    
     // Helper function to safely create audit log
     async function createAuditLog(data) {
       try {
@@ -19,7 +17,6 @@ function createAuditMiddleware(collectionName) {
         });
         
         const saved = await auditLog.save();
-        console.log(`✅ Audit log created: ${collectionName} - ${data.action} - ${saved._id}`);
         return saved;
       } catch (error) {
         console.error(`❌ Failed to create audit log for ${collectionName}:`, error.message);
@@ -52,7 +49,6 @@ function createAuditMiddleware(collectionName) {
     // Track CREATE operations
     schema.post('save', async function(doc) {
       if (this.isNew) {
-        console.log(`📝 Document created in ${collectionName}:`, doc._id);
         await createAuditLog({
           documentId: doc._id,
           action: 'CREATE',
@@ -69,7 +65,6 @@ function createAuditMiddleware(collectionName) {
 
     schema.post('findOneAndUpdate', async function(doc) {
       if (doc && this._originalDoc) {
-        console.log(`📝 Document updated in ${collectionName}:`, doc._id);
         const changes = detectChanges(this._originalDoc, doc);
         
         await createAuditLog({
@@ -85,7 +80,6 @@ function createAuditMiddleware(collectionName) {
     // Track UPDATE operations - updateOne/updateMany
     schema.post('updateOne', async function(result) {
       if (result.modifiedCount > 0) {
-        console.log(`📝 Document updated (updateOne) in ${collectionName}`);
         const query = this.getQuery();
         const docId = query._id;
         
@@ -104,7 +98,6 @@ function createAuditMiddleware(collectionName) {
     // Track DELETE operations - findOneAndDelete
     schema.post('findOneAndDelete', async function(doc) {
       if (doc) {
-        console.log(`📝 Document deleted in ${collectionName}:`, doc._id);
         await createAuditLog({
           documentId: doc._id,
           action: 'DELETE',
@@ -117,7 +110,6 @@ function createAuditMiddleware(collectionName) {
     // Track DELETE operations - deleteOne
     schema.post('deleteOne', async function(result) {
       if (result.deletedCount > 0) {
-        console.log(`📝 Document deleted (deleteOne) in ${collectionName}`);
         const query = this.getQuery();
         const docId = query._id;
         
@@ -131,8 +123,6 @@ function createAuditMiddleware(collectionName) {
         }
       }
     });
-
-    console.log(`✅ Audit middleware applied successfully to ${collectionName}`);
   };
 }
 

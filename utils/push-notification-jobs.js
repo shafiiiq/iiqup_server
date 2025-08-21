@@ -16,8 +16,6 @@ class PushNotificationService {
      */
     static async sendNotificationToUser(uniqueCode, notificationData) {
         try {
-            console.log(`📤 Sending notification to user ${uniqueCode}:`, notificationData.title);
-
             const results = {
                 websocket: { success: false },
                 pushNotification: { success: false }
@@ -75,7 +73,6 @@ class PushNotificationService {
      */
     static async broadcastNotification(notificationData) {
         try {
-            console.log(`📢 Broadcasting notification:`, notificationData.title);
 
             const results = {
                 websocket: { success: false },
@@ -141,9 +138,6 @@ class PushNotificationService {
                     message: 'No user IDs provided'
                 };
             }
-
-            console.log(`📤 Sending notification to ${uniqueCodes.length} users:`, notificationData.title);
-
             const results = {
                 websocket: { success: 0, failed: 0 },
                 pushNotification: { success: 0, failed: 0 },
@@ -222,9 +216,7 @@ class PushNotificationService {
      * @param {object} stockInfo - Stock information
      * @param {string} message - Custom message
      */
-    static async sendStockAlert(uniqueCode, stockInfo, message) {
-        console.log("yessssssssssssssssssss hereeeeeeeeeeeeeeee");
-        
+    static async sendStockAlert(uniqueCode, stockInfo, message) {        
         const notification = {
             _id: `stock_${stockInfo._id}_${Date.now()}`,
             type: 'special',
@@ -361,8 +353,6 @@ class PushNotificationService {
 
             user.updatedAt = new Date();
             await user.save();
-
-            console.log(`✅ Special notification stored for user ${uniqueCode}`);
 
         } catch (error) {
             console.error('❌ Error storing special notification:', error);

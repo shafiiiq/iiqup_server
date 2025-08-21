@@ -3,8 +3,6 @@ const connectedUsers = new Map(); // Store connected users with their socket IDs
 
 const setupWebSocket = (io) => {
   io.on('connection', (socket) => {
-    console.log('New client connected:', socket.id);
-
     // Handle user authentication/registration
     socket.on('authenticate', (data) => {
       const { uniqueCode, userId } = data;
@@ -15,7 +13,6 @@ const setupWebSocket = (io) => {
           connectedAt: new Date()
         });
         socket.join(`user_${uniqueCode}`); // Join user-specific room
-        console.log(`User ${uniqueCode} authenticated and joined room`);
         
         // Send confirmation
         socket.emit('authenticated', { success: true, message: 'Connected successfully' });
@@ -24,13 +21,11 @@ const setupWebSocket = (io) => {
 
     // Handle user disconnection
     socket.on('disconnect', () => {
-      console.log('Client disconnected:', socket.id);
       
       // Remove user from connected users map
       for (const [uniqueCode, userData] of connectedUsers.entries()) {
         if (userData.socketId === socket.id) {
           connectedUsers.delete(uniqueCode);
-          console.log(`User ${uniqueCode} disconnected`);
           break;
         }
       }
@@ -57,7 +52,6 @@ const sendNotificationToUser = (uniqueCode, notification) => {
     };
     
     global.io.to(`user_${uniqueCode}`).emit('new_notification', enrichedNotification);
-    console.log(`Backend sending to user ${uniqueCode}:`, notification.title || notification.message);
   }
 };
 
@@ -65,7 +59,6 @@ const sendNotificationToUser = (uniqueCode, notification) => {
 const broadcastNotification = (notification) => {
   if (global.io) {
     global.io.emit('new_notification', notification);
-    console.log('Notification broadcasted to all users:', notification.title || notification.message);
   }
 };
 

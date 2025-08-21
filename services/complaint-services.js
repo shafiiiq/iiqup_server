@@ -12,7 +12,6 @@ class ComplaintService {
       const equipment = await Equipment.findOne({ regNo: complaint.regNo });
 
       const complaintDateToSave = new Complaint(complaint)
-      console.log(complaintDateToSave);
       await complaintDateToSave.save();
 
       // Create notifications

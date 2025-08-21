@@ -27,15 +27,14 @@ const USER_ROLES = {
   WORKSHOP_MANAGER: 'WORKSHOP_MANAGER',
   MAINTENANCE_HEAD: 'MAINTENANCE_HEAD',
   MECHANIC_HEAD: 'MECHANIC_HEAD',
-  OPERATOR: 'OPERATOR'
-  // Add more roles as needed
-  // ACCOUNTANT: 'ACCOUNTANT',
-  // HR_MANAGER: 'HR_MANAGER',
-  // INVENTORY_MANAGER: 'INVENTORY_MANAGER',
+  OPERATOR: 'OPERATOR',
+  GUEST_USER: 'GUEST_USER',
+  ACCOUNTANT: 'ACCOUNTANT',
 };
 
 // Insert a new user
 const insertUser = async (userData) => {
+
   try {
     // Hash password
     const salt = await bcrypt.genSalt(10);
@@ -70,7 +69,7 @@ const insertUser = async (userData) => {
       const token = generateToken(newUser);
 
       return {
-        status: 201,
+        status: 200,
         message: 'User created successfully',
         data: {
           user: {
@@ -412,6 +411,9 @@ const generateUniqueCode = (role) => {
       break;
     case USER_ROLES.OPERATOR:
       prefix = 'OPR';
+      break;
+    case USER_ROLES.GUEST_USER:
+      prefix = 'GUE';
       break;
     default:
       prefix = 'USR';
@@ -1390,8 +1392,6 @@ const insertPushToken = async (uniqueCode, pushToken, platform = null) => {
     user.updatedAt = new Date();
     await user.save();
 
-    console.log(`✅ Push token registered for user ${uniqueCode}`);
-
     return {
       success: true,
       message: 'Push token registered successfully',
@@ -1447,8 +1447,6 @@ const removePushToken = async (uniqueCode, pushToken) => {
     // Update the user
     user.updatedAt = new Date();
     await user.save();
-
-    console.log(`✅ Push token removed for user ${uniqueCode}`);
 
     return {
       success: true,
@@ -1556,8 +1554,6 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
     const errors = tickets.filter(ticket => ticket.status === 'error');
     const successful = tickets.filter(ticket => ticket.status === 'ok');
 
-    console.log(`✅ Sent ${successful.length} notifications to user ${uniqueCode}`);
-
     if (errors.length > 0) {
       console.warn(`⚠️ ${errors.length} notifications failed for user ${uniqueCode}`);
     }
@@ -1649,8 +1645,6 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
     const errors = tickets.filter(ticket => ticket.status === 'error');
     const successful = tickets.filter(ticket => ticket.status === 'ok');
 
-    console.log(`✅ Sent bulk notifications: ${successful.length} successful, ${errors.length} failed`);
-
     return {
       success: true,
       message: 'Bulk notifications sent successfully',
@@ -1674,8 +1668,6 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
 };
 
 const getAuthSignKey = async (password) => {
-  console.log("yes  ",password);
-  
   const response = await verifyDocAuthUserCreds(password)
   try {
     if (response.status !== 200) {
@@ -1752,7 +1744,6 @@ const cleanupFiles = (files) => {
     try {
       if (fs.existsSync(file.path)) {
         fs.unlinkSync(file.path);
-        console.log(`Cleaned up file: ${file.filename}`);
       }
     } catch (error) {
       console.error(`Error cleaning up file ${file.filename}:`, error.message);

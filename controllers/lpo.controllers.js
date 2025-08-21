@@ -145,8 +145,6 @@ class LPOController {
       
       const latestRef = await lpoService.getLatestLPORef();
 
-      console.log(latestRef);
-
       res.status(200).json({
         success: true,
         message: 'Latest LPO reference retrieved successfully',

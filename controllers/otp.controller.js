@@ -12,9 +12,6 @@ const requestOTP = async (req, res) => {
     email = process.env.AUTH_OTP_USER_EMAIL
   }
 
-  console.log("emailll", email);
-
-
   if (!email) {
     return res.status(400).json({
       success: false,

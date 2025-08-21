@@ -8,11 +8,7 @@ const backupData = async () => {
     const databaseName = 'alansari';
     const backupPath = 'C:\\mongoData';
     const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017';
-    
-    console.log('🕒 Backup process initiated...');
-    console.log(`📊 Database: ${databaseName}`);
-    console.log(`📁 Target path: ${backupPath}`);
-    
+        
     // Generate timestamp for backup folder
     const timestamp = new Date().toISOString()
         .replace(/[:.]/g, '-')
@@ -92,12 +88,6 @@ const backupData = async () => {
             console.log(`📦 Backup contains ${files.length} collection files`);
             console.log(`📋 Files: ${files.join(', ')}`);
         }
-
-        console.log(`✅ Backup completed successfully: ${backupName}`);
-        console.log(`📁 Location: ${backupFullPath}`);
-        console.log(`📊 Total documents backed up: ${totalDocuments}`);
-        console.log(`⏱️ Duration: ${duration} seconds`);
-        console.log(`🎉 Backup process finished at ${new Date().toLocaleString()}`);
 
     } catch (error) {
         console.error('❌ Backup failed:', error.message);

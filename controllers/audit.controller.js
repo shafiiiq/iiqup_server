@@ -237,9 +237,7 @@ async function createTestData(req, res) {
       
       const savedEquipment = await testEquipment.save();
       testDataCreated.push({ type: 'equipment', id: savedEquipment._id, name: savedEquipment.name });
-      console.log('✅ Test equipment created:', savedEquipment._id);
     } catch (error) {
-      console.log('⚠️  Equipment creation failed:', error.message);
     }
     
     // Test Service Report creation
@@ -255,9 +253,7 @@ async function createTestData(req, res) {
       
       const savedReport = await testServiceReport.save();
       testDataCreated.push({ type: 'service-report', id: savedReport._id, title: savedReport.title });
-      console.log('✅ Test service report created:', savedReport._id);
     } catch (error) {
-      console.log('⚠️  Service report creation failed:', error.message);
     }
     
     // Test Document creation
@@ -272,9 +268,7 @@ async function createTestData(req, res) {
       
       const savedDocument = await testDocument.save();
       testDataCreated.push({ type: 'document', id: savedDocument._id, name: savedDocument.name });
-      console.log('✅ Test document created:', savedDocument._id);
     } catch (error) {
-      console.log('⚠️  Document creation failed:', error.message);
     }
     
     // Wait a moment for audit logs to be created
@@ -283,9 +277,7 @@ async function createTestData(req, res) {
     // Check audit logs
     const totalAuditLogs = await AuditLog.countDocuments();
     const recentLogs = await AuditLog.find().sort({ timestamp: -1 }).limit(5);
-    
-    console.log(`📊 Total audit logs after test data creation: ${totalAuditLogs}`);
-    
+        
     res.json({
       status: 200,
       message: `Created ${testDataCreated.length} test items`,
@@ -345,7 +337,6 @@ async function updateTestData(req, res) {
     await new Promise(resolve => setTimeout(resolve, 2000));
     
     const totalAuditLogs = await AuditLog.countDocuments();
-    console.log(`📊 Total audit logs after updates: ${totalAuditLogs}`);
     
     res.json({
       status: 200,
@@ -398,9 +389,7 @@ async function createTestAuditLogs(req, res) {
       
       testLogs.push(testLog);
     }
-    
-    console.log(`✅ Created ${testLogs.length} test audit logs`);
-    
+        
     res.json({
       status: 200,
       message: `Created ${testLogs.length} test audit logs successfully`,

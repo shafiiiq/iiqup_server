@@ -61,7 +61,6 @@ router.get('/add-encrypted-password', async (req, res) => {
       { email: mail },
       { $set: { docAuthPasw: encPasw } }
     );
-    console.log(`Updated ${result.docAuthPasw} documents successfully`);
     res.status(200).json({
       success: true,
       message: `Updated ${result.modifiedCount} documents successfully`,

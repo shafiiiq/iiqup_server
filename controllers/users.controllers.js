@@ -27,6 +27,18 @@ const getUsers = async (req, res) => {
     })
 }
 
+const getAllUsers = async (req, res) => {
+  userServices.fetchAllUsers()
+    .then((fetchedUsers) => {
+      if (fetchedUsers) {
+        res.status(fetchedUsers.status).json(fetchedUsers)
+      }
+    })
+    .catch((err) => {
+      res.status(err.status || 500).json({ message: 'Cannot get all users', error: err.message })
+    })
+}
+
 const updateUser = async (req, res) => {
   const { id } = req.params;
   const updateData = req.body;
@@ -533,6 +545,7 @@ const getUserRoles = async (req, res) => {
 module.exports = {
   addUsers,
   getUsers,
+  getAllUsers,
   updateUser,
   deleteUser,
   verifyUser,

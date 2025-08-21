@@ -12,7 +12,6 @@ const cleanupUploadedFiles = (files) => {
     try {
       if (fs.existsSync(file.path)) {
         fs.unlinkSync(file.path);
-        console.log(`Cleaned up file: ${file.filename}`);
       }
     } catch (error) {
       console.error(`Error cleaning up file ${file.filename}:`, error.message);
@@ -85,7 +84,6 @@ const formatFileSize = (bytes) => {
 const ensureDirectoryExists = (dirPath) => {
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });
-    console.log(`Created directory: ${dirPath}`);
   }
 };
 
@@ -97,7 +95,6 @@ const deleteFile = (filePath) => {
   try {
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
-      console.log(`Deleted file: ${filePath}`);
       return true;
     }
     return false;

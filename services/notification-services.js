@@ -24,10 +24,7 @@ const getPendingNotifications = async (uniqueCode, since) => {
 
     const notifications = await Notification.find(query)
       .sort({ createdAt: -1 })
-      .lean();
-
-      console.log(notifications);
-      
+      .lean();      
 
     return notifications;
   } catch (error) {

@@ -15,16 +15,13 @@ module.exports = mongoose.connect(process.env.MONGO_URI)
       
       // Get current indexes
       const indexes = await collection.indexes();
-      console.log('Current indexes:', indexes.map(idx => idx.name));
       
       // Drop problematic indexes (keep _id index)
       for (const index of indexes) {
         if (index.name !== '_id_' && index.name !== 'equipmentNo_1') {
           try {
             await collection.dropIndex(index.name);
-            console.log(`Dropped index: ${index.name}`);
           } catch (err) {
-            console.log(`Could not drop ${index.name}:`, err.message);
           }
         }
       }

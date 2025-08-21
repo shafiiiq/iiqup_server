@@ -156,15 +156,12 @@ const deleteServiceHistory = async (req, res) => {
   const { id, type } = req.params;
 
   serviceHistoryServices.deleteServiceHistory(id, type)
-    .then((result) => {
-      console.log(result);
-      
+    .then((result) => {      
       if (result) {
         res.status(result.status).json(result);
       }
     })
     .catch((err) => {
-       console.log(err);
       res.status(err.status || 500).json({ error: err.message });
     });
 };

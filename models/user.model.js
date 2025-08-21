@@ -13,6 +13,7 @@ const userRoles = {
   WORKSHOP_MANAGER: 'WORKSHOP_MANAGER',
   MAINTENANCE_HEAD: 'MAINTENANCE_HEAD',
   MECHANIC_HEAD: 'MECHANIC_HEAD',
+  GUEST_USER: 'GUEST_USER'
   // Add more roles as needed
 };
 
@@ -118,7 +119,6 @@ const userSchema = new Schema({
   }],
   joiningDate: {
     type: Date,
-    required: true
   },
   docAuthPasw: {
     type: String

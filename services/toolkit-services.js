@@ -198,8 +198,6 @@ const updateVariant = async (toolkitId, variantId, updateData) => {
       action = newStock > previousStock ? 'added' : 'reduced';
       const reason = updateData.reason || `Stock ${action}: ${Math.abs(newStock - previousStock)} items`;
 
-      console.log(action);
-
       addStockHistoryEntry(
         variant,
         action,
@@ -517,8 +515,6 @@ const updateToolkit = async (toolkitId, updateData) => {
       },
       { new: true, runValidators: true }
     );
-
-    console.log('Updated toolkit:', updatedToolkit);
 
     return {
       status: 200,
