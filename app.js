@@ -152,14 +152,25 @@ var app = express();
 var server = http.createServer(app);
 
 // CORS configuration for Express
+// CORS configuration for Express
 const corsOptions = {
-  origin: [
-    'https://iiqup.netlify.app',
-    'https://ansarigroup.online',
-    'https://www.ansarigroup.online',
-    'http://localhost:4041',
-    'http://localhost:3000',
-  ],
+  origin: function (origin, callback) {
+    // allow requests with no origin (React Native app)
+    if (!origin) return callback(null, true);
+
+    // whitelist of allowed domains for web
+    const whitelist = [
+      'https://iiqup.netlify.app',
+      'https://ansarigroup.online',
+      'https://www.ansarigroup.online',
+    ];
+
+    if (whitelist.indexOf(origin) !== -1) {
+      callback(null, true); // allow
+    } else {
+      callback(new Error('Not allowed by CORS')); // block
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [
     'Origin',
@@ -167,24 +178,28 @@ const corsOptions = {
     'Content-Type',
     'Accept',
     'Authorization',
-    'Cache-Control'
+    'Cache-Control',
   ],
   credentials: true,
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
 };
 
-// Setup Socket.IO
+// Socket.IO CORS (same logic)
 const io = socketIo(server, {
   cors: {
-    origin: [
-      'https://iiqup.netlify.app',
-      'https://ansarigroup.online',
-      'https://www.ansarigroup.online',
-      'http://localhost:4041',
-    ],
-    methods: ["GET", "POST"],
-    credentials: true
-  }
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+      const whitelist = [
+        'https://iiqup.netlify.app',
+        'https://ansarigroup.online',
+        'https://www.ansarigroup.online',
+      ];
+      if (whitelist.indexOf(origin) !== -1) callback(null, true);
+      else callback(new Error('Not allowed by CORS'));
+    },
+    methods: ['GET', 'POST'],
+    credentials: true,
+  },
 });
 
 // Setup WebSocket handlers
@@ -199,11 +214,9 @@ app.use(autoBackup());
 // Middleware setup
 app.use(logger('dev'));
 
-// Apply CORS middleware with proper configuration
+// Apply CORS middleware
 app.use(cors(corsOptions));
-
-// Handle preflight requests
-app.options('*', cors(corsOptions));
+app.options('*', cors(corsOptions)); // handle preflight requests
 
 // Body parsing middleware
 app.use(express.json({ limit: '50gb' }));
