@@ -6,7 +6,7 @@ const { authMiddleware } = require('../utils/jwt');
 
 router.post('/addusers', authMiddleware, userController.addUsers);
 router.get('/allusers', authMiddleware, userController.getUsers);
-router.get('/get-all-users', authMiddleware, userController.getAllusers);
+router.get('/get-all-users', authMiddleware, userController.getAllUsers);
 router.put('/updateuser/:id', authMiddleware, userController.updateUser);
 router.delete('/deleteuser/:id', authMiddleware, userController.deleteUser);
 router.post('/verify-ceo', userController.verifyCEO);

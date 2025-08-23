@@ -567,5 +567,6 @@ module.exports = {
   sendTestNotification,
   getUserRoles,
   verifyDocAuthUser,
-  getSignKey
+  getSignKey,
+  getAllUsers
 };

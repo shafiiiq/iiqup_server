@@ -203,6 +203,31 @@ const fetchUsers = async () => {
   }
 };
 
+const fetchAllUsers = async () => {
+  try {
+    const office = await User.find({}, { password: 0 }); // Exclude password from results
+    const mechanic = await Mechanic.find({}, { password: 0 }); // Exclude password from results
+    const operator = await Operator.find({}, { password: 0 }); // Exclude password from results
+
+    return {
+      status: 200,
+      message: 'Users fetched successfully',
+      data: {
+        office: office,
+        mechanic: mechanic,
+        operator: operator
+      }
+    };
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    throw {
+      status: 500,
+      message: 'Failed to fetch users',
+      error: error.message
+    };
+  }
+};
+
 // Update user
 const userUpdate = async (userId, updateData) => {
   try {
@@ -1829,6 +1854,7 @@ module.exports = {
   cleanupInvalidTokens,
   verifyDocAuthUserCreds,
   getAuthSignKey,
+  fetchAllUsers,
 
   // Also add the helper functions if needed:
   getFileType,
