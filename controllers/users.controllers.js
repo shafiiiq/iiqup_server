@@ -335,6 +335,9 @@ const addPushToken = async (req, res) => {
 
     const result = await userServices.insertPushToken(uniqueCode, pushToken, platform)
 
+    console.log("push regirster result", result);
+    
+
     if (result.success) {
       res.status(200).json({
         success: true,
