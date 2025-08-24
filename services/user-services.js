@@ -30,6 +30,11 @@ const USER_ROLES = {
   OPERATOR: 'OPERATOR',
   GUEST_USER: 'GUEST_USER',
   ACCOUNTANT: 'ACCOUNTANT',
+  ASSISTANT_ACCOUNTANT: 'ASSISTANT_ACCOUNTANT',
+  OFFICE_ADMIN: 'OFFICE_ADMIN',
+  ASSISTANT_OFFICE_ADMIN: 'ASSISTANT_OFFICE_ADMIN',
+  SUB_ADMIN: 'SUB_ADMIN',
+  SUB_ACCOUNTANT: 'SUB_ACCOUNTANT'
 };
 
 // Insert a new user
@@ -436,6 +441,24 @@ const generateUniqueCode = (role) => {
       break;
     case USER_ROLES.OPERATOR:
       prefix = 'OPR';
+      break;
+    case USER_ROLES.ACCOUNTANT:
+      prefix = 'ACT';
+      break;
+    case USER_ROLES.ASSISTANT_ACCOUNTANT:
+      prefix = 'AST';
+      break;
+    case USER_ROLES.OFFICE_ADMIN:
+      prefix = 'OFA';
+      break;
+    case USER_ROLES.ASSISTANT_OFFICE_ADMIN:
+      prefix = 'ASN';
+      break;
+    case USER_ROLES.SUB_ADMIN:
+      prefix = 'SBN';
+      break;
+    case USER_ROLES.SUB_ACCOUNTANT:
+      prefix = 'SBC';
       break;
     case USER_ROLES.GUEST_USER:
       prefix = 'GUE';
@@ -1577,6 +1600,8 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
 
     // Check for errors in tickets
     const errors = tickets.filter(ticket => ticket.status === 'error');
+    console.log("notification err: ", errors);
+    
     const successful = tickets.filter(ticket => ticket.status === 'ok');
 
     if (errors.length > 0) {

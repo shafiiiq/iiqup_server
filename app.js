@@ -49,7 +49,6 @@ var app = express();
 var server = http.createServer(app);
 
 // CORS configuration for Express
-// CORS configuration for Express
 const corsOptions = {
   origin: function (origin, callback) {
     // allow requests with no origin (React Native app)
@@ -60,6 +59,7 @@ const corsOptions = {
       'https://iiqup.netlify.app',
       'https://ansarigroup.online',
       'https://www.ansarigroup.online',
+      "http://localhost:3000"
     ];
 
     if (whitelist.indexOf(origin) !== -1) {
