@@ -350,7 +350,7 @@ const addPushToken = async (req, res) => {
         message: result.message
       });
     }
-  } catch (error) {
+  } catch (error) { 
     console.error('❌ Error registering push token:', error);
     res.status(500).json({
       success: false,

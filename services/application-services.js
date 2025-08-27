@@ -243,7 +243,7 @@ const createApplication = async (applicationData) => {
     })
 
     await PushNotificationService.sendGeneralNotification(
-      'SAD-c6e8d3', // broadcast to all users
+      null, // broadcast to all users
       `Requesting ${leaveType} ${type}`, //title
       `${user.name} is requesting to ${leaveType} ${type} from ${startDate} to ${endDate} regarding the ${data.reason}`, //decription
       'high', //priority
@@ -269,7 +269,7 @@ const createApplication = async (applicationData) => {
     });
 
     await PushNotificationService.sendGeneralNotification(
-      'SAD-c6e8d3', // broadcast to all users
+      null, // broadcast to all users
       `Requesting ${type}`, //title
       `${user.name} is requesting to ${type} for ${data.amount} for ${data.purpose}`, //decription
       'high', //priority
