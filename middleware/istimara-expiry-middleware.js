@@ -1,6 +1,7 @@
 const Equipment = require('../models/equip.model.js');
 const { createNotification } = require('../utils/notification-jobs.js');
 const moment = require('moment');
+const PushNotificationService = require('../utils/push-notification-jobs');
 
 /**
  * Check for Istimara expiry and send notifications:
