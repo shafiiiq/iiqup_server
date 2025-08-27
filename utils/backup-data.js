@@ -4,13 +4,16 @@ const { MongoClient } = require('mongodb');
 const cron = require('node-cron');
 
 const backupData = async () => {
+    // Configuration
     const databaseName = 'iiqup';
+    const backupPath = 'C:\\mongoData';
+    const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017';
     
-    // CHANGED: Put backup folder in your project directory where we definitely have permission
-    const backupPath = path.join(__dirname, '..', 'aws', 'server', 'backup', 'database');
-                       
-    const mongoUri = process.env.MONGO_URI || 'mongodb+srv://username:password@cluster.mongodb.net/';
-        
+    console.log('🕒 Backup process initiated...');
+    console.log(`📊 Database: ${databaseName}`);
+    console.log(`📁 Target path: ${backupPath}`);
+    
+    // Generate timestamp for backup folder
     const timestamp = new Date().toISOString()
         .replace(/[:.]/g, '-')
         .replace('T', '_')
@@ -19,47 +22,42 @@ const backupData = async () => {
     const backupName = `backup_${databaseName}_${timestamp}`;
     const backupFullPath = path.join(backupPath, backupName);
 
-    let client;
-
     try {
-        console.log('🚀 Starting backup process...');
-        console.log(`📁 Backup path: ${backupFullPath}`);
-
-        // Check if backup directory exists and create if not
+        // Create backup directory if it doesn't exist
+        console.log('🔍 Checking backup directory...');
         if (!fs.existsSync(backupPath)) {
-            console.log('📁 Creating backup directory...');
+            console.log('📂 Creating backup directory...');
             fs.mkdirSync(backupPath, { recursive: true });
-            console.log('✅ Backup directory created');
+            console.log('✅ Backup directory created successfully');
+        } else {
+            console.log('✅ Backup directory exists');
         }
 
         if (!fs.existsSync(backupFullPath)) {
-            console.log('📁 Creating backup folder...');
             fs.mkdirSync(backupFullPath, { recursive: true });
-            console.log('✅ Backup folder created');
         }
 
-        // Test write permission
-        const testFile = path.join(backupFullPath, 'test.txt');
-        try {
-            fs.writeFileSync(testFile, 'test', 'utf8');
-            fs.unlinkSync(testFile); // Delete test file
-            console.log('✅ Write permissions verified');
-        } catch (permError) {
-            console.error('❌ No write permission:', permError.message);
-            throw new Error(`No write permission to ${backupFullPath}`);
-        }
-
-        console.log('🔗 Connecting to MongoDB...');
-        client = new MongoClient(mongoUri);
+        console.log(`🔄 Starting backup: ${backupName}`);
+        console.log(`⏳ Please wait... This may take a while for large databases`);
         
+        console.log('🔗 Connecting to MongoDB...');
+        
+        // Connect to MongoDB using Node.js driver
+        const client = new MongoClient(mongoUri);
         await client.connect();
-        console.log('✅ Connected to MongoDB Atlas successfully');
+        console.log('✅ Connected to MongoDB successfully');
 
         const db = client.db(databaseName);
+        
+        // Get all collections
         console.log('📦 Getting list of collections...');
         const collections = await db.listCollections().toArray();
         console.log(`📋 Found ${collections.length} collections to backup`);
 
+        const startTime = Date.now();
+        let totalDocuments = 0;
+        
+        // Backup each collection
         for (let i = 0; i < collections.length; i++) {
             const collectionInfo = collections[i];
             const collectionName = collectionInfo.name;
@@ -68,129 +66,66 @@ const backupData = async () => {
             
             try {
                 const collection = db.collection(collectionName);
-                const count = await collection.countDocuments();
-                console.log(`📊 Collection ${collectionName} has ${count} documents`);
-                
-                let documents;
-                if (count === 0) {
-                    console.log(`⚠️  Collection ${collectionName} is empty, creating empty backup file`);
-                    documents = [];
-                } else if (count > 10000) {
-                    console.log(`📦 Large collection detected, using cursor for ${collectionName}`);
-                    documents = [];
-                    const cursor = collection.find({});
-                    await cursor.forEach(doc => {
-                        documents.push(doc);
-                    });
-                } else {
-                    documents = await collection.find({}).toArray();
-                }
+                const documents = await collection.find({}).toArray();
                 
                 const filePath = path.join(backupFullPath, `${collectionName}.json`);
-                console.log(`💾 Writing to file: ${filePath}`);
+                fs.writeFileSync(filePath, JSON.stringify(documents, null, 2));
                 
-                const jsonData = JSON.stringify(documents, null, 2);
-                fs.writeFileSync(filePath, jsonData, 'utf8');
-                
-                // Verify file was created and get size
-                if (fs.existsSync(filePath)) {
-                    const stats = fs.statSync(filePath);
-                    const sizeKB = (stats.size / 1024).toFixed(2);
-                    console.log(`✅ ${collectionName}: ${count} documents backed up (${sizeKB} KB)`);
-                } else {
-                    console.error(`❌ Failed to create backup file for ${collectionName}`);
-                }
+                totalDocuments += documents.length;
+                console.log(`✅ ${collectionName}: ${documents.length} documents backed up`);
                 
             } catch (collectionError) {
-                console.error(`❌ Error backing up collection ${collectionName}:`, collectionError.message);
-                // Continue with next collection instead of silent failure
+                console.error(`❌ Failed to backup collection ${collectionName}:`, collectionError.message);
             }
         }
 
-        // Clean old backups - keep only latest 10 folders
-        console.log('🧹 Cleaning old backups...');
-        cleanOldBackups(backupPath);
+        await client.close();
+        console.log('🔌 MongoDB connection closed');
+
+        const endTime = Date.now();
+        const duration = ((endTime - startTime) / 1000).toFixed(2);
+
+        // Verify backup was created
+        console.log('🔍 Verifying backup...');
+        if (fs.existsSync(backupFullPath)) {
+            const files = fs.readdirSync(backupFullPath);
+            console.log(`📦 Backup contains ${files.length} collection files`);
+            console.log(`📋 Files: ${files.join(', ')}`);
+        }
 
         console.log(`✅ Backup completed successfully: ${backupName}`);
-        console.log(`📁 Backup location: ${backupFullPath}`);
+        console.log(`📁 Location: ${backupFullPath}`);
+        console.log(`📊 Total documents backed up: ${totalDocuments}`);
+        console.log(`⏱️ Duration: ${duration} seconds`);
+        console.log(`🎉 Backup process finished at ${new Date().toLocaleString()}`);
 
     } catch (error) {
         console.error('❌ Backup failed:', error.message);
-        console.error('Stack trace:', error.stack);
-    } finally {
-        if (client) {
-            try {
-                await client.close();
-                console.log('🔒 MongoDB connection closed');
-            } catch (closeError) {
-                console.error('❌ Error closing connection:', closeError.message);
-            }
-        }
+        console.error('🔧 Troubleshooting:');
+        console.error('   - Check if MongoDB is running');
+        console.error('   - Verify database name is correct');
+        console.error('   - Check MongoDB connection URI');
+        console.error('   - Ensure sufficient disk space');
     }
 };
 
-const cleanOldBackups = (backupPath) => {
-    try {
-        if (!fs.existsSync(backupPath)) {
-            console.log('⚠️  Backup path does not exist, skipping cleanup');
-            return;
-        }
-
-        // Get all backup folders
-        const items = fs.readdirSync(backupPath);
-        const backupFolders = items.filter(item => {
-            const itemPath = path.join(backupPath, item);
-            return fs.statSync(itemPath).isDirectory() && item.startsWith('backup_');
-        });
-
-        console.log(`🗂️  Found ${backupFolders.length} backup folders`);
-
-        // Sort by creation time (newest first)
-        backupFolders.sort((a, b) => {
-            const aPath = path.join(backupPath, a);
-            const bPath = path.join(backupPath, b);
-            const aStat = fs.statSync(aPath);
-            const bStat = fs.statSync(bPath);
-            return bStat.mtime.getTime() - aStat.mtime.getTime();
-        });
-
-        // Keep only latest 10 folders, delete the rest
-        if (backupFolders.length > 10) {
-            const foldersToDelete = backupFolders.slice(10);
-            console.log(`🗑️  Deleting ${foldersToDelete.length} old backup folders`);
-            
-            foldersToDelete.forEach(folder => {
-                const folderPath = path.join(backupPath, folder);
-                try {
-                    fs.rmSync(folderPath, { recursive: true, force: true });
-                    console.log(`🗑️  Deleted: ${folder}`);
-                } catch (deleteError) {
-                    console.error(`❌ Failed to delete ${folder}:`, deleteError.message);
-                }
-            });
-        } else {
-            console.log('✅ No old backups to clean');
-        }
-    } catch (error) {
-        console.error('❌ Error during cleanup:', error.message);
-    }
-};
-
+// Auto backup middleware
 const autoBackup = () => {
-    console.log('🚀 Auto-backup system started - Every hour');
-    
-    // Run initial backup to test
-    console.log('🧪 Running initial backup test...');
-    backupData();
+    console.log('🚀 Starting auto-backup system...');
+    console.log('📅 Current time:', new Date().toLocaleString());
+    console.log('⏰ Scheduled for: Every hour');
     
     // Schedule hourly backup
-    cron.schedule('0 * * * *', async () => {
-        console.log('⏰ Scheduled backup starting...');
-        await backupData();
-    }, {
-        scheduled: true,
-        timezone: "UTC"
+    cron.schedule('0 * * * *', () => {
+        console.log('\n=================================');
+        console.log('⏰ HOURLY BACKUP TRIGGERED');
+        console.log('📅 Time:', new Date().toLocaleString());
+        console.log('=================================');
+        backupData();
     });
+
+    console.log('✅ Auto-backup system initialized successfully');
+    console.log('📊 System status: ACTIVE - Running every hour');
 
     // Return middleware function
     return (req, res, next) => {
