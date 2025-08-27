@@ -2,13 +2,12 @@ const fs = require('fs');
 const path = require('path');
 const { MongoClient } = require('mongodb');
 const cron = require('node-cron');
-const os = require('os');
 
 const backupData = async () => {
     const databaseName = 'iiqup';
     
-    // Full absolute path - easy to change to external drive later
-    const backupPath = '/aws/server/backup/database';
+    // CHANGED: Put backup folder in home directory where we have permission
+    const backupPath = '/home/ubuntu/aws/server/backup/database';
                        
     const mongoUri = process.env.MONGO_URI || 'mongodb+srv://username:password@cluster.mongodb.net/';
         
@@ -51,13 +50,7 @@ const backupData = async () => {
         }
 
         console.log('🔗 Connecting to MongoDB...');
-        client = new MongoClient(mongoUri, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-            serverSelectionTimeoutMS: 30000,
-            socketTimeoutMS: 60000,
-            connectTimeoutMS: 30000,
-        });
+        client = new MongoClient(mongoUri);
         
         await client.connect();
         console.log('✅ Connected to MongoDB Atlas successfully');
