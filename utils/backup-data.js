@@ -5,7 +5,7 @@ const cron = require('node-cron');
 
 const backupData = async () => {
     const databaseName = 'iiqup';
-    const backupPath = 'C:\\iiQup\database';
+    const backupPath = 'C:\\iiQup\\database';
     const mongoUri = process.env.MONGO_URI || 'mongodb+srv://username:password@cluster.mongodb.net/';
         
     const timestamp = new Date().toISOString()
