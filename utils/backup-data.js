@@ -6,8 +6,8 @@ const cron = require('node-cron');
 const backupData = async () => {
     const databaseName = 'iiqup';
     
-    // CHANGED: Put backup folder in home directory where we have permission
-    const backupPath = '/home/ubuntu/aws/server/backup/database';
+    // CHANGED: Put backup folder in your project directory where we definitely have permission
+    const backupPath = path.join(__dirname, '..', 'aws', 'server', 'backup', 'database');
                        
     const mongoUri = process.env.MONGO_URI || 'mongodb+srv://username:password@cluster.mongodb.net/';
         
