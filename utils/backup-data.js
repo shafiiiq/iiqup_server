@@ -4,9 +4,9 @@ const { MongoClient } = require('mongodb');
 const cron = require('node-cron');
 
 const backupData = async () => {
-    // Configuration
+    // Configuration - Fixed path
     const databaseName = 'iiqup';
-    const backupPath = 'C:\\mongoData';
+    const backupPath = path.join('C:', 'AWS', 'secure', 'backup', 'database');
     const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017';
     
     console.log('🕒 Backup process initiated...');
@@ -133,4 +133,21 @@ const autoBackup = () => {
     };
 };
 
-module.exports = { autoBackup };
+// TEST FUNCTION - Call this to trigger backup immediately
+const testBackupNow = async () => {
+    console.log('\n=================================');
+    console.log('🧪 MANUAL TEST BACKUP TRIGGERED');
+    console.log('📅 Time:', new Date().toLocaleString());
+    console.log('=================================');
+    
+    try {
+        await backupData();
+        console.log('🎉 Test backup completed successfully!');
+    } catch (error) {
+        console.error('❌ Test backup failed:', error.message);
+    }
+};
+
+testBackupNow()
+
+module.exports = { autoBackup, testBackupNow };
