@@ -336,7 +336,7 @@ const addPushToken = async (req, res) => {
     const result = await userServices.insertPushToken(uniqueCode, pushToken, platform)
 
     console.log("push regirster result", result);
-    
+
 
     if (result.success) {
       res.status(200).json({
@@ -350,7 +350,7 @@ const addPushToken = async (req, res) => {
         message: result.message
       });
     }
-  } catch (error) { 
+  } catch (error) {
     console.error('❌ Error registering push token:', error);
     res.status(500).json({
       success: false,
@@ -505,14 +505,6 @@ const sendTestNotification = async (req, res) => {
 }
 
 const getUserRoles = async (req, res) => {
-  // Debug: Log each environment variable to see which ones are missing
-  console.log("Environment variables check:");
-  console.log("MECHANIC:", process.env.MECHANIC);
-  console.log("MAINTANANCE_HEAD:", process.env.MAINTANANCE_HEAD);
-  console.log("OPERATOR:", process.env.OPERATOR);
-  console.log("CAMP_BOSS:", process.env.CAMP_BOSS);
-  console.log("MECHANIC_HEAD:", process.env.MECHANIC_HEAD);
-
   if (process.env.MECHANIC &&
     process.env.MAINTANANCE_HEAD &&
     process.env.OPERATOR &&
@@ -525,7 +517,13 @@ const getUserRoles = async (req, res) => {
         MAINTANANCE_HEAD: process.env.MAINTANANCE_HEAD,
         OPERATOR: process.env.OPERATOR,
         CAMP_BOSS: process.env.CAMP_BOSS,
-        MECHANIC_HEAD: process.env.MECHANIC_HEAD
+        MECHANIC_HEAD: process.env.MECHANIC_HEAD,
+        SUPER_ADMIN: process.env.SUPER_ADMIN,
+        JALEEL_KA: process.env.JALEEL_KA,
+        WORKSHOP_MANAGER: process.env.WORKSHOP_MANAGER,
+        SUB_ADMIN: process.env.SUB_ADMIN,
+        ASSISTANT_OFFICE_ADMIN: process.env.ASSISTANT_OFFICE_ADMIN,
+        OFFICE_ADMIN: process.env.OFFICE_ADMIN,
       }
     })
   } else {
@@ -536,6 +534,12 @@ const getUserRoles = async (req, res) => {
     if (!process.env.OPERATOR) missingVars.push('OPERATOR');
     if (!process.env.CAMP_BOSS) missingVars.push('CAMP_BOSS');
     if (!process.env.MECHANIC_HEAD) missingVars.push('MECHANIC_HEAD');
+    if (!process.env.SUPER_ADMIN) missingVars.push('SUPER_ADMIN');
+    if (!process.env.JALEEL_KA) missingVars.push('JALEEL_KA');
+    if (!process.env.SUB_ADMIN) missingVars.push('SUB_ADMIN');
+    if (!process.env.WORKSHOP_MANAGER) missingVars.push('WORKSHOP_MANAGER');
+    if (!process.env.OFFICE_ADMIN) missingVars.push('OFFICE_ADMIN');
+    if (!process.env.ASSISTANT_OFFICE_ADMIN) missingVars.push('ASSISTANT_OFFICE_ADMIN');
 
     console.log("Missing environment variables:", missingVars);
     res.status(500).json({

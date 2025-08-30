@@ -3,7 +3,18 @@ const path = require('path');
 const fs = require('fs');
 const { createNotification } = require('../utils/notification-jobs'); // Import notification service
 const PushNotificationService = require('../utils/push-notification-jobs');
-const {putObject} = require('../s3bucket/s3.bucket')
+const { putObject } = require('../s3bucket/s3.bucket')
+
+// Format dates to DD-MM-YYYY
+const formatDate = (date) => {
+  // Convert to Date object if it's a string
+  const dateObj = date instanceof Date ? date : new Date(date);
+
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  return `${day}-${month}-${year}`;
+};
 
 const formatDateTime = () => {
   const now = new Date();
@@ -23,7 +34,7 @@ const formatDateTime = () => {
 };
 
 module.exports = {
-  saveDocument: async (regNo, documentType, file, description, category) => {
+  saveDocument: async (regNo, documentType, file, description, category, date, expiry) => {
     try {
       // Generate S3 key (path)
       const ext = path.extname(file.fileName);
@@ -46,6 +57,8 @@ module.exports = {
       }
 
       document.files.push({
+        date: formatDate(date),
+        expiry: formatDate(expiry),
         filename: finalFilename,
         path: s3Key,
         mimetype: file.mimeType || file.fileName.split('.').pop()

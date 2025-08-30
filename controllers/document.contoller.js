@@ -4,7 +4,9 @@ const path = require('path');
 
 const uploadDocument = async (req, res) => {
   try {
-    const { regNo, documentType, description, category, fileName, mimeType } = req.body;
+    const { regNo, documentType, description, category, fileName, mimeType, date, expiry } = req.body;
+
+    console.log(req.body)
 
     if (!regNo || !documentType) {
       return res.status(400).json({
@@ -21,7 +23,7 @@ const uploadDocument = async (req, res) => {
     }
 
     // Save to database and get presigned URL
-    const result = await documentServices.saveDocument(regNo, documentType, { fileName, mimeType }, description, category);
+    const result = await documentServices.saveDocument(regNo, documentType, { fileName, mimeType }, description, category, date, expiry);
 
     res.status(200).json({
       status: 200,
@@ -30,7 +32,7 @@ const uploadDocument = async (req, res) => {
       document: {
         filename: result.finalFilename,
         path: result.s3Key,
-        type: documentType
+        type: documentType 
       }
     });
 
