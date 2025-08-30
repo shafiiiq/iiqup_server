@@ -6,8 +6,6 @@ const uploadDocument = async (req, res) => {
   try {
     const { regNo, documentType, description, category, fileName, mimeType, date, expiry } = req.body;
 
-    console.log(req.body)
-
     if (!regNo || !documentType) {
       return res.status(400).json({
         status: 400,

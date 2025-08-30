@@ -105,7 +105,7 @@ setupWebSocket(io);
 global.io = io;
 
 require('./utils/db');
-app.use(autoBackup());
+// app.use(autoBackup());.
 
 // Middleware setup
 app.use(logger('dev'));

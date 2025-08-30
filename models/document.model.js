@@ -23,11 +23,9 @@ const DocumentSchema = new mongoose.Schema({
   files: [{
     date: {
       type: String,
-      required: true
     },
     expiry: {
       type: String,
-      required: true
     },
     path: {
       type: String,

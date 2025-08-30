@@ -7,8 +7,21 @@ const { putObject } = require('../s3bucket/s3.bucket')
 
 // Format dates to DD-MM-YYYY
 const formatDate = (date) => {
-  // Convert to Date object if it's a string
-  const dateObj = date instanceof Date ? date : new Date(date);
+  if (!date) return null;
+
+  // If it's already in YYYY-MM-DD format, convert to DD-MM-YYYY
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const [year, month, day] = date.split('-');
+    return `${day}-${month}-${year}`;
+  }
+
+  // Convert to Date object if it's not already
+  const dateObj = date instanceof Date ? date : new Date(date + 'T00:00:00'); // Add time to avoid timezone issues
+
+  // Check if the date is valid
+  if (isNaN(dateObj.getTime())) {
+    return null;
+  }
 
   const year = dateObj.getFullYear();
   const month = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -56,9 +69,18 @@ module.exports = {
         });
       }
 
+      // Validate and format dates - ensure they're not undefined
+      const formattedDate = date ? formatDate(date) : null;
+      const formattedExpiry = expiry ? formatDate(expiry) : null;
+
+      // Check if required fields are present after formatting
+      if (!formattedDate || !formattedExpiry) {
+        throw new Error('Date and expiry are required and must be valid dates');
+      }
+
       document.files.push({
-        date: formatDate(date),
-        expiry: formatDate(expiry),
+        date: formattedDate,
+        expiry: formattedExpiry,
         filename: finalFilename,
         path: s3Key,
         mimetype: file.mimeType || file.fileName.split('.').pop()
@@ -75,7 +97,7 @@ module.exports = {
       await PushNotificationService.sendGeneralNotification(
         null, // broadcast to all users
         `New document added`, //title
-        `Document ${documentType} is uploaded for ${regNo}, Now you can access new one`, //decription
+        `Document ${documentType} is uploaded for ${regNo}, Now you can access new one`, //description
         'high', //priority
         'normal' // type
       );
