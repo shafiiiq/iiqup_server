@@ -27,6 +27,9 @@ const DocumentSchema = new mongoose.Schema({
     expiry: {
       type: String,
     },
+    filename: {
+      type: String,
+    },
     path: {
       type: String,
       required: true
