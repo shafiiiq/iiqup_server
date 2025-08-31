@@ -197,18 +197,18 @@ module.exports = {
     });
   },
 
-  deleteEquipments: (regNo) => {
+  deleteEquipments: (id) => {
     return new Promise(async (resolve, reject) => {
       try {
-        const validUser = await equipmentModel.findOne({ regNo: regNo });
-        if (validUser) {
-          const deleteUser = await equipmentModel.findOneAndDelete({ regNo: regNo });
+        const equipment = await equipmentModel.findById(id);
+        if (equipment) {
+          const deleteEquipment = await equipmentModel.findOneAndDelete({ regNo: equipment.regNo });
 
           // Send notification for equipment deletion
           try {
             await createNotification({
               title: "Equipment Removed",
-              description: `Equipment ${deleteUser.machine} - ${deleteUser.regNo} has been removed from the system`,
+              description: `Equipment ${deleteEquipment.machine} - ${deleteEquipment.regNo} has been removed from the system`,
               priority: "medium",
               sourceId: deleteUser._id,
               time: new Date()
@@ -217,7 +217,7 @@ module.exports = {
             await PushNotificationService.sendGeneralNotification(
               null, // broadcast to all users
               'Equipment Removed', //title
-              `Equipment ${deleteUser.machine} - ${deleteUser.regNo} has been removed from the system`, //decription
+              `Equipment ${deleteEquipment.machine} - ${deleteEquipment.regNo} has been removed from the system`, //decription
               'medium', //priority
               'normal' // type
             );
@@ -230,7 +230,7 @@ module.exports = {
             status: 200,
             ok: true,
             message: 'Equipment deleted successfully',
-            data: deleteUser
+            data: deleteEquipment
           });
         }
       } catch (error) {

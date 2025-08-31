@@ -9,6 +9,6 @@ router.get('/get-equipments', equipmentController.getEquipments)
 router.get('/get-equipment/:regNo', equipmentController.getEquipmentsByReg)
 router.put('/update-equipment/:regNo', equipmentController.updateEquipments)
 router.put('/status-update/:regNo', equipmentController.updateStatus)
-router.delete('/delete-equipment/:regNo', equipmentController.deleteEquipments)
+router.delete('/delete-equipment/:id', equipmentController.deleteEquipments)
 
 module.exports = router;
