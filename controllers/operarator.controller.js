@@ -4,6 +4,8 @@ require('dotenv').config();
 
 class OperatorController {
   static async createOperator(req, res) {
+    console.log(req.body);
+    
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
@@ -44,6 +46,9 @@ class OperatorController {
   static async verifyOperator(req, res) {
     try {
       const { qatarId } = req.body;
+
+      console.log(req.body);
+      
       
       if (!qatarId) {
         return res.status(400).json({
