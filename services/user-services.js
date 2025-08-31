@@ -1045,6 +1045,11 @@ const addComplaints = async (regNo, userUniqueCode, data, uploadedFiles = null) 
 
 const grantAccept = async (uniqueCode, dataId, purpose) => {
   try {
+
+    if (uniqueCode === process.env.WORKSHOP_MANAGER) {
+      uniqueCode = process.env.MAINTANANCE_HEAD
+    }
+    
     // Find the user by uniqueCode
     const user = await User.findOne({ uniqueCode });
 
@@ -1171,6 +1176,10 @@ const grantAccept = async (uniqueCode, dataId, purpose) => {
 
 const fetchAccessData = async (uniqueCode, purpose) => {
   try {
+    if (uniqueCode === process.env.WORKSHOP_MANAGER) {
+      uniqueCode = process.env.MAINTANANCE_HEAD
+    }
+
     const user = await User.findOne({ uniqueCode });
 
     if (!user) {
@@ -1601,7 +1610,7 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
     // Check for errors in tickets
     const errors = tickets.filter(ticket => ticket.status === 'error');
     console.log("notification err: ", errors);
-    
+
     const successful = tickets.filter(ticket => ticket.status === 'ok');
 
     if (errors.length > 0) {

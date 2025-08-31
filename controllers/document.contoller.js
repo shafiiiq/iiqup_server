@@ -4,7 +4,7 @@ const path = require('path');
 
 const uploadDocument = async (req, res) => {
   try {
-    const { regNo, documentType, description, category, fileName, mimeType, date, expiry } = req.body;
+    const { regNo, documentType, description, category, fileName, mimeType, date, expiry } = req.body;  
 
     if (!regNo || !documentType) {
       return res.status(400).json({
