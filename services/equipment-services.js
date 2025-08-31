@@ -197,10 +197,12 @@ module.exports = {
     });
   },
 
-  deleteEquipments: (id) => {
+  deleteEquipments: (regNo) => {
     return new Promise(async (resolve, reject) => {
       try {
-        const equipment = await equipmentModel.findById(id);
+        const equipment = await equipmentModel.findOne({regNo});
+        console.log(equipment);
+        
         if (equipment) {
           const deleteEquipment = await equipmentModel.findOneAndDelete({ regNo: equipment.regNo });
 
@@ -208,16 +210,16 @@ module.exports = {
           try {
             await createNotification({
               title: "Equipment Removed",
-              description: `Equipment ${deleteEquipment.machine} - ${deleteEquipment.regNo} has been removed from the system`,
+              description: `Equipment ${deleteEquipment.machine} - ${deleteEquipment.regNo} has been removed from the system or sold`,
               priority: "medium",
-              sourceId: deleteUser._id,
+              sourceId: deleteEquipment._id,
               time: new Date()
             });
 
             await PushNotificationService.sendGeneralNotification(
               null, // broadcast to all users
               'Equipment Removed', //title
-              `Equipment ${deleteEquipment.machine} - ${deleteEquipment.regNo} has been removed from the system`, //decription
+              `Equipment ${deleteEquipment.machine} - ${deleteEquipment.regNo} has been removed from the system or sold`, //decription
               'medium', //priority
               'normal' // type
             );

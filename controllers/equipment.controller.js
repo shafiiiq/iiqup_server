@@ -53,10 +53,10 @@ const updateEquipments = async (req, res) => {
 }
 
 
-const deleteEquipments= async (req, res) => {
-  const { id } = req.params;
+const deleteEquipments= async (req, res) => {  
+  const { regNo } = req.params;
 
-  userServices.deleteEquipments(id)
+  userServices.deleteEquipments(regNo)
     .then((response) => {
       if (response) {
         res.status(response.status).json(response)
