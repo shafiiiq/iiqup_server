@@ -278,6 +278,8 @@ module.exports = {
         // Check if serial number already exists
         const existingStock = await Stock.findOne({ serialNumber: data.serialNumber });
         if (existingStock) {
+          console.log("stock is existing");
+          
           return reject({
             status: 409,
             message: 'Stock with this serial number already exists'
