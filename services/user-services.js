@@ -497,12 +497,11 @@ const verifyCEOcreds = async (email) => {
       };
     }
 
-    if (user.email !== 'ceo@ansarigroup.co' && email !== 'ceo@ansarigroup.co') {
-
+    if (user.email !== process.env.CEO_EMAIL && email !== process.env.CEO_EMAIL) {
       return {
         status: 200,
         success: true,
-        message: 'Authentication successful, user is not a ceo',
+        message: 'Authentication failed, user is not a ceo',
         data: null
       }
     }

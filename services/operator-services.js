@@ -2,33 +2,41 @@ const Operator = require('../models/operator.model');
 const User = require('../models/user.model');
 const { generateUniqueCode } = require('../utils/code-generator');
 const otpServices = require('../services/otp-services');
+const { putObject } = require('../s3bucket/s3.bucket');
+const { v4: uuidv4 } = require('uuid');
 
 class OperatorService {
-  static async createOperator(name, qatarId, equipmentNumber, type) {
+  static async createOperator(operatorData) {
     // Check if operator already exists
-    const existingOperator = await Operator.findOne({ qatarId });
+    const existingOperator = await Operator.findOne({ 
+      $or: [
+        { qatarId: operatorData.qatarId },
+        { id: operatorData.id }
+      ]
+    });
+    
     if (existingOperator) {
-      const error = new Error('Operator with this Qatar ID already exists');
+      const error = new Error('Operator with this Qatar ID or ID already exists');
       error.statusCode = 409;
       throw error;
     }
 
     // Validate required fields
-    if (!name || !qatarId || !equipmentNumber || !type) {
-      const error = new Error('All fields are required');
-      error.statusCode = 400;
-      throw error;
+    const requiredFields = ['name', 'qatarId', 'id', 'slNo'];
+    for (const field of requiredFields) {
+      if (!operatorData[field]) {
+        const error = new Error(`${field} is required`);
+        error.statusCode = 400;
+        throw error;
+      }
     }
 
-    const uniqueCode = generateUniqueCode(name, qatarId);
-    
-    const operator = new Operator({
-      name,
-      qatarId,
-      uniqueCode,
-      equipmentNumber,
-      userType: type
-    });
+    // Generate unique code if not provided
+    if (!operatorData.uniqueCode) {
+      operatorData.uniqueCode = generateUniqueCode(operatorData.name, operatorData.qatarId);
+    }
+
+    const operator = new Operator(operatorData);
 
     // Find auth user
     const authUser = await User.findOne({ email: process.env.AUTH_USER });
@@ -102,6 +110,89 @@ class OperatorService {
     }
 
     return updatedOperator;
+  }
+
+  static async uploadProfilePic(qatarId, file) {
+    if (!qatarId || !file) {
+      const error = new Error('Qatar ID and file are required');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const operator = await Operator.findOne({ qatarId });
+    if (!operator) {
+      const error = new Error('Operator not found');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    // Generate S3 key
+    const timestamp = Date.now();
+    const fileName = `${operator.name.replace(/\s+/g, '-')}-${operator.qatarId}-${timestamp}`;
+    const s3Key = `operators/profiles/${fileName}`;
+
+    try {
+      // Upload to S3
+      const uploadResult = await putObject(file, s3Key. file.mimeType);
+      
+      // Update operator with profile pic URL
+      const updatedOperator = await Operator.findOneAndUpdate(
+        { qatarId },
+        { 
+          profilePic: uploadResult.Location,
+          updatedAt: Date.now()
+        },
+        { new: true, runValidators: true }
+      );
+
+      return updatedOperator;
+    } catch (error) {
+      console.error('S3 Upload Error:', error);
+      throw new Error('Failed to upload profile picture');
+    }
+  }
+
+  static async getAllOperators() {
+    return await Operator.find().sort({ createdAt: -1 });
+  }
+
+  static async getOperatorByQatarId(qatarId) {
+    if (!qatarId) {
+      const error = new Error('Qatar ID is required');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const operator = await Operator.findOne({ qatarId });
+    if (!operator) {
+      const error = new Error('Operator not found');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    return operator;
+  }
+
+  static async updateOperator(qatarId, updateData) {
+    if (!qatarId) {
+      const error = new Error('Qatar ID is required');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const operator = await Operator.findOneAndUpdate(
+      { qatarId },
+      { ...updateData, updatedAt: Date.now() },
+      { new: true, runValidators: true }
+    );
+
+    if (!operator) {
+      const error = new Error('Operator not found');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    return operator;
   }
 }
 
