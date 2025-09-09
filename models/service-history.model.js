@@ -42,6 +42,9 @@ const ServiceHistorySchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  serviceType: {
+    type: String,
+  },
   serviceReport:[],
   fullService: {
     type:Boolean

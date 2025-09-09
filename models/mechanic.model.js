@@ -5,21 +5,25 @@ const Schema = mongoose.Schema;
 const ToolkitSchema = new Schema({
   name: {
     type: String,
-    required: [true, 'Equipment name is required'],
     trim: true
   },
   type: {
     type: String,
-    required: [true, 'Equipment type is required'],
-    enum: [
-      'Head Protection', 
-      'Eye Protection', 
-      'Hand Protection', 
-      'Foot Protection', 
-      'Body Protection',
-      'Fall Protection',
-      'Respiratory Protection'
-    ],
+    trim: true
+  },
+  toolkitId: {
+    type: String,
+    required: [true, 'toolkitId is required'],
+    trim: true
+  },
+  toolkitName: {
+    type: String,
+    required: [true, 'toolkitName is required'],
+    trim: true
+  },
+  variantId: {
+    type: String,
+    required: [true, 'variantId is required'],
     trim: true
   },
   size: {
@@ -32,9 +36,19 @@ const ToolkitSchema = new Schema({
     required: [true, 'Color is required'],
     trim: true
   },
-  stockCount: {
+  assignedDate: {
+    type: String,
+    required: [true, 'assignedDate is required'],
+    trim: true
+  },
+  reason: {
+    type: String,
+    required: [true, 'reason is required'],
+    trim: true
+  },
+  quantity: {
     type: Number,
-    required: [true, 'Stock count is required'],
+    required: [true, 'quantity is required'],
     min: 0,
     default: 0
   },
@@ -46,7 +60,7 @@ const ToolkitSchema = new Schema({
   },
   status: {
     type: String,
-    enum: ['available', 'low', 'out'],
+    enum: ['available', 'low', 'out', 'assigned'],
     default: 'available'
   },
   inuse: {
@@ -64,7 +78,7 @@ const ToolkitSchema = new Schema({
 });
 
 // Pre-save middleware for toolkit (unchanged)
-ToolkitSchema.pre('save', function(next) {
+ToolkitSchema.pre('save', function (next) {
   // Calculate status based on stock count and minimum stock level
   if (this.stockCount <= 0) {
     this.status = 'out';
@@ -73,10 +87,10 @@ ToolkitSchema.pre('save', function(next) {
   } else {
     this.status = 'available';
   }
-  
+
   // Update the updatedAt field
   this.updatedAt = Date.now();
-  
+
   next();
 });
 
@@ -107,16 +121,16 @@ const AttendanceSchema = new Schema({
 });
 
 // Calculate total time when clocking out (unchanged)
-AttendanceSchema.pre('save', function(next) {
+AttendanceSchema.pre('save', function (next) {
   if (this.in && this.out) {
     let totalMinutes = Math.floor((this.out - this.in) / (1000 * 60));
-    
+
     // Subtract break time if both breakOut and breakIn exist
     if (this.breakOut && this.breakIn) {
       const breakMinutes = Math.floor((this.breakIn - this.breakOut) / (1000 * 60));
       totalMinutes -= breakMinutes;
     }
-    
+
     this.totalTime = totalMinutes > 0 ? totalMinutes : 0;
   }
   next();
@@ -159,9 +173,9 @@ const OvertimeEntrySchema = new Schema({
 });
 
 // Calculate total overtime and formatted time for each entry
-OvertimeEntrySchema.pre('save', function(next) {
+OvertimeEntrySchema.pre('save', function (next) {
   let totalMinutes = 0;
-  
+
   if (this.times && this.times.length > 0) {
     this.times.forEach(timeEntry => {
       if (timeEntry.in && timeEntry.out) {
@@ -173,9 +187,9 @@ OvertimeEntrySchema.pre('save', function(next) {
       }
     });
   }
-  
+
   this.totalTime = totalMinutes;
-  
+
   // Format the time as hours and minutes
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
@@ -187,7 +201,7 @@ OvertimeEntrySchema.pre('save', function(next) {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const year = date.getFullYear();
   this.formattedDate = `${day}-${month}-${year}`;
-  
+
   next();
 });
 
@@ -209,20 +223,20 @@ const MonthlyOvertimeSchema = new Schema({
 });
 
 // Calculate total monthly overtime
-MonthlyOvertimeSchema.pre('save', function(next) {
+MonthlyOvertimeSchema.pre('save', function (next) {
   let totalMonthMinutes = 0;
-  
+
   if (this.entries && this.entries.length > 0) {
     totalMonthMinutes = this.entries.reduce((total, entry) => total + entry.totalTime, 0);
   }
-  
+
   this.totalMonthTime = totalMonthMinutes;
-  
+
   // Format the time as hours and minutes
   const hours = Math.floor(totalMonthMinutes / 60);
   const minutes = totalMonthMinutes % 60;
   this.formattedMonthTime = `${hours}h ${minutes}m`;
-  
+
   next();
 });
 
@@ -286,7 +300,7 @@ const MechanicSchema = new Schema({
 });
 
 // Update timestamp on save
-MechanicSchema.pre('save', function(next) {
+MechanicSchema.pre('save', function (next) {
   this.updatedAt = Date.now();
   next();
 });

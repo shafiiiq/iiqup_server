@@ -29,6 +29,16 @@ const StockHistorySchema = new Schema({
   updatedBy: {
     type: String,
     default: 'System'
+  },
+  person: {
+    type: String,
+  },
+  personId: {
+    type: String,
+  },
+  assignedDate: {
+    type: Date,
+    default: Date.now
   }
 });
 
@@ -76,13 +86,11 @@ const VariantSchema = new Schema({
 const ToolkitSchema = new Schema({
   name: {
     type: String,
-    required: [true, 'Equipment name is required'],
     trim: true,
     unique: true // Ensure unique names
   },
   type: {
     type: String,
-    required: [true, 'Equipment type is required'],
     trim: true
   },
   variants: [VariantSchema], // Array of variants
@@ -116,7 +124,7 @@ ToolkitSchema.pre('save', function (next) {
     } else {
       variant.status = 'available';
     }
-    
+
     // Update last updated date
     variant.lastUpdatedDate = Date.now();
   });

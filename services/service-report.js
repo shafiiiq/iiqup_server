@@ -6,36 +6,58 @@ const PushNotificationService = require('../utils/push-notification-jobs');
 module.exports = {
 
   insertServiceReport: (data) => {
+
     return new Promise(async (resolve, reject) => {
       try {
         if (!data || !data.regNo || !data.date) {
           throw new Error('Missing required data: regNo and date are required');
         }
 
-        if (data.checklistItems) {
-          data.serviceType = 'oil'
+        if (data.checklistItems && data.serviceType !== 'normal') {
+          data.serviceType = 'oil';
+        } else if (data.serviceType === 'normal') {
+          data.serviceType = 'normal';
+
+          try {
+            const correspondingReport = await serviceHistoryModel.findOne({
+              regNo: data.regNo,
+              date: data.date
+            });
+
+            console.log("correspondingReport", correspondingReport);
+
+            if (correspondingReport) {
+              // Update the serviceType field directly
+              correspondingReport.serviceType = data.serviceType;
+
+              await correspondingReport.save();
+            }
+          } catch (error) {
+            console.error('Error updating service report:', error);
+          }
         }
+
         const result = await serviceReportModel.create(data);
 
         if (!result) {
           throw new Error(`Failed to create service report for regNo: ${data.regNo}`);
         }
 
-        await createNotification({
-          title: `${data.machine} - ${data.regNo} serviced`,
-          description: `At ${data.location}\nServiced Hours: ${data.serviceHrs}\nNext Service: ${data.nextServiceHrs}\n${data.remarks}\nMechanics: ${data.mechanics}`,
-          priority: "high",
-          sourceId: 'from applications',
-          time: new Date()
-        });
+        // await createNotification({
+        //   title: `${data.machine} - ${data.regNo} serviced`,
+        //   description: `At ${data.location}\nServiced Hours: ${data.serviceHrs}\nNext Service: ${data.nextServiceHrs}\n${data.remarks}\nMechanics: ${data.mechanics}`,
+        //   priority: "high",
+        //   sourceId: 'from applications',
+        //   time: new Date()
+        // });
 
-        await PushNotificationService.sendGeneralNotification(
-          null, // broadcast to all users
-          `${data.machine} - ${data.regNo} serviced`, //title
-          `At ${data.location}\nServiced Hours: ${data.serviceHrs}\nNext Service: ${data.nextServiceHrs}\n${data.remarks}\nMechanics: ${data.mechanics}`, //decription
-          'high', //priority
-          'normal' // type
-        );
+        // await PushNotificationService.sendGeneralNotification(
+        //   null, // broadcast to all users
+        //   `${data.machine} - ${data.regNo} serviced`, //title
+        //   `At ${data.location}\nServiced Hours: ${data.serviceHrs}\nNext Service: ${data.nextServiceHrs}\n${data.remarks}\nMechanics: ${data.mechanics}`, //decription
+        //   'high', //priority
+        //   'normal' // type
+        // );
 
         resolve({
           status: 200,

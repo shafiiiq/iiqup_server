@@ -1,5 +1,80 @@
 const mongoose = require('mongoose');
 
+const ToolkitSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    trim: true
+  },
+  type: {
+    type: String,
+    trim: true
+  },
+  toolkitId: {
+    type: String,
+    required: [true, 'toolkitId is required'],
+    trim: true
+  },
+  toolkitName: {
+    type: String,
+    required: [true, 'toolkitName is required'],
+    trim: true
+  },
+  variantId: {
+    type: String,
+    required: [true, 'variantId is required'],
+    trim: true
+  },
+  size: {
+    type: String,
+    required: [true, 'Size is required'],
+    trim: true
+  },
+  color: {
+    type: String,
+    required: [true, 'Color is required'],
+    trim: true
+  },
+  assignedDate: {
+    type: String,
+    required: [true, 'assignedDate is required'],
+    trim: true
+  },
+  reason: {
+    type: String,
+    required: [true, 'reason is required'],
+    trim: true
+  },
+  quantity: {
+    type: Number,
+    required: [true, 'quantity is required'],
+    min: 0,
+    default: 0
+  },
+  minStockLevel: {
+    type: Number,
+    required: [true, 'Minimum stock level is required'],
+    min: 1,
+    default: 5
+  },
+  status: {
+    type: String,
+    enum: ['available', 'low', 'out', 'assigned'],
+    default: 'available'
+  },
+  inuse: {
+    type: Boolean,
+    default: false
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
 const operatorSchema = new mongoose.Schema({
   id: {
     type: Number,
@@ -77,8 +152,7 @@ const operatorSchema = new mongoose.Schema({
   },
   workmenCompensationAdded: {
     type: String,
-    enum: ['yes', 'no'],
-    default: 'no'
+    default: 'no',
   },
   contactNo: {
     type: String,
@@ -106,9 +180,7 @@ const operatorSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
-  toolkits: [{
-    type: String
-  }],
+  toolkits: [ToolkitSchema],
   isVerified: {
     type: Boolean,
     default: false
@@ -128,7 +200,7 @@ const operatorSchema = new mongoose.Schema({
 });
 
 // Update the updatedAt field before saving
-operatorSchema.pre('save', function(next) {
+operatorSchema.pre('save', function (next) {
   this.updatedAt = Date.now();
   next();
 });

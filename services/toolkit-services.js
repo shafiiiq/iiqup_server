@@ -1,11 +1,14 @@
+const Mechanic = require('../models/mechanic.model');
+const Operator = require('../models/operator.model');
 const Toolkit = require('../models/toolkit.model');
+const User = require('../models/user.model');
 const { createNotification } = require('../utils/notification-jobs'); // Import notification service
 const PushNotificationService = require('../utils/push-notification-jobs');
 
 /**
  * Helper function to add stock history entry
  */
-const addStockHistoryEntry = (variant, action, previousStock, newStock, reason = '', updatedBy = 'System') => {
+const addStockHistoryEntry = (variant, action, previousStock, newStock, reason = '', updatedBy = 'System', person, personId, assignedDate) => {
   const validPreviousStock = Number(previousStock) || 0;
   const validNewStock = Number(newStock) || 0;
   const changeAmount = validNewStock - validPreviousStock;
@@ -19,7 +22,10 @@ const addStockHistoryEntry = (variant, action, previousStock, newStock, reason =
     size: variant.size,      // Will now have actual value
     color: variant.color,    // Will now have actual value
     timestamp: new Date(),
-    updatedBy
+    updatedBy,
+    person,
+    personId,
+    assignedDate
   });
 };
 
@@ -258,7 +264,7 @@ const updateVariant = async (toolkitId, variantId, updateData) => {
  * @param {string} updatedBy - Who made the change
  * @returns {Promise} - Promise with the result of the operation
  */
-const reduceStock = async (toolkitId, variantId, quantity, reason = '', updatedBy = 'System', person) => {
+const reduceStock = async (toolkitId, variantId, quantity, reason = '', updatedBy = 'System', person, personId, assignedDate) => {
   try {
     const toolkit = await Toolkit.findById(toolkitId);
 
@@ -298,24 +304,64 @@ const reduceStock = async (toolkitId, variantId, quantity, reason = '', updatedB
       variant.stockCount,
       reason || `Stock reduced: ${quantity} items used`,
       updatedBy,
-      person
+      person,
+      personId,
+      assignedDate
     );
+
+    let assignedPerson;
+
+    const officeUser = await User.findById(personId);
+    const operator = await Operator.findById(personId);
+    const mechanic = await Mechanic.findById(personId);
+
+    if (officeUser) {
+      assignedPerson = officeUser;
+    } else if (operator) {
+      assignedPerson = operator;
+    } else if (mechanic) {
+      assignedPerson = mechanic;
+    }
+
+    // Add toolkit assignment to person's toolkits array
+    if (assignedPerson) {
+      const toolkitAssignment = {
+        toolkitId: toolkit._id,
+        toolkitName: toolkit.name,
+        type: toolkit.type,
+        variantId: variant._id,
+        size: variant.size,
+        color: variant.color,
+        quantity: quantity,
+        assignedDate: assignedDate,
+        assignedBy: updatedBy,
+        reason: reason || `Stock reduced: ${quantity} items used`,
+        status: 'assigned'
+      };
+
+      if (!assignedPerson.toolkits) {
+        assignedPerson.toolkits = [];
+      }
+
+      assignedPerson.toolkits.push(toolkitAssignment);
+      await assignedPerson.save();
+    }
 
     const savedToolkit = await toolkit.save();
 
     await createNotification({
       title: "Safety items update",
-      description: `${quantity} Size:${variant.size} Color:${variant.color} ${toolkit.name} handovered to ${person}`,
-      priority: "high", //priority
-      'type': 'normal'// type
+      description: `${quantity} ${variant.color} color ${variant.size} size ${toolkit.name} handovered to ${person}`,
+      priority: "high",
+      'type': 'normal'
     });
 
     await PushNotificationService.sendGeneralNotification(
-      null, // broadcast to all users
-      "Safety items update", //title
-      `${quantity} Size:${variant.size} Color:${variant.color} ${toolkit.name} handovered to ${person}`, //decription
-      'high', //priority
-      'normal' // type
+      null,
+      "Safety items update",
+      `${quantity} ${variant.color} color ${variant.size} size ${toolkit.name} handovered to ${person}`,
+      'high',
+      'normal'
     );
 
     return {

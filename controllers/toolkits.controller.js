@@ -105,7 +105,7 @@ const searchToolkits = async (req, res) => {
 
 const reduceStock = async (req, res) => {
   const { toolkitId, variantId } = req.params;
-  const { quantity, reason, updatedBy, person } = req.body;
+  const { quantity, reason, updatedBy, person, personId, assignedDate } = req.body;
 
   if (!quantity || quantity <= 0) {
     return res.status(400).json({
@@ -114,7 +114,7 @@ const reduceStock = async (req, res) => {
     });
   }
 
-  toolkitServices.reduceStock(toolkitId, variantId, quantity, reason, updatedBy, person)
+  toolkitServices.reduceStock(toolkitId, variantId, quantity, reason, updatedBy, person, personId, assignedDate)
     .then((result) => {
       if (result) {
         res.status(result.status).json(result);
