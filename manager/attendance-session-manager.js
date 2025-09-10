@@ -1,7 +1,7 @@
 // Session Manager - Maintains login session to avoid repeated logins
 class AttendanceSessionManager {
   constructor() {
-    this.baseUrl = 'http://127.0.0.1:8081';
+    this.baseUrl = process.env.ATTENDANCE_URL;
     this.cookieJar = new Map();
     this.lastLoginTime = null;
     this.sessionTimeout = 30 * 60 * 1000; // 30 minutes
