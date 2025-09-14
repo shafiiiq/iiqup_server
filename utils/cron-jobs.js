@@ -1,7 +1,7 @@
 const cron = require('node-cron');
 const mechanicService = require('../services/mechanic-service');
 const { checkIstimaraExpiry } = require('../middleware/istimara-expiry-middleware');
-const liveMonitor = require('../jobs/attendance-cron-jobs'); // Add this import
+const liveMonitor = require('../jobs/attendance-cron-jobs'); 
 
 /**
  * Setup cron jobs for the application
@@ -141,7 +141,7 @@ const setupCronJobs = () => {
         // Optional: Start attendance monitoring after jobs are initialized
         setTimeout(() => {
           console.log('🚀 Server is ready for additional monitoring...');
-          liveMonitor.startMonitoring();
+          // liveMonitor.startMonitoring();
         }, 5000);
 
       } catch (error) {

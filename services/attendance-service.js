@@ -1,10 +1,57 @@
 const Attendance = require('../models/attendance.model');
 const moment = require('moment');
+const PushNotificationService = require('../utils/push-notification-jobs');
+require('dotenv').config();
+
+const standardizeName = (name) => {
+  if (!name) return '';
+
+  return name
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
+// Add this helper function for time formatting
+const formatTime = (timeString) => {
+  const [hours, minutes] = timeString.split(':');
+  const hour24 = parseInt(hours);
+  const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
+  const ampm = hour24 >= 12 ? 'PM' : 'AM';
+
+  return `${hour12}:${minutes}${ampm}`;
+};
+
+// Add this helper function for date formatting
+const formatDate = (dateString) => {
+  const date = new Date(dateString);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const months = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  const dateOnly = dateString; // since dateOnly is already in YYYY-MM-DD format
+  const todayString = today.toISOString().split('T')[0];
+  const yesterdayString = yesterday.toISOString().split('T')[0];
+
+  if (dateOnly === todayString) {
+    return `today (${date.getDate()} ${months[date.getMonth()]})`;
+  } else if (dateOnly === yesterdayString) {
+    return `yesterday (${date.getDate()} ${months[date.getMonth()]})`;
+  } else {
+    return `on ${date.getDate()} ${months[date.getMonth()]}`;
+  }
+};
 
 // Helper function to determine punch type based on ACTUAL punch time
 const determinePunchType = async (pin, currentDateTime) => {
   const dateOnly = moment(currentDateTime).format('YYYY-MM-DD');
-  
+
   // Get today's punches for this employee SORTED BY ACTUAL PUNCH TIME
   const todayPunches = await Attendance.find({
     pin: pin,
@@ -15,16 +62,16 @@ const determinePunchType = async (pin, currentDateTime) => {
   if (todayPunches.length === 0) {
     return 'IN';
   }
-  
+
   // Check if current punch time already exists (avoid duplicates)
-  const existingPunch = todayPunches.find(punch => 
+  const existingPunch = todayPunches.find(punch =>
     moment(punch.punchDateTime).isSame(moment(currentDateTime))
   );
-  
+
   if (existingPunch) {
     return existingPunch.punchType; // Return existing type if duplicate
   }
-  
+
   // Find the position where this punch should be inserted based on time
   let insertPosition = 0;
   for (let i = 0; i < todayPunches.length; i++) {
@@ -34,7 +81,7 @@ const determinePunchType = async (pin, currentDateTime) => {
       break;
     }
   }
-  
+
   // Determine punch type based on position in chronological order
   // Position 0, 2, 4, ... should be IN
   // Position 1, 3, 5, ... should be OUT
@@ -44,24 +91,24 @@ const determinePunchType = async (pin, currentDateTime) => {
 // Alternative simpler approach - determine punch type after all data is inserted
 const recalculatePunchTypes = async (pin, date) => {
   const dateOnly = moment(date).format('YYYY-MM-DD');
-  
+
   // Get all punches for this employee on this date, sorted by actual time
   const punches = await Attendance.find({
     pin: pin,
     dateOnly: dateOnly
   }).sort({ punchDateTime: 1 });
-  
+
   // Update punch types in correct chronological order
   for (let i = 0; i < punches.length; i++) {
     const correctPunchType = (i % 2 === 0) ? 'IN' : 'OUT';
-    
+
     if (punches[i].punchType !== correctPunchType) {
       await Attendance.findByIdAndUpdate(punches[i]._id, {
         punchType: correctPunchType
       });
     }
   }
-  
+
   return punches.length;
 };
 
@@ -82,8 +129,8 @@ const addAttendance = async (attendanceData) => {
     punchDateTime.setHours(parseInt(hours), parseInt(minutes), parseInt(seconds), 0);
 
     // Check if record already exists first
-    const existingRecord = await Attendance.findOne({ 
-      originalId: attendanceData.id 
+    const existingRecord = await Attendance.findOne({
+      originalId: attendanceData.id
     });
 
     if (existingRecord) {
@@ -105,7 +152,7 @@ const addAttendance = async (attendanceData) => {
       photo: attendanceData.photo || '',
       location: attendanceData.location,
       punchType: punchType,
-      
+
       // Time tracking fields
       dateOnly: moment(punchDateTime).format('YYYY-MM-DD'),
       timeOnly: attendanceData.punch_time,
@@ -116,10 +163,31 @@ const addAttendance = async (attendanceData) => {
 
     // Save new record
     const savedAttendance = await Attendance.create(attendanceRecord);
-    
+
     // Recalculate punch types for this employee's day to ensure correctness
     await recalculatePunchTypes(attendanceData.pin, punchDateTime);
-    
+
+    try {
+      const standardizedName = standardizeName(savedAttendance.empName);
+      const formattedTime = formatTime(savedAttendance.timeOnly);
+      const formattedDate = formatDate(savedAttendance.dateOnly);
+
+      const title = `${standardizedName} Punched ${savedAttendance.punchType}`;
+      const description = `${standardizedName} punched ${savedAttendance.punchType.toLowerCase()} at ${formattedTime} ${formattedDate}`;
+
+      await PushNotificationService.sendGeneralNotification(
+        [process.env.MAINTANANCE_HEAD, process.env.WORKSHOP_MANAGER, process.env.SUPER_ADMIN], // broadcast to all users
+        title,
+        description,
+        'high', // priority
+        'attendance' // type
+      );
+
+      console.log(`🔔 Notification sent for ${standardizedName}`);
+    } catch (error) {
+      console.error('❌ Error sending notifications:', error);
+    }
+
     return savedAttendance;
 
   } catch (error) {
@@ -135,15 +203,15 @@ const addAttendance = async (attendanceData) => {
 const fixExistingPunchTypes = async (pin = null, date = null) => {
   try {
     let query = {};
-    
+
     if (pin) query.pin = pin;
     if (date) query.dateOnly = moment(date).format('YYYY-MM-DD');
-    
+
     // Get all unique employee-date combinations
     const combinations = await Attendance.distinct('pin', query);
-    
+
     let totalFixed = 0;
-    
+
     for (const employeePin of combinations) {
       let dateQuery = { pin: employeePin };
       if (date) {
@@ -153,16 +221,16 @@ const fixExistingPunchTypes = async (pin = null, date = null) => {
       } else {
         // Get all dates for this employee
         const dates = await Attendance.distinct('dateOnly', { pin: employeePin });
-        
+
         for (const dateOnly of dates) {
           const fixed = await recalculatePunchTypes(employeePin, dateOnly);
           totalFixed += fixed;
         }
       }
     }
-    
+
     return { message: `Fixed punch types for ${totalFixed} records` };
-    
+
   } catch (error) {
     throw error;
   }
@@ -171,33 +239,33 @@ const fixExistingPunchTypes = async (pin = null, date = null) => {
 const getLiveMecAttendance = async (userId, filters = {}) => {
   try {
     const query = {};
-    
+
     // Apply filters
     if (filters.pin) {
       query.pin = filters.pin;
     }
-    
+
     if (filters.date) {
       query.dateOnly = filters.date;
     }
-    
+
     if (filters.month) {
       query.monthYear = filters.month;
     }
-    
+
     if (filters.year) {
       query.year = parseInt(filters.year);
     }
-    
+
     if (filters.week && filters.weekYear) {
       query.weekNumber = parseInt(filters.week);
       query.year = parseInt(filters.weekYear);
     }
-    
+
     if (filters.empName) {
       query.empName = new RegExp(filters.empName, 'i');
     }
-    
+
     // Date range filter
     if (filters.startDate && filters.endDate) {
       query.dateOnly = {
@@ -220,11 +288,11 @@ const getLiveMecAttendance = async (userId, filters = {}) => {
 const getAttendanceStats = async (filters = {}) => {
   try {
     const matchStage = {};
-    
+
     if (filters.pin) matchStage.pin = filters.pin;
     if (filters.month) matchStage.monthYear = filters.month;
     if (filters.year) matchStage.year = parseInt(filters.year);
-    
+
     const stats = await Attendance.aggregate([
       { $match: matchStage },
       {
@@ -268,15 +336,15 @@ const getAttendanceStats = async (filters = {}) => {
 // Get today's attendance
 const getTodayAttendance = async () => {
   const today = moment().format('YYYY-MM-DD');
-  return await Attendance.find({ 
-    dateOnly: today 
+  return await Attendance.find({
+    dateOnly: today
   }).sort({ punchDateTime: -1 });
 };
 
 // Get unprocessed attendance records
 const getUnprocessedRecords = async () => {
-  return await Attendance.find({ 
-    notificationSent: false 
+  return await Attendance.find({
+    notificationSent: false
   }).sort({ punchDateTime: 1 });
 };
 
@@ -284,11 +352,11 @@ const getUnprocessedRecords = async () => {
 const markAsProcessed = async (recordIds) => {
   return await Attendance.updateMany(
     { _id: { $in: recordIds } },
-    { 
-      $set: { 
-        isProcessed: true, 
-        notificationSent: true 
-      } 
+    {
+      $set: {
+        isProcessed: true,
+        notificationSent: true
+      }
     }
   );
 };

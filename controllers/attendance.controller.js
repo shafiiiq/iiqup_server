@@ -1,5 +1,6 @@
 const attendanceService = require('../services/attendance-service');
 const liveMonitor = require('../jobs/attendance-cron-jobs');
+const Mechanic = require('../models/mechanic.model'); // Add this import
 
 // Create new attendance record (manual)
 const storeToProcess = async (req, res) => {
@@ -24,6 +25,78 @@ const storeToProcess = async (req, res) => {
       success: false,
       message: error.message
     });
+  }
+};
+
+// data {
+//   id: 4599,
+//   pin: '7',
+//   emp_name: 'abdul rasak',
+//   punch_time: '05:20:31',
+//   state: '255',
+//   work_code: '0',
+//   capture: '',
+//   photo: 'auth_files/photo/7.jpg?_=1757838507',
+//   location: 'Auto add',
+//   icon: '/media/images/device.png'
+// }
+
+const sendToServer = async (attendanceData) => {
+  try {
+    // Handle both direct data and request object formats
+    const data = attendanceData.body || attendanceData;
+    const { pin, punch_time, state, work_code, location, id } = data;
+
+    // Parse the pin to integer
+    const parsedPin = parseInt(pin);
+
+    // Find mechanic by zktecoPin
+    const mechanic = await Mechanic.findOne({ zktecoPin: parsedPin });
+
+    if (!mechanic) {
+      // console.log(`No mechanic found with zktecoPin: ${parsedPin}`);
+      return;
+    }
+
+    // Check for duplicate - prevent same time with same state (more realistic for attendance)
+    const existingRecord = mechanic.attendance.find(att =>
+      att.punch_time === punch_time && att.punch_state === state
+    );
+
+    if (existingRecord) {
+      // console.log(`Duplicate attendance record skipped for ${mechanic.name} - ID: ${id}, Time: ${punch_time}`);
+      return;
+    }
+
+    // Create new attendance record
+    const newAttendance = {
+      id: id,
+      punch_time: punch_time,
+      punch_state: state,
+      emp_name: mechanic.name,
+      verify_type: '1', // Fingerprint
+      work_code: work_code,
+      gps_location: location,
+      terminal_alias: 'ZKTeco Device',
+      capture: '',
+      upload_time: new Date().toISOString(),
+      icon: '/media/images/device.png',
+      location: location,
+      photo: 'auth_files/photo/7.jpg?_=1757838507',
+      pin: parsedPin
+    };
+
+    const savedAttendance = await attendanceService.addAttendance(newAttendance);
+    // console.log(savedAttendance);
+    
+
+    // Add to mechanic's attendance array
+    mechanic.attendance.push(newAttendance);
+    await mechanic.save();
+    // console.log(`✅ Attendance saved for ${mechanic.name} at ${punch_time} - ID: ${id}, State: ${state}`);
+
+  } catch (error) {
+    console.error('Error saving attendance:', error);
   }
 };
 
@@ -91,7 +164,7 @@ const getDailyReport = async (req, res) => {
     const targetDate = date || new Date().toISOString().split('T')[0];
 
     const attendances = await attendanceService.getLiveMecAttendance(null, { date: targetDate });
-    
+
     // Group by employee
     const employeeReport = {};
     attendances.forEach(attendance => {
@@ -104,21 +177,21 @@ const getDailyReport = async (req, res) => {
           lastPunch: null
         };
       }
-      
+
       employeeReport[attendance.pin].punches.push({
         time: attendance.timeOnly,
         type: attendance.punchType,
         datetime: attendance.punchDateTime
       });
-      
+
       // Update first and last punch
-      if (!employeeReport[attendance.pin].firstPunch || 
-          attendance.punchDateTime < employeeReport[attendance.pin].firstPunch) {
+      if (!employeeReport[attendance.pin].firstPunch ||
+        attendance.punchDateTime < employeeReport[attendance.pin].firstPunch) {
         employeeReport[attendance.pin].firstPunch = attendance.punchDateTime;
       }
-      
-      if (!employeeReport[attendance.pin].lastPunch || 
-          attendance.punchDateTime > employeeReport[attendance.pin].lastPunch) {
+
+      if (!employeeReport[attendance.pin].lastPunch ||
+        attendance.punchDateTime > employeeReport[attendance.pin].lastPunch) {
         employeeReport[attendance.pin].lastPunch = attendance.punchDateTime;
       }
     });
@@ -219,7 +292,7 @@ const stopMonitoring = async (req, res) => {
 const getEmployeeMonthlyAttendance = async (req, res) => {
   try {
     const { pin, month, year } = req.query;
-    
+
     if (!pin || !month || !year) {
       return res.status(400).json({
         success: false,
@@ -228,9 +301,9 @@ const getEmployeeMonthlyAttendance = async (req, res) => {
     }
 
     const monthYear = `${year}-${month.toString().padStart(2, '0')}`;
-    const attendances = await attendanceService.getLiveMecAttendance(null, { 
-      pin, 
-      monthYear 
+    const attendances = await attendanceService.getLiveMecAttendance(null, {
+      pin,
+      monthYear
     });
 
     res.status(200).json({
@@ -258,5 +331,6 @@ module.exports = {
   getMonitoringStatus,
   startMonitoring,
   stopMonitoring,
-  getEmployeeMonthlyAttendance
+  getEmployeeMonthlyAttendance,
+  sendToServer
 };

@@ -38,6 +38,8 @@ var applicationRouter = require('./routes/applications');
 var securityRouter = require('./routes/security');
 var _0authRouter = require('./routes/0auth');
 var s3Config = require('./routes/s3Config');
+var FuelsRouter = require('./routes/fuels');
+var ztech = require('./routes/ztech');
 const attendanceRoutes = require('./routes/attendance');
 
 var app = express();
@@ -119,6 +121,7 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Routes
+app.use('/', ztech);
 app.use('/users', userRouter);
 app.use('/otp', otpRouter);
 app.use('/equipments', authMiddleware, equipementRouter);
@@ -137,7 +140,8 @@ app.use('/applications', authMiddleware, applicationRouter);
 app.use('/hunter-eye', securityRouter);
 app.use('/0auth', _0authRouter);
 app.use('/s3Config', s3Config);
-app.use('/attendance', attendanceRoutes); // Fixed: added missing '/'
+app.use('/fuels', FuelsRouter);
+app.use('/attendance', attendanceRoutes); 
 
 // Overtime auto deleter after 2 months
 app.use(overtimeCleanupMiddleware);

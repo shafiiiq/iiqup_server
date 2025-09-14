@@ -96,28 +96,66 @@ ToolkitSchema.pre('save', function (next) {
 
 // Define the attendance schema (unchanged)
 const AttendanceSchema = new Schema({
-  date: {
-    type: Date,
-    required: [true, 'Date is required'],
-    default: Date.now
+  id: {
+    type: Number,
   },
-  in: {
-    type: Date,
-    required: [true, 'Clock-in time is required']
+  emp: {
+    type: Number,
   },
-  out: {
-    type: Date
+  emp_code: {
+    type: String
   },
-  breakOut: {
-    type: Date
+  first_name: {
+    type: String
   },
-  breakIn: {
-    type: Date
+  last_name: {
+    type: String
   },
-  totalTime: {
-    type: Number, // Store total time in minutes
-    default: 0
-  }
+  department: {
+    type: String,
+  },
+  position: {
+    type: String,
+  },
+  punch_time: {
+    type: String,
+  },
+  punch_state: {
+    type: String,
+  },
+  verify_type: {
+    type: String,
+  },
+  verify_type_display: {
+    type: String,
+  },
+  work_code: {
+    type: String,
+  },
+  gps_location: {
+    type: String,
+  },
+  work_code: {
+    type: String,
+  },
+  area_alias: {
+    type: String,
+  },
+  terminal_sn: {
+    type: String,
+  },
+  temperature: {
+    type: String,
+  },
+  is_mask: {
+    type: String,
+  },
+  terminal_alias: {
+    type: String,
+  },
+  upload_time: {
+    type: String,
+  },
 });
 
 // Calculate total time when clocking out (unchanged)
@@ -296,6 +334,9 @@ const MechanicSchema = new Schema({
   updatedAt: {
     type: Date,
     default: Date.now
+  },
+  zktecoPin :{
+    type: Number
   }
 });
 
