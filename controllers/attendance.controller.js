@@ -2,6 +2,24 @@ const attendanceService = require('../services/attendance-service');
 const liveMonitor = require('../jobs/attendance-cron-jobs');
 const Mechanic = require('../models/mechanic.model'); // Add this import
 
+const convertToQatarTime = (timeString) => {
+  try {
+    // Get today's date
+    const today = moment().format('YYYY-MM-DD');
+
+    // Create a moment object assuming the time is UTC
+    const utcDateTime = moment.tz(`${today} ${timeString}`, 'UTC');
+
+    // Convert to Qatar timezone and extract time
+    const qatarTime = utcDateTime.tz('Asia/Qatar').format('HH:mm:ss');
+
+    return qatarTime;
+  } catch (error) {
+    console.error('Error converting time to Qatar timezone:', error);
+    return timeString;
+  }
+};
+
 // Create new attendance record (manual)
 const storeToProcess = async (req, res) => {
   try {
@@ -30,7 +48,7 @@ const storeToProcess = async (req, res) => {
 
 const sendToServer = async (attendanceData) => {
   console.log("this is the attendance data", attendanceData);
-  
+
   try {
     // Handle both direct data and request object formats
     const data = attendanceData.body || attendanceData;
@@ -43,32 +61,35 @@ const sendToServer = async (attendanceData) => {
     const mechanic = await Mechanic.findOne({ zktecoPin: parsedPin });
 
     if (!mechanic) {
-      // console.log(`No mechanic found with zktecoPin: ${parsedPin}`);
       return;
     }
 
-    // Check for duplicate - prevent same time with same state (more realistic for attendance)
+    // Convert punch_time to Qatar timezone
+    const qatarTime = convertToQatarTime(punch_time);
+    console.log(`Hardware time: ${punch_time}, Qatar local time: ${qatarTime}`);
+
+    // Check for duplicate with Qatar time
     const existingRecord = mechanic.attendance.find(att =>
-      att.punch_time === punch_time && att.punch_state === state
+      att.punch_time === qatarTime && att.punch_state === state
     );
 
     if (existingRecord) {
-      // console.log(`Duplicate attendance record skipped for ${mechanic.name} - ID: ${id}, Time: ${punch_time}`);
+      console.log(`Duplicate attendance record skipped for ${mechanic.name}`);
       return;
     }
 
-    // Create new attendance record
+    // Create new attendance record with Qatar time
     const newAttendance = {
       id: id,
-      punch_time: punch_time,
+      punch_time: qatarTime,
       punch_state: state,
       emp_name: mechanic.name,
-      verify_type: '1', // Fingerprint
+      verify_type: '1',
       work_code: work_code,
       gps_location: location,
       terminal_alias: 'ZKTeco Device',
       capture: '',
-      upload_time: new Date().toISOString(),
+      upload_time: moment().tz('Asia/Qatar').toISOString(),
       icon: '/media/images/device.png',
       location: location,
       photo: 'auth_files/photo/7.jpg?_=1757838507',
@@ -76,13 +97,10 @@ const sendToServer = async (attendanceData) => {
     };
 
     const savedAttendance = await attendanceService.addAttendance(newAttendance);
-    // console.log(savedAttendance);
-    
 
-    // Add to mechanic's attendance array
     mechanic.attendance.push(newAttendance);
     await mechanic.save();
-    // console.log(`✅ Attendance saved for ${mechanic.name} at ${punch_time} - ID: ${id}, State: ${state}`);
+    console.log(`✅ Attendance saved for ${mechanic.name} at ${qatarTime} Qatar time`);
 
   } catch (error) {
     console.error('Error saving attendance:', error);
