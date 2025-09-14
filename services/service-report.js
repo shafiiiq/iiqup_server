@@ -43,21 +43,21 @@ module.exports = {
           throw new Error(`Failed to create service report for regNo: ${data.regNo}`);
         }
 
-        // await createNotification({
-        //   title: `${data.machine} - ${data.regNo} serviced`,
-        //   description: `At ${data.location}\nServiced Hours: ${data.serviceHrs}\nNext Service: ${data.nextServiceHrs}\n${data.remarks}\nMechanics: ${data.mechanics}`,
-        //   priority: "high",
-        //   sourceId: 'from applications',
-        //   time: new Date()
-        // });
+        await createNotification({
+          title: `${data.machine} - ${data.regNo} serviced`,
+          description: `At ${data.location}\nServiced Hours: ${data.serviceHrs}\nNext Service: ${data.nextServiceHrs}\n${data.remarks}\nMechanics: ${data.mechanics}`,
+          priority: "high",
+          sourceId: 'from applications',
+          time: new Date()
+        });
 
-        // await PushNotificationService.sendGeneralNotification(
-        //   null, // broadcast to all users
-        //   `${data.machine} - ${data.regNo} serviced`, //title
-        //   `At ${data.location}\nServiced Hours: ${data.serviceHrs}\nNext Service: ${data.nextServiceHrs}\n${data.remarks}\nMechanics: ${data.mechanics}`, //decription
-        //   'high', //priority
-        //   'normal' // type
-        // );
+        await PushNotificationService.sendGeneralNotification(
+          null, // broadcast to all users
+          `${data.machine} - ${data.regNo} serviced`, //title
+          `At ${data.location}\nServiced Hours: ${data.serviceHrs}\nNext Service: ${data.nextServiceHrs}\n${data.remarks}\nMechanics: ${data.mechanics}`, //decription
+          'high', //priority
+          'normal' // type
+        );
 
         resolve({
           status: 200,

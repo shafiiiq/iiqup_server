@@ -41,6 +41,7 @@ var s3Config = require('./routes/s3Config');
 var FuelsRouter = require('./routes/fuels');
 var ztech = require('./routes/ztech');
 const attendanceRoutes = require('./routes/attendance');
+const testRoutes = require('./routes/test');
 
 var app = express();
 
@@ -58,6 +59,7 @@ const corsOptions = {
       'https://iiqup.netlify.app',
       'https://ansarigroup.online',
       'https://www.ansarigroup.online',
+      // "http://localhost:3000"
     ];
 
     if (whitelist.indexOf(origin) !== -1) {
@@ -142,6 +144,7 @@ app.use('/0auth', _0authRouter);
 app.use('/s3Config', s3Config);
 app.use('/fuels', FuelsRouter);
 app.use('/attendance', attendanceRoutes); 
+app.use('/test', testRoutes); 
 
 // Overtime auto deleter after 2 months
 app.use(overtimeCleanupMiddleware);
