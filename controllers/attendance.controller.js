@@ -28,20 +28,9 @@ const storeToProcess = async (req, res) => {
   }
 };
 
-// data {
-//   id: 4599,
-//   pin: '7',
-//   emp_name: 'abdul rasak',
-//   punch_time: '05:20:31',
-//   state: '255',
-//   work_code: '0',
-//   capture: '',
-//   photo: 'auth_files/photo/7.jpg?_=1757838507',
-//   location: 'Auto add',
-//   icon: '/media/images/device.png'
-// }
-
 const sendToServer = async (attendanceData) => {
+  console.log("this is the attendance data", attendanceData);
+  
   try {
     // Handle both direct data and request object formats
     const data = attendanceData.body || attendanceData;
