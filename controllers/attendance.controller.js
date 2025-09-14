@@ -1,6 +1,7 @@
 const attendanceService = require('../services/attendance-service');
 const liveMonitor = require('../jobs/attendance-cron-jobs');
 const Mechanic = require('../models/mechanic.model'); // Add this import
+const moment = require('moment-timezone')
 
 const convertToQatarTime = (timeString) => {
   try {
