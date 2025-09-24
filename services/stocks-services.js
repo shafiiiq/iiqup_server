@@ -309,7 +309,7 @@ module.exports = {
 
         const savedStock = await newStock.save();
 
-        await createNotification({
+        const notification = await createNotification({
           title: "New Stock Added",
           description: `${data.stockCount} new ${data.serialNumber} - ${data.product} added to stock ${newStock.equipments ? `for ${newStock.equipments}` : ''}`,
           priority: "high",
@@ -321,7 +321,8 @@ module.exports = {
           "New Stock Added", //title
           `${data.stockCount} new ${data.serialNumber} - ${data.product} added to stock ${newStock.equipments ? `for ${newStock.equipments}` : ''}`, //decription
           'high', //priority
-          'normal' // type
+          'normal', // type
+          notification._id
         );
 
         resolve({
@@ -647,7 +648,7 @@ module.exports = {
             { new: true, runValidators: true }
           );
 
-          await createNotification({
+          const notificaton = await createNotification({
             title: "Stock Update",
             description: `${quantityChange} ${currentStock.product} with part number ${currentStock.serialNumber} is used by ${mechanicName} for ${equipmentName} ${equipmentNumber}`,
             priority: "high",
@@ -659,7 +660,8 @@ module.exports = {
             "Stock Update", //title
             `${quantityChange} ${currentStock.product} with part number ${currentStock.serialNumber} is used by ${mechanicName} for ${equipmentName} ${equipmentNumber}`, //decription
             'high', //priority
-            'normal' // type
+            'normal', // type
+            notification._id
           );
         }
 
@@ -687,10 +689,10 @@ module.exports = {
             "Low Stock", //title
             message,
             'high', //priority
-            'normal' // type
+            'normal', // type
           );
         } else {
-          await createNotification({
+          const notification = await createNotification({
             title: "Stock Update",
             description: `${quantityChange} ${currentStock.product} with part number ${currentStock.serialNumber} is used by ${updateData.mechanicName} for ${updateData.equipmentName} ${updateData.equipmentNumber}`,
             priority: "high",
@@ -702,7 +704,8 @@ module.exports = {
             "Stock Update", //title
             `${quantityChange} ${currentStock.product} with part number ${currentStock.serialNumber} is used by ${updateData.mechanicName} for ${updateData.equipmentName} ${updateData.equipmentNumber}`, //decription
             'high', //priority
-            'normal' // type
+            'normal', // type
+            notification._id
           );
         }
 

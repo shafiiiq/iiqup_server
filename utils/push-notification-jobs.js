@@ -277,7 +277,7 @@ class PushNotificationService {
      * @param {string} priority - Notification priority
      * @param {string} type - Notification type
      */
-    static async sendGeneralNotification(uniqueCode, title, description, priority = 'medium', type = 'normal') {
+    static async sendGeneralNotification(uniqueCode, title, description, priority = 'medium', type = 'normal', notificationId) {
         const notification = {
             _id: `general_${Date.now()}`,
             type: type,
@@ -285,7 +285,8 @@ class PushNotificationService {
             description: description,
             message: description,
             priority: priority,
-            time: new Date().toISOString()
+            time: new Date().toISOString(),
+            notificationId
         };
 
         if (Array.isArray(uniqueCode)) {

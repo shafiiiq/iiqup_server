@@ -26,9 +26,9 @@ module.exports = {
 
         // Send notification for new equipment
         try {
-          await createNotification({
-            title: "New Equipment Added",
-            description: `Congratulations! We have bought a brand new ${equipment.machine} (${equipment.brand}) today`,
+          const notification = await createNotification({
+            title: "New Asset Launched",
+            description: `Alhamdulillah , We are happy to inform to you! We have bought a brand new ${equipment.machine} (${equipment.brand}) today`,
             priority: "high",
             sourceId: equipment._id,
             time: new Date()
@@ -36,10 +36,11 @@ module.exports = {
 
           await PushNotificationService.sendGeneralNotification(
             null, // broadcast to all users
-            "New Equipment Added", //title
-            `Congratulations! We have bought a brand new ${equipment.machine} (${equipment.brand}) today`, //decription
+            "New Asset Launched", //title
+            `Alhamdulillah , We are happy to inform to you! We have bought a brand new ${equipment.machine} (${equipment.brand}) today`, //decription
             'high', //priority
-            'normal' // type
+            'normal', // type
+            notification._id
           );
         } catch (notificationError) {
           console.error('Failed to send notification for new equipment:', notificationError);
@@ -162,7 +163,7 @@ module.exports = {
           if (changes.length > 0) {
             const changesText = changes.join(', ');
 
-            await createNotification({
+            const notification = await createNotification({
               title: "Equipment Updated",
               description: `${equipment.machine} - ${equipment.regNo}'s new ${changesText}`,
               priority: "medium",
@@ -175,7 +176,8 @@ module.exports = {
               'Equipment Updated', //title
               `${equipment.machine} - ${equipment.regNo}'s new ${changesText}`, //description
               'medium', //priority
-              'normal' // type
+              'normal', // type
+              notification._id
             );
           }
 
@@ -200,15 +202,15 @@ module.exports = {
   deleteEquipments: (regNo) => {
     return new Promise(async (resolve, reject) => {
       try {
-        const equipment = await equipmentModel.findOne({regNo});
+        const equipment = await equipmentModel.findOne({ regNo });
         console.log(equipment);
-        
+
         if (equipment) {
           const deleteEquipment = await equipmentModel.findOneAndDelete({ regNo: equipment.regNo });
 
           // Send notification for equipment deletion
           try {
-            await createNotification({
+            const notification = await createNotification({
               title: "Equipment Removed",
               description: `Equipment ${deleteEquipment.machine} - ${deleteEquipment.regNo} has been removed from the system or sold`,
               priority: "medium",
@@ -221,7 +223,8 @@ module.exports = {
               'Equipment Removed', //title
               `Equipment ${deleteEquipment.machine} - ${deleteEquipment.regNo} has been removed from the system or sold`, //decription
               'medium', //priority
-              'normal' // type
+              'normal', // type
+              notification._id
             );
           } catch (notificationError) {
             console.error('Failed to send notification for equipment deletion:', notificationError);
@@ -296,7 +299,7 @@ module.exports = {
 
         // Send notification for status change
         try {
-          await createNotification({
+          const notification = await createNotification({
             title: `${updatedEquipment.machine} - ${updatedEquipment.regNo} - ${status} now`,
             description: `${updatedEquipment.machine} - ${updatedEquipment.regNo} is in ${status} now`,
             priority: "high",
@@ -309,7 +312,8 @@ module.exports = {
             `${updatedEquipment.machine} - ${updatedEquipment.regNo} - ${status} now`, //title
             `${updatedEquipment.machine} - ${updatedEquipment.regNo} is in ${status} now`, //decription
             'high', //priority
-            'normal' // type
+            'normal', // type
+            notification._id
           );
         } catch (notificationError) {
           console.error('Failed to send notification for status change:', notificationError);

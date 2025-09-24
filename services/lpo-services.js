@@ -35,11 +35,9 @@ class LPOService {
       };
 
       const lpo = new LPO(lpoWithTotal);
-
-      console.log(lpoData);
       
 
-      await createNotification({
+      const notification = await createNotification({
         title: `New LPO`,
         description: `LPO: ${lpoData.lpoRef} for ${lpoData.company.vendor} for ${lpoData.equipments}`,
         priority: "high",
@@ -52,7 +50,8 @@ class LPOService {
         `New LPO`, //title
         `LPO: ${lpoData.lpoRef} for ${lpoData.company.vendor} for ${lpoData.equipments}`, //decription
         'high', //priority
-        'normal' // type
+        'normal', // type
+        notification._id
       );
 
       return await lpo.save();

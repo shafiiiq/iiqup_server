@@ -234,7 +234,7 @@ const createApplication = async (applicationData) => {
 
     const user = await User.findById(userId)
 
-    await createNotification({
+    const notification = await createNotification({
       title: `Requesting ${leaveType} ${type}`,
       description: `${user.name} is requesting to ${leaveType} ${type} from ${startDate} to ${endDate} regarding the ${data.reason}`,
       priority: "high",
@@ -247,7 +247,8 @@ const createApplication = async (applicationData) => {
       `Requesting ${leaveType} ${type}`, //title
       `${user.name} is requesting to ${leaveType} ${type} from ${startDate} to ${endDate} regarding the ${data.reason}`, //decription
       'high', //priority
-      'normal' // type
+      'normal', // type
+      notification._id
     );
     return await application.save();
   } else {
@@ -260,7 +261,7 @@ const createApplication = async (applicationData) => {
 
     const user = await User.findOne({ _id: userId })
 
-    await createNotification({
+    const notificaton = await createNotification({
       title: `Requesting ${type}`,
       description: `${user.name} is requesting to ${type} for ${data.amount} for ${data.purpose}`,
       priority: "high",
@@ -273,7 +274,8 @@ const createApplication = async (applicationData) => {
       `Requesting ${type}`, //title
       `${user.name} is requesting to ${type} for ${data.amount} for ${data.purpose}`, //decription
       'high', //priority
-      'normal' // type
+      'normal', // type
+      notification._id
     );
 
     return await application.save();
@@ -368,7 +370,7 @@ const changeApplicationStatus = async (applicationId, newStatus, options = {}) =
       notificationDescription += `. Reason: ${rejectedReason}`;
     }
 
-    await createNotification({
+    const notification = await createNotification({
       title: notificationTitle,
       description: notificationDescription,
       priority: "medium",
@@ -381,7 +383,8 @@ const changeApplicationStatus = async (applicationId, newStatus, options = {}) =
       notificationTitle,
       notificationDescription,
       'medium',
-      'normal'
+      'normal',
+      notification._id
     );
   }
 

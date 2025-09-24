@@ -34,7 +34,8 @@ const USER_ROLES = {
   OFFICE_ADMIN: 'OFFICE_ADMIN',
   ASSISTANT_OFFICE_ADMIN: 'ASSISTANT_OFFICE_ADMIN',
   SUB_ADMIN: 'SUB_ADMIN',
-  SUB_ACCOUNTANT: 'SUB_ACCOUNTANT'
+  SUB_ACCOUNTANT: 'SUB_ACCOUNTANT',
+  SUB_ASSISTANT_MANAGER: 'SUB_ASSISTANT_MANAGER',
 };
 
 // Insert a new user
@@ -808,7 +809,7 @@ const grantPermission = async (mechanicId, purpose, data) => {
         notificationMessage = `${mechanic.name} has submitted an overtime request for ${formattedDate}`;
       }
 
-      await createNotification({
+      const notification = await createNotification({
         title: "Mechanic overtime request",
         description: notificationMessage,
         priority: "high",
@@ -820,7 +821,8 @@ const grantPermission = async (mechanicId, purpose, data) => {
         "Mechanic overtime request",
         notificationMessage,
         'high',
-        'normal'
+        'normal',
+        notification._id
       );
     } catch (notificationError) {
       console.error('Error sending push notification:', notificationError);
@@ -1048,7 +1050,7 @@ const grantAccept = async (uniqueCode, dataId, purpose) => {
     if (uniqueCode === process.env.WORKSHOP_MANAGER) {
       uniqueCode = process.env.MAINTANANCE_HEAD
     }
-    
+
     // Find the user by uniqueCode
     const user = await User.findOne({ uniqueCode });
 
@@ -1128,7 +1130,7 @@ const grantAccept = async (uniqueCode, dataId, purpose) => {
           notificationMessage = `Hamsa is accepted overtime of ${mechanic.name} has submitted an overtime request for ${formattedDate}`;
         }
 
-        await createNotification({
+        const notification = await createNotification({
           title: "Mechanic overtime request",
           description: notificationMessage,
           priority: "high",
@@ -1140,7 +1142,8 @@ const grantAccept = async (uniqueCode, dataId, purpose) => {
           "Mechanic overtime accepted", // title
           notificationMessage, // description
           'high', // priority
-          'normal' // type
+          'normal', // type
+          notification._id
         );
       } catch (notificationError) {
         console.error('Error sending push notification:', notificationError);
@@ -1590,7 +1593,8 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
       body: notificationData.body || notificationData.message || 'You have a new notification',
       data: notificationData.data || notificationData,
       priority: notificationData.priority === 'high' ? 'high' : 'normal',
-      channelId: getChannelId(notificationData.priority)
+      channelId: getChannelId(notificationData.priority),
+      notificationId: notificationData.notificationId || null
     }));
 
     // Send notifications

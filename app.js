@@ -41,9 +41,16 @@ var s3Config = require('./routes/s3Config');
 var FuelsRouter = require('./routes/fuels');
 var ztech = require('./routes/ztech');
 const attendanceRoutes = require('./routes/attendance');
+const backchargeRouter = require('./routes/backcharge');
 const testRoutes = require('./routes/test');
 
 var app = express();
+
+const getIt =async () => {
+ 
+}
+
+getIt()
 
 // Create HTTP server
 var server = http.createServer(app);
@@ -59,12 +66,11 @@ const corsOptions = {
       'https://iiqup.netlify.app',
       'https://ansarigroup.online',
       'https://www.ansarigroup.online',
-      // "http://localhost:3000"
     ];
 
     if (whitelist.indexOf(origin) !== -1) {
       callback(null, true); // allow
-    } else { 
+    } else {
       callback(new Error('Not allowed by CORS')); // block
     }
   },
@@ -143,8 +149,9 @@ app.use('/hunter-eye', securityRouter);
 app.use('/0auth', _0authRouter);
 app.use('/s3Config', s3Config);
 app.use('/fuels', FuelsRouter);
-app.use('/attendance', attendanceRoutes); 
-app.use('/test', testRoutes); 
+app.use('/attendance', attendanceRoutes);
+app.use('/backcharge', backchargeRouter);
+app.use('/test', testRoutes);
 
 // Overtime auto deleter after 2 months
 app.use(overtimeCleanupMiddleware);

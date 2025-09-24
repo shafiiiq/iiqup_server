@@ -61,7 +61,9 @@ const sendToServer = async (attendanceData) => {
     // Find mechanic by zktecoPin
     const mechanic = await Mechanic.findOne({ zktecoPin: parsedPin });
 
-    if (!mechanic) {
+    // If no mechanic found and it's not a special admin pin (1 or 15), return early
+    if (!mechanic && parsedPin !== 15 && parsedPin !== 1) {
+      console.log(`No mechanic found for pin: ${parsedPin}`);
       return;
     }
 
@@ -69,14 +71,28 @@ const sendToServer = async (attendanceData) => {
     const qatarTime = convertToQatarTime(punch_time);
     console.log(`Hardware time: ${punch_time}, Qatar local time: ${qatarTime}`);
 
-    // Check for duplicate with Qatar time
-    const existingRecord = mechanic.attendance.find(att =>
-      att.punch_time === qatarTime && att.punch_state === state
-    );
+    // Check for duplicate with Qatar time (only if mechanic exists)
+    if (mechanic) {
+      const existingRecord = mechanic.attendance.find(att =>
+        att.punch_time === qatarTime && att.punch_state === state
+      );
 
-    if (existingRecord) {
-      console.log(`Duplicate attendance record skipped for ${mechanic.name}`);
-      return;
+      if (existingRecord) {
+        console.log(`Duplicate attendance record skipped for ${mechanic.name}`);
+        return;
+      }
+    }
+
+    // Determine employee name based on pin
+    let empName;
+    if (parsedPin === 1) {
+      empName = process.env.SUPER_ADMIN_NAME;
+    } else if (parsedPin === 15) {
+      empName = process.env.WORKSHOP_MANAGER_EMP_NAME;
+    } else if (mechanic) {
+      empName = mechanic.name;
+    } else {
+      empName = `Unknown User (PIN: ${parsedPin})`;
     }
 
     // Create new attendance record with Qatar time
@@ -84,7 +100,7 @@ const sendToServer = async (attendanceData) => {
       id: id,
       punch_time: qatarTime,
       punch_state: state,
-      emp_name: mechanic.name,
+      emp_name: empName,
       verify_type: '1',
       work_code: work_code,
       gps_location: location,
@@ -97,11 +113,17 @@ const sendToServer = async (attendanceData) => {
       pin: parsedPin
     };
 
+    // Save attendance to the service
     const savedAttendance = await attendanceService.addAttendance(newAttendance);
 
-    mechanic.attendance.push(newAttendance);
-    await mechanic.save();
-    console.log(`✅ Attendance saved for ${mechanic.name} at ${qatarTime} Qatar time`);
+    // Only add to mechanic's attendance array if it's a regular mechanic
+    if (mechanic) {
+      mechanic.attendance.push(newAttendance);
+      await mechanic.save();
+      console.log(`✅ Attendance saved for ${mechanic.name} at ${qatarTime} Qatar time`);
+    } else {
+      console.log(`✅ Attendance saved for ${empName} at ${qatarTime} Qatar time`);
+    }
 
   } catch (error) {
     console.error('Error saving attendance:', error);

@@ -4,7 +4,7 @@ const userController = require('../controllers/users.controllers');
 const overtimeUpload = require('../multer/overtime-upload'); // Import the multer config
 const { authMiddleware } = require('../utils/jwt');
 
-router.post('/addusers', authMiddleware, userController.addUsers);
+router.post('/addusers', userController.addUsers);
 router.get('/allusers', authMiddleware, userController.getUsers);
 router.get('/get-all-users', authMiddleware, userController.getAllUsers);
 router.put('/updateuser/:id', authMiddleware, userController.updateUser);

@@ -6,6 +6,7 @@ const path = require('path');
 const { putObject } = require('../s3bucket/s3.bucket');
 
 class ComplaintController {
+  // Step 1: Register complaint (unchanged but now only notifies MAINTENANCE_HEAD)
   static async registerComplaint(req, res) {
     try {
       const { regNo, name, uniqueCode, files } = req.body;
@@ -17,18 +18,14 @@ class ComplaintController {
         });
       }
 
-      // Helper function to determine if file is video
       const isVideoFile = (mimeType, fileName) => {
-        // Check mimeType first
         if (mimeType) {
           const normalizedMimeType = mimeType.toLowerCase();
-          // Handle cases like 'video', 'video/mp4', 'video/webm', etc.
           if (normalizedMimeType === 'video' || normalizedMimeType.startsWith('video/')) {
             return true;
           }
         }
 
-        // Fallback to file extension if mimeType is not clear
         if (fileName) {
           const ext = path.extname(fileName).toLowerCase();
           const videoExtensions = ['.mp4', '.webm', '.ogg', '.avi', '.mov', '.wmv', '.flv', '.m4v', '.3gp', '.mkv'];
@@ -38,20 +35,20 @@ class ComplaintController {
         return false;
       };
 
-      // Generate presigned URLs and return them to the client
-      const filesWithUploadData = await Promise.all(
+      // Generate upload URLs for each file
+      const uploadData = await Promise.all(
         files.map(async (file) => {
           const ext = path.extname(file.fileName);
-          const finalFilename = `${regNo || 'no-reg'}-${Date.now()}${ext}`;
+          const finalFilename = `${regNo || 'no-reg'}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}${ext}`;
           const s3Key = `complaints/${regNo || 'no-reg'}/${uniqueCode}/complaint-${uniqueCode}-${finalFilename}`;
 
+          // Get presigned upload URL
           const uploadUrl = await putObject(
             file.fileName,
             s3Key,
             file.mimeType
           );
 
-          // Determine the correct type
           const isVideo = isVideoFile(file.mimeType, file.fileName);
 
           return {
@@ -60,41 +57,439 @@ class ComplaintController {
             filePath: s3Key,
             mimeType: file.mimeType,
             type: isVideo ? 'video' : 'photo',
-            uploadUrl: uploadUrl,
+            uploadUrl: uploadUrl, // This is what the frontend expects
             uploadDate: new Date()
           };
         })
       );
 
-      // Create complaint document (without saving yet)
+      // Create complaint record
       const complaintData = {
         uniqueCode,
         regNo: regNo || 'no-reg',
         name: name || 'no-name',
-        mediaFiles: filesWithUploadData,
-        status: 'pending'
+        mediaFiles: uploadData.map(item => ({
+          fileName: item.fileName,
+          originalName: item.originalName,
+          filePath: item.filePath,
+          mimeType: item.mimeType,
+          type: item.type,
+          uploadDate: item.uploadDate
+        }))
       };
+
+      console.log('Creating complaint with data:', complaintData);
 
       const result = await ComplaintService.createComplaint(complaintData);
 
-      res.status(200).json({
-        status: 200,
-        message: 'Pre-signed URLs generated',
+      // Return response in the format expected by frontend
+      res.status(202).json({
+        status: 202,
+        message: 'Complaint registered successfully. MAINTENANCE_HEAD has been notified.',
         data: {
-          complaint: complaintData,
-          uploadData: filesWithUploadData
+          complaint: result,
+          uploadData: uploadData // Array of objects with uploadUrl property
         }
       });
     } catch (error) {
-      console.error('Error generating upload URLs:', error);
+      console.error('Error registering complaint:', error);
       res.status(500).json({
         status: 500,
-        message: 'Failed to generate upload URLs',
+        message: 'Failed to register complaint',
         error: error.message
       });
     }
   }
 
+  // Step 2: MAINTENANCE_HEAD assigns mechanic
+  static async assignMechanic(req, res) {
+    try {
+      const { complaintId } = req.params;
+      const { mechanicId, mechanicName, assignedBy } = req.body;
+
+      if (!mechanicId || !mechanicName || !assignedBy) {
+        return res.status(400).json({
+          status: 400,
+          message: 'mechanicId, mechanicName, and assignedBy are required'
+        });
+      }
+
+      const result = await ComplaintService.assignMechanic(
+        complaintId,
+        { mechanicId, mechanicName },
+        assignedBy
+      );
+
+      res.status(200).json(result);
+    } catch (error) {
+      console.error('Error assigning mechanic:', error);
+      res.status(error.status || 500).json({
+        status: error.status || 500,
+        message: error.message || 'Failed to assign mechanic'
+      });
+    }
+  }
+
+  // Step 3: Mechanic requests items
+  static async mechanicRequestItems(req, res) {
+    try {
+      const { complaintId } = req.params;
+      const { requestText, audioFile, mechanicId } = req.body;
+
+      if (!requestText && !audioFile) {
+        return res.status(400).json({
+          status: 400,
+          message: 'Either requestText or audioFile is required'
+        });
+      }
+
+      let audioFileData = null;
+      if (audioFile) {
+        // Handle audio file upload to S3
+        const ext = path.extname(audioFile.fileName);
+        const finalFilename = `audio-${complaintId}-${Date.now()}${ext}`;
+        const s3Key = `complaint-audio/${complaintId}/${finalFilename}`;
+
+        const uploadUrl = await putObject(
+          audioFile.fileName,
+          s3Key,
+          audioFile.mimeType
+        );
+
+        audioFileData = {
+          fileName: finalFilename,
+          filePath: s3Key,
+          duration: audioFile.duration || 0,
+          uploadUrl: uploadUrl
+        };
+      }
+
+      const result = await ComplaintService.mechanicRequestItems(
+        complaintId,
+        { requestText, audioFile: audioFileData },
+        mechanicId
+      );
+
+      res.status(200).json({
+        ...result,
+        uploadData: audioFileData ? [audioFileData] : []
+      });
+    } catch (error) {
+      console.error('Error in mechanic request:', error);
+      res.status(error.status || 500).json({
+        status: error.status || 500,
+        message: error.message || 'Failed to submit request'
+      });
+    }
+  }
+
+  // Step 4: MAINTENANCE_HEAD forwards to WORKSHOP_MANAGER
+  static async forwardToWorkshop(req, res) {
+    try {
+      const { complaintId } = req.params;
+      const { approvedBy, comments, documents } = req.body;
+
+      if (!approvedBy) {
+        return res.status(400).json({
+          status: 400,
+          message: 'approvedBy is required'
+        });
+      }
+
+      // If documents are provided, generate upload URLs
+      let documentsWithUploadData = null;
+      if (documents && documents.length > 0) {
+        documentsWithUploadData = await Promise.all(
+          documents.map(async (document, index) => { // Add index here
+            const ext = path.extname(document.fileName);
+            const finalFilename = `${approvedBy}-${Date.now()}-${index}${ext}`; // Add index to filename
+            const s3Key = `complaints/${complaintId}/attachments/forward-to-workshop-${finalFilename}`;
+
+            const uploadUrl = await putObject(
+              document.fileName,
+              s3Key,
+              document.mimeType
+            );
+
+            const isImageFile = (mimeType) => {
+              return mimeType && mimeType.startsWith('image/');
+            };
+
+            return {
+              fileName: finalFilename,
+              originalName: document.fileName,
+              filePath: s3Key,
+              fileSize: document.size,
+              mimeType: document.mimeType,
+              type: isImageFile(document.mimeType) ? 'image' : 'document',
+              uploadDate: new Date(),
+              uploadUrl: uploadUrl
+            };
+          })
+        );
+      }
+
+      const result = await ComplaintService.forwardToWorkshop(
+        complaintId,
+        approvedBy,
+        comments,
+        documentsWithUploadData
+      );
+
+      // Prepare response
+      const response = {
+        status: 200,
+        message: 'Request forwarded to workshop manager',
+        data: result
+      };
+
+      // If documents were uploaded, include upload URLs
+      if (documentsWithUploadData) {
+        response.data = {
+          complaint: result,
+          uploadData: documentsWithUploadData.map(doc => ({
+            uploadUrl: doc.uploadUrl,
+            key: doc.filePath,
+            fileName: doc.fileName,
+            originalName: doc.originalName
+          }))
+        };
+      }
+
+      res.status(200).json(response);
+    } catch (error) {
+      console.error('Error forwarding to workshop:', error);
+      res.status(error.status || 500).json({
+        status: error.status || 500,
+        message: error.message || 'Failed to forward to workshop'
+      });
+    }
+  }
+
+  // Step 5: WORKSHOP_MANAGER creates LPO
+  static async createLPOForComplaint(req, res) {
+    try {
+      const { complaintId } = req.params;
+      const { lpoData, createdBy } = req.body;
+
+      console.log('complaint id', complaintId)
+
+      if (!lpoData || !createdBy) {
+        return res.status(400).json({
+          status: 400,
+          message: 'lpoData and createdBy are required'
+        });
+      }
+
+      const result = await ComplaintService.createLPOForComplaint(
+        complaintId,
+        lpoData,
+        createdBy
+      );
+
+      res.status(200).json(result);
+    } catch (error) {
+      console.error('Error creating LPO:', error);
+      res.status(error.status || 500).json({
+        status: error.status || 500,
+        message: error.message || 'Failed to create LPO'
+      });
+    }
+  }
+
+  static async uploadLPOForComplaint(req, res) {
+    try {
+      const { complaintId } = req.params;
+      const { uploadedBy, lpoRef, description, fileName } = req.body;
+
+      if (!uploadedBy || !lpoRef) {
+        return res.status(400).json({
+          status: 400,
+          message: 'uploadedBy and lpoRef are required'
+        });
+      }
+
+      const finalFilename = fileName || `lpo-${complaintId}-${Date.now()}.pdf`;
+      const s3Key = `complaint-lpos/${complaintId}/${finalFilename}`;
+
+      // Generate pre-signed URL for S3 upload
+      const uploadUrl = await putObject(
+        finalFilename,
+        s3Key,
+        'application/pdf',
+      );
+
+      const lpoFileData = {
+        fileName: finalFilename,
+        originalName: finalFilename,
+        filePath: s3Key,
+        mimeType: 'application/pdf',
+        uploadUrl: uploadUrl,
+        uploadDate: new Date()
+      };
+
+      const result = await ComplaintService.uploadLPOForComplaint(
+        complaintId,
+        lpoFileData,
+        uploadedBy,
+        lpoRef,
+        description
+      );
+
+      res.status(200).json({
+        status: 200,
+        message: 'Pre-signed URL generated successfully',
+        uploadUrl: uploadUrl,
+        data: {
+          complaint: result,
+          uploadData: lpoFileData
+        }
+      });
+
+    } catch (error) {
+      console.error('Error uploading LPO:', error);
+      res.status(error.status || 500).json({
+        status: error.status || 500,
+        message: error.message || 'Failed to upload LPO'
+      });
+    }
+  }
+
+  // Step 6: PURCHASE_MANAGER approves
+  static async purchaseApproval(req, res) {
+    try {
+      const { complaintId } = req.params;
+      const {
+        approvedBy,
+        comments,
+        signed,
+        authorised,
+        approvedDate,
+        approvedFrom,
+        approvedIP,
+        approvedBDevice,
+        approvedLocation
+      } = req.body;
+
+      if (!approvedBy) {
+        return res.status(400).json({
+          status: 400,
+          message: 'approvedBy is required'
+        });
+      }
+
+      // Validate required signing fields if signed is true
+      if (signed && (!approvedDate || !approvedFrom)) {
+        return res.status(400).json({
+          status: 400,
+          message: 'approvedDate and approvedFrom are required for signing'
+        });
+      }
+
+      const result = await ComplaintService.purchaseApproval(
+        complaintId,
+        {
+          approvedBy,
+          comments,
+          signed: signed || false,
+          authorised: authorised || false,
+          approvedDate,
+          approvedFrom,
+          approvedIP,
+          approvedBDevice,
+          approvedLocation
+        }
+      );
+
+      res.status(200).json(result);
+    } catch (error) {
+      console.error('Error in purchase approval:', error);
+      res.status(error.status || 500).json({
+        status: error.status || 500,
+        message: error.message || 'Failed to approve purchase'
+      });
+    }
+  }
+  // Step 7: CEO final approval
+  static async ceoApproval(req, res) {
+    try {
+      const { complaintId } = req.params;
+      const {
+        approvedBy,
+        comments,
+        signed,
+        authorised,
+        approvedDate,
+        approvedFrom,
+        approvedIP,
+        approvedBDevice,
+        approvedLocation
+      } = req.body;
+
+      if (!approvedBy) {
+        return res.status(400).json({
+          status: 400,
+          message: 'approvedBy is required'
+        });
+      }
+
+      const approvedCreds = {
+        signed: signed || false,
+        authorised: authorised || false,
+        approvedDate,
+        approvedFrom,
+        approvedIP,
+        approvedBDevice,
+        approvedLocation,
+        approvedBy,
+      }
+
+      const result = await ComplaintService.ceoApproval(
+        complaintId,
+        approvedBy,
+        comments,
+        approvedCreds
+      );
+
+      res.status(200).json(result);
+    } catch (error) {
+      console.error('Error in CEO approval:', error);
+      res.status(error.status || 500).json({
+        status: error.status || 500,
+        message: error.message || 'Failed to get CEO approval'
+      });
+    }
+  }
+
+  // Step 8: Mark items as available
+  static async markItemsAvailable(req, res) {
+    try {
+      const { complaintId } = req.params;
+      const { markedBy } = req.body;
+
+      if (!markedBy) {
+        return res.status(400).json({
+          status: 400,
+          message: 'markedBy is required'
+        });
+      }
+
+      const result = await ComplaintService.markItemsAvailable(
+        complaintId,
+        markedBy
+      );
+
+      res.status(200).json(result);
+    } catch (error) {
+      console.error('Error marking items available:', error);
+      res.status(error.status || 500).json({
+        status: error.status || 500,
+        message: error.message || 'Failed to mark items as available'
+      });
+    }
+  }
+
+  // Step 9: Mechanic completes work (updated)
   static async addSolution(req, res, next) {
     try {
       const { complaintId } = req.params;
@@ -107,7 +502,6 @@ class ComplaintController {
         });
       }
 
-      // Generate presigned URLs for each file
       const filesWithUploadData = await Promise.all(
         files.map(async (file) => {
           const ext = path.extname(file.fileName);
@@ -132,7 +526,6 @@ class ComplaintController {
         })
       );
 
-      // Call the service to update the complaint
       const result = await ComplaintService.addSolutionToComplaint(
         complaintId,
         filesWithUploadData,
@@ -140,10 +533,9 @@ class ComplaintController {
         mechanic
       );
 
-      // Return both the service result and upload URLs
       res.status(200).json({
         status: 200,
-        message: 'Solution added successfully',
+        message: 'Work completed successfully. All stakeholders have been notified.',
         data: {
           complaint: result.data,
           uploadData: filesWithUploadData
@@ -159,6 +551,7 @@ class ComplaintController {
     }
   }
 
+  // Existing methods (unchanged)
   static async getUserComplaints(req, res, next) {
     try {
       const { uniqueCode } = req.params;
@@ -184,18 +577,54 @@ class ComplaintController {
     }
   }
 
-
   static async getAllComplaints(req, res, next) {
     try {
       const complaint = await ComplaintService.getFullComplaints();
 
       if (!complaint) {
-        return res.status(404).json({ error: 'Complaint not found' });
+        return res.status(404).json({ error: 'Complaints not found' });
       }
 
       res.json(complaint);
     } catch (error) {
       next(error);
+    }
+  }
+
+  // New methods for workflow management
+  static async getComplaintsByStatus(req, res) {
+    try {
+      const { status } = req.params;
+      const complaints = await ComplaintService.getComplaintsByStatus(status);
+      res.json({
+        status: 200,
+        data: complaints
+      });
+    } catch (error) {
+      console.error('Error getting complaints by status:', error);
+      res.status(500).json({
+        status: 500,
+        message: 'Failed to get complaints',
+        error: error.message
+      });
+    }
+  }
+
+  static async getMechanicComplaints(req, res) {
+    try {
+      const { mechanicId } = req.params;
+      const complaints = await ComplaintService.getComplaintsByMechanic(mechanicId);
+      res.json({
+        status: 200,
+        data: complaints
+      });
+    } catch (error) {
+      console.error('Error getting mechanic complaints:', error);
+      res.status(500).json({
+        status: 500,
+        message: 'Failed to get mechanic complaints',
+        error: error.message
+      });
     }
   }
 }

@@ -337,6 +337,9 @@ const MechanicSchema = new Schema({
   },
   zktecoPin :{
     type: Number
+  },
+  status: {
+    type:String,
   }
 });
 

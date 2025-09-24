@@ -86,7 +86,7 @@ module.exports = {
         mimetype: file.mimeType || file.fileName.split('.').pop()
       });
 
-      await createNotification({
+      const notification = await createNotification({
         title: `New document added`,
         description: `Document ${documentType} is uploaded for ${regNo}, Now you can access new one`,
         priority: "high",
@@ -99,7 +99,8 @@ module.exports = {
         `New document added`, //title
         `Document ${documentType} is uploaded for ${regNo}, Now you can access new one`, //description
         'high', //priority
-        'normal' // type
+        'normal', // type
+         notification._id
       );
 
       await document.save();

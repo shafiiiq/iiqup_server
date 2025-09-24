@@ -20,6 +20,23 @@ const NotificationSchema = new mongoose.Schema({
   updatedAt: {
     type: Date,
     default: Date.now
+  },
+  hasButton: {
+    type: Boolean,
+    default: false
+  },
+
+  navigateText: {
+    type: String
+  },
+  navigateTo: {
+    type: String
+  },
+  sourceId: {
+    type: String
+  },
+  navigteToId: {
+    type: String
   }
 });
 

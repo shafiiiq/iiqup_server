@@ -8,6 +8,9 @@ const Notification = require('../models/notification-model'); // Adjust path as 
  * @param {Date} [notificationData.time] - Notification time (defaults to current time)
  * @param {string} notificationData.priority - Notification priority (e.g., 'high', 'medium', 'low')
  * @param {string} notificationData.sourceId - Source ID (required)
+ * @param {string} notificationData.navigateText -navigateText
+ * @param {string} notificationData.navigateTo - navigateTo
+ * @param {string} notificationData.navigteToId - navigteToId
  * @returns {Promise<Object>} - Created notification object
  */
 const createNotification = async (notificationData) => {
@@ -17,6 +20,12 @@ const createNotification = async (notificationData) => {
       description,
       time = new Date(),
       priority,
+      navigteToId,
+      navigateTo,
+      navigateText,
+      sourceId,
+      hasButton,
+      navigateToId
     } = notificationData;
 
     // Create new notification
@@ -25,12 +34,17 @@ const createNotification = async (notificationData) => {
       description,
       time,
       priority,
+      navigateToId: navigateToId || null,
+      navigateTo: navigateTo || null,
+      navigateText: navigateText || null,
+      sourceId: sourceId || null,
+      hasButton: hasButton || false,
       updatedAt: new Date()
     });
 
     // Save to database
     const savedNotification = await notification.save();
-    
+
     return {
       success: true,
       data: savedNotification,
@@ -64,7 +78,7 @@ const createBulkNotifications = async (notificationsArray) => {
     }));
 
     const savedNotifications = await Notification.insertMany(notifications);
-    
+
     return {
       success: true,
       data: savedNotifications,
