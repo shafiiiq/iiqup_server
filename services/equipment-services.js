@@ -6,7 +6,6 @@ const PushNotificationService = require('../utils/push-notification-jobs');
 module.exports = {
 
   insertEquipments: (data) => {
-
     return new Promise(async (resolve, reject) => {
       try {
         const existingUser = await equipmentModel.findOne({ regNo: data.regNo });
@@ -18,9 +17,11 @@ module.exports = {
             message: 'Equipment already exists',
           });
         }
-        const equipments = await equipmentModel.find({});
 
-        data.id = equipments.length + 1
+        const equipments = await equipmentModel.find({});
+        data.id = equipments.length + 1;
+
+        console.log('Next ID:', data.id);
 
         const equipment = await equipmentModel.create(data);
 
@@ -37,7 +38,7 @@ module.exports = {
           await PushNotificationService.sendGeneralNotification(
             null, // broadcast to all users
             "New Asset Launched", //title
-            `Alhamdulillah , We are happy to inform to you! We have bought a brand new ${equipment.machine} (${equipment.brand}) today`, //decription
+            `Alhamdulillah , We are happy to inform to you! We have bought a brand new ${equipment.machine} (${equipment.brand}) today`, //description
             'high', //priority
             'normal', // type
             notification._id
@@ -55,15 +56,41 @@ module.exports = {
         });
 
       } catch (err) {
-        reject({
-          status: 500,
-          ok: false,
-          message: 'Missing data or an error occurred',
-          error: err.message
-        });
+        console.log(err);
+
+        // Handle duplicate key error specifically
+        if (err.code === 11000) {
+          // Increment the ID and retry
+          try {
+            data.id = data.id + 1;
+            console.log('Retrying with ID:', data.id);
+
+            const equipment = await equipmentModel.create(data);
+
+            resolve({
+              status: 200,
+              ok: true,
+              message: 'Equipment added successfully',
+              data: equipment
+            });
+          } catch (retryErr) {
+            reject({
+              status: 500,
+              ok: false,
+              message: 'Failed to create equipment after retry',
+              error: retryErr.message
+            });
+          }
+        } else {
+          reject({
+            status: 500,
+            ok: false,
+            message: 'Missing data or an error occurred',
+            error: err.message
+          });
+        }
       }
     });
-
   },
 
   fetchEquipments: () => {
