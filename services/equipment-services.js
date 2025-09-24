@@ -60,27 +60,68 @@ module.exports = {
 
         // Handle duplicate key error specifically
         if (err.code === 11000) {
-          // Increment the ID and retry
-          try {
-            data.id = data.id + 1;
-            console.log('Retrying with ID:', data.id);
+          // Find next available ID by incrementing until we find one that works
+          let attempts = 0;
+          const maxAttempts = 10;
 
-            const equipment = await equipmentModel.create(data);
+          while (attempts < maxAttempts) {
+            try {
+              data.id = data.id + 1;
+              console.log('Retrying with ID:', data.id);
 
-            resolve({
-              status: 200,
-              ok: true,
-              message: 'Equipment added successfully',
-              data: equipment
-            });
-          } catch (retryErr) {
-            reject({
-              status: 500,
-              ok: false,
-              message: 'Failed to create equipment after retry',
-              error: retryErr.message
-            });
+              const equipment = await equipmentModel.create(data);
+
+              // Send notification for new equipment (retry case)
+              try {
+                const notification = await createNotification({
+                  title: "New Asset Launched",
+                  description: `Alhamdulillah , We are happy to inform to you! We have bought a brand new ${equipment.machine} (${equipment.brand}) today`,
+                  priority: "high",
+                  sourceId: equipment._id,
+                  time: new Date()
+                });
+
+                await PushNotificationService.sendGeneralNotification(
+                  null, // broadcast to all users
+                  "New Asset Launched", //title
+                  `Alhamdulillah , We are happy to inform to you! We have bought a brand new ${equipment.machine} (${equipment.brand}) today`, //description
+                  'high', //priority
+                  'normal', // type
+                  notification._id
+                );
+              } catch (notificationError) {
+                console.error('Failed to send notification for new equipment:', notificationError);
+              }
+
+              return resolve({
+                status: 200,
+                ok: true,
+                message: 'Equipment added successfully',
+                data: equipment
+              });
+            } catch (retryErr) {
+              if (retryErr.code === 11000) {
+                attempts++;
+                continue; // Try next ID
+              } else {
+                // Different error, reject
+                return reject({
+                  status: 500,
+                  ok: false,
+                  message: 'Failed to create equipment',
+                  error: retryErr.message
+                });
+              }
+            }
           }
+
+          // If we've exhausted all attempts
+          reject({
+            status: 500,
+            ok: false,
+            message: 'Unable to find available ID after multiple attempts',
+            error: 'Too many duplicate IDs'
+          });
         } else {
           reject({
             status: 500,
