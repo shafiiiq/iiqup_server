@@ -578,7 +578,7 @@ class ComplaintService {
         description: `CEO approved LPO for complaint ${complaint.regNo}. Items can now be procured.`,
         priority: "high",
         sourceId: 'final_approval',
-        recipient: notif.recipient,
+        recipient: [process.env.MAINTENANCE_HEAD, process.env.JALEEL_KA],
         time: new Date(),
         navigateTo: `/(screens)/signedLpo/${complaint._id}`,
         navigateText: `View the item required`,
