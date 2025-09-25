@@ -176,7 +176,7 @@ const addAttendance = async (attendanceData) => {
       const description = `${standardizedName} punched ${savedAttendance.punchType.toLowerCase()} at ${formattedTime} ${formattedDate}`;
 
       await PushNotificationService.sendGeneralNotification(
-        [process.env.MAINTANANCE_HEAD, process.env.WORKSHOP_MANAGER, process.env.SUPER_ADMIN], // broadcast to all users
+        [process.env.MAINTENANCE_HEAD, process.env.WORKSHOP_MANAGER, process.env.SUPER_ADMIN], // broadcast to all users
         title,
         description,
         'high', // priority

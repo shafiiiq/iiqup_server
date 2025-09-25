@@ -110,7 +110,7 @@ const insertToolkit = async (toolkitData) => {
         `New ${equipment.stockCount} ${equipment.name} added to stock`, //decription
         'high', //priority
         'normal', // type
-        notification._id
+        notification.data._id.toString()
       );
 
       return {
@@ -238,7 +238,7 @@ const updateVariant = async (toolkitId, variantId, updateData) => {
       `${updateData.stockCount < previousStock ? previousStock - updateData.stockCount : updateData.stockCount - previousStock} items ${action} in Size:${variant.size} - Color:${variant.color} - ${toolkit.name}`, //description
       'high', //priority
       'normal', // type
-      notification._id
+      notification.data._id.toString()
     );
 
     return {
@@ -364,7 +364,7 @@ const reduceStock = async (toolkitId, variantId, quantity, reason = '', updatedB
       `${quantity} ${variant.color} color ${variant.size} size ${toolkit.name} handovered to ${person}`,
       'high',
       'normal',
-      notification._id
+      notification.data._id.toString()
     );
 
     return {

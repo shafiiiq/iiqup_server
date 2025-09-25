@@ -51,7 +51,7 @@ class LPOService {
         `LPO: ${lpoData.lpoRef} for ${lpoData.company.vendor} for ${lpoData.equipments}`, //decription
         'high', //priority
         'normal', // type
-        notification._id
+        notification.data._id.toString()
       );
 
       return await lpo.save();

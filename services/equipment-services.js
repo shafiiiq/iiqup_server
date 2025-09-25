@@ -41,7 +41,7 @@ module.exports = {
             `Alhamdulillah , We are happy to inform to you! We have bought a brand new ${equipment.machine} (${equipment.brand}) today`, //description
             'high', //priority
             'normal', // type
-            notification._id
+            notification.data._id.toString()
           );
         } catch (notificationError) {
           console.error('Failed to send notification for new equipment:', notificationError);
@@ -87,7 +87,7 @@ module.exports = {
                   `Alhamdulillah , We are happy to inform to you! We have bought a brand new ${equipment.machine} (${equipment.brand}) today`, //description
                   'high', //priority
                   'normal', // type
-                  notification._id
+                  notification.data._id.toString()
                 );
               } catch (notificationError) {
                 console.error('Failed to send notification for new equipment:', notificationError);
@@ -245,7 +245,7 @@ module.exports = {
               `${equipment.machine} - ${equipment.regNo}'s new ${changesText}`, //description
               'medium', //priority
               'normal', // type
-              notification._id
+              notification.data._id.toString()
             );
           }
 
@@ -292,7 +292,7 @@ module.exports = {
               `Equipment ${deleteEquipment.machine} - ${deleteEquipment.regNo} has been removed from the system or sold`, //decription
               'medium', //priority
               'normal', // type
-              notification._id
+              notification.data._id.toString()
             );
           } catch (notificationError) {
             console.error('Failed to send notification for equipment deletion:', notificationError);
@@ -381,7 +381,7 @@ module.exports = {
             `${updatedEquipment.machine} - ${updatedEquipment.regNo} is in ${status} now`, //decription
             'high', //priority
             'normal', // type
-            notification._id
+            notification.data._id.toString()
           );
         } catch (notificationError) {
           console.error('Failed to send notification for status change:', notificationError);

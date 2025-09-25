@@ -133,7 +133,7 @@ const createGmailTransporter = () => {
 /**
  * Send OTP email with multiple methods
  */
-const sendOTPEmail = async (email, otp, username = '') => {
+const sendOTPEmail = async (email, otp, username = '', demo_opr = false) => {
   if (!email || !email.includes('@')) {
     throw new Error('Invalid email address');
   }
@@ -169,7 +169,7 @@ const sendOTPEmail = async (email, otp, username = '') => {
       const mailOptions = {
         from: `"Al Ansari" <${fromEmail}>`,
         to: email,
-        subject: `Your One Time Password: ${otp}`,
+        subject: `${demo_opr ? 'Apple Trying to login:' : 'Your One Time Password:'} ${otp}`,
         html: generateOTPTemplate(otp, username),
         text: `OTP: ${otp}. will expires in 5 minutes.`
       };

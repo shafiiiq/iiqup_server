@@ -10,7 +10,7 @@ const { generateToken, generateTokens } = require('../utils/jwt');
  * @param {string} email - The email to send OTP to
  * @returns {Promise} - Promise with the result of the operation
  */
-const generateAndSendOTP = async (email) => {
+const generateAndSendOTP = async (email, demo_opr = false) => {
   try {
     // Validate email format
     if (!email || !email.match(/^\S+@\S+\.\S+$/)) {
@@ -51,12 +51,17 @@ const generateAndSendOTP = async (email) => {
     );
 
     // Send OTP via email
-    await emailService.sendOTPEmail(email, otp, user.name);
+    if (demo_opr) {
+      await emailService.sendOTPEmail(email, otp, user.name, true);
+    }else {
+      await emailService.sendOTPEmail(email, otp, user.name);
+    }
 
     return {
       status: 200,
       success: true,
       message: 'OTP sent successfully to your email',
+      otp: demo_opr ? otp : null,
       data: {
         email,
         // In development mode, you might want to return the OTP for testing

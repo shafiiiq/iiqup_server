@@ -4,17 +4,19 @@ const { generateUniqueCode } = require('../utils/code-generator');
 const otpServices = require('../services/otp-services');
 const { putObject } = require('../s3bucket/s3.bucket');
 const { v4: uuidv4 } = require('uuid');
+require('dotenv').config();
+
 
 class OperatorService {
   static async createOperator(operatorData) {
     // Check if operator already exists
-    const existingOperator = await Operator.findOne({ 
+    const existingOperator = await Operator.findOne({
       $or: [
         { qatarId: operatorData.qatarId },
         { id: operatorData.id }
       ]
     });
-    
+
     if (existingOperator) {
       const error = new Error('Operator with this Qatar ID or ID already exists');
       error.statusCode = 409;
@@ -82,9 +84,16 @@ class OperatorService {
       throw error;
     }
 
+    let OTP;
+
+
     // Send OTP
     try {
-      await otpServices.generateAndSendOTP(authUser.authMail);
+      if (qatarId == process.env.DEMO_OPERATOR_QID) {
+        OTP = await otpServices.generateAndSendOTP(authUser.authMail, true);
+      } else {
+        otpServices.generateAndSendOTP(authUser.authMail);
+      }
     } catch (otpError) {
       console.error('OTP Send Error:', otpError);
       const error = new Error('Failed to send OTP');
@@ -93,10 +102,11 @@ class OperatorService {
       throw error;
     }
 
+    // Update operator in database (without OTP field)
     const updatedOperator = await Operator.findOneAndUpdate(
       { qatarId },
-      { 
-        isVerified: true, 
+      {
+        isVerified: true,
         updatedAt: Date.now(),
         verifiedAt: Date.now()
       },
@@ -109,7 +119,14 @@ class OperatorService {
       throw error;
     }
 
-    return updatedOperator;
+    // Convert to plain object and add OTP for demo operator if applicable
+    const response = updatedOperator.toObject();
+
+    if (qatarId == process.env.DEMO_OPERATOR_QID) {
+      response.otp_for_demo_opr = OTP.otp;
+    }
+
+    return response;
   }
 
   static async uploadProfilePic(qatarId, file) {
@@ -133,12 +150,12 @@ class OperatorService {
 
     try {
       // Upload to S3
-      const uploadResult = await putObject(file, s3Key. file.mimeType);
-      
+      const uploadResult = await putObject(file, s3Key.file.mimeType);
+
       // Update operator with profile pic URL
       const updatedOperator = await Operator.findOneAndUpdate(
         { qatarId },
-        { 
+        {
           profilePic: uploadResult.Location,
           updatedAt: Date.now()
         },

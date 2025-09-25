@@ -822,7 +822,7 @@ const grantPermission = async (mechanicId, purpose, data) => {
         notificationMessage,
         'high',
         'normal',
-        notification._id
+        notification.data._id.toString()
       );
     } catch (notificationError) {
       console.error('Error sending push notification:', notificationError);
@@ -1048,7 +1048,7 @@ const grantAccept = async (uniqueCode, dataId, purpose) => {
   try {
 
     if (uniqueCode === process.env.WORKSHOP_MANAGER) {
-      uniqueCode = process.env.MAINTANANCE_HEAD
+      uniqueCode = process.env.MAINTENANCE_HEAD
     }
 
     // Find the user by uniqueCode
@@ -1143,7 +1143,7 @@ const grantAccept = async (uniqueCode, dataId, purpose) => {
           notificationMessage, // description
           'high', // priority
           'normal', // type
-          notification._id
+          notification.data._id.toString()
         );
       } catch (notificationError) {
         console.error('Error sending push notification:', notificationError);
@@ -1179,7 +1179,7 @@ const grantAccept = async (uniqueCode, dataId, purpose) => {
 const fetchAccessData = async (uniqueCode, purpose) => {
   try {
     if (uniqueCode === process.env.WORKSHOP_MANAGER) {
-      uniqueCode = process.env.MAINTANANCE_HEAD
+      uniqueCode = process.env.MAINTENANCE_HEAD
     }
 
     const user = await User.findOne({ uniqueCode });
@@ -1364,7 +1364,7 @@ const deleteNotification = async (notificationId) => {
 
     // Find the user that contains the notification and remove it
     const result = await User.updateOne(
-      { 'specialNotification._id': notificationId },
+      { 'specialnotification.data._id.toString()': notificationId },
       {
         $pull: {
           specialNotification: { _id: notificationId }
@@ -1596,6 +1596,9 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
       channelId: getChannelId(notificationData.priority),
       notificationId: notificationData.notificationId || null
     }));
+
+    console.log(messages);
+    
 
     // Send notifications
     const chunks = expo.chunkPushNotifications(messages);

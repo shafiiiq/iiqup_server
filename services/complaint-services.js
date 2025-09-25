@@ -34,13 +34,14 @@ class ComplaintService {
         hasButton: true
       });
 
+
       await PushNotificationService.sendGeneralNotification(
         process.env.MAINTENANCE_HEAD,
         `New Complaint - ${complaint.regNo}`,
         `New complaint needs mechanic assignment for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'}`,
         'high',
         'normal',
-        notification._id
+        notification.data._id.toString()
       );
 
       return complaintData;
@@ -101,7 +102,7 @@ class ComplaintService {
         `You've been assigned to work on ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}`,
         'high',
         'normal',
-        notification._id
+        notification.data._id.toString()
       );
 
       return {
@@ -145,7 +146,7 @@ class ComplaintService {
         description: `${complaint.assignedMechanic.mechanicName} needs items for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Request: ${requestData.requestText}`,
         priority: "high",
         sourceId: 'mechanic_request',
-        recipient: process.env.MAINTENANCE_HEAD,
+        recipient: process.env.MAINTENANCE_HEAD, 
         time: new Date(),
         navigateTo: `/(screens)/assignMechanic/${complaint._id}`,
         navigateText: 'View mechanic request',
@@ -159,7 +160,7 @@ class ComplaintService {
         `${complaint.assignedMechanic.mechanicName} needs items for ${complaint.regNo}`,
         'high',
         'normal',
-        notification._id
+        notification.data._id.toString()
       );
 
       return {
@@ -264,7 +265,7 @@ class ComplaintService {
         pushNotificationBody,
         'high',
         'normal',
-        notification._id
+        notification.data._id.toString()
       );
 
       return complaint;
@@ -329,7 +330,7 @@ class ComplaintService {
         `LPO ${lpo.lpoRef} is created for complaint with ${complaint.regNo}, Await until lpo is uploaded`,
         'high',
         'normal',
-        notification._id
+        notification.data._id.toString()
       );
 
       return {
@@ -413,7 +414,7 @@ class ComplaintService {
         `Please approve LPO ${lpoRef} for complaint ${complaint.regNo}`,
         'high',
         'normal',
-        notification._id
+        notification.data._id.toString()
       );
 
       return {
@@ -515,7 +516,7 @@ class ComplaintService {
         `Final approval needed for LPO ${complaint.lpoDetails.lpoRef}`,
         'high',
         'normal',
-        notification._id
+        notification.data._id.toString()
       );
 
       return {
@@ -606,7 +607,7 @@ class ComplaintService {
           notif.description,
           'high',
           'normal',
-          notification._id
+          notification.data._id.toString()
         );
       }
 
@@ -665,7 +666,7 @@ class ComplaintService {
         `Items available for ${complaint.regNo}. You can start working now.`,
         'high',
         'normal',
-         notification._id
+        notification.data._id.toString()
       );
 
       return {
@@ -745,7 +746,7 @@ class ComplaintService {
         description: `${mechanic} completed work on ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Equipment ready to work.`,
         priority: "medium",
         sourceId: 'work_completed',
-        recipient: stakeholder,
+        recipient: stakeholders,
         time: new Date()
       });
 

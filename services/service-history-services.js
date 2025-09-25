@@ -211,7 +211,7 @@ module.exports = {
                     `${equipment.brand} ${equipment.machine} ${data.regNo}'s next service is full service, NEXT SERVICE HR/KM: ${data.nextServiceHrs}`,
                     'high',
                     'normal',
-                    notification._id
+                    notification.data._id.toString()
                 );
 
                 resolve({

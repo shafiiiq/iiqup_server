@@ -163,7 +163,7 @@ const checkIstimaraExpiry = async () => {
           notificationType == 'MONTHLY' ? 'high' 
           : notificationType == 'WEEKLY' ? 'medium'
           : 'normal', // type
-          result._id
+          result.data._id
         );
         
         if (result.success) {

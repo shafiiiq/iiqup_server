@@ -322,7 +322,7 @@ module.exports = {
           `${data.stockCount} new ${data.serialNumber} - ${data.product} added to stock ${newStock.equipments ? `for ${newStock.equipments}` : ''}`, //decription
           'high', //priority
           'normal', // type
-          notification._id
+          notification.data._id.toString()
         );
 
         resolve({
@@ -661,7 +661,7 @@ module.exports = {
             `${quantityChange} ${currentStock.product} with part number ${currentStock.serialNumber} is used by ${mechanicName} for ${equipmentName} ${equipmentNumber}`, //decription
             'high', //priority
             'normal', // type
-            notification._id
+            notification.data._id.toString()
           );
         }
 
@@ -705,7 +705,7 @@ module.exports = {
             `${quantityChange} ${currentStock.product} with part number ${currentStock.serialNumber} is used by ${updateData.mechanicName} for ${updateData.equipmentName} ${updateData.equipmentNumber}`, //decription
             'high', //priority
             'normal', // type
-            notification._id
+            notification.data._id.toString()
           );
         }
 

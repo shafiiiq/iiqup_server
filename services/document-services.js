@@ -100,7 +100,7 @@ module.exports = {
         `Document ${documentType} is uploaded for ${regNo}, Now you can access new one`, //description
         'high', //priority
         'normal', // type
-         notification._id
+         notification.data._id.toString()
       );
 
       await document.save();

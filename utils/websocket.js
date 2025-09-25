@@ -50,6 +50,9 @@ const sendNotificationToUser = (uniqueCode, notification) => {
         sentAt: new Date().toISOString()
       }
     };
+
+    console.log(enrichedNotification);
+    
     
     global.io.to(`user_${uniqueCode}`).emit('new_notification', enrichedNotification);
   }
@@ -57,7 +60,7 @@ const sendNotificationToUser = (uniqueCode, notification) => {
 
 // Function to broadcast notification to all connected users
 const broadcastNotification = (notification) => {
-  if (global.io) {
+  if (global.io) {    
     global.io.emit('new_notification', notification);
   }
 };

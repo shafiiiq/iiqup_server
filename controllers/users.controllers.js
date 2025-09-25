@@ -506,7 +506,7 @@ const sendTestNotification = async (req, res) => {
 
 const getUserRoles = async (req, res) => {
   if (process.env.MECHANIC &&
-    process.env.MAINTANANCE_HEAD &&
+    process.env.MAINTENANCE_HEAD &&
     process.env.OPERATOR &&
     process.env.CAMP_BOSS &&
     process.env.MECHANIC_HEAD) {
@@ -514,7 +514,7 @@ const getUserRoles = async (req, res) => {
       status: 200,
       roles: {
         MECHANIC: process.env.MECHANIC,
-        MAINTANANCE_HEAD: process.env.MAINTANANCE_HEAD,
+        MAINTENANCE_HEAD: process.env.MAINTENANCE_HEAD,
         OPERATOR: process.env.OPERATOR,
         CAMP_BOSS: process.env.CAMP_BOSS,
         MECHANIC_HEAD: process.env.MECHANIC_HEAD,
@@ -530,7 +530,7 @@ const getUserRoles = async (req, res) => {
     // More specific error message
     const missingVars = [];
     if (!process.env.MECHANIC) missingVars.push('MECHANIC');
-    if (!process.env.MAINTANANCE_HEAD) missingVars.push('MAINTANANCE_HEAD');
+    if (!process.env.MAINTENANCE_HEAD) missingVars.push('MAINTENANCE_HEAD');
     if (!process.env.OPERATOR) missingVars.push('OPERATOR');
     if (!process.env.CAMP_BOSS) missingVars.push('CAMP_BOSS');
     if (!process.env.MECHANIC_HEAD) missingVars.push('MECHANIC_HEAD');

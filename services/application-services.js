@@ -248,7 +248,7 @@ const createApplication = async (applicationData) => {
       `${user.name} is requesting to ${leaveType} ${type} from ${startDate} to ${endDate} regarding the ${data.reason}`, //decription
       'high', //priority
       'normal', // type
-      notification._id
+      notification.data._id.toString()
     );
     return await application.save();
   } else {
@@ -275,7 +275,7 @@ const createApplication = async (applicationData) => {
       `${user.name} is requesting to ${type} for ${data.amount} for ${data.purpose}`, //decription
       'high', //priority
       'normal', // type
-      notification._id
+      notification.data._id.toString()
     );
 
     return await application.save();
@@ -384,7 +384,7 @@ const changeApplicationStatus = async (applicationId, newStatus, options = {}) =
       notificationDescription,
       'medium',
       'normal',
-      notification._id
+      notification.data._id.toString()
     );
   }
 

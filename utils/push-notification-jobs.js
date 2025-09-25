@@ -290,10 +290,15 @@ class PushNotificationService {
         };
 
         if (Array.isArray(uniqueCode)) {
+            console.log("yes here 1");
             return await this.sendNotificationToUsers(uniqueCode, notification);
         } else if (uniqueCode) {
+            console.log("yes here 2");
             return await this.sendNotificationToUser(uniqueCode, notification);
         } else {
+            console.log("yes here 3");
+            console.log(notification);
+            
             return await this.broadcastNotification(notification);
         }
     }

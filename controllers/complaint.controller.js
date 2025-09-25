@@ -78,8 +78,6 @@ class ComplaintController {
         }))
       };
 
-      console.log('Creating complaint with data:', complaintData);
-
       const result = await ComplaintService.createComplaint(complaintData);
 
       // Return response in the format expected by frontend
