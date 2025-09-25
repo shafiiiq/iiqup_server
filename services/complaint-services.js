@@ -146,7 +146,7 @@ class ComplaintService {
         description: `${complaint.assignedMechanic.mechanicName} needs items for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Request: ${requestData.requestText}`,
         priority: "high",
         sourceId: 'mechanic_request',
-        recipient: process.env.MAINTENANCE_HEAD, 
+        recipient: process.env.MAINTENANCE_HEAD,
         time: new Date(),
         navigateTo: `/(screens)/assignMechanic/${complaint._id}`,
         navigateText: 'View mechanic request',
@@ -573,23 +573,9 @@ class ComplaintService {
         throw { status: 404, message: 'Complaint not found' };
       }
 
-      // Notify MAINTENANCE_HEAD and JALEEL_KA
-      const notifications = [
-        {
-          recipient: process.env.MAINTENANCE_HEAD,
-          title: `Approved - LPO ${complaint.lpoDetails.lpoRef}`,
-          description: `CEO approved LPO for complaint ${complaint.regNo}. Items can now be procured.`
-        },
-        {
-          recipient: process.env.JALEEL_KA,
-          title: `Purchase Approved - ${complaint.lpoDetails.lpoRef}`,
-          description: `Buy items for complaint ${complaint.regNo}. LPO: ${complaint.lpoDetails.lpoRef}`
-        }
-      ];
-
       const notification = await createNotification({
-        title: notif.title,
-        description: notif.description,
+        title: `Approved - LPO ${complaint.lpoDetails.lpoRef}`,
+        description: `CEO approved LPO for complaint ${complaint.regNo}. Items can now be procured.`,
         priority: "high",
         sourceId: 'final_approval',
         recipient: notif.recipient,
@@ -600,16 +586,14 @@ class ComplaintService {
         hasButton: true
       });
 
-      for (const notif of notifications) {
-        await PushNotificationService.sendGeneralNotification(
-          notif.recipient,
-          notif.title,
-          notif.description,
-          'high',
-          'normal',
-          notification.data._id.toString()
-        );
-      }
+      await PushNotificationService.sendGeneralNotification(
+        [process.env.MAINTENANCE_HEAD, process.env.JALEEL_KA],
+        `Approved - LPO ${complaint.lpoDetails.lpoRef}`,
+        `CEO approved LPO for complaint ${complaint.regNo}. Items can now be procured.`,
+        'high',
+        'normal',
+        notification.data._id.toString()
+      );
 
       return {
         status: 200,
