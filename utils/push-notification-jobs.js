@@ -296,9 +296,7 @@ class PushNotificationService {
             console.log("yes here 2");
             return await this.sendNotificationToUser(uniqueCode, notification);
         } else {
-            console.log("yes here 3");
-            console.log(notification);
-            
+            console.log("yes here 3");            
             return await this.broadcastNotification(notification);
         }
     }

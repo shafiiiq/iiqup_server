@@ -1595,10 +1595,7 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
       priority: notificationData.priority === 'high' ? 'high' : 'normal',
       channelId: getChannelId(notificationData.priority),
       notificationId: notificationData.notificationId || null
-    }));
-
-    console.log(messages);
-    
+    }));    
 
     // Send notifications
     const chunks = expo.chunkPushNotifications(messages);

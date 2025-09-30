@@ -147,7 +147,7 @@ const operatorSchema = new mongoose.Schema({
     default: null
   },
   labourContractExpiry: {
-    type: Date,
+    type: mongoose.Schema.Types.Mixed,
     default: null
   },
   workmenCompensationAdded: {
