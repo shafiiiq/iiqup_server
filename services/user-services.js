@@ -1086,7 +1086,7 @@ const grantAccept = async (uniqueCode, dataId, purpose) => {
 
     try {
       // Call the API to store the data permanently
-      const response = await fetch(`http://localhost:3001/mechanics/${mechanicId}/overtime`, {
+      const response = await fetch(`${process.env.SERVER_ADDRESS}/${mechanicId}/overtime`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

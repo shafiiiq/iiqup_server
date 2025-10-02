@@ -167,6 +167,7 @@ const addAttendance = async (attendanceData) => {
     // Recalculate punch types for this employee's day to ensure correctness
     await recalculatePunchTypes(attendanceData.pin, punchDateTime);
 
+    // Send notifications and WhatsApp messages
     try {
       const standardizedName = standardizeName(savedAttendance.empName);
       const formattedTime = formatTime(savedAttendance.timeOnly);
@@ -175,15 +176,20 @@ const addAttendance = async (attendanceData) => {
       const title = `${standardizedName} Punched ${savedAttendance.punchType}`;
       const description = `${standardizedName} punched ${savedAttendance.punchType.toLowerCase()} at ${formattedTime} ${formattedDate}`;
 
+      // Send push notifications
       await PushNotificationService.sendGeneralNotification(
-        [process.env.MAINTENANCE_HEAD, process.env.WORKSHOP_MANAGER, process.env.SUPER_ADMIN], // broadcast to all users
+        [process.env.MAINTENANCE_HEAD, process.env.WORKSHOP_MANAGER, process.env.SUPER_ADMIN],
         title,
         description,
-        'high', // priority
-        'attendance' // type
+        'high',
+        'attendance'
       );
 
       console.log(`🔔 Notification sent for ${standardizedName}`);
+
+      // Send WhatsApp message automatically
+      await sendWhatsAppMessage(standardizedName, savedAttendance.punchType, formattedTime, formattedDate);
+
     } catch (error) {
       console.error('❌ Error sending notifications:', error);
     }
@@ -192,10 +198,47 @@ const addAttendance = async (attendanceData) => {
 
   } catch (error) {
     if (error.code === 11000) {
-      // Duplicate key error, record already exists
       return null;
     }
     throw error;
+  }
+};
+
+const sendWhatsAppMessage = async (empName, punchType, time, date) => {
+  try {
+    const axios = require('axios');
+    
+    const message = `🕒 *Attendance Alert*\n\n` +
+                   `👤 Employee: ${empName}\n` +
+                   `📍 Status: Punched ${punchType}\n` +
+                   `⏰ Time: ${time}\n` +
+                   `📅 Date: ${date}`;
+
+    const recipients = [
+      process.env.WHATSAPP_NUMBER_1,
+    ].filter(Boolean);
+
+    for (const number of recipients) {
+      await axios.post(
+        `https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
+        {
+          messaging_product: 'whatsapp',
+          to: number.replace('+', ''),
+          type: 'text',
+          text: { body: message }
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+    }
+
+    console.log('✅ WhatsApp messages sent successfully');
+  } catch (error) {
+    console.error('❌ WhatsApp sending failed:', error);
   }
 };
 
