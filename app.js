@@ -18,6 +18,7 @@ const { istimaraExpiryMiddleware } = require('./middleware/istimara-expiry-middl
 // Import WebSocket handler
 const { setupWebSocket } = require('./utils/websocket');
 const { autoBackup } = require('./utils/backup-data');
+const { connectDevDB } = require('./config/dev.connection');
 
 // Import routes
 var equipementRouter = require('./routes/equipments');
@@ -43,14 +44,18 @@ var ztech = require('./routes/ztech');
 const attendanceRoutes = require('./routes/attendance');
 const backchargeRouter = require('./routes/backcharge');
 const testRoutes = require('./routes/test');
+const devInfinity = require('./routes/dev');
 
 var app = express();
 
-const getIt =async () => {
- 
-}
-
-getIt()
+connectDevDB()
+  .then(() => {
+    console.log('✅ Dev Portfolio Database connected');
+  })
+  .catch((err) => {
+    console.error('❌ Dev Portfolio Database connection failed:', err);
+    process.exit(1);
+  });
 
 // Create HTTP server
 var server = http.createServer(app);
@@ -152,6 +157,9 @@ app.use('/fuels', FuelsRouter);
 app.use('/attendance', attendanceRoutes);
 app.use('/backcharge', backchargeRouter);
 app.use('/test', testRoutes);
+
+// infinty deV special router
+app.use('/api/v1/portfolio/dev', devInfinity);
 
 // Overtime auto deleter after 2 months
 app.use(overtimeCleanupMiddleware);
