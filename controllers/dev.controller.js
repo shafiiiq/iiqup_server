@@ -3,7 +3,7 @@ const path = require('path');
 const { putObject } = require('../s3bucket/s3.bucket');
 
 class DevController {
-    static async uploadImage(req, res) {
+    static async uploadImage(req, res) { 
         try {
             const { id, schema, files } = req.body;
 

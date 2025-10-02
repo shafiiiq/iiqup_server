@@ -2,16 +2,18 @@ const { getDevModels } = require('../models/portfolio.model');
 
 class DevServices {
   static getSchemaModel(schemaName) {
+    console.log('schemaName',schemaName);
+    
     const models = getDevModels();
     
     const schemaMap = {
       'profile': models.Profile,
-      'experience': models.Experience,
-      'project': models.Project,
-      'skill': models.Skill,
-      'education': models.Education,
-      'certificate': models.Certificate,
-      'service': models.Service,
+      'experiences': models.Experience,
+      'projects': models.Project,
+      'skills': models.Skill,
+      'educations': models.Education,
+      'certificates': models.Certificate,
+      'services': models.Service,
       'stats': models.Stats,
       'contact': models.Contact
     };
