@@ -208,22 +208,40 @@ const sendWhatsAppMessage = async (empName, punchType, time, date) => {
   try {
     const axios = require('axios');
     
+    // Validate environment variables
+    if (!process.env.WHATSAPP_ACCESS_TOKEN) {
+      throw new Error('WHATSAPP_ACCESS_TOKEN is not set in environment variables');
+    }
+    
+    if (!process.env.WHATSAPP_PHONE_NUMBER_ID) {
+      throw new Error('WHATSAPP_PHONE_NUMBER_ID is not set in environment variables');
+    }
+    
     const message = `🕒 *Attendance Alert*\n\n` +
                    `👤 Employee: ${empName}\n` +
                    `📍 Status: Punched ${punchType}\n` +
                    `⏰ Time: ${time}\n` +
                    `📅 Date: ${date}`;
-
+    
     const recipients = [
       process.env.WHATSAPP_NUMBER_1,
+      process.env.WHATSAPP_NUMBER_2
     ].filter(Boolean);
 
+    if (recipients.length === 0) {
+      console.warn('⚠️ No WhatsApp recipients configured');
+      return;
+    }
+
     for (const number of recipients) {
-      await axios.post(
+      // Remove any non-digit characters from phone number
+      const cleanNumber = number.replace(/\D/g, '');
+      
+      const response = await axios.post(
         `https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
         {
           messaging_product: 'whatsapp',
-          to: number.replace('+', ''),
+          to: cleanNumber, // Should be like '919778593415' without '+'
           type: 'text',
           text: { body: message }
         },
@@ -234,11 +252,18 @@ const sendWhatsAppMessage = async (empName, punchType, time, date) => {
           }
         }
       );
+      
+      console.log(`✅ WhatsApp sent to ${cleanNumber}:`, response.data);
     }
-
-    console.log('✅ WhatsApp messages sent successfully');
+    
+    console.log('✅ All WhatsApp messages sent successfully');
+    
   } catch (error) {
-    console.error('❌ WhatsApp sending failed:', error);
+    console.error('❌ WhatsApp sending failed:', error.message);
+    if (error.response) {
+      console.error('Response data:', error.response.data);
+      console.error('Response status:', error.response.status);
+    }
   }
 };
 
