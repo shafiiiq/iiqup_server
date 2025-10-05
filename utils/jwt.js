@@ -38,6 +38,8 @@ const generateTokens = (user) => {
     {
       id: user._id,
       email: user.email,
+      role: user.role,           // ADD THIS
+      uniqueCode: user.uniqueCode, // ADD THIS
       type: 'refresh'
     },
     JWT_SECRET,
@@ -78,7 +80,7 @@ const authMiddleware = (req, res, next) => {
     if (!token) {
       return res.status(401).json({ message: 'Access denied. No token provided.' });
     }
-    
+
     const decoded = verifyToken(token);
 
     req.user = decoded;
@@ -120,7 +122,11 @@ const refreshToken = (refreshToken) => {
   try {
     const decoded = jwt.verify(refreshToken, JWT_SECRET);
 
-    // Create new tokens
+    // Verify it's a refresh token type
+    if (decoded.type !== 'refresh') {
+      throw new Error('Invalid token type');
+    }
+
     const user = {
       _id: decoded.id,
       email: decoded.email,
@@ -128,10 +134,12 @@ const refreshToken = (refreshToken) => {
       uniqueCode: decoded.uniqueCode
     };
 
-    const newAccessToken = generateToken(user);
+    // Generate BOTH new access and refresh tokens
+    const { accessToken, refreshToken: newRefreshToken } = generateTokens(user);
 
     return {
-      accessToken: newAccessToken
+      accessToken,
+      refreshToken: newRefreshToken  // Return new refresh token too
     };
   } catch (error) {
     throw new Error('Invalid refresh token');

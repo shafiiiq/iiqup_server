@@ -23,7 +23,15 @@ router.post('/remove-push-token', userController.removePushToken);
 router.post('/get-push-tokens', userController.getUserPushTokens);
 router.post('/send-test-notification', userController.sendTestNotification);
 router.get('/get-user-roles', authMiddleware, userController.getUserRoles)
-router.post('/six-digit-auth/verify',authMiddleware,  userController.verifyDocAuthUser)
-router.post('/doc-0auth-sign-key',authMiddleware, userController.getSignKey)
+router.post('/six-digit-auth/verify', authMiddleware, userController.verifyDocAuthUser)
+router.post('/doc-0auth-sign-key', authMiddleware, userController.getSignKey)
+router.get('/verify-token', authMiddleware, (req, res) => {
+    // If authMiddleware passes, token is valid
+    res.status(200).json({
+        success: true,
+        valid: true,
+        message: 'Token is valid'
+    });
+});
 
 module.exports = router;
