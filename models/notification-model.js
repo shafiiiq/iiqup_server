@@ -37,7 +37,18 @@ const NotificationSchema = new mongoose.Schema({
   },
   navigteToId: {
     type: String
-  }
+  },
+  delivered: {
+    type: Boolean,
+    default: false
+  },
+  deliveredAt: {
+    type: Date
+  },
+  deliveredTo: [{
+    uniqueCode: String,
+    deliveredAt: Date
+  }]
 });
 
 module.exports = mongoose.model('Notifications', NotificationSchema);

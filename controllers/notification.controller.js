@@ -97,7 +97,7 @@ const markAsRead = async (req, res) => {
     const { id } = req.params;
     
     // Update notification as read in database
-    // await Notification.findByIdAndUpdate(id, { isRead: true });
+    await Notification.findByIdAndUpdate(id, { isRead: true });
     
     res.status(200).json({
       status: 200,
@@ -118,7 +118,7 @@ const deleteNotification = async (req, res) => {
     const { id } = req.params;
     
     // Delete notification from database
-    // await Notification.findByIdAndDelete(id);
+    await Notification.findByIdAndDelete(id);
     
     res.status(200).json({
       status: 200,
@@ -136,17 +136,66 @@ const deleteNotification = async (req, res) => {
 
 const getPendingNotifications = async (req, res) => {
   try {
-    const { uniqueCode, since } = req.body;
+    const { uniqueCode, since, limit = 100 } = req.body;
+    
+    console.log('📨 getPendingNotifications called');
+    console.log('Body:', req.body);
     
     if (!uniqueCode) {
-      return res.status(400).json({ error: 'uniqueCode is required' });
+      return res.status(400).json({ 
+        success: false,
+        error: 'uniqueCode is required' 
+      });
     }
 
-    const notifications = await notificationsService.getPendingNotifications(uniqueCode, since);
-    res.json({ notifications });
+    // Call the service
+    const result = await notificationsService.getPendingNotifications(
+      uniqueCode, 
+      since, 
+      limit
+    );
+
+    // Return the result
+    res.status(200).json({
+      success: true,
+      notifications: result.notifications,
+      meta: result.meta
+    });
+
   } catch (error) {
-    console.error('Error in getPendingNotifications:', error);
-    res.status(500).json({ error: 'Failed to fetch pending notifications' });
+    console.error('❌ Error in getPendingNotifications controller:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to fetch pending notifications',
+      message: error.message 
+    });
+  }
+};
+
+const markNotificationAsDelivered = async (req, res) => {
+  try {
+    const { notificationId, uniqueCode } = req.body;
+    
+    if (!notificationId || !uniqueCode) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'notificationId and uniqueCode are required' 
+      });
+    }
+
+    const result = await notificationsService.markNotificationAsDelivered(
+      notificationId, 
+      uniqueCode
+    );
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Error marking notification as delivered:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
   }
 };
 
@@ -156,5 +205,6 @@ module.exports = {
   getNotificationStats,
   markAsRead,
   deleteNotification,
-  getPendingNotifications
+  getPendingNotifications,
+  markNotificationAsDelivered
 };

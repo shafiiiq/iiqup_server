@@ -129,9 +129,9 @@ class OperatorService {
     return response;
   }
 
-  static async uploadProfilePic(qatarId, file) {
-    if (!qatarId || !file) {
-      const error = new Error('Qatar ID and file are required');
+  static async uploadProfilePic(qatarId, fileName, mimeType) {
+    if (!qatarId || !fileName || !mimeType) {
+      const error = new Error('Qatar ID, fileName, and mimeType are required');
       error.statusCode = 400;
       throw error;
     }
@@ -145,27 +145,48 @@ class OperatorService {
 
     // Generate S3 key
     const timestamp = Date.now();
-    const fileName = `${operator.name.replace(/\s+/g, '-')}-${operator.qatarId}-${timestamp}`;
-    const s3Key = `operators/profiles/${fileName}`;
+    const fileExtension = fileName.split('.').pop() || 'jpg';
+    const finalFileName = `${operator.name.replace(/\s+/g, '-')}-${operator.qatarId}-${timestamp}.${fileExtension}`;
+    const s3Key = `operators/profiles/${finalFileName}`;
 
     try {
-      // Upload to S3
-      const uploadResult = await putObject(file, s3Key.file.mimeType);
+      // Get presigned upload URL
+      const uploadUrl = await putObject(
+        fileName,
+        s3Key,
+        mimeType
+      );
 
-      // Update operator with profile pic URL
+      // Prepare profile pic data object (like mediaFiles in complaint)
+      const profilePicData = {
+        fileName: finalFileName,
+        originalName: fileName,
+        filePath: s3Key,
+        mimeType: mimeType,
+        uploadDate: new Date(),
+        url: s3Key
+      };
+
+      // Update operator with profile pic data
       const updatedOperator = await Operator.findOneAndUpdate(
         { qatarId },
         {
-          profilePic: uploadResult.Location,
+          profilePic: profilePicData,
           updatedAt: Date.now()
         },
         { new: true, runValidators: true }
       );
 
-      return updatedOperator;
+      return {
+        uploadUrl: uploadUrl,
+        profilePicData: profilePicData,
+        operator: updatedOperator
+      };
     } catch (error) {
       console.error('S3 Upload Error:', error);
-      throw new Error('Failed to upload profile picture');
+      const uploadError = new Error('Failed to generate upload URL');
+      uploadError.statusCode = 500;
+      throw uploadError;
     }
   }
 

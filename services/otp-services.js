@@ -126,7 +126,7 @@ const verifyOTP = async (email, otp, type, qatarId = null) => {
     if (type === 'mechanic') {
       user = await Mechanic.findOne({ authMail: email }).select('_id name email role uniqueCode userType');
     } else if (type === 'operator') {
-      user = await Operator.findOne({ qatarId: qatarId }).select('_id name uniqueCode userType equipmentNumber');
+      user = await Operator.findOne({ qatarId: qatarId }).select('_id name uniqueCode userType equipmentNumber qatarId');
     } else {
       user = await User.findOne({ authMail: email }).select('_id name email role uniqueCode userType');
     }
@@ -137,6 +137,9 @@ const verifyOTP = async (email, otp, type, qatarId = null) => {
       role: user.role, // Use user.role instead of user.userType
       uniqueCode: user.uniqueCode
     });
+
+    console.log(user);
+    
 
 
     return {
@@ -153,6 +156,7 @@ const verifyOTP = async (email, otp, type, qatarId = null) => {
           userType: user.userType,
           uniqueCode: user.uniqueCode,
           equipmentNumber: user.equipmentNumber ? user.equipmentNumber : null,
+          qatarId: user.qatarId ? user.qatarId : null,
           auth0token: _auth_tokens.accessToken,
           refresh_token: _auth_tokens.refreshToken
         } : null

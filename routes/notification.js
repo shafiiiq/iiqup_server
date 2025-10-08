@@ -17,6 +17,8 @@ router.put('/mark-read/:id', notificationController.markAsRead);
 // Delete notification
 router.delete('/delete/:id', notificationController.deleteNotification);
 
-router.post('/get-pending-notifications', notificationController.getPendingNotifications);
+// router.post('/get-pending-notifications', notificationController.getPendingNotifications);
+
+// router.post('/mark-delivered', notificationController.markNotificationAsDelivered);
 
 module.exports = router;

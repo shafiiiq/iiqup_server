@@ -7,24 +7,24 @@ class OperatorController {
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           success: false,
           message: 'Validation failed',
-          errors: errors.array() 
+          errors: errors.array()
         });
       }
 
       const operatorData = req.body;
-      
+
       const operator = await OperatorService.createOperator(operatorData);
-      
+
       res.status(201).json({
         success: true,
         data: operator,
         authMail: process.env.AUTH_OTP_USER_EMAIL,
         message: 'Operator created successfully'
       });
-      
+
     } catch (error) {
       console.error('Create Operator Error:', error);
       const statusCode = error.statusCode || 500;
@@ -46,16 +46,16 @@ class OperatorController {
           message: 'Qatar ID is required'
         });
       }
-      
+
       const operator = await OperatorService.verifyOperator(qatarId);
-      
+
       res.json({
         success: true,
         data: operator,
         authMail: process.env.AUTH_OTP_USER_EMAIL,
         message: 'Operator verified successfully'
       });
-      
+
     } catch (error) {
       console.error('Verify Operator Error:', error);
       const statusCode = error.statusCode || 500;
@@ -69,23 +69,23 @@ class OperatorController {
 
   static async uploadProfilePic(req, res) {
     try {
-      const { qatarId } = req.body;
-      
-      if (!req.file) {
+      const { qatarId, fileName, mimeType } = req.body;
+
+      if (!qatarId || !fileName || !mimeType) {
         return res.status(400).json({
           success: false,
-          message: 'Profile picture file is required'
+          message: 'Qatar ID, fileName, and mimeType are required'
         });
       }
 
-      const operator = await OperatorService.uploadProfilePic(qatarId, req.file);
-      
+      const result = await OperatorService.uploadProfilePic(qatarId, fileName, mimeType);
+
       res.json({
         success: true,
-        data: operator,
-        message: 'Profile picture uploaded successfully'
+        data: result,
+        message: 'Upload URL generated successfully'
       });
-      
+
     } catch (error) {
       console.error('Upload Profile Pic Error:', error);
       const statusCode = error.statusCode || 500;
@@ -99,14 +99,14 @@ class OperatorController {
   static async getAllOperators(req, res) {
     try {
       const operators = await OperatorService.getAllOperators();
-      
+
       res.json({
         success: true,
         data: operators,
         count: operators.length,
         message: 'Operators retrieved successfully'
       });
-      
+
     } catch (error) {
       console.error('Get All Operators Error:', error);
       const statusCode = error.statusCode || 500;
@@ -120,15 +120,15 @@ class OperatorController {
   static async getOperatorByQatarId(req, res) {
     try {
       const { qatarId } = req.params;
-      
+
       const operator = await OperatorService.getOperatorByQatarId(qatarId);
-      
+
       res.json({
         success: true,
         data: operator,
         message: 'Operator retrieved successfully'
       });
-      
+
     } catch (error) {
       console.error('Get Operator Error:', error);
       const statusCode = error.statusCode || 500;
@@ -143,15 +143,15 @@ class OperatorController {
     try {
       const { qatarId } = req.params;
       const updateData = req.body;
-      
+
       const operator = await OperatorService.updateOperator(qatarId, updateData);
-      
+
       res.json({
         success: true,
         data: operator,
         message: 'Operator updated successfully'
       });
-      
+
     } catch (error) {
       console.error('Update Operator Error:', error);
       const statusCode = error.statusCode || 500;

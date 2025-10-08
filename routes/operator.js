@@ -19,7 +19,9 @@ router.post('/verify-operator', [
 // Upload profile picture
 router.post('/upload-profile-pic', 
   [
-    body('qatarId').notEmpty().withMessage('Qatar ID is required')
+    body('qatarId').notEmpty().withMessage('Qatar ID is required'),
+    body('fileName').notEmpty().withMessage('File name is required'),
+    body('mimeType').notEmpty().withMessage('MIME type is required')
   ],
   OperatorController.uploadProfilePic
 );

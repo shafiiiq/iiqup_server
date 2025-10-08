@@ -75,6 +75,16 @@ const ToolkitSchema = new mongoose.Schema({
   }
 });
 
+const profilePicSchema = new mongoose.Schema({
+  fileName: { type: String },
+  originalName: { type: String },
+  filePath: { type: String },
+  mimeType: { type: String },
+  uploadDate: { type: Date, default: Date.now },
+  url: { type: String }
+});
+
+
 const operatorSchema = new mongoose.Schema({
   id: {
     type: Number,
@@ -176,10 +186,7 @@ const operatorSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
-  profilePic: {
-    type: String,
-    default: ''
-  },
+  profilePic: profilePicSchema,
   toolkits: [ToolkitSchema],
   isVerified: {
     type: Boolean,
