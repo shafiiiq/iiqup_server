@@ -82,7 +82,7 @@ const profilePicSchema = new mongoose.Schema({
   mimeType: { type: String },
   uploadDate: { type: Date, default: Date.now },
   url: { type: String }
-});
+}, { _id: false });
 
 
 const operatorSchema = new mongoose.Schema({
@@ -186,7 +186,10 @@ const operatorSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
-  profilePic: profilePicSchema,
+  profilePic: {
+    type: profilePicSchema,
+    default: null
+  },
   toolkits: [ToolkitSchema],
   isVerified: {
     type: Boolean,

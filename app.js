@@ -100,7 +100,7 @@ const io = socketIo(server, {
       const whitelist = [
         'https://iiqup.netlify.app',
         'https://ansarigroup.online',
-        'https://www.ansarigroup.online',
+        'https://www.ansarigroup.online'
       ];
       if (whitelist.indexOf(origin) !== -1) callback(null, true);
       else callback(new Error('Not allowed by CORS'));

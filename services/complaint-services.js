@@ -26,14 +26,13 @@ class ComplaintService {
         description: `${complaint.name} registered complaint for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Please assign a mechanic.`,
         priority: "high",
         sourceId: complaintData._id,
-        recipient: process.env.MAINTENANCE_HEAD,
+        recipient: process.env.MAINTENANCE_HEAD, // ✅ Single user
         time: new Date(),
         navigateTo: `/(screens)/assignMechanic/${complaintData._id}`,
         navigateText: 'Assign Mechanic',
         navigteToId: complaintData._id,
         hasButton: true
       });
-
 
       await PushNotificationService.sendGeneralNotification(
         process.env.MAINTENANCE_HEAD,

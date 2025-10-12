@@ -19,31 +19,37 @@ const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
   try {
     console.log('📬 Fetching pending notifications...');
     console.log('User:', uniqueCode);
-    console.log('Since:', since);
 
     if (!uniqueCode) {
       throw new Error('uniqueCode is required');
     }
 
-    // Fetch from last 7 days (as fallback)
     const sevenDaysAgo = new Date(Date.now() - (7 * 24 * 60 * 60 * 1000));
     const fetchFromDate = sevenDaysAgo;
 
-    console.log(`📅 Fetching notifications from: ${fetchFromDate.toISOString()}`);
+    console.log(`📅 Fetching from: ${fetchFromDate.toISOString()}`);
 
-    // IMPORTANT: Fetch notifications NOT YET DELIVERED to this user
+    // ✅ UPDATED QUERY: Check if user is in targetUsers OR it's a broadcast
     const normalNotifications = await Notification.find({
       createdAt: { $gte: fetchFromDate },
-      // Only get notifications not delivered to this user
-      'deliveredTo.uniqueCode': { $ne: uniqueCode }
+      
+      // ✅ NEW LOGIC: Only fetch if:
+      // 1. It's a broadcast (isBroadcast: true)
+      // 2. OR user is in targetUsers array
+      // 3. AND user hasn't received it yet
+      $or: [
+        { isBroadcast: true }, // Broadcast to all
+        { targetUsers: uniqueCode } // User is in target list
+      ],
+      'deliveredTo.uniqueCode': { $ne: uniqueCode } // Not delivered yet
     })
-      .sort({ createdAt: -1 })
-      .limit(limit)
-      .lean();
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .lean();
 
-    console.log(`📢 Found ${normalNotifications.length} undelivered normal notifications`);
+    console.log(`📢 Found ${normalNotifications.length} undelivered notifications for ${uniqueCode}`);
 
-    // Fetch special notifications
+    // Fetch special notifications (same as before)
     const user = await User.findOne({ uniqueCode }).select('specialNotification');
 
     let specialNotifications = [];
@@ -79,9 +85,9 @@ const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
       return dateB - dateA;
     });
 
-    const limitedNotifications = limit ? allNotifications.slice(0, limit) : allNotifications;
+    const limitedNotifications = allNotifications.slice(0, limit);
 
-    console.log(`✅ Returning ${limitedNotifications.length} undelivered notifications`);
+    console.log(`✅ Returning ${limitedNotifications.length} notifications`);
 
     return {
       notifications: limitedNotifications,
@@ -94,7 +100,7 @@ const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
     };
 
   } catch (error) {
-    console.error('❌ Error fetching pending notifications:', error);
+    console.error('❌ Error:', error);
     throw error;
   }
 };

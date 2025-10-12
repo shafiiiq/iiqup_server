@@ -18,45 +18,64 @@ const createNotification = async (notificationData) => {
     const {
       title,
       description,
-      time = new Date(),
       priority,
-      navigteToId,
+      sourceId,
+      recipient, // Can be: uniqueCode, [array], or null
+      time,
       navigateTo,
       navigateText,
-      sourceId,
+      navigteToId,
       hasButton,
-      navigateToId
+      type = 'normal'
     } = notificationData;
 
-    // Create new notification
+    // ✅ Determine target users and broadcast flag
+    let targetUsers = [];
+    let isBroadcast = false;
+
+    if (recipient === null || recipient === undefined) {
+      // Broadcast to all
+      isBroadcast = true;
+      targetUsers = [];
+    } else if (Array.isArray(recipient)) {
+      // Multiple specific users
+      targetUsers = recipient;
+      isBroadcast = false;
+    } else {
+      // Single user
+      targetUsers = [recipient];
+      isBroadcast = false;
+    }
+
     const notification = new Notification({
       title,
       description,
-      time,
-      priority,
-      navigateToId: navigateToId || null,
-      navigateTo: navigateTo || null,
-      navigateText: navigateText || null,
-      sourceId: sourceId || null,
+      priority: priority || 'medium',
+      sourceId,
+      time: time || new Date(),
+      navigateTo,
+      navigateText,
+      navigteToId,
       hasButton: hasButton || false,
+      type,
+      targetUsers, // ✅ Store who should receive it
+      isBroadcast, // ✅ Store if it's broadcast
+      createdAt: new Date(),
       updatedAt: new Date()
     });
 
-    // Save to database
-    const savedNotification = await notification.save();
+    await notification.save();
 
     return {
       success: true,
-      data: savedNotification,
-      message: 'Notification created successfully'
+      data: notification
     };
 
   } catch (error) {
-    console.error('Error creating notification:', error);
+    console.error('❌ Error creating notification:', error);
     return {
       success: false,
-      error: error.message,
-      message: 'Failed to create notification'
+      error: error.message
     };
   }
 };

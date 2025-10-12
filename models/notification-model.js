@@ -25,7 +25,6 @@ const NotificationSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-
   navigateText: {
     type: String
   },
@@ -38,12 +37,13 @@ const NotificationSchema = new mongoose.Schema({
   navigteToId: {
     type: String
   },
-  delivered: {
+  targetUsers: [{
+    type: String, // Array of uniqueCodes
+    default: []
+  }],
+  isBroadcast: {
     type: Boolean,
-    default: false
-  },
-  deliveredAt: {
-    type: Date
+    default: false // true = send to all users
   },
   deliveredTo: [{
     uniqueCode: String,
