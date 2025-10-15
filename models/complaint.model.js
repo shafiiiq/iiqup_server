@@ -62,6 +62,8 @@ const lpoTrackingSchema = new mongoose.Schema({
   createdBy: { type: String }, // WORKSHOP_MANAGER
   createdDate: { type: Date, default: Date.now },
 
+  htmlContent: { type: String },
+
   // Add LPO file information
   lpoFile: {
     fileName: { type: String },
@@ -74,12 +76,15 @@ const lpoTrackingSchema = new mongoose.Schema({
   uploadedDate: { type: Date },
 
   purchaseApprovalDate: { type: Date },
+  accountsApprovalDate: { type: Date },
+  managerApprovalDate: { type: Date },
   ceoApprovalDate: { type: Date },
   status: {
     type: String,
-    enum: ['created', 'uploaded', 'purchase_approved', 'ceo_approved', 'items_procured'],
+    enum: ['created', 'uploaded', 'purchase_approved', 'accounts_approved', 'manager_approved', 'ceo_approved', 'items_procured'],
     default: 'created'
   },
+  // PMR fields
   PMRsigned: {
     type: Boolean,
     default: false
@@ -106,6 +111,64 @@ const lpoTrackingSchema = new mongoose.Schema({
   PMRapprovedLocation: {
     type: String,
   },
+
+  // MANAGER fields
+  MANAGERsigned: {
+    type: Boolean,
+    default: false
+  },
+  MANAGERauthorised: {
+    type: Boolean,
+    default: false
+  },
+  MANAGERapprovedBy: {
+    type: String,
+  },
+  MANAGERapprovedDate: {
+    type: String,
+  },
+  MANAGERapprovedFrom: {
+    type: String,
+  },
+  MANAGERapprovedIP: {
+    type: String,
+  },
+  MANAGERapprovedBDevice: {
+    type: String,
+  },
+  MANAGERapprovedLocation: {
+    type: String,
+  },
+
+  // ACCOUTNS fields
+  ACCOUNTSsigned: {
+    type: Boolean,
+    default: false
+  },
+  ACCOUNTSauthorised: {
+    type: Boolean,
+    default: false
+  },
+  ACCOUNTSapprovedBy: {
+    type: String,
+  },
+  ACCOUNTSapprovedDate: {
+    type: String,
+  },
+  ACCOUNTSapprovedFrom: {
+    type: String,
+  },
+  ACCOUNTSapprovedIP: {
+    type: String,
+  },
+  ACCOUNTSapprovedBDevice: {
+    type: String,
+  },
+  ACCOUNTSapprovedLocation: {
+    type: String,
+  },
+
+  // CEO fields
   CEOsigned: {
     type: Boolean,
     default: false
@@ -131,7 +194,7 @@ const lpoTrackingSchema = new mongoose.Schema({
   },
   CEOapprovedLocation: {
     type: String,
-  }
+  },
 });
 
 const complaintSchema = new mongoose.Schema({
@@ -174,6 +237,8 @@ const complaintSchema = new mongoose.Schema({
       'lpo_created',          // LPO created by workshop manager
       'lpo_uploaded',         // LPO uploaded by workshop manager
       'purchase_approved',    // Approved by purchase manager
+      'accounts_approved',    // Approved by accounts
+      'manager_approved',     // Approved by manager
       'ceo_approved',         // Approved by CEO
       'items_available',      // Items available for mechanic
       'work_in_progress',     // Mechanic started work

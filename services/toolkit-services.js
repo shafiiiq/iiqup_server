@@ -336,11 +336,9 @@ const reduceStock = async (toolkitId, variantId, quantity, reason = '', updatedB
         color: variant.color,
         quantity: quantity,
         assignedDate: assignedDate,
+        assignedBy: updatedBy,
         reason: reason || `Stock reduced: ${quantity} items used`,
-        status: 'assigned',
-        minStockLevel: variant.minStockLevel || 5,
-        inuse: true,
-        updatedAt: new Date()
+        status: 'assigned'
       };
 
       if (!assignedPerson.toolkits) {

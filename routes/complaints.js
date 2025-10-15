@@ -19,10 +19,12 @@ router.post('/create-lpo/:complaintId', ComplaintController.createLPOForComplain
 
 router.post('/upload-lpo/:complaintId', ComplaintController.uploadLPOForComplaint);
 
-// Step 6: PURCHASE_MANAGER approves
 router.post('/purchase-approval/:complaintId', ComplaintController.purchaseApproval);
 
-// Step 7: CEO final approval
+router.post('/accounts-approval/:complaintId', ComplaintController.accountsApproval);
+
+router.post('/manager-approval/:complaintId', ComplaintController.managerApproval);
+
 router.post('/ceo-approval/:complaintId', ComplaintController.ceoApproval);
 
 // Step 8: Mark items as available (by JALEEL_KA or MAINTENANCE_HEAD)

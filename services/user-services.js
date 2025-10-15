@@ -1595,7 +1595,7 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
       priority: notificationData.priority === 'high' ? 'high' : 'normal',
       channelId: getChannelId(notificationData.priority),
       notificationId: notificationData.notificationId || null
-    }));    
+    }));
 
     // Send notifications
     const chunks = expo.chunkPushNotifications(messages);
@@ -1756,6 +1756,213 @@ const getAuthSignKey = async (password) => {
   }
 };
 
+// Activate signature with device trust
+const activateSignatureAccess = async (userId, activationKey, signType, deviceInfo) => {
+  try {
+
+    const user = await User.findById(userId);
+    if (!user) {
+      throw { status: 404, message: 'User not found' };
+    }
+
+    // Find or create signature activation record
+    let signActivation = user.signatureActivation.find(s => s.signType === signType);
+
+    if (!signActivation) {
+      throw { status: 404, message: 'Signature type not configured for this user' };
+    }
+
+    // Verify activation key
+    const isKeyValid = await bcrypt.compare(activationKey, signActivation.activationKey);
+    if (!isKeyValid) {
+      throw { status: 401, message: 'Invalid activation key' };
+    }
+
+    // Add trusted device
+    const deviceRecord = {
+      uniqueCode: deviceInfo.deviceFingerprint,
+      ipAddress: deviceInfo.ipAddress,
+      location: deviceInfo.location,
+      userAgent: deviceInfo.userAgent,
+      browserInfo: deviceInfo.browserInfo,
+      activatedAt: new Date(),
+      lastUsed: new Date(),
+      isActive: true
+    };
+
+    signActivation.trustedDevices.push(deviceRecord);
+    signActivation.isActivated = true;
+    signActivation.activatedAt = new Date();
+    signActivation.activatedBy = userId;
+
+    await user.save();
+
+    return {
+      status: 200,
+      message: 'Signature activated successfully',
+      data: {
+        signType,
+        deviceTrusted: true
+      }
+    };
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Verify trusted device
+const verifyTrustedDevice = async (userId, signType, deviceInfo) => {
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      throw { status: 404, message: 'User not found' };
+    }
+
+    const signActivation = user.signatureActivation.find(s => s.signType === signType);
+
+    if (!signActivation || !signActivation.isActivated) {
+      return {
+        status: 200,
+        data: {
+          isActivated: false,
+          isTrusted: false
+        }
+      };
+    }
+
+    // Check if device is trusted
+    const trustedDevice = signActivation.trustedDevices.find(d =>
+      d.uniqueCode === deviceInfo.deviceFingerprint &&
+      d.ipAddress === deviceInfo.ipAddress &&
+      d.userAgent === deviceInfo.userAgent &&
+      d.browserInfo === deviceInfo.browserInfo &&
+      d.location === deviceInfo.location &&
+      d.isActive
+    );
+
+    if (!trustedDevice) {
+      throw new Error('unauthorised request');
+    }
+
+    trustedDevice.lastUsed = new Date();
+    await user.save();
+
+    return {
+      status: 200,
+      data: {
+        isActivated: !!trustedDevice,
+        isTrusted: !!trustedDevice
+      }
+    };
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Updated sign key services with device verification
+const getPmAuthSignKey = async (userId, deviceInfo) => {
+  try {
+    const verificationResult = await verifyTrustedDevice(userId, 'pm', deviceInfo);
+
+    if (!verificationResult.data.isTrusted) {
+      throw {
+        status: 403,
+        message: 'Device not trusted. Please activate signature access first.'
+      };
+    }
+
+    return {
+      status: 200,
+      data: {
+        sign_key: process.env.PM_SIGN_KEY,
+        expiresIn: 30 // seconds
+      }
+    };
+  } catch (error) {
+    throw error;
+  }
+};
+
+const getAccountsAuthSignKey = async (userId, deviceInfo) => {
+  try {
+    const verificationResult = await verifyTrustedDevice(userId, 'accounts', deviceInfo);
+
+    if (!verificationResult.data.isTrusted) {
+      throw { status: 403, message: 'Device not trusted' };
+    }
+
+    return {
+      status: 200,
+      data: {
+        sign_key: process.env.ACCOUNTS_SIGN_KEY,
+        expiresIn: 30
+      }
+    };
+  } catch (error) {
+    throw error;
+  }
+};
+
+const getManagerAuthSignKey = async (userId, deviceInfo) => {
+  try {
+    const verificationResult = await verifyTrustedDevice(userId, 'manager', deviceInfo);
+
+    if (!verificationResult.data.isTrusted) {
+      throw { status: 403, message: 'Device not trusted' };
+    }
+
+    return {
+      status: 200,
+      data: {
+        sign_key: process.env.MANAGER_SIGN_KEY,
+        expiresIn: 30
+      }
+    };
+  } catch (error) {
+    throw error;
+  }
+};
+
+const getAuthorizedAuthSignKey = async (userId, deviceInfo) => {
+  try {
+    const verificationResult = await verifyTrustedDevice(userId, 'authorized', deviceInfo);
+
+    if (!verificationResult.data.isTrusted) {
+      throw { status: 403, message: 'Device not trusted' };
+    }
+
+    return {
+      status: 200,
+      data: {
+        sign_key: process.env.AUTHORIZED_SIGN_KEY,
+        expiresIn: 30
+      }
+    };
+  } catch (error) {
+    throw error;
+  }
+};
+
+const getAuthSealKey = async (userId, deviceInfo) => {
+  try {
+    const verificationResult = await verifyTrustedDevice(userId, 'seal', deviceInfo);
+
+    if (!verificationResult.data.isTrusted) {
+      throw { status: 403, message: 'Device not trusted' };
+    }
+
+    return {
+      status: 200,
+      data: {
+        sign_key: process.env.SEAL_KEY,
+        expiresIn: 30
+      }
+    };
+  } catch (error) {
+    throw error;
+  }
+};
+
 const cleanupInvalidTokens = async (uniqueCode = null) => {
   try {
     const query = uniqueCode ? { uniqueCode } : {};
@@ -1892,9 +2099,13 @@ module.exports = {
   verifyDocAuthUserCreds,
   getAuthSignKey,
   fetchAllUsers,
-
-  // Also add the helper functions if needed:
   getFileType,
-
+  getPmAuthSignKey,
+  getAccountsAuthSignKey,
+  getManagerAuthSignKey,
+  getAuthorizedAuthSignKey,
+  getAuthSealKey,
+  activateSignatureAccess,
+  verifyTrustedDevice,
   USER_ROLES,
 };

@@ -84,7 +84,7 @@ const userSchema = new Schema({
     type: Date
   },
   permissions: {
-    type: [String],
+    type: [Object],
     default: []
   },
   userType: {
@@ -156,6 +156,39 @@ const userSchema = new Schema({
       default: Date.now
     }
   }],
+  signatureActivation: [{
+    signType: {
+      type: String,
+      enum: ['pm', 'accounts', 'manager', 'authorized', 'seal'],
+      required: true
+    },
+    activationKey: {
+      type: String,
+      required: true // Store bcrypt hashed 20-digit key
+    },
+    trustedDevices: [{
+      uniqueCode: String,
+      ipAddress: String,
+      location: String,
+      userAgent: String,
+      browserInfo: String,
+      activatedAt: Date,
+      lastUsed: Date,
+      isActive: {
+        type: Boolean,
+        default: true
+      }
+    }],
+    isActivated: {
+      type: Boolean,
+      default: false
+    },
+    activatedAt: Date,
+    activatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+  }]
 });
 
 // Method to check if user has specific permission

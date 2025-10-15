@@ -184,6 +184,97 @@ router.get('/update-sites', async (req, res) => {
     }
 });
 
+
+const bcrypt = require('bcrypt');
+
+router.post('/add-activation-key', async (req, res) => {
+  try {
+    const { userId, activationKey } = req.body;
+
+    // Validate
+    if (!userId || !activationKey) {
+      return res.status(400).json({
+        success: false,
+        message: 'userId and activationKey are required'
+      });
+    }
+
+    if (activationKey.length !== 20) {
+      return res.status(400).json({
+        success: false,
+        message: 'Activation key must be exactly 20 digits '
+      });
+    }
+
+    // Hash the activation key
+    const hashedKey = await bcrypt.hash(activationKey, 10);
+
+    // Update user with all signature types using same key
+    const result = await User.updateOne(
+      { _id: userId },
+      {
+        $set: {
+          signatureActivation: [
+            {
+              signType: 'pm',
+              activationKey: hashedKey,
+              trustedDevices: [],
+              isActivated: false
+            },
+            {
+              signType: 'accounts',
+              activationKey: hashedKey,
+              trustedDevices: [],
+              isActivated: false
+            },
+            {
+              signType: 'manager',
+              activationKey: hashedKey,
+              trustedDevices: [],
+              isActivated: false
+            },
+            {
+              signType: 'authorized',
+              activationKey: hashedKey,
+              trustedDevices: [],
+              isActivated: false
+            },
+            {
+              signType: 'seal',
+              activationKey: hashedKey,
+              trustedDevices: [],
+              isActivated: false
+            }
+          ],
+          updatedAt: new Date()
+        }
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Activation key added successfully',
+      userId: userId,
+      activationKey: activationKey
+    });
+
+  } catch (error) {
+    console.error('Error adding activation key:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error adding activation key',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;
 
 

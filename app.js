@@ -34,7 +34,7 @@ var otpRouter = require('./routes/otp');
 var notificationRouter = require('./routes/notification');
 var lpoRouter = require('./routes/lpo');
 var operatorRouter = require('./routes/operator');
-var complaintsRouter = require('./routes/compalints');
+var complaintsRouter = require('./routes/complaints');
 var applicationRouter = require('./routes/applications');
 var securityRouter = require('./routes/security');
 var _0authRouter = require('./routes/0auth');
@@ -67,10 +67,11 @@ const corsOptions = {
     if (!origin) return callback(null, true);
 
     // whitelist of allowed domains for web
-    const whitelist = [
+    const whitelist = [ 
       'https://iiqup.netlify.app',
       'https://ansarigroup.online',
       'https://www.ansarigroup.online',
+      'http://localhost:3000'
     ];
 
     if (whitelist.indexOf(origin) !== -1) {
@@ -137,7 +138,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', ztech);
 app.use('/users', userRouter);
 app.use('/otp', otpRouter);
-app.use('/equipments', authMiddleware, equipementRouter);
+app.use('/equipments', equipementRouter);
 app.use('/service-report', serviceReport);
 app.use('/service-history', authMiddleware, serviceHistory);
 app.use('/stocks', stocksRouter);

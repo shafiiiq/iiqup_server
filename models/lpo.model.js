@@ -105,6 +105,26 @@ const lpoSchema = new mongoose.Schema({
   lpoCounter: {
     type: Number,
     required: true
+  },
+  pmSigned: {
+    type: Boolean,
+    required: true,
+    default: false
+  },
+  accountsSigned: {
+    type: Boolean,
+    required: true,
+    default: false
+  },
+  managerSigned: {
+    type: Boolean,
+    required: true,
+    default: false
+  },
+  ceoSigned: {
+    type: Boolean,
+    required: true,
+    default: false
   }
 }, {
   timestamps: true

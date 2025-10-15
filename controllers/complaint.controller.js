@@ -298,12 +298,12 @@ class ComplaintController {
   static async uploadLPOForComplaint(req, res) {
     try {
       const { complaintId } = req.params;
-      const { uploadedBy, lpoRef, description, fileName } = req.body;
+      const { uploadedBy, lpoRef, description, fileName, } = req.body;
 
       if (!uploadedBy || !lpoRef) {
         return res.status(400).json({
           status: 400,
-          message: 'uploadedBy and lpoRef are required'
+          message: 'uploadedBy, lpoRef, and htmlContent are required'
         });
       }
 
@@ -326,12 +326,13 @@ class ComplaintController {
         uploadDate: new Date()
       };
 
+      // Pass htmlContent to service
       const result = await ComplaintService.uploadLPOForComplaint(
         complaintId,
         lpoFileData,
         uploadedBy,
         lpoRef,
-        description
+        description,
       );
 
       res.status(200).json({
@@ -408,6 +409,110 @@ class ComplaintController {
       });
     }
   }
+
+  // Step 7: CEO final approval
+  static async accountsApproval(req, res) {
+    try {
+      const { complaintId } = req.params;
+      const {
+        approvedBy,
+        comments,
+        signed,
+        authorised,
+        approvedDate,
+        approvedFrom,
+        approvedIP,
+        approvedBDevice,
+        approvedLocation
+      } = req.body;
+
+      if (!approvedBy) {
+        return res.status(400).json({
+          status: 400,
+          message: 'approvedBy is required'
+        });
+      }
+
+      const approvedCreds = {
+        signed: signed || false,
+        authorised: authorised || false,
+        approvedDate,
+        approvedFrom,
+        approvedIP,
+        approvedBDevice,
+        approvedLocation,
+        approvedBy,
+      }
+
+      const result = await ComplaintService.accountsApproval(
+        complaintId,
+        approvedBy,
+        comments,
+        approvedCreds
+      );
+
+      res.status(200).json(result);
+    } catch (error) {
+      console.error('Error in CEO approval:', error);
+      res.status(error.status || 500).json({
+        status: error.status || 500,
+        message: error.message || 'Failed to get CEO approval'
+      });
+    }
+  }
+
+  // Step 7: CEO final approval
+  static async managerApproval(req, res) {
+    try {
+      const { complaintId } = req.params;
+      const {
+        approvedBy,
+        comments,
+        signed,
+        authorised,
+        approvedDate,
+        approvedFrom,
+        approvedIP,
+        approvedBDevice,
+        approvedLocation
+      } = req.body;
+
+      if (!approvedBy) {
+        return res.status(400).json({
+          status: 400,
+          message: 'approvedBy is required'
+        });
+      }
+
+      const approvedCreds = {
+        signed: signed || false,
+        authorised: authorised || false,
+        approvedDate,
+        approvedFrom,
+        approvedIP,
+        approvedBDevice,
+        approvedLocation,
+        approvedBy,
+      }
+
+      const result = await ComplaintService.managerApproval(
+        complaintId,
+        approvedBy,
+        comments,
+        approvedCreds
+      );
+
+      res.status(200).json(result);
+    } catch (error) {
+      console.error('Error in CEO approval:', error);
+      res.status(error.status || 500).json({
+        status: error.status || 500,
+        message: error.message || 'Failed to get CEO approval'
+      });
+    }
+  }
+
+
   // Step 7: CEO final approval
   static async ceoApproval(req, res) {
     try {

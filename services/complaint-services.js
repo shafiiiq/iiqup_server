@@ -345,7 +345,6 @@ class ComplaintService {
 
   static async uploadLPOForComplaint(complaintId, lpoFileData, uploadedBy, lpoRef, description) {
     try {
-      // Find the complaint
       const complaint = await Complaint.findById(complaintId);
 
       if (!complaint) {
@@ -354,20 +353,17 @@ class ComplaintService {
         throw error;
       }
 
-      // Check if complaint is in correct status to receive LPO upload
       if (complaint.workflowStatus !== 'lpo_created' && complaint.workflowStatus !== 'sent_to_workshop') {
         const error = new Error('Invalid workflow status for LPO upload');
         error.status = 400;
         throw error;
       }
 
-      // Update the complaint with LPO file information
       const updateData = {
         workflowStatus: 'lpo_uploaded',
         updatedAt: new Date()
       };
 
-      // Add LPO file details to lpoDetails
       updateData['lpoDetails.lpoFile'] = lpoFileData;
       updateData['lpoDetails.lpoRef'] = lpoRef;
       updateData['lpoDetails.description'] = description || '';
@@ -375,7 +371,6 @@ class ComplaintService {
       updateData['lpoDetails.uploadedDate'] = new Date();
       updateData['lpoDetails.status'] = 'uploaded';
 
-      // Add to approval trail
       const approvalEntry = {
         approvedBy: uploadedBy,
         role: 'WORKSHOP_MANAGER',
@@ -394,6 +389,7 @@ class ComplaintService {
         { new: true, runValidators: true }
       );
 
+      // Notify PM
       const notification = await createNotification({
         title: `LPO Approval Needed - ${lpoRef}`,
         description: `New LPO created for complaint ${complaint.regNo}. LPO Ref: ${lpoRef}. Please review and approve.`,
@@ -428,6 +424,7 @@ class ComplaintService {
   }
 
   // Step 6: PURCHASE_MANAGER approves
+  // After purchaseApproval
   static async purchaseApproval(complaintId, approvalData) {
     try {
       const {
@@ -442,14 +439,12 @@ class ComplaintService {
         approvedLocation
       } = approvalData;
 
-      // First, check if the complaint exists and validate workflow status
       const existingComplaint = await Complaint.findById(complaintId);
 
       if (!existingComplaint) {
         throw { status: 404, message: 'Complaint not found' };
       }
 
-      // Validate workflow status
       if (existingComplaint.workflowStatus !== 'lpo_uploaded') {
         throw {
           status: 400,
@@ -457,7 +452,6 @@ class ComplaintService {
         };
       }
 
-      // Prepare the update object
       const updateFields = {
         'lpoDetails.purchaseApprovalDate': new Date(),
         'lpoDetails.status': 'purchase_approved',
@@ -472,7 +466,6 @@ class ComplaintService {
         }
       };
 
-      // Add signing fields if provided
       if (signed) {
         updateFields['lpoDetails.PMRsigned'] = true;
         updateFields['lpoDetails.PMRauthorised'] = authorised;
@@ -495,24 +488,31 @@ class ComplaintService {
         throw { status: 404, message: 'Failed to update complaint' };
       }
 
-      // Notify CEO
+      // Update LPO with pmSigned: true
+      if (complaint.lpoDetails && complaint.lpoDetails.lpoId) {
+        await LPO.updateOne(
+          { _id: complaint.lpoDetails.lpoId },
+          { pmSigned: true }
+        );
+      }
+
       const notification = await createNotification({
-        title: `CEO Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`,
-        description: `Purchase manager ${signed ? 'signed and ' : ''}approved LPO for complaint ${complaint.regNo}. Final CEO approval needed.`,
+        title: `ACCOUNTS Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`,
+        description: `Purchase manager ${signed ? 'signed and ' : ''}approved LPO for complaint ${complaint.regNo}. ACCOUNTS approval needed.`,
         priority: "high",
-        sourceId: 'ceo_approval',
-        recipient: process.env.CEO,
+        sourceId: 'accounts_approval',
+        recipient: process.env.ACCOUNTS,
         time: new Date(),
-        navigateTo: `/(screens)/ceoSign/${complaint._id}`,
+        navigateTo: `/(screens)/accountsSign/${complaint._id}`,
         navigateText: `View and Sign`,
         navigteToId: complaint._id,
         hasButton: true
       });
 
       await PushNotificationService.sendGeneralNotification(
-        process.env.CEO,
-        `CEO Approval Needed`,
-        `Final approval needed for LPO ${complaint.lpoDetails.lpoRef}`,
+        process.env.ACCOUNTS,
+        `ACCOUNTS Approval Needed`,
+        `ACCOUNTS approval needed for LPO ${complaint.lpoDetails.lpoRef}`,
         'high',
         'normal',
         notification.data._id.toString()
@@ -520,7 +520,7 @@ class ComplaintService {
 
       return {
         status: 200,
-        message: `Purchase approval ${signed ? 'and signing ' : ''}completed successfully`,
+        message: `Purchase Manager approval ${signed ? 'and signing ' : ''}completed successfully`,
         data: complaint,
         signed: signed,
         authorised: authorised
@@ -531,7 +531,167 @@ class ComplaintService {
     }
   }
 
-  // Step 7: CEO final approval
+  // After accountsApproval
+  static async accountsApproval(complaintId, approvedBy, comments = '', approvedCreds) {
+    try {
+      const updateFields = {
+        'lpoDetails.accountsApprovalDate': new Date(),
+        'lpoDetails.status': 'accounts_approved',
+        'workflowStatus': 'accounts_approved',
+        $push: {
+          approvalTrail: {
+            approvedBy: approvedBy,
+            role: 'ACCOUNTS',
+            action: 'approved',
+            comments: comments || 'ACCOUNTS approved'
+          }
+        }
+      };
+
+      if (approvedCreds && approvedCreds.signed) {
+        updateFields['lpoDetails.ACCOUNTSsigned'] = true;
+        updateFields['lpoDetails.ACCOUNTSauthorised'] = approvedCreds.authorised;
+        updateFields['lpoDetails.ACCOUNTSapprovedBy'] = approvedCreds.approvedBy;
+        updateFields['lpoDetails.ACCOUNTSapprovedDate'] = approvedCreds.approvedDate || new Date().toISOString();
+
+        if (approvedCreds.approvedFrom) updateFields['lpoDetails.ACCOUNTSapprovedFrom'] = approvedCreds.approvedFrom;
+        if (approvedCreds.approvedIP) updateFields['lpoDetails.ACCOUNTSapprovedIP'] = approvedCreds.approvedIP;
+        if (approvedCreds.approvedBDevice) updateFields['lpoDetails.ACCOUNTSapprovedBDevice'] = approvedCreds.approvedBDevice;
+        if (approvedCreds.approvedLocation) updateFields['lpoDetails.ACCOUNTSapprovedLocation'] = approvedCreds.approvedLocation;
+      }
+
+      const complaint = await Complaint.findByIdAndUpdate(
+        complaintId,
+        updateFields,
+        { new: true }
+      );
+
+      if (!complaint) {
+        throw { status: 404, message: 'Complaint not found' };
+      }
+
+      // Update LPO with accountsSigned: true
+      if (complaint.lpoDetails && complaint.lpoDetails.lpoId) {
+        await LPO.updateOne(
+          { _id: complaint.lpoDetails.lpoId },
+          { accountsSigned: true }
+        );
+      }
+
+      const notification = await createNotification({
+        title: `MANAGER Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`,
+        description: `Accounts ${approvedCreds?.signed ? 'signed and ' : ''}approved LPO for complaint ${complaint.regNo}. Manager approval needed.`,
+        priority: "high",
+        sourceId: 'manager_approval',
+        recipient: process.env.MANAGER,
+        time: new Date(),
+        navigateTo: `/(screens)/managerSign/${complaint._id}`,
+        navigateText: `View the item required`,
+        navigteToId: complaint._id,
+        hasButton: true
+      });
+
+      await PushNotificationService.sendGeneralNotification(
+        [process.env.MAINTENANCE_HEAD, process.env.JALEEL_KA],
+        `MANAGER Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`,
+        `Accounts ${approvedCreds?.signed ? 'signed and ' : ''}approved LPO for complaint ${complaint.regNo}. Manager approval needed.`,
+        'high',
+        'normal',
+        notification.data._id.toString()
+      );
+
+      return {
+        status: 200,
+        message: 'ACCOUNTS approval completed',
+        data: complaint
+      };
+    } catch (error) {
+      console.error('Error in ACCOUNTS approval:', error);
+      throw error;
+    }
+  }
+
+  // After managerApproval
+  static async managerApproval(complaintId, approvedBy, comments = '', approvedCreds) {
+    try {
+      const updateFields = {
+        'lpoDetails.managerApprovalDate': new Date(),
+        'lpoDetails.status': 'manager_approved',
+        'workflowStatus': 'manager_approved',
+        $push: {
+          approvalTrail: {
+            approvedBy: approvedBy,
+            role: 'MANAGER',
+            action: 'approved',
+            comments: comments || 'MANAGER approved'
+          }
+        }
+      };
+
+      if (approvedCreds && approvedCreds.signed) {
+        updateFields['lpoDetails.MANAGERsigned'] = true;
+        updateFields['lpoDetails.MANAGERauthorised'] = approvedCreds.authorised;
+        updateFields['lpoDetails.MANAGERapprovedBy'] = approvedCreds.approvedBy;
+        updateFields['lpoDetails.MANAGERapprovedDate'] = approvedCreds.approvedDate || new Date().toISOString();
+
+        if (approvedCreds.approvedFrom) updateFields['lpoDetails.MANAGERapprovedFrom'] = approvedCreds.approvedFrom;
+        if (approvedCreds.approvedIP) updateFields['lpoDetails.MANAGERapprovedIP'] = approvedCreds.approvedIP;
+        if (approvedCreds.approvedBDevice) updateFields['lpoDetails.MANAGERapprovedBDevice'] = approvedCreds.approvedBDevice;
+        if (approvedCreds.approvedLocation) updateFields['lpoDetails.MANAGERapprovedLocation'] = approvedCreds.approvedLocation;
+      }
+
+      const complaint = await Complaint.findByIdAndUpdate(
+        complaintId,
+        updateFields,
+        { new: true }
+      );
+
+      if (!complaint) {
+        throw { status: 404, message: 'Complaint not found' };
+      }
+
+      // Update LPO with managerSigned: true
+      if (complaint.lpoDetails && complaint.lpoDetails.lpoId) {
+        await LPO.updateOne(
+          { _id: complaint.lpoDetails.lpoId },
+          { managerSigned: true }
+        );
+      }
+
+      const notification = await createNotification({
+        title: `CEO Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`,
+        description: `Manager ${approvedCreds?.signed ? 'signed and ' : ''}approved LPO for complaint ${complaint.regNo}. CEO approval needed.`,
+        priority: "high",
+        sourceId: 'ceo_approval',
+        recipient: process.env.CEO,
+        time: new Date(),
+        navigateTo: `/(screens)/ceoSign/${complaint._id}`,
+        navigateText: `View the item required`,
+        navigteToId: complaint._id,
+        hasButton: true
+      });
+
+      await PushNotificationService.sendGeneralNotification(
+        [process.env.CEO],
+        `CEO Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`,
+        `Manager ${approvedCreds?.signed ? 'signed and ' : ''}approved LPO for complaint ${complaint.regNo}. CEO approval needed.`,
+        'high',
+        'normal',
+        notification.data._id.toString()
+      );
+
+      return {
+        status: 200,
+        message: 'MANAGER approval completed',
+        data: complaint
+      };
+    } catch (error) {
+      console.error('Error in MANAGER approval:', error);
+      throw error;
+    }
+  }
+
+  // After ceoApproval
   static async ceoApproval(complaintId, approvedBy, comments = '', approvedCreds) {
     try {
       const updateFields = {
@@ -548,7 +708,6 @@ class ComplaintService {
         }
       };
 
-      // Add CEO credential fields if signed
       if (approvedCreds && approvedCreds.signed) {
         updateFields['lpoDetails.CEOsigned'] = true;
         updateFields['lpoDetails.CEOauthorised'] = approvedCreds.authorised;
@@ -561,7 +720,6 @@ class ComplaintService {
         if (approvedCreds.approvedLocation) updateFields['lpoDetails.CEOapprovedLocation'] = approvedCreds.approvedLocation;
       }
 
-      // Use the updateFields object in findByIdAndUpdate
       const complaint = await Complaint.findByIdAndUpdate(
         complaintId,
         updateFields,
@@ -570,6 +728,14 @@ class ComplaintService {
 
       if (!complaint) {
         throw { status: 404, message: 'Complaint not found' };
+      }
+
+      // Update LPO with ceoSigned: true
+      if (complaint.lpoDetails && complaint.lpoDetails.lpoId) {
+        await LPO.updateOne(
+          { _id: complaint.lpoDetails.lpoId },
+          { ceoSigned: true }
+        );
       }
 
       const notification = await createNotification({

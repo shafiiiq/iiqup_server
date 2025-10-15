@@ -451,7 +451,7 @@ const verifyDocAuthUser = async (req, res) => {
 }
 
 const getSignKey = async (req, res) => {
-  userServices.getAuthSignKey(req.body.password)
+  userServices.getAuthSignKey()
     .then((data) => {
       if (data) {
         res.status(data.status).json(data)
@@ -461,6 +461,128 @@ const getSignKey = async (req, res) => {
       res.status(err.status || 500).json({ message: 'Cannot get all users', error: err.message })
     })
 }
+ 
+// Activation endpoint
+const activateSignature = async (req, res) => {
+  try {
+    const { activationKey, signType, deviceInfo, } = req.body;
+    const { deviceFingerprint, userId } = deviceInfo;
+
+    const result = await userServices.activateSignatureAccess(
+      userId,
+      activationKey,
+      signType,
+      deviceInfo,
+      deviceFingerprint
+    );
+
+    res.status(result.status).json(result);
+  } catch (err) {
+    res.status(err.status || 500).json({
+      message: 'Signature activation failed',
+      error: err.message
+    }); 
+  } 
+};
+
+// Verify device trust
+const verifyDeviceTrust = async (req, res) => {
+  try {
+    const { signType, deviceInfo } = req.body;
+    
+    const { userId } = deviceInfo;
+
+    const result = await userServices.verifyTrustedDevice(
+      userId,
+      signType,
+      deviceInfo
+    );
+
+    res.status(result.status).json(result);
+  } catch (err) {
+    res.status(err.status || 500).json({
+      message: 'Device verification failed',
+      error: err.message
+    });
+  }
+};
+
+// Updated sign key getters with device verification
+const getSignPmKey = async (req, res) => {
+  try {
+    const { deviceInfo } = req.body;
+    const {userId} = deviceInfo
+
+    const data = await userServices.getPmAuthSignKey(userId, deviceInfo);
+    res.status(data.status).json(data);
+  } catch (err) {
+    res.status(err.status || 500).json({
+      message: 'Cannot get PM sign key',
+      error: err.message
+    });
+  }
+};
+
+// Similar updates for other sign key functions
+const getSignAccountsKey = async (req, res) => {
+  try {
+    const { deviceInfo } = req.body;
+    const {userId} = deviceInfo
+
+    const data = await userServices.getAccountsAuthSignKey(userId, deviceInfo);
+    res.status(data.status).json(data);
+  } catch (err) {
+    res.status(err.status || 500).json({
+      message: 'Cannot get Accounts sign key',
+      error: err.message
+    });
+  }
+};
+
+const getSignManagerKey = async (req, res) => {
+  try {
+    const { deviceInfo } = req.body;
+    const {userId} = deviceInfo
+
+    const data = await userServices.getManagerAuthSignKey(userId, deviceInfo);
+    res.status(data.status).json(data);
+  } catch (err) {
+    res.status(err.status || 500).json({
+      message: 'Cannot get Manager sign key',
+      error: err.message
+    });
+  }
+};
+
+const getSignAuthorizedKey = async (req, res) => {
+  try {
+    const { deviceInfo } = req.body;
+    const {userId} = deviceInfo
+
+    const data = await userServices.getAuthorizedAuthSignKey(userId, deviceInfo);
+    res.status(data.status).json(data);
+  } catch (err) {
+    res.status(err.status || 500).json({
+      message: 'Cannot get Authorized sign key',
+      error: err.message
+    });
+  }
+};
+
+const getSealKey = async (req, res) => {
+  try {
+    const { deviceInfo } = req.body;
+    const {userId} = deviceInfo
+
+    const data = await userServices.getAuthSealKey(userId, deviceInfo);
+    res.status(data.status).json(data);
+  } catch (err) {
+    res.status(err.status || 500).json({
+      message: 'Cannot get Seal key',
+      error: err.message
+    });
+  }
+};
 
 const sendTestNotification = async (req, res) => {
   try {
@@ -575,5 +697,12 @@ module.exports = {
   getUserRoles,
   verifyDocAuthUser,
   getSignKey,
-  getAllUsers
+  getAllUsers,
+  getSignPmKey,
+  getSignAccountsKey,
+  getSignManagerKey,
+  getSignAuthorizedKey,
+  getSealKey,
+  activateSignature,
+  verifyDeviceTrust,
 };
