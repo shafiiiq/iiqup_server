@@ -168,10 +168,15 @@ const userSchema = new Schema({
     },
     trustedDevices: [{
       uniqueCode: String,
+      uniqueCodeIv: String,
       ipAddress: String,
+      ipAddressIv: String,
       location: String,
+      locationIv: String,
       userAgent: String,
+      userAgentIv: String,
       browserInfo: String,
+      browserInfoIv: String,
       activatedAt: Date,
       lastUsed: Date,
       isActive: {

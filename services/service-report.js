@@ -179,7 +179,6 @@ module.exports = {
         const completedItems = checklistItems.filter(item =>
           item.status === '✓' || item.status === '✗'
         ).length;
-        const isFullService = totalItems > 0 ? completedItems >= totalItems * 0.8 : false;
 
         // Prepare service history update data
         const serviceHistoryUpdate = {
@@ -191,7 +190,6 @@ module.exports = {
           airFilter: airFilterStatus,
           serviceHrs: parseInt(updatedServiceReport.serviceHrs) || 0,
           nextServiceHrs: parseInt(updatedServiceReport.nextServiceHrs) || 0,
-          fullService: isFullService
         };
 
         // Update service history - find by regNo and date

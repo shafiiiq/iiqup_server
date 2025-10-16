@@ -12,6 +12,11 @@ const { createNotification } = require('../utils/notification-jobs');
 // Create a new Expo SDK client
 const expo = new Expo();
 
+const crypto = require('crypto');
+
+const ALGORITHM = 'aes-256-cbc';
+const ENCRYPTION_KEY = process.env.DEVICE_ENCRYPTION_KEY;
+
 // JWT Secret key - should be stored in environment variables in production
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
@@ -1756,10 +1761,92 @@ const getAuthSignKey = async (password) => {
   }
 };
 
+// Ensure key is exactly 32 bytes
+const getEncryptionKey = () => {
+  if (!ENCRYPTION_KEY) {
+    throw new Error('DEVICE_ENCRYPTION_KEY is not set');
+  }
+  
+  // If the key is hex, convert it to buffer
+  if (/^[0-9a-fA-F]{64}$/.test(ENCRYPTION_KEY)) {
+    return Buffer.from(ENCRYPTION_KEY, 'hex');
+  }
+  
+  // Otherwise, use it as-is but ensure it's 32 bytes
+  const key = Buffer.from(ENCRYPTION_KEY, 'utf8');
+  if (key.length !== 32) {
+    throw new Error('Encryption key must be 32 bytes (64 hex characters or 32 UTF-8 characters)');
+  }
+  return key;
+};
+
+// Encrypt device data
+const encryptDeviceData = (data) => {
+  try {
+    if (!data) {
+      throw new Error('Data to encrypt cannot be empty');
+    }
+
+    const iv = crypto.randomBytes(16);
+    const keyBuffer = getEncryptionKey();
+    const cipher = crypto.createCipheriv(ALGORITHM, keyBuffer, iv);
+    
+    // Ensure data is a string and trim whitespace
+    const dataString = String(data).trim();
+    
+    let encrypted = cipher.update(dataString, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    
+    return {
+      encryptedData: encrypted,
+      iv: iv.toString('hex')
+    };
+  } catch (error) {
+    console.error('Encryption error:', error.message);
+    throw error;
+  }
+};
+
+// Decrypt and verify device data
+const decryptAndVerifyDeviceData = (encryptedData, iv, originalData) => {
+  try {
+    if (!encryptedData || !iv || !originalData) {
+      console.log('Missing required parameters for decryption');
+      return false;
+    }
+    
+    const keyBuffer = getEncryptionKey();
+    const decipher = crypto.createDecipheriv(ALGORITHM, keyBuffer, Buffer.from(iv, 'hex'));
+    
+    let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    
+    // Ensure both strings are trimmed before comparison
+    const decryptedTrimmed = decrypted.trim();
+    const originalTrimmed = String(originalData).trim();
+    
+    const isMatch = decryptedTrimmed === originalTrimmed;
+    
+    // Debug logging (remove in production)
+    if (!isMatch) {
+      console.log('Decryption mismatch:', { 
+        decryptedLength: decryptedTrimmed.length,
+        originalLength: originalTrimmed.length, 
+        decryptedFirst20: decryptedTrimmed.substring(0, 20),
+        originalFirst20: originalTrimmed.substring(0, 20)
+      });
+    }
+    
+    return isMatch;
+  } catch (error) {
+    console.error('Decryption error:', error.message);
+    return false;
+  }
+};
+
 // Activate signature with device trust
 const activateSignatureAccess = async (userId, activationKey, signType, deviceInfo) => {
   try {
-
     const user = await User.findById(userId);
     if (!user) {
       throw { status: 404, message: 'User not found' };
@@ -1778,19 +1865,54 @@ const activateSignatureAccess = async (userId, activationKey, signType, deviceIn
       throw { status: 401, message: 'Invalid activation key' };
     }
 
-    // Add trusted device
-    const deviceRecord = {
-      uniqueCode: deviceInfo.deviceFingerprint,
-      ipAddress: deviceInfo.ipAddress,
-      location: deviceInfo.location,
-      userAgent: deviceInfo.userAgent,
-      browserInfo: deviceInfo.browserInfo,
-      activatedAt: new Date(),
-      lastUsed: new Date(),
-      isActive: true
-    };
+    // Encrypt each device field separately with validation
+    if (!deviceInfo.deviceFingerprint || !deviceInfo.ipAddress || !deviceInfo.location || 
+        !deviceInfo.userAgent || !deviceInfo.browserInfo) {
+      throw { status: 400, message: 'Incomplete device information' };
+    }
 
-    signActivation.trustedDevices.push(deviceRecord);
+    const encryptedUniqueCode = encryptDeviceData(deviceInfo.deviceFingerprint);
+    const encryptedIpAddress = encryptDeviceData(deviceInfo.ipAddress);
+    const encryptedLocation = encryptDeviceData(deviceInfo.location);
+    const encryptedUserAgent = encryptDeviceData(deviceInfo.userAgent);
+    const encryptedBrowserInfo = encryptDeviceData(deviceInfo.browserInfo);
+
+    // Check if device already exists
+    const existingDeviceIndex = signActivation.trustedDevices.findIndex(d => {
+      if (!d.isActive) return false;
+      
+      return decryptAndVerifyDeviceData(d.uniqueCode, d.uniqueCodeIv, deviceInfo.deviceFingerprint) &&
+             decryptAndVerifyDeviceData(d.ipAddress, d.ipAddressIv, deviceInfo.ipAddress) &&
+             decryptAndVerifyDeviceData(d.userAgent, d.userAgentIv, deviceInfo.userAgent) &&
+             decryptAndVerifyDeviceData(d.browserInfo, d.browserInfoIv, deviceInfo.browserInfo) &&
+             decryptAndVerifyDeviceData(d.location, d.locationIv, deviceInfo.location);
+    });
+
+    if (existingDeviceIndex !== -1) {
+      // Update existing device
+      signActivation.trustedDevices[existingDeviceIndex].lastUsed = new Date();
+      signActivation.trustedDevices[existingDeviceIndex].isActive = true;
+    } else {
+      // Add new trusted device
+      const deviceRecord = {
+        uniqueCode: encryptedUniqueCode.encryptedData,
+        uniqueCodeIv: encryptedUniqueCode.iv,
+        ipAddress: encryptedIpAddress.encryptedData,
+        ipAddressIv: encryptedIpAddress.iv,
+        location: encryptedLocation.encryptedData,
+        locationIv: encryptedLocation.iv,
+        userAgent: encryptedUserAgent.encryptedData,
+        userAgentIv: encryptedUserAgent.iv,
+        browserInfo: encryptedBrowserInfo.encryptedData,
+        browserInfoIv: encryptedBrowserInfo.iv,
+        activatedAt: new Date(),
+        lastUsed: new Date(),
+        isActive: true
+      };
+
+      signActivation.trustedDevices.push(deviceRecord);
+    }
+
     signActivation.isActivated = true;
     signActivation.activatedAt = new Date();
     signActivation.activatedBy = userId;
@@ -1806,6 +1928,7 @@ const activateSignatureAccess = async (userId, activationKey, signType, deviceIn
       }
     };
   } catch (error) {
+    console.error('Activation error:', error);
     throw error;
   }
 };
@@ -1830,31 +1953,53 @@ const verifyTrustedDevice = async (userId, signType, deviceInfo) => {
       };
     }
 
-    // Check if device is trusted
-    const trustedDevice = signActivation.trustedDevices.find(d =>
-      d.uniqueCode === deviceInfo.deviceFingerprint &&
-      d.ipAddress === deviceInfo.ipAddress &&
-      d.userAgent === deviceInfo.userAgent &&
-      d.browserInfo === deviceInfo.browserInfo &&
-      d.location === deviceInfo.location &&
-      d.isActive
-    );
-
-    if (!trustedDevice) {
-      throw new Error('unauthorised request');
+    // Validate device info
+    if (!deviceInfo.deviceFingerprint || !deviceInfo.ipAddress || !deviceInfo.location || 
+        !deviceInfo.userAgent || !deviceInfo.browserInfo) {
+      console.log('Incomplete device information provided');
+      throw { status: 400, message: 'Incomplete device information' };
     }
 
+    // Check if device is trusted
+    const trustedDevice = signActivation.trustedDevices.find(d => {
+      if (!d.isActive) return false;
+      
+      const isUniqueCodeValid = decryptAndVerifyDeviceData(d.uniqueCode, d.uniqueCodeIv, deviceInfo.deviceFingerprint);
+      const isIpAddressValid = decryptAndVerifyDeviceData(d.ipAddress, d.ipAddressIv, deviceInfo.ipAddress);
+      const isUserAgentValid = decryptAndVerifyDeviceData(d.userAgent, d.userAgentIv, deviceInfo.userAgent);
+      const isBrowserInfoValid = decryptAndVerifyDeviceData(d.browserInfo, d.browserInfoIv, deviceInfo.browserInfo);
+      const isLocationValid = decryptAndVerifyDeviceData(d.location, d.locationIv, deviceInfo.location);
+
+      return isUniqueCodeValid &&
+             isIpAddressValid &&
+             isUserAgentValid &&
+             isBrowserInfoValid &&
+             isLocationValid;
+    });
+
+    if (!trustedDevice) {
+      return {
+        status: 401,
+        data: {
+          isActivated: false,
+          isTrusted: false
+        }
+      };
+    }
+
+    // Update last used timestamp
     trustedDevice.lastUsed = new Date();
     await user.save();
 
     return {
       status: 200,
       data: {
-        isActivated: !!trustedDevice,
-        isTrusted: !!trustedDevice
+        isActivated: true,
+        isTrusted: true
       }
     };
   } catch (error) {
+    console.error('Verification error:', error);
     throw error;
   }
 };

@@ -188,7 +188,7 @@ const operatorSchema = new mongoose.Schema({
   },
   profilePic: {
     type: profilePicSchema,
-    default: ''
+    default: {}
   },
   toolkits: [ToolkitSchema],
   isVerified: {

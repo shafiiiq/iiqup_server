@@ -346,6 +346,7 @@ const reduceStock = async (toolkitId, variantId, quantity, reason = '', updatedB
       }
 
       assignedPerson.toolkits.push(toolkitAssignment);
+      assignedPerson.profilePic = {}
       await assignedPerson.save();
     }
 

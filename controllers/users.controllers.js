@@ -445,8 +445,8 @@ const verifyDocAuthUser = async (req, res) => {
     res.status(err.status || 500).json({
       success: false,
       message: 'Authentication failed',
-      error: err.message
-    });
+      error: err.message 
+    });   
   }
 }
 
@@ -480,16 +480,16 @@ const activateSignature = async (req, res) => {
   } catch (err) {
     res.status(err.status || 500).json({
       message: 'Signature activation failed',
-      error: err.message
+      error: err.message 
     }); 
   } 
 };
 
 // Verify device trust
 const verifyDeviceTrust = async (req, res) => {
-  try {
+  try { 
     const { signType, deviceInfo } = req.body;
-    
+      
     const { userId } = deviceInfo;
 
     const result = await userServices.verifyTrustedDevice(
