@@ -1,4 +1,25 @@
 const { getDevModels } = require('../models/portfolio.model');
+let Profile, Experience, Project, Skill, Education, Certificate, Service, Stats, Contact;
+
+// Initialize models lazily on first access
+const initModels = () => {
+  if (!Profile) {
+    const models = getDevModels();
+    Profile = models.Profile;
+    Experience = models.Experience;
+    Project = models.Project;
+    Skill = models.Skill;
+    Education = models.Education;
+    Certificate = models.Certificate;
+    Service = models.Service;
+    Stats = models.Stats;
+    Contact = models.Contact;
+  }
+};
+
+// Call initModels before class definition
+// This will be executed when any method is called
+setTimeout(() => initModels(), 0);
 
 class DevServices {
   // dev portfolio s3 services - BEGIN
