@@ -265,7 +265,7 @@ class DevServices {
 
   // Education methods
   static async getEducation() {
-    try {
+    try {      
       return await Education.find().sort({ order: 1, endYear: -1 });
     } catch (error) {
       throw new Error('Error fetching education: ' + error.message);
