@@ -114,7 +114,7 @@ class DevServices {
 
   // dev porfolio mongo db services - BEGIN
   // Profile methods
-  async getProfile() {
+  static async getProfile() {
     try {
       let profile = await Profile.findOne();
       if (!profile) {
@@ -126,7 +126,7 @@ class DevServices {
     }
   }
 
-  async updateProfile(profileData) {
+  static async updateProfile(profileData) {
     try {
       let profile = await Profile.findOne();
       if (!profile) {
@@ -141,7 +141,7 @@ class DevServices {
   }
 
   // Experience methods
-  async getExperience() {
+  static async getExperience() {
     try {
       return await Experience.find().sort({ order: 1, createdAt: -1 });
     } catch (error) {
@@ -149,7 +149,7 @@ class DevServices {
     }
   }
 
-  async addExperience(experienceData) {
+  static async addExperience(experienceData) {
     try {
       const experience = new Experience(experienceData);
       return await experience.save();
@@ -158,7 +158,7 @@ class DevServices {
     }
   }
 
-  async updateExperience(id, experienceData) {
+  static async updateExperience(id, experienceData) {
     try {
       return await Experience.findByIdAndUpdate(id, experienceData, { new: true, runValidators: true });
     } catch (error) {
@@ -166,7 +166,7 @@ class DevServices {
     }
   }
 
-  async deleteExperience(id) {
+  static async deleteExperience(id) {
     try {
       return await Experience.findByIdAndDelete(id);
     } catch (error) {
@@ -175,7 +175,7 @@ class DevServices {
   }
 
   // Projects methods
-  async getProjects() {
+  static async getProjects() {
     try {
       return await Project.find().sort({ order: 1, createdAt: -1 });
     } catch (error) {
@@ -183,7 +183,7 @@ class DevServices {
     }
   }
 
-  async addProject(projectData) {
+  static async addProject(projectData) {
     try {
       const project = new Project(projectData);
       return await project.save();
@@ -192,7 +192,7 @@ class DevServices {
     }
   }
 
-  async updateProject(id, projectData) {
+  static async updateProject(id, projectData) {
     try {
       return await Project.findByIdAndUpdate(id, projectData, { new: true, runValidators: true });
     } catch (error) {
@@ -200,7 +200,7 @@ class DevServices {
     }
   }
 
-  async deleteProject(id) {
+  static async deleteProject(id) {
     try {
       return await Project.findByIdAndDelete(id);
     } catch (error) {
@@ -209,7 +209,7 @@ class DevServices {
   }
 
   // Skills methods
-  async getSkills() {
+  static async getSkills() {
     try {
       return await Skill.find().sort({ order: 1, createdAt: -1 });
     } catch (error) {
@@ -217,7 +217,7 @@ class DevServices {
     }
   }
 
-  async addSkill(skillData) {
+  static async addSkill(skillData) {
     try {
       const skill = new Skill(skillData);
       return await skill.save();
@@ -226,7 +226,7 @@ class DevServices {
     }
   }
 
-  async updateSkill(id, skillData) {
+  static async updateSkill(id, skillData) {
     try {
       return await Skill.findByIdAndUpdate(id, skillData, { new: true, runValidators: true });
     } catch (error) {
@@ -234,7 +234,7 @@ class DevServices {
     }
   }
 
-  async deleteSkill(id) {
+  static async deleteSkill(id) {
     try {
       return await Skill.findByIdAndDelete(id);
     } catch (error) {
@@ -243,7 +243,7 @@ class DevServices {
   }
 
   // Education methods
-  async getEducation() {
+  static async getEducation() {
     try {
       return await Education.find().sort({ order: 1, endYear: -1 });
     } catch (error) {
@@ -251,7 +251,7 @@ class DevServices {
     }
   }
 
-  async addEducation(educationData) {
+  static async addEducation(educationData) {
     try {
       const education = new Education(educationData);
       return await education.save();
@@ -260,7 +260,7 @@ class DevServices {
     }
   }
 
-  async updateEducation(id, educationData) {
+  static async updateEducation(id, educationData) {
     try {
       return await Education.findByIdAndUpdate(id, educationData, { new: true, runValidators: true });
     } catch (error) {
@@ -268,7 +268,7 @@ class DevServices {
     }
   }
 
-  async deleteEducation(id) {
+  static async deleteEducation(id) {
     try {
       return await Education.findByIdAndDelete(id);
     } catch (error) {
@@ -277,7 +277,7 @@ class DevServices {
   }
 
   // Certificates methods
-  async getCertificates() {
+  static async getCertificates() {
     try {
       return await Certificate.find().sort({ order: 1, year: -1 });
     } catch (error) {
@@ -285,7 +285,7 @@ class DevServices {
     }
   }
 
-  async addCertificate(certificateData) {
+  static async addCertificate(certificateData) {
     try {
       const certificate = new Certificate(certificateData);
       return await certificate.save();
@@ -294,7 +294,7 @@ class DevServices {
     }
   }
 
-  async updateCertificate(id, certificateData) {
+  static async updateCertificate(id, certificateData) {
     try {
       return await Certificate.findByIdAndUpdate(id, certificateData, { new: true, runValidators: true });
     } catch (error) {
@@ -302,7 +302,7 @@ class DevServices {
     }
   }
 
-  async deleteCertificate(id) {
+  static async deleteCertificate(id) {
     try {
       return await Certificate.findByIdAndDelete(id);
     } catch (error) {
@@ -311,7 +311,7 @@ class DevServices {
   }
 
   // Services methods
-  async getServices() {
+  static async getServices() {
     try {
       return await Service.find().sort({ order: 1, createdAt: -1 });
     } catch (error) {
@@ -319,7 +319,7 @@ class DevServices {
     }
   }
 
-  async addService(serviceData) {
+  static async addService(serviceData) {
     try {
       const service = new Service(serviceData);
       return await service.save();
@@ -328,7 +328,7 @@ class DevServices {
     }
   }
 
-  async updateService(id, serviceData) {
+  static async updateService(id, serviceData) {
     try {
       return await Service.findByIdAndUpdate(id, serviceData, { new: true, runValidators: true });
     } catch (error) {
@@ -336,7 +336,7 @@ class DevServices {
     }
   }
 
-  async deleteService(id) {
+  static async deleteService(id) {
     try {
       return await Service.findByIdAndDelete(id);
     } catch (error) {
@@ -345,7 +345,7 @@ class DevServices {
   }
 
   // Stats methods
-  async getStats() {
+  static async getStats() {
     try {
       let stats = await Stats.findOne();
       if (!stats) {
@@ -357,7 +357,7 @@ class DevServices {
     }
   }
 
-  async updateStats(statsData) {
+  static async updateStats(statsData) {
     try {
       let stats = await Stats.findOne();
       if (!stats) {
@@ -372,7 +372,7 @@ class DevServices {
   }
 
   // Contact methods
-  async getContact() {
+  static async getContact() {
     try {
       let contact = await Contact.findOne();
       if (!contact) {
@@ -384,7 +384,7 @@ class DevServices {
     }
   }
 
-  async updateContact(contactData) {
+  static async updateContact(contactData) {
     try {
       let contact = await Contact.findOne();
       if (!contact) {
@@ -399,7 +399,7 @@ class DevServices {
   }
 
   // Utility methods
-  async initializeDefaultData() {
+  static async initializeDefaultData() {
     try {
       // Initialize profile if not exists
       await this.getProfile();
@@ -416,7 +416,7 @@ class DevServices {
     }
   }
 
-  async getPortfolioSummary() {
+  static async getPortfolioSummary() {
     try {
       const [
         experienceCount,
