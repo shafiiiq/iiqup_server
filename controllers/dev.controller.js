@@ -668,7 +668,52 @@ class DevController {
             });
         }
     }
-    // dev porfolio mongo db related services - BEGIN
+    // dev porfolio mongo db related services - END
+
+    // dev creads access 
+    static async creadsAccess(req, res) {
+        try {
+            // Convert headers to lowercase for consistent access
+            const attestationtoken = req.headers['attestationtoken'] || req.headers['attestationToken'];
+            const deviceid = req.headers['deviceid'] || req.headers['deviceId'];
+            const timestamp = req.headers['timestamp'];
+
+            console.log('Received headers:', { attestationtoken, deviceid, timestamp });
+
+            if (!attestationtoken || !deviceid || !timestamp) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Missing authentication headers'
+                });
+            }
+
+            const isValid = await devServices.verifyAppRequest({
+                attestationToken: attestationtoken,
+                deviceId: deviceid,
+                timestamp: timestamp
+            });
+
+            if (!isValid) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Invalid authentication'
+                });
+            }
+
+            const credentials = await devServices.getCredentials();
+
+            res.status(200).json({
+                success: true,
+                access_creads: credentials
+            });
+
+        } catch (error) {
+            res.status(500).json({
+                success: false,
+                message: error.message
+            });
+        }
+    }
 }
 
 module.exports = DevController;

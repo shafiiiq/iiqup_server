@@ -1,5 +1,6 @@
 const { getDevModels } = require('../models/portfolio.model');
 let Profile, Experience, Project, Skill, Education, Certificate, Service, Stats, Contact;
+const crypto = require('crypto');
 
 // Initialize models lazily on first access
 const initModels = () => {
@@ -265,7 +266,7 @@ class DevServices {
 
   // Education methods
   static async getEducation() {
-    try {      
+    try {
       return await Education.find().sort({ order: 1, endYear: -1 });
     } catch (error) {
       throw new Error('Error fetching education: ' + error.message);
@@ -469,6 +470,129 @@ class DevServices {
     }
   }
   // dev portfolio mongo db services - END 
+
+
+  // dev creads access 
+  // Verify if request is from your real app
+  static async verifyAppRequest({ attestationToken, deviceId, timestamp }) {
+    try {
+      console.log('Verifying request:', { deviceId, timestamp });
+
+      const now = Date.now();
+      const requestTime = parseInt(timestamp);
+
+      // CHECK 1: Timestamp verification
+      if (now - requestTime > 30000) {
+        console.log('Timestamp expired');
+        return false;
+      }
+
+      // CHECK 2: Device fingerprint verification
+      try {
+        const deviceData = JSON.parse(attestationToken);
+
+        // Verify device data is valid
+        if (!deviceData.brand || !deviceData.manufacturer || !deviceData.modelName) {
+          console.log('Invalid device fingerprint');
+          return false;
+        }
+
+        // Verify deviceId matches the one in attestation
+        if (deviceData.installationId !== deviceId) {
+          console.log('Device ID mismatch');
+          return false;
+        }
+
+        console.log('Device verified:', {
+          brand: deviceData.brand,
+          model: deviceData.modelName,
+          os: deviceData.osName
+        });
+
+      } catch (parseError) {
+        console.log('Failed to parse attestation token'); 
+        return false;
+      }
+
+      // CHECK 3: Block emulators (optional)
+      const deviceData = JSON.parse(attestationToken);
+      if (deviceData.brand === 'generic' ||
+        deviceData.manufacturer === 'Google' && deviceData.modelName.includes('sdk')) {
+        console.log('Emulator detected - blocked');
+        return false;
+      }
+
+      console.log('Request verified');
+      return true;
+
+    } catch (error) {
+      console.error('Verification error:', error);
+      return false;
+    }
+  }
+
+  // Verify attestation token with Google Play Integrity (Android)
+  static async verifyAttestation(token) {
+    try {
+      const response = await fetch(
+        `https://playintegrity.googleapis.com/v1/${process.env.ANDROID_PACKAGE_NAME}:decodeIntegrityToken`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.GOOGLE_CLOUD_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ integrity_token: token })
+        }
+      );
+
+      const data = await response.json();
+      const verdict = data?.tokenPayloadExternal?.appIntegrity?.appRecognitionVerdict;
+
+      if (verdict !== 'PLAY_RECOGNIZED') {
+        return false;
+      }
+
+      return true;
+
+    } catch (error) {
+      return false;
+    }
+  }
+
+  // Get credentials (only called after verification)
+  static async getCredentials() {
+    const credentials = {
+      RAPID_API_KEY: process.env.RAPID_API_KEY,
+      TMDB_API_KEY: process.env.TMDB_API_KEY,
+      TMDB_BASE_URL: process.env.TMDB_BASE_URL,
+      TMDB_IMAGE_BASE_URL: process.env.TMDB_IMAGE_BASE_URL,
+      YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY,
+      YOUTUBE_API_URL: process.env.YOUTUBE_API_URL,
+      ITUNES_API_URL: process.env.ITUNES_API_URL,
+      ITUNES_PODCAST_API: process.env.ITUNES_PODCAST_API,
+    };
+
+    // Debug log
+    console.log('Environment variables loaded:', {
+      RAPID_API_KEY: !!process.env.RAPID_API_KEY,
+      TMDB_API_KEY: !!process.env.TMDB_API_KEY,
+      YOUTUBE_API_KEY: !!process.env.YOUTUBE_API_KEY,
+    });
+
+    // Check for missing variables
+    const missingVars = [];
+    Object.entries(credentials).forEach(([key, value]) => {
+      if (!value) missingVars.push(key);
+    });
+
+    if (missingVars.length > 0) {
+      console.error('Missing env variables:', missingVars);
+      throw new Error(`Missing: ${missingVars.join(', ')}`);
+    }
+
+    return credentials;
+  }
 }
 
 module.exports = DevServices;

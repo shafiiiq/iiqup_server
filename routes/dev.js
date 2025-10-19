@@ -54,4 +54,7 @@ router.put('/update-contact', devController.updateContact);
 router.get('/get-profile', devController.getProfile);
 router.put('/update-profile', devController.updateProfile);
 
+// get sense creads
+router.post('/dev0auth-creads-access', devController.creadsAccess)
+
 module.exports = router;

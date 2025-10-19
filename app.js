@@ -2,7 +2,7 @@ var express = require('express');
 var path = require('path');
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
-var cors = require('cors'); 
+var cors = require('cors');
 var http = require('http');
 var socketIo = require('socket.io');
 require('dotenv').config();
@@ -67,10 +67,11 @@ const corsOptions = {
     if (!origin) return callback(null, true);
 
     // whitelist of allowed domains for web
-    const whitelist = [ 
+    const whitelist = [
       'https://iiqup.netlify.app',
       'https://ansarigroup.online',
       'https://www.ansarigroup.online',
+      'http://localhost:3000'
     ];
 
     if (whitelist.indexOf(origin) !== -1) {
