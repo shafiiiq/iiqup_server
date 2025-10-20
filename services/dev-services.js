@@ -503,6 +503,15 @@ class DevServices {
           return false;
         }
 
+        const isValid = await this.verifyAttestation(attestationToken);
+
+        if (!isValid) {
+          return res.status(403).json({
+            success: false,
+            message: 'Invalid authentication'
+          });
+        }
+
         console.log('Device verified:', {
           brand: deviceData.brand,
           model: deviceData.modelName,
@@ -510,7 +519,7 @@ class DevServices {
         });
 
       } catch (parseError) {
-        console.log('Failed to parse attestation token'); 
+        console.log('Failed to parse attestation token');
         return false;
       }
 

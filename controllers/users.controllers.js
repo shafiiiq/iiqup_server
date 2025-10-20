@@ -451,7 +451,7 @@ const verifyDocAuthUser = async (req, res) => {
 }
 
 const getSignKey = async (req, res) => {
-  userServices.getAuthSignKey()
+  userServices.getAuthSignKey(req.body.password)
     .then((data) => {
       if (data) {
         res.status(data.status).json(data)

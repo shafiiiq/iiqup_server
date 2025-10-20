@@ -637,6 +637,9 @@ const verifyDocAuthUserCreds = async (password) => {
     // Compare passwords
     const isPasswordValid = await bcrypt.compare(password, user.docAuthPasw);
 
+    console.log(isPasswordValid);
+
+
     if (!isPasswordValid) {
       return {
         status: 401,
@@ -1735,7 +1738,11 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
 };
 
 const getAuthSignKey = async (password) => {
+  console.log("password", password);
+
   const response = await verifyDocAuthUserCreds(password)
+  console.log("response", response);
+
   try {
     if (response.status !== 200) {
       return {
@@ -1766,12 +1773,12 @@ const getEncryptionKey = () => {
   if (!ENCRYPTION_KEY) {
     throw new Error('DEVICE_ENCRYPTION_KEY is not set');
   }
-  
+
   // If the key is hex, convert it to buffer
   if (/^[0-9a-fA-F]{64}$/.test(ENCRYPTION_KEY)) {
     return Buffer.from(ENCRYPTION_KEY, 'hex');
   }
-  
+
   // Otherwise, use it as-is but ensure it's 32 bytes
   const key = Buffer.from(ENCRYPTION_KEY, 'utf8');
   if (key.length !== 32) {
@@ -1790,13 +1797,13 @@ const encryptDeviceData = (data) => {
     const iv = crypto.randomBytes(16);
     const keyBuffer = getEncryptionKey();
     const cipher = crypto.createCipheriv(ALGORITHM, keyBuffer, iv);
-    
+
     // Ensure data is a string and trim whitespace
     const dataString = String(data).trim();
-    
+
     let encrypted = cipher.update(dataString, 'utf8', 'hex');
     encrypted += cipher.final('hex');
-    
+
     return {
       encryptedData: encrypted,
       iv: iv.toString('hex')
@@ -1814,29 +1821,29 @@ const decryptAndVerifyDeviceData = (encryptedData, iv, originalData) => {
       console.log('Missing required parameters for decryption');
       return false;
     }
-    
+
     const keyBuffer = getEncryptionKey();
     const decipher = crypto.createDecipheriv(ALGORITHM, keyBuffer, Buffer.from(iv, 'hex'));
-    
+
     let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
-    
+
     // Ensure both strings are trimmed before comparison
     const decryptedTrimmed = decrypted.trim();
     const originalTrimmed = String(originalData).trim();
-    
+
     const isMatch = decryptedTrimmed === originalTrimmed;
-    
+
     // Debug logging (remove in production)
     if (!isMatch) {
-      console.log('Decryption mismatch:', { 
+      console.log('Decryption mismatch:', {
         decryptedLength: decryptedTrimmed.length,
-        originalLength: originalTrimmed.length, 
+        originalLength: originalTrimmed.length,
         decryptedFirst20: decryptedTrimmed.substring(0, 20),
         originalFirst20: originalTrimmed.substring(0, 20)
       });
     }
-    
+
     return isMatch;
   } catch (error) {
     console.error('Decryption error:', error.message);
@@ -1866,8 +1873,8 @@ const activateSignatureAccess = async (userId, activationKey, signType, deviceIn
     }
 
     // Encrypt each device field separately with validation
-    if (!deviceInfo.deviceFingerprint || !deviceInfo.ipAddress || !deviceInfo.location || 
-        !deviceInfo.userAgent || !deviceInfo.browserInfo) {
+    if (!deviceInfo.deviceFingerprint || !deviceInfo.ipAddress || !deviceInfo.location ||
+      !deviceInfo.userAgent || !deviceInfo.browserInfo) {
       throw { status: 400, message: 'Incomplete device information' };
     }
 
@@ -1880,12 +1887,12 @@ const activateSignatureAccess = async (userId, activationKey, signType, deviceIn
     // Check if device already exists
     const existingDeviceIndex = signActivation.trustedDevices.findIndex(d => {
       if (!d.isActive) return false;
-      
+
       return decryptAndVerifyDeviceData(d.uniqueCode, d.uniqueCodeIv, deviceInfo.deviceFingerprint) &&
-             decryptAndVerifyDeviceData(d.ipAddress, d.ipAddressIv, deviceInfo.ipAddress) &&
-             decryptAndVerifyDeviceData(d.userAgent, d.userAgentIv, deviceInfo.userAgent) &&
-             decryptAndVerifyDeviceData(d.browserInfo, d.browserInfoIv, deviceInfo.browserInfo) &&
-             decryptAndVerifyDeviceData(d.location, d.locationIv, deviceInfo.location);
+        decryptAndVerifyDeviceData(d.ipAddress, d.ipAddressIv, deviceInfo.ipAddress) &&
+        decryptAndVerifyDeviceData(d.userAgent, d.userAgentIv, deviceInfo.userAgent) &&
+        decryptAndVerifyDeviceData(d.browserInfo, d.browserInfoIv, deviceInfo.browserInfo) &&
+        decryptAndVerifyDeviceData(d.location, d.locationIv, deviceInfo.location);
     });
 
     if (existingDeviceIndex !== -1) {
@@ -1954,8 +1961,8 @@ const verifyTrustedDevice = async (userId, signType, deviceInfo) => {
     }
 
     // Validate device info
-    if (!deviceInfo.deviceFingerprint || !deviceInfo.ipAddress || !deviceInfo.location || 
-        !deviceInfo.userAgent || !deviceInfo.browserInfo) {
+    if (!deviceInfo.deviceFingerprint || !deviceInfo.ipAddress || !deviceInfo.location ||
+      !deviceInfo.userAgent || !deviceInfo.browserInfo) {
       console.log('Incomplete device information provided');
       throw { status: 400, message: 'Incomplete device information' };
     }
@@ -1963,7 +1970,7 @@ const verifyTrustedDevice = async (userId, signType, deviceInfo) => {
     // Check if device is trusted
     const trustedDevice = signActivation.trustedDevices.find(d => {
       if (!d.isActive) return false;
-      
+
       const isUniqueCodeValid = decryptAndVerifyDeviceData(d.uniqueCode, d.uniqueCodeIv, deviceInfo.deviceFingerprint);
       const isIpAddressValid = decryptAndVerifyDeviceData(d.ipAddress, d.ipAddressIv, deviceInfo.ipAddress);
       const isUserAgentValid = decryptAndVerifyDeviceData(d.userAgent, d.userAgentIv, deviceInfo.userAgent);
@@ -1971,10 +1978,10 @@ const verifyTrustedDevice = async (userId, signType, deviceInfo) => {
       const isLocationValid = decryptAndVerifyDeviceData(d.location, d.locationIv, deviceInfo.location);
 
       return isUniqueCodeValid &&
-             isIpAddressValid &&
-             isUserAgentValid &&
-             isBrowserInfoValid &&
-             isLocationValid;
+        isIpAddressValid &&
+        isUserAgentValid &&
+        isBrowserInfoValid &&
+        isLocationValid;
     });
 
     if (!trustedDevice) {
