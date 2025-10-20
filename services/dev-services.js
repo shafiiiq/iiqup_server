@@ -481,57 +481,49 @@ class DevServices {
       const now = Date.now();
       const requestTime = parseInt(timestamp);
 
-      // CHECK 1: Timestamp verification
+      // CHECK 1: Timestamp
       if (now - requestTime > 30000) {
         console.log('Timestamp expired');
         return false;
       }
 
-      // CHECK 2: Device fingerprint verification
+      // CHECK 2: Detect token type
+      let isPlayIntegrityToken = false;
       try {
-        const deviceData = JSON.parse(attestationToken);
-
-        // Verify device data is valid
-        if (!deviceData.brand || !deviceData.manufacturer || !deviceData.modelName) {
-          console.log('Invalid device fingerprint');
-          return false;
-        }
-
-        // Verify deviceId matches the one in attestation
-        if (deviceData.installationId !== deviceId) {
-          console.log('Device ID mismatch');
-          return false;
-        }
-
-        const isValid = await this.verifyAttestation(attestationToken);
-
-        if (!isValid) {
-          return res.status(403).json({
-            success: false,
-            message: 'Invalid authentication'
-          });
-        }
-
-        console.log('Device verified:', {
-          brand: deviceData.brand,
-          model: deviceData.modelName,
-          os: deviceData.osName
-        });
-
-      } catch (parseError) {
-        console.log('Failed to parse attestation token');
-        return false;
+        JSON.parse(attestationToken);
+        // Successfully parsed = Device fingerprint (Expo Go)
+      } catch {
+        // Failed to parse = Play Integrity token (Production)
+        isPlayIntegrityToken = true;
       }
 
-      // CHECK 3: Block emulators (optional)
+      // If Play Integrity token (Production)
+      if (isPlayIntegrityToken) {
+        console.log('Using Play Integrity verification...');
+        const isValid = await this.verifyPlayIntegrity(attestationToken);
+        return isValid;
+      }
+
+      // If Device fingerprint (Expo Go)
       const deviceData = JSON.parse(attestationToken);
-      if (deviceData.brand === 'generic' ||
-        deviceData.manufacturer === 'Google' && deviceData.modelName.includes('sdk')) {
-        console.log('Emulator detected - blocked');
+
+      if (!deviceData.brand || !deviceData.manufacturer || !deviceData.modelName) {
+        console.log('Invalid device fingerprint');
         return false;
       }
 
-      console.log('Request verified');
+      if (deviceData.installationId !== deviceId) {
+        console.log('Device ID mismatch');
+        return false;
+      }
+
+      if (deviceData.brand === 'generic' ||
+        (deviceData.manufacturer === 'Google' && deviceData.modelName.includes('sdk'))) {
+        console.log('Emulator blocked');
+        return false;
+      }
+
+      console.log('Device fingerprint verified');
       return true;
 
     } catch (error) {
@@ -541,14 +533,27 @@ class DevServices {
   }
 
   // Verify attestation token with Google Play Integrity (Android)
-  static async verifyAttestation(token) {
+  static async verifyPlayIntegrity(token) {
     try {
+      const { google } = require('googleapis');
+
+      const auth = new google.auth.GoogleAuth({
+        credentials: {
+          client_email: process.env.GOOGLE_CLIENT_EMAIL,
+          private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+        },
+        scopes: ['https://www.googleapis.com/auth/playintegrity'],
+      });
+
+      const client = await auth.getClient();
+      const accessToken = await client.getAccessToken();
+
       const response = await fetch(
         `https://playintegrity.googleapis.com/v1/${process.env.ANDROID_PACKAGE_NAME}:decodeIntegrityToken`,
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${process.env.GOOGLE_CLOUD_API_KEY}`,
+            'Authorization': `Bearer ${accessToken.token}`,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({ integrity_token: token })
@@ -556,15 +561,16 @@ class DevServices {
       );
 
       const data = await response.json();
-      const verdict = data?.tokenPayloadExternal?.appIntegrity?.appRecognitionVerdict;
 
-      if (verdict !== 'PLAY_RECOGNIZED') {
+      const appVerdict = data?.tokenPayloadExternal?.appIntegrity?.appRecognitionVerdict;
+      if (appVerdict !== 'PLAY_RECOGNIZED') {
         return false;
       }
 
       return true;
 
     } catch (error) {
+      console.error('Play Integrity error:', error);
       return false;
     }
   }
