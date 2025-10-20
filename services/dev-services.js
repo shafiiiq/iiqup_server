@@ -476,58 +476,75 @@ class DevServices {
   // Verify if request is from your real app
   static async verifyAppRequest({ attestationToken, deviceId, timestamp }) {
     try {
-      console.log('Verifying request:', { deviceId, timestamp });
+      console.log('=== VERIFICATION START ===');
+      console.log('Device ID:', deviceId);
+      console.log('Timestamp:', timestamp);
+      console.log('Token length:', attestationToken?.length);
+      console.log('Token preview:', attestationToken?.substring(0, 100));
 
       const now = Date.now();
       const requestTime = parseInt(timestamp);
 
       // CHECK 1: Timestamp
       if (now - requestTime > 30000) {
-        console.log('Timestamp expired');
+        console.log('❌ Timestamp expired');
         return false;
       }
+      console.log('✓ Timestamp valid');
 
       // CHECK 2: Detect token type
       let isPlayIntegrityToken = false;
+      let deviceData;
+
       try {
-        JSON.parse(attestationToken);
-        // Successfully parsed = Device fingerprint (Expo Go)
-      } catch {
-        // Failed to parse = Play Integrity token (Production)
+        deviceData = JSON.parse(attestationToken);
+        console.log('✓ Parsed as device fingerprint:', deviceData);
+      } catch (parseError) {
+        console.log('❌ Not JSON, treating as Play Integrity token');
         isPlayIntegrityToken = true;
       }
 
-      // If Play Integrity token (Production)
+      // If Play Integrity token (Production Android)
       if (isPlayIntegrityToken) {
         console.log('Using Play Integrity verification...');
         const isValid = await this.verifyPlayIntegrity(attestationToken);
+        console.log('Play Integrity result:', isValid);
         return isValid;
       }
 
-      // If Device fingerprint (Expo Go)
-      const deviceData = JSON.parse(attestationToken);
+      // If Device fingerprint (Expo Go / iOS)
+      console.log('Validating device fingerprint...');
 
       if (!deviceData.brand || !deviceData.manufacturer || !deviceData.modelName) {
-        console.log('Invalid device fingerprint');
+        console.log('❌ Invalid device fingerprint - missing fields');
+        console.log('Received:', deviceData);
         return false;
       }
+      console.log('✓ Device data complete');
+
+      console.log('Comparing IDs:');
+      console.log('  Header deviceId:', deviceId);
+      console.log('  Token installationId:', deviceData.installationId);
 
       if (deviceData.installationId !== deviceId) {
-        console.log('Device ID mismatch');
+        console.log('❌ Device ID mismatch');
         return false;
       }
+      console.log('✓ Device ID matches');
 
       if (deviceData.brand === 'generic' ||
-        (deviceData.manufacturer === 'Google' && deviceData.modelName.includes('sdk'))) {
-        console.log('Emulator blocked');
+        (deviceData.manufacturer === 'Google' && deviceData.modelName?.includes('sdk'))) {
+        console.log('❌ Emulator detected');
         return false;
       }
+      console.log('✓ Not an emulator');
 
-      console.log('Device fingerprint verified');
+      console.log('✅ Device fingerprint verified successfully');
       return true;
 
     } catch (error) {
-      console.error('Verification error:', error);
+      console.error('❌ Verification error:', error.message);
+      console.error('Stack:', error.stack);
       return false;
     }
   }
