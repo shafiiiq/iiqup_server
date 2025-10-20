@@ -5,9 +5,9 @@ const { sendNotificationToUser, broadcastNotification } = require('../utils/webs
 // const Notification = require('../models/notification.model');
 
 const getAllNotifications = async (req, res) => {
-  try {
+  try {    
     // Get all notifications from the service
-    const notifications = await notificationsService.getAllNotificationsService();
+    const notifications = await notificationsService.getAllNotificationsService(req.body.uniqueCode);
     
     res.status(200).json({
       status: 200,

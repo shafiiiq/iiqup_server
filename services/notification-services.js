@@ -2,11 +2,23 @@
 const Notification = require('../models/notification-model'); // Adjust path as needed
 const User = require('../models/user.model');
 
-const getAllNotificationsService = async () => {
+const getAllNotificationsService = async (uniqueCode) => {
   try {
+    const allowedRoles = [
+      process.env.MAINTENANCE_HEAD,
+      process.env.WORKSHOP_MANAGER,
+      process.env.SUPER_ADMIN
+    ];
+
     // Fetch all notifications from the database
-    // You can add sorting, filtering, or population as needed
-    const notifications = await Notification.find()
+    let notifications = await Notification.find();
+
+    // If uniqueCode is NOT in allowed roles, filter out attendance notifications
+    if (!allowedRoles.includes(uniqueCode)) {
+      notifications = notifications.filter(
+        notification => notification.sourceId !== 'attendance'
+      );
+    }
 
     return notifications;
   } catch (error) {
@@ -32,7 +44,7 @@ const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
     // ✅ UPDATED QUERY: Check if user is in targetUsers OR it's a broadcast
     const normalNotifications = await Notification.find({
       createdAt: { $gte: fetchFromDate },
-      
+
       // ✅ NEW LOGIC: Only fetch if:
       // 1. It's a broadcast (isBroadcast: true)
       // 2. OR user is in targetUsers array
@@ -43,9 +55,9 @@ const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
       ],
       'deliveredTo.uniqueCode': { $ne: uniqueCode } // Not delivered yet
     })
-    .sort({ createdAt: -1 })
-    .limit(limit)
-    .lean();
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
 
     console.log(`📢 Found ${normalNotifications.length} undelivered notifications for ${uniqueCode}`);
 

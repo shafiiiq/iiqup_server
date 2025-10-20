@@ -4,6 +4,7 @@ const { uploadSolutionFiles } = require('../multer/solution-upload');
 const multer = require('multer');
 const path = require('path');
 const { putObject } = require('../s3bucket/s3.bucket');
+const Mechanic = require('../models/mechanic.model');
 
 class ComplaintController {
   // Step 1: Register complaint (unchanged but now only notifies MAINTENANCE_HEAD)
@@ -104,6 +105,8 @@ class ComplaintController {
     try {
       const { complaintId } = req.params;
       const { mechanicId, mechanicName, assignedBy } = req.body;
+      const mechanic = await Mechanic.findById(mechanicId)
+      const uniqueCode = mechanic.uniqueCode
 
       if (!mechanicId || !mechanicName || !assignedBy) {
         return res.status(400).json({
@@ -114,7 +117,7 @@ class ComplaintController {
 
       const result = await ComplaintService.assignMechanic(
         complaintId,
-        { mechanicId, mechanicName },
+        { mechanicId, mechanicName, uniqueCode},
         assignedBy
       );
 

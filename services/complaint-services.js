@@ -87,7 +87,7 @@ class ComplaintService {
         description: `You have been assigned to work on ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Please check the complaint details.`,
         priority: "high",
         sourceId: 'job_assignment',
-        recipient: mechanicData.mechanicId,
+        recipient: mechanicData.uniqueCode,
         time: new Date(),
         navigateTo: `/(screens)/mehanicsJobs/${complaint._id}`,
         navigateText: 'View and Do',
@@ -650,6 +650,7 @@ class ComplaintService {
         throw { status: 404, message: 'Complaint not found' };
       }
 
+      let target
       // Update LPO with managerSigned: true
       if (complaint.lpoDetails && complaint.lpoDetails.lpoId) {
         await LPO.updateOne(
@@ -658,12 +659,24 @@ class ComplaintService {
         );
       }
 
+      if (complaint.lpoDetails && complaint.lpoDetails.lpoId) {
+        const lpoData = await Complaint.findById(complaint.lpoDetails.lpoId)
+        if (lpoData.signatures.authorizedSignatoryTitle === 'CEO') {
+          target = process.env.CEO
+        }
+
+        if (lpoData.signatures.authorizedSignatoryTitle === 'MD') {
+          target = process.env.MD
+        }
+        throw { status: 404, message: 'Invalid auth position' };
+      }
+
       const notification = await createNotification({
         title: `CEO Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`,
         description: `Manager ${approvedCreds?.signed ? 'signed and ' : ''}approved LPO for complaint ${complaint.regNo}. CEO approval needed.`,
         priority: "high",
         sourceId: 'ceo_approval',
-        recipient: process.env.CEO,
+        recipient: target,
         time: new Date(),
         navigateTo: `/(screens)/ceoSign/${complaint._id}`,
         navigateText: `View the item required`,
@@ -795,13 +808,16 @@ class ComplaintService {
         throw { status: 404, message: 'Complaint not found' };
       }
 
+      const mechanic = await Mechanic.findById(complaint.assignedMechanic.mechanicId)
+      const uniqueCode = mechanic.uniqueCode
+
       // Notify mechanic that items are ready
       const notification = await createNotification({
         title: `Items Ready - ${complaint.regNo}`,
         description: `All requested items are now available. You can start working on ${complaint.regNo}.`,
         priority: "high",
         sourceId: 'items_ready',
-        recipient: complaint.assignedMechanic.mechanicId,
+        recipient: uniqueCode,
         time: new Date(),
         navigateTo: `/(screens)/mehanicsJobs/${complaint._id}`,
         navigateText: `Complete and send video`,
@@ -810,7 +826,7 @@ class ComplaintService {
       });
 
       await PushNotificationService.sendGeneralNotification(
-        complaint.assignedMechanic.mechanicId,
+        uniqueCode,
         `Items Ready`,
         `Items available for ${complaint.regNo}. You can start working now.`,
         'high',
@@ -882,30 +898,22 @@ class ComplaintService {
 
       const equipment = await Equipment.findOne({ regNo: complaint.regNo });
 
-      // Notify all stakeholders about completion
-      const stakeholders = [
-        process.env.MAINTENANCE_HEAD,
-        process.env.WORKSHOP_MANAGER,
-        process.env.PURCHASE_MANAGER
-      ];
-
-
       await createNotification({
         title: `Work Completed - ${complaint.regNo}`,
         description: `${mechanic} completed work on ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Equipment ready to work.`,
         priority: "medium",
         sourceId: 'work_completed',
-        recipient: stakeholders,
+        recipient: null,
         time: new Date()
       });
 
-      // await PushNotificationService.sendGeneralNotification(
-      //   stakeholder,
-      //   `Work Completed`,
-      //   `${complaint.regNo} work completed by ${mechanic}`,
-      //   'medium',
-      //   'normal'
-      // );
+      await PushNotificationService.sendGeneralNotification(
+        null,
+        `Work Completed - ${complaint.regNo}`,
+         `${mechanic} completed work on ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Equipment ready to work.`,
+        'medium',
+        'normal'
+      );
 
       return {
         status: 200,

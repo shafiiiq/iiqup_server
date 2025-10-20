@@ -71,7 +71,6 @@ const corsOptions = {
       'https://iiqup.netlify.app',
       'https://ansarigroup.online',
       'https://www.ansarigroup.online',
-      'http://localhost:3000'
     ];
 
     if (whitelist.indexOf(origin) !== -1) {

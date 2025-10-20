@@ -1,6 +1,7 @@
 const Attendance = require('../models/attendance.model');
 const moment = require('moment');
 const PushNotificationService = require('../utils/push-notification-jobs');
+const { createNotification } = require('../utils/notification-jobs');
 require('dotenv').config();
 
 const standardizeName = (name) => {
@@ -176,12 +177,21 @@ const addAttendance = async (attendanceData) => {
       const title = `${standardizedName} Punched ${savedAttendance.punchType}`;
       const description = `${standardizedName} punched ${savedAttendance.punchType.toLowerCase()} at ${formattedTime} ${formattedDate}`;
 
+      await createNotification({
+        title: title,
+        description: description,
+        priority: "low",
+        sourceId: 'attendance',
+        recipient: [process.env.MAINTENANCE_HEAD, process.env.WORKSHOP_MANAGER, process.env.SUPER_ADMIN],
+        time: new Date()
+      });
+
       // Send push notifications
       await PushNotificationService.sendGeneralNotification(
         [process.env.MAINTENANCE_HEAD, process.env.WORKSHOP_MANAGER, process.env.SUPER_ADMIN],
         title,
         description,
-        'high',
+        'low',
         'attendance'
       );
 
@@ -207,22 +217,22 @@ const addAttendance = async (attendanceData) => {
 const sendWhatsAppMessage = async (empName, punchType, time, date) => {
   try {
     const axios = require('axios');
-    
+
     // Validate environment variables
     if (!process.env.WHATSAPP_ACCESS_TOKEN) {
       throw new Error('WHATSAPP_ACCESS_TOKEN is not set in environment variables');
     }
-    
+
     if (!process.env.WHATSAPP_PHONE_NUMBER_ID) {
       throw new Error('WHATSAPP_PHONE_NUMBER_ID is not set in environment variables');
     }
-    
+
     const message = `🕒 *Attendance Alert*\n\n` +
-                   `👤 Employee: ${empName}\n` +
-                   `📍 Status: Punched ${punchType}\n` +
-                   `⏰ Time: ${time}\n` +
-                   `📅 Date: ${date}`;
-    
+      `👤 Employee: ${empName}\n` +
+      `📍 Status: Punched ${punchType}\n` +
+      `⏰ Time: ${time}\n` +
+      `📅 Date: ${date}`;
+
     const recipients = [
       process.env.WHATSAPP_NUMBER_1,
       process.env.WHATSAPP_NUMBER_2
@@ -236,7 +246,7 @@ const sendWhatsAppMessage = async (empName, punchType, time, date) => {
     for (const number of recipients) {
       // Remove any non-digit characters from phone number
       const cleanNumber = number.replace(/\D/g, '');
-      
+
       const response = await axios.post(
         `https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
         {
@@ -252,12 +262,12 @@ const sendWhatsAppMessage = async (empName, punchType, time, date) => {
           }
         }
       );
-      
+
       console.log(`✅ WhatsApp sent to ${cleanNumber}:`, response.data);
     }
-    
+
     console.log('✅ All WhatsApp messages sent successfully');
-    
+
   } catch (error) {
     console.error('❌ WhatsApp sending failed:', error.message);
     if (error.response) {

@@ -3,7 +3,7 @@ var router = express.Router();
 const notificationController = require('../controllers/notification.controller');
 
 // Get all notifications
-router.get('/get-all-notification', notificationController.getAllNotifications);
+router.post('/get-all-notification', notificationController.getAllNotifications);
 
 // Create new notification (with real-time broadcasting)
 router.post('/create-notification', notificationController.createNotification);
