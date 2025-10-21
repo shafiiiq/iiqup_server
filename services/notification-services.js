@@ -27,96 +27,6 @@ const getAllNotificationsService = async (uniqueCode) => {
   }
 };
 
-// const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
-//   try {
-//     console.log('📬 Fetching pending notifications...');
-//     console.log('User:', uniqueCode);
-
-//     if (!uniqueCode) {
-//       throw new Error('uniqueCode is required');
-//     }
-
-//     const sevenDaysAgo = new Date(Date.now() - (7 * 24 * 60 * 60 * 1000));
-//     const fetchFromDate = sevenDaysAgo;
-
-//     console.log(`📅 Fetching from: ${fetchFromDate.toISOString()}`);
-
-//     // ✅ UPDATED QUERY: Check if user is in targetUsers OR it's a broadcast
-//     const normalNotifications = await Notification.find({
-//       createdAt: { $gte: fetchFromDate },
-
-//       // ✅ NEW LOGIC: Only fetch if:
-//       // 1. It's a broadcast (isBroadcast: true)
-//       // 2. OR user is in targetUsers array
-//       // 3. AND user hasn't received it yet
-//       $or: [
-//         { isBroadcast: true }, // Broadcast to all
-//         { targetUsers: uniqueCode } // User is in target list
-//       ],
-//       'deliveredTo.uniqueCode': { $ne: uniqueCode } // Not delivered yet
-//     })
-//       .sort({ createdAt: -1 })
-//       .limit(limit)
-//       .lean();
-
-//     console.log(`📢 Found ${normalNotifications.length} undelivered notifications for ${uniqueCode}`);
-
-//     // Fetch special notifications (same as before)
-//     const user = await User.findOne({ uniqueCode }).select('specialNotification');
-
-//     let specialNotifications = [];
-//     if (user && user.specialNotification) {
-//       specialNotifications = user.specialNotification.filter(notif => {
-//         const notifDate = new Date(notif.time || notif.createdAt);
-//         return notifDate >= fetchFromDate;
-//       });
-//     }
-
-//     console.log(`⭐ Found ${specialNotifications.length} special notifications`);
-
-//     // Combine all notifications
-//     const allNotifications = [
-//       ...normalNotifications.map(n => ({
-//         ...n,
-//         type: 'normal',
-//         _id: n._id.toString(),
-//         time: n.createdAt || n.time,
-//       })),
-//       ...specialNotifications.map(n => ({
-//         ...n,
-//         type: 'special',
-//         _id: n._id ? n._id.toString() : `special_${Date.now()}_${Math.random()}`,
-//         time: n.time || n.createdAt,
-//       }))
-//     ];
-
-//     // Sort by time
-//     allNotifications.sort((a, b) => {
-//       const dateA = new Date(a.time || a.createdAt);
-//       const dateB = new Date(b.time || b.createdAt);
-//       return dateB - dateA;
-//     });
-
-//     const limitedNotifications = allNotifications.slice(0, limit);
-
-//     console.log(`✅ Returning ${limitedNotifications.length} notifications`);
-
-//     return {
-//       notifications: limitedNotifications,
-//       meta: {
-//         total: limitedNotifications.length,
-//         since: fetchFromDate.toISOString(),
-//         normalCount: normalNotifications.length,
-//         specialCount: specialNotifications.length,
-//       }
-//     };
-
-//   } catch (error) {
-//     console.error('❌ Error:', error);
-//     throw error;
-//   }
-// };
-
 const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
   try {
     console.log('📬 Fetching pending notifications...');
@@ -126,20 +36,10 @@ const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
       throw new Error('uniqueCode is required');
     }
 
-    // ⚠️ TEMPORARY FIX - REMOVE THIS IN FUTURE (After December 2025)
-    // This cutoff date prevents fetching old notifications that were sent
-    // before the "mark as read" and "pending notification" features were implemented.
-    // Once all users are on track (after a few weeks), remove this and use only sevenDaysAgo logic.
-    const TEMPORARY_CUTOFF_DATE = new Date('2025-10-21T09:00:00.000Z'); // October 21, 2025, 9:00 AM UTC
-    
     const sevenDaysAgo = new Date(Date.now() - (7 * 24 * 60 * 60 * 1000));
-    
-    // Use the LATER date between cutoff and 7 days ago
-    // This ensures we never fetch notifications before October 21, 2024, 9 PM
-    const fetchFromDate = TEMPORARY_CUTOFF_DATE > sevenDaysAgo ? TEMPORARY_CUTOFF_DATE : sevenDaysAgo;
+    const fetchFromDate = sevenDaysAgo;
 
     console.log(`📅 Fetching from: ${fetchFromDate.toISOString()}`);
-    console.log(`⚠️ Using temporary cutoff: ${TEMPORARY_CUTOFF_DATE.toISOString()} (REMOVE IN FUTURE)`);
 
     // ✅ UPDATED QUERY: Check if user is in targetUsers OR it's a broadcast
     const normalNotifications = await Notification.find({
@@ -168,9 +68,6 @@ const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
     if (user && user.specialNotification) {
       specialNotifications = user.specialNotification.filter(notif => {
         const notifDate = new Date(notif.time || notif.createdAt);
-        
-        // ⚠️ TEMPORARY FIX - REMOVE IN FUTURE
-        // Apply the same cutoff date for special notifications
         return notifDate >= fetchFromDate;
       });
     }
@@ -211,8 +108,6 @@ const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
         since: fetchFromDate.toISOString(),
         normalCount: normalNotifications.length,
         specialCount: specialNotifications.length,
-        // ⚠️ TEMPORARY - REMOVE IN FUTURE
-        usingTemporaryCutoff: fetchFromDate.getTime() === TEMPORARY_CUTOFF_DATE.getTime()
       }
     };
 
@@ -221,6 +116,111 @@ const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
     throw error;
   }
 };
+
+// const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
+//   try {
+//     console.log('📬 Fetching pending notifications...');
+//     console.log('User:', uniqueCode);
+
+//     if (!uniqueCode) {
+//       throw new Error('uniqueCode is required');
+//     }
+
+//     // ⚠️ TEMPORARY FIX - REMOVE THIS IN FUTURE (After December 2025)
+//     // This cutoff date prevents fetching old notifications that were sent
+//     // before the "mark as read" and "pending notification" features were implemented.
+//     // Once all users are on track (after a few weeks), remove this and use only sevenDaysAgo logic.
+//     const TEMPORARY_CUTOFF_DATE = new Date('2025-10-21T09:00:00.000Z'); // October 21, 2025, 9:00 AM UTC
+    
+//     const sevenDaysAgo = new Date(Date.now() - (7 * 24 * 60 * 60 * 1000));
+    
+//     // Use the LATER date between cutoff and 7 days ago
+//     // This ensures we never fetch notifications before October 21, 2024, 9 PM
+//     const fetchFromDate = TEMPORARY_CUTOFF_DATE > sevenDaysAgo ? TEMPORARY_CUTOFF_DATE : sevenDaysAgo;
+
+//     console.log(`📅 Fetching from: ${fetchFromDate.toISOString()}`);
+//     console.log(`⚠️ Using temporary cutoff: ${TEMPORARY_CUTOFF_DATE.toISOString()} (REMOVE IN FUTURE)`);
+
+//     // ✅ UPDATED QUERY: Check if user is in targetUsers OR it's a broadcast
+//     const normalNotifications = await Notification.find({
+//       createdAt: { $gte: fetchFromDate },
+
+//       // ✅ NEW LOGIC: Only fetch if:
+//       // 1. It's a broadcast (isBroadcast: true)
+//       // 2. OR user is in targetUsers array
+//       // 3. AND user hasn't received it yet
+//       $or: [
+//         { isBroadcast: true }, // Broadcast to all
+//         { targetUsers: uniqueCode } // User is in target list
+//       ],
+//       'deliveredTo.uniqueCode': { $ne: uniqueCode } // Not delivered yet
+//     })
+//       .sort({ createdAt: -1 })
+//       .limit(limit)
+//       .lean();
+
+//     console.log(`📢 Found ${normalNotifications.length} undelivered notifications for ${uniqueCode}`);
+
+//     // Fetch special notifications (same as before)
+//     const user = await User.findOne({ uniqueCode }).select('specialNotification');
+
+//     let specialNotifications = [];
+//     if (user && user.specialNotification) {
+//       specialNotifications = user.specialNotification.filter(notif => {
+//         const notifDate = new Date(notif.time || notif.createdAt);
+        
+//         // ⚠️ TEMPORARY FIX - REMOVE IN FUTURE
+//         // Apply the same cutoff date for special notifications
+//         return notifDate >= fetchFromDate;
+//       });
+//     }
+
+//     console.log(`⭐ Found ${specialNotifications.length} special notifications`);
+
+//     // Combine all notifications
+//     const allNotifications = [
+//       ...normalNotifications.map(n => ({
+//         ...n,
+//         type: 'normal',
+//         _id: n._id.toString(),
+//         time: n.createdAt || n.time,
+//       })),
+//       ...specialNotifications.map(n => ({
+//         ...n,
+//         type: 'special',
+//         _id: n._id ? n._id.toString() : `special_${Date.now()}_${Math.random()}`,
+//         time: n.time || n.createdAt,
+//       }))
+//     ];
+
+//     // Sort by time
+//     allNotifications.sort((a, b) => {
+//       const dateA = new Date(a.time || a.createdAt);
+//       const dateB = new Date(b.time || b.createdAt);
+//       return dateB - dateA;
+//     });
+
+//     const limitedNotifications = allNotifications.slice(0, limit);
+
+//     console.log(`✅ Returning ${limitedNotifications.length} notifications`);
+
+//     return {
+//       notifications: limitedNotifications,
+//       meta: {
+//         total: limitedNotifications.length,
+//         since: fetchFromDate.toISOString(),
+//         normalCount: normalNotifications.length,
+//         specialCount: specialNotifications.length,
+//         // ⚠️ TEMPORARY - REMOVE IN FUTURE
+//         usingTemporaryCutoff: fetchFromDate.getTime() === TEMPORARY_CUTOFF_DATE.getTime()
+//       }
+//     };
+
+//   } catch (error) {
+//     console.error('❌ Error:', error);
+//     throw error;
+//   }
+// };
 
 // ⚠️⚠️⚠️ IMPORTANT REMINDER ⚠️⚠️⚠️
 // TODO: REMOVE TEMPORARY_CUTOFF_DATE logic after December 2025
