@@ -92,7 +92,7 @@ class PushNotificationService {
             try {
                 const allUsers = await User.find({ isActive: true }).select('uniqueCode');
                 const uniqueCodes = allUsers.map(user => user.uniqueCode);
-                
+
                 if (uniqueCodes.length > 0) {
                     const pushResult = await userService.sendBulkNotifications(uniqueCodes, notificationData);
                     results.pushNotification = pushResult;
@@ -194,8 +194,8 @@ class PushNotificationService {
 
             return {
                 success: overallSuccess,
-                message: overallSuccess ? 
-                    `Notifications sent to ${results.websocket.success + results.pushNotification.success} users` : 
+                message: overallSuccess ?
+                    `Notifications sent to ${results.websocket.success + results.pushNotification.success} users` :
                     'Failed to send notifications',
                 data: results
             };
@@ -216,7 +216,7 @@ class PushNotificationService {
      * @param {object} stockInfo - Stock information
      * @param {string} message - Custom message
      */
-    static async sendStockAlert(uniqueCode, stockInfo, message) {        
+    static async sendStockAlert(uniqueCode, stockInfo, message) {
         const notification = {
             _id: `stock_${stockInfo._id}_${Date.now()}`,
             type: 'special',
@@ -261,11 +261,11 @@ class PushNotificationService {
         };
 
         if (Array.isArray(uniqueCode)) {
-            return await this.sendNotificationToUsers(uniqueCode, notification);
+            return this.sendNotificationToUsers(uniqueCode, notification);
         } else if (uniqueCode) {
-            return await this.sendNotificationToUser(uniqueCode, notification);
+            return this.sendNotificationToUser(uniqueCode, notification);
         } else {
-            return await this.broadcastNotification(notification);
+            return this.broadcastNotification(notification);
         }
     }
 
@@ -279,7 +279,7 @@ class PushNotificationService {
      */
     static async sendGeneralNotification(uniqueCode, title, description, priority = 'medium', type = 'normal', notificationId) {
         const notification = {
-            _id: `general_${Date.now()}`,
+            _id: notificationId,
             type: type,
             title: title,
             description: description,
@@ -291,13 +291,13 @@ class PushNotificationService {
 
         if (Array.isArray(uniqueCode)) {
             console.log("yes here 1");
-            return await this.sendNotificationToUsers(uniqueCode, notification);
+            return this.sendNotificationToUsers(uniqueCode, notification);
         } else if (uniqueCode) {
             console.log("yes here 2");
-            return await this.sendNotificationToUser(uniqueCode, notification);
+            return this.sendNotificationToUser(uniqueCode, notification);
         } else {
-            console.log("yes here 3");            
-            return await this.broadcastNotification(notification);
+            console.log("yes here 3");
+            return this.broadcastNotification(notification);
         }
     }
 
@@ -320,11 +320,11 @@ class PushNotificationService {
         };
 
         if (Array.isArray(uniqueCode)) {
-            return await this.sendNotificationToUsers(uniqueCode, notification);
+            return this.sendNotificationToUsers(uniqueCode, notification);
         } else if (uniqueCode) {
-            return await this.sendNotificationToUser(uniqueCode, notification);
+            return this.sendNotificationToUser(uniqueCode, notification);
         } else {
-            return await this.broadcastNotification(notification);
+            return this.broadcastNotification(notification);
         }
     }
 
@@ -336,7 +336,7 @@ class PushNotificationService {
     static async storeSpecialNotification(uniqueCode, notificationData) {
         try {
             const user = await User.findOne({ uniqueCode });
-            
+
             if (!user) {
                 throw new Error('User not found');
             }
@@ -350,7 +350,7 @@ class PushNotificationService {
             };
 
             user.specialNotification.push(specialNotification);
-            
+
             if (user.specialNotification.length > 100) {
                 user.specialNotification = user.specialNotification.slice(-100);
             }
@@ -371,13 +371,13 @@ class PushNotificationService {
      */
     static async sendNotificationToRoles(roles, notificationData) {
         try {
-            const users = await User.find({ 
+            const users = await User.find({
                 role: { $in: roles },
-                isActive: true 
+                isActive: true
             }).select('uniqueCode');
 
             const uniqueCodes = users.map(user => user.uniqueCode);
-            
+
             if (uniqueCodes.length === 0) {
                 return {
                     success: false,
@@ -404,7 +404,7 @@ class PushNotificationService {
     static async getNotificationStats() {
         try {
             const totalUsers = await User.countDocuments({ isActive: true });
-            const usersWithTokens = await User.countDocuments({ 
+            const usersWithTokens = await User.countDocuments({
                 isActive: true,
                 'pushTokens.0': { $exists: true }
             });
