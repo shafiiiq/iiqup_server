@@ -130,7 +130,7 @@ const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
     // This cutoff date prevents fetching old notifications that were sent
     // before the "mark as read" and "pending notification" features were implemented.
     // Once all users are on track (after a few weeks), remove this and use only sevenDaysAgo logic.
-    const TEMPORARY_CUTOFF_DATE = new Date('2025-10-21T21:00:00.000Z'); // October 21, 2025, 9:00 PM UTC
+    const TEMPORARY_CUTOFF_DATE = new Date('2025-10-21T09:00:00.000Z'); // October 21, 2025, 9:00 AM UTC
     
     const sevenDaysAgo = new Date(Date.now() - (7 * 24 * 60 * 60 * 1000));
     
