@@ -48,20 +48,28 @@ const generateAndSendOTP = async (email, demo_opr = false) => {
         verified: false
       },
       { upsert: true, new: true }
-    );
+    ); 
 
     // Send OTP via email
     if (demo_opr) {
       await emailService.sendOTPEmail(email, otp, user.name, true);
-    }else {
+    } else {
       await emailService.sendOTPEmail(email, otp, user.name);
     }
+
+    if (process.env.DEMO_OFFICE == user.email) {
+      console.log("yesss same"); 
+    }
+ 
+    console.log("DEMO_OFFICE", process.env.DEMO_OFFICE);
+    console.log("user.email", user.email);
+    
 
     return {
       status: 200,
       success: true,
       message: 'OTP sent successfully to your email',
-      otp: demo_opr ? otp : null,
+      otp: process.env.DEMO_OFFICE == user.email || process.env.DEMO_MECHANIC == user.email || demo_opr ? otp : null,
       data: {
         email,
         // In development mode, you might want to return the OTP for testing
@@ -139,7 +147,7 @@ const verifyOTP = async (email, otp, type, qatarId = null) => {
     });
 
     console.log(user);
-    
+
 
 
     return {

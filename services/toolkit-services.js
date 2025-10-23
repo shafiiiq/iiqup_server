@@ -99,7 +99,7 @@ const insertToolkit = async (toolkitData) => {
       const notification = await createNotification({
         title: "New Safety items Added",
         description: `New ${equipment.stockCount} ${equipment.name} added to stock`,
-        priority: "high",
+        priority: "low",
         sourceId: equipment._id,
         time: new Date()
       });
@@ -108,7 +108,7 @@ const insertToolkit = async (toolkitData) => {
         null, // broadcast to all users
         "New Safety items Added", //title
         `New ${equipment.stockCount} ${equipment.name} added to stock`, //decription
-        'high', //priority
+        'low', //priority
         'normal', // type
         notification.data._id.toString()
       );
@@ -227,7 +227,7 @@ const updateVariant = async (toolkitId, variantId, updateData) => {
     const notification = await createNotification({
       title: "Safety items update",
       description: `${updateData.stockCount < previousStock ? previousStock - updateData.stockCount : updateData.stockCount - previousStock} items ${action} in Size:${variant.size} - Color:${variant.color} - ${toolkit.name}`,
-      priority: "high",
+      priority: "low",
       sourceId: toolkit._id, // Changed from equipment._id to toolkit._id
       time: new Date()
     });
@@ -236,7 +236,7 @@ const updateVariant = async (toolkitId, variantId, updateData) => {
       null, // broadcast to all users
       "Safety items update", //title
       `${updateData.stockCount < previousStock ? previousStock - updateData.stockCount : updateData.stockCount - previousStock} items ${action} in Size:${variant.size} - Color:${variant.color} - ${toolkit.name}`, //description
-      'high', //priority
+      'low', //priority
       'normal', // type
       notification.data._id.toString()
     );
@@ -355,7 +355,7 @@ const reduceStock = async (toolkitId, variantId, quantity, reason = '', updatedB
     const notification = await createNotification({
       title: "Safety items update",
       description: `${quantity} ${variant.color} color ${variant.size} size ${toolkit.name} handovered to ${person}`,
-      priority: "high",
+      priority: "low",
       'type': 'normal'
     });
 
@@ -363,7 +363,7 @@ const reduceStock = async (toolkitId, variantId, quantity, reason = '', updatedB
       null,
       "Safety items update",
       `${quantity} ${variant.color} color ${variant.size} size ${toolkit.name} handovered to ${person}`,
-      'high',
+      'low',
       'normal',
       notification.data._id.toString()
     );

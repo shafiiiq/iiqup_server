@@ -21,6 +21,8 @@ const requestOTP = async (req, res) => {
 
   try {
     const result = await otpServices.generateAndSendOTP(email);
+    console.log(result);
+    
     res.status(result.status).json(result);
   } catch (err) {
     res.status(500).json({

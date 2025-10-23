@@ -5,9 +5,9 @@ const ComplaintController = require('../controllers/complaint.controller');
 // Step 1: Register a new complaint (unchanged but now notifies only MAINTENANCE_HEAD)
 router.post('/register', ComplaintController.registerComplaint);
 
-// Step 2: MAINTENANCE_HEAD assigns mechanic
+// Step 2: MAINTENANCE_HEAD assigns mechanic  
 router.post('/assign-mechanic/:complaintId', ComplaintController.assignMechanic);
-
+ 
 // Step 3: Mechanic requests items/tools
 router.post('/mechanic-request/:complaintId', ComplaintController.mechanicRequestItems);
 
@@ -40,6 +40,6 @@ router.get('/get-all-complaints', ComplaintController.getAllComplaints);
 
 // New workflow management routes
 router.get('/status/:status', ComplaintController.getComplaintsByStatus);
-router.get('/mechanic/:mechanicId', ComplaintController.getMechanicComplaints);
+router.post('/mechanic-jobs', ComplaintController.getMechanicComplaints);
 
 module.exports = router;

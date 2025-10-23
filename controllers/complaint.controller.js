@@ -105,8 +105,7 @@ class ComplaintController {
     try {
       const { complaintId } = req.params;
       const { mechanicId, mechanicName, assignedBy } = req.body;
-      const mechanic = await Mechanic.findById(mechanicId)
-      const uniqueCode = mechanic.uniqueCode
+      const mechanic = await Mechanic.findOne({mechanicId: mechanicId})
 
       if (!mechanicId || !mechanicName || !assignedBy) {
         return res.status(400).json({
@@ -114,10 +113,10 @@ class ComplaintController {
           message: 'mechanicId, mechanicName, and assignedBy are required'
         });
       }
-
+ 
       const result = await ComplaintService.assignMechanic(
         complaintId,
-        { mechanicId, mechanicName, uniqueCode},
+        { mechanicId, mechanicName },
         assignedBy
       );
 
@@ -718,8 +717,9 @@ class ComplaintController {
 
   static async getMechanicComplaints(req, res) {
     try {
-      const { mechanicId } = req.params;
-      const complaints = await ComplaintService.getComplaintsByMechanic(mechanicId);
+      const { email } = req.body;
+
+      const complaints = await ComplaintService.getComplaintsByMechanic(email);
       res.json({
         status: 200,
         data: complaints

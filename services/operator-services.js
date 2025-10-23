@@ -86,7 +86,6 @@ class OperatorService {
 
     let OTP;
 
-
     // Send OTP
     try {
       if (qatarId == process.env.DEMO_OPERATOR_QID) {

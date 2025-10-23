@@ -281,7 +281,7 @@ class PushNotificationService {
         const notification = {
             _id: notificationId,
             type: type,
-            title: title,
+            title: title, 
             description: description,
             message: description,
             priority: priority,

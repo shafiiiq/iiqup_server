@@ -2,6 +2,7 @@ const Complaint = require('../models/complaint.model');
 const Equipment = require('../models/equip.model');
 const lpoModel = require('../models/lpo.model');
 const LPO = require('../models/lpo.model');
+const Mechanic = require('../models/mechanic.model');
 const { getFileDuration } = require('../utils/complaint-helper');
 const { createNotification } = require('../utils/notification-jobs');
 const PushNotificationService = require('../utils/push-notification-jobs');
@@ -87,7 +88,7 @@ class ComplaintService {
         description: `You have been assigned to work on ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Please check the complaint details.`,
         priority: "high",
         sourceId: 'job_assignment',
-        recipient: mechanicData.uniqueCode,
+        recipient: mechanicData.mechanicId,
         time: new Date(),
         navigateTo: `/(screens)/mehanicsJobs/${complaint._id}`,
         navigateText: 'View and Do',
@@ -961,11 +962,13 @@ class ComplaintService {
   }
 
   // New method to get complaints assigned to a specific mechanic
-  static async getComplaintsByMechanic(mechanicId) {
+  static async getComplaintsByMechanic(email) {
     try {
-      return await Complaint.find({
-        'assignedMechanic.mechanicId': mechanicId
+      const mechanic = await Mechanic.findOne({ email})
+      const data = await Complaint.find({
+        'assignedMechanic.mechanicId': mechanic.userId
       }).sort({ createdAt: -1 });
+      return data
     } catch (error) {
       throw error;
     }
