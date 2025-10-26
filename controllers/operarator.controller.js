@@ -52,7 +52,7 @@ class OperatorController {
       res.json({
         success: true,
         data: operator,
-        authMail: process.env.AUTH_OTP_USER_EMAIL,
+        authMail: process.env.ADMIN_OTP_USER_EMAIL,
         message: 'Operator verified successfully'
       });
 
