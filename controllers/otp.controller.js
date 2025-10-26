@@ -54,6 +54,11 @@ const verifyOTP = async (req, res) => {
     });
   }
 
+  console.log('otp', otp);
+  console.log('email', email);
+  console.log('type', type);
+  
+
   try {
     const result = await otpServices.verifyOTP(email, otp, type, type === 'operator' ? req.body.qatarId : null);
 
