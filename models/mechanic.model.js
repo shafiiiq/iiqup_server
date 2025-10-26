@@ -335,12 +335,34 @@ const MechanicSchema = new Schema({
     type: Date,
     default: Date.now
   },
-  zktecoPin :{
+  zktecoPin: {
     type: Number
   },
   status: {
-    type:String,
-  }
+    type: String,
+  },
+  pushTokens: [{
+    token: {
+      type: String,   // Expo push token
+      required: true
+    },
+    platform: {
+      type: String,   // 'ios' or 'android'
+      enum: ['ios', 'android']
+    },
+    registeredAt: {
+      type: Date,
+      default: Date.now
+    },
+    isActive: {
+      type: Boolean,
+      default: true
+    },
+    lastUsed: {
+      type: Date,
+      default: Date.now
+    }
+  }],
 });
 
 // Update timestamp on save

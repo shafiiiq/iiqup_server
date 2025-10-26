@@ -1417,8 +1417,17 @@ const insertPushToken = async (uniqueCode, pushToken, platform = null) => {
       };
     }
 
+    let user
     // Find user by unique code
-    const user = await User.findOne({ uniqueCode });
+    user = await User.findOne({ uniqueCode });
+
+    if (!user) {
+      user = await Operator.findOne({ uniqueCode });
+    }
+
+    if (!user) {
+      user = await Mechanic.findOne({ uniqueCode });
+    }
 
     if (!user) {
       return {
@@ -1455,6 +1464,9 @@ const insertPushToken = async (uniqueCode, pushToken, platform = null) => {
       });
     }
 
+    // default for operator 
+    user.profilePic = {}
+
     // Update the user
     user.updatedAt = new Date();
     await user.save();
@@ -1481,8 +1493,18 @@ const insertPushToken = async (uniqueCode, pushToken, platform = null) => {
 
 const removePushToken = async (uniqueCode, pushToken) => {
   try {
+
+    let user
     // Find user by unique code
-    const user = await User.findOne({ uniqueCode });
+    user = await User.findOne({ uniqueCode });
+
+    if (!user) {
+      user = await Operator.findOne({ uniqueCode });
+    }
+
+    if (!user) {
+      user = await Mechanic.findOne({ uniqueCode });
+    }
 
     if (!user) {
       return {

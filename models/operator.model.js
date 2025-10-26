@@ -191,6 +191,28 @@ const operatorSchema = new mongoose.Schema({
     default: {}
   },
   toolkits: [ToolkitSchema],
+  pushTokens: [{
+    token: {
+      type: String,   // Expo push token
+      required: true
+    },
+    platform: {
+      type: String,   // 'ios' or 'android'
+      enum: ['ios', 'android']
+    },
+    registeredAt: {
+      type: Date,
+      default: Date.now
+    },
+    isActive: {
+      type: Boolean,
+      default: true
+    },
+    lastUsed: {
+      type: Date,
+      default: Date.now
+    }
+  }],
   isVerified: {
     type: Boolean,
     default: false
