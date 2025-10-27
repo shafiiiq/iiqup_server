@@ -1416,6 +1416,9 @@ const deleteNotification = async (notificationId) => {
 // real time push notifications <<<<<<<<<<<<<< --------------------------------------- >>>>>>>>>>>>>>>>>>>>>>>>
 const insertPushToken = async (uniqueCode, pushToken, platform = null) => {
   try {
+
+    console.log("pushToken", pushToken);
+    
     // Validate FCM token format (basic check)
     if (!pushToken || typeof pushToken !== 'string' || pushToken.length < 100) {
       return {
