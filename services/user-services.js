@@ -1417,15 +1417,21 @@ const deleteNotification = async (notificationId) => {
 const insertPushToken = async (uniqueCode, pushToken, platform = null) => {
   try {
 
-    console.log("pushToken", pushToken);
-    
+    // Convert to string if it's not already
+    const tokenString = String(pushToken || '');
+
+    console.log("pushToken", tokenString);
+    console.log("pushToken type:", typeof tokenString);
+    console.log("pushToken length:", tokenString.length);
+
     // Validate FCM token format (basic check)
-    if (!pushToken || typeof pushToken !== 'string' || pushToken.length < 100) {
+    if (!tokenString || tokenString.length < 100) {
       return {
         success: false,
         message: 'Invalid push token format'
       };
     }
+    
     let user
     // Find user by unique code
     user = await User.findOne({ uniqueCode });
