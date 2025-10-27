@@ -167,7 +167,7 @@ class PushNotificationService {
                 try {
                     const pushResult = await userService.sendNotificationToUser(uniqueCode, notificationData);
                     userResult.pushNotification = pushResult;
-                    if (pushResult.success) {
+                    if (pushResult.success) { 
                         results.pushNotification.success++;
                     } else {
                         results.pushNotification.failed++;

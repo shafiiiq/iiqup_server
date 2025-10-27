@@ -6,11 +6,18 @@ const Mechanic = require('../models/mechanic.model');
 const Operator = require('../models/operator.model');
 const { default: mongoose } = require('mongoose');
 const { renameFilesWithRequestId } = require('../multer/overtime-upload'); // Check this file too
-const { Expo } = require('expo-server-sdk');
+const admin = require('firebase-admin');
 const { createNotification } = require('../utils/notification-jobs');
 
-// Create a new Expo SDK client
-const expo = new Expo();
+// Initialize Firebase Admin
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+}
+
 
 const crypto = require('crypto');
 
@@ -1409,14 +1416,13 @@ const deleteNotification = async (notificationId) => {
 // real time push notifications <<<<<<<<<<<<<< --------------------------------------- >>>>>>>>>>>>>>>>>>>>>>>>
 const insertPushToken = async (uniqueCode, pushToken, platform = null) => {
   try {
-    // Validate the push token format
-    if (!Expo.isExpoPushToken(pushToken)) {
+    // Validate FCM token format (basic check)
+    if (!pushToken || typeof pushToken !== 'string' || pushToken.length < 100) {
       return {
         success: false,
         message: 'Invalid push token format'
       };
     }
-
     let user
     // Find user by unique code
     user = await User.findOne({ uniqueCode });
@@ -1587,7 +1593,15 @@ const getUserPushTokens = async (uniqueCode) => {
 const sendNotificationToUser = async (uniqueCode, notificationData) => {
   try {
     // Find user with push tokens
-    const user = await User.findOne({ uniqueCode }).select('uniqueCode name pushTokens');
+    let user = await User.findOne({ uniqueCode }).select('uniqueCode name pushTokens');
+
+    if (!user) {
+      user = await Operator.findOne({ uniqueCode }).select('uniqueCode name pushTokens');
+    }
+
+    if (!user) {
+      user = await Mechanic.findOne({ uniqueCode }).select('uniqueCode name pushTokens');
+    }
 
     if (!user) {
       return {
@@ -1603,9 +1617,9 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
       };
     }
 
-    // Get active push tokens
+    // Get active FCM tokens (not Expo tokens)
     const activeTokens = user.pushTokens
-      .filter(tokenData => tokenData.isActive && Expo.isExpoPushToken(tokenData.token))
+      .filter(tokenData => tokenData.isActive && tokenData.token)
       .map(tokenData => tokenData.token);
 
     if (activeTokens.length === 0) {
@@ -1615,49 +1629,64 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
       };
     }
 
-    // Prepare messages
-    const messages = activeTokens.map(token => ({
-      to: token,
-      sound: 'default',
-      title: notificationData.title || 'New Notification',
-      body: notificationData.body || notificationData.message || 'You have a new notification',
-      data: notificationData.data || notificationData,
-      priority: notificationData.priority === 'high' ? 'high' : 'normal',
-      channelId: getChannelId(notificationData.priority),
-      notificationId: notificationData.notificationId || null
-    }));
-
-    // Send notifications
-    const chunks = expo.chunkPushNotifications(messages);
-    const tickets = [];
-
-    for (let chunk of chunks) {
-      try {
-        const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
-        tickets.push(...ticketChunk);
-      } catch (error) {
-        console.error('❌ Error sending notification chunk:', error);
+    // 🆕 SEND VIA FIREBASE CLOUD MESSAGING
+    const message = {
+      notification: {
+        title: notificationData.title || 'New Notification',
+        body: notificationData.description || notificationData.message || 'You have a new notification'
+      },
+      data: {
+        ...notificationData,
+        notificationId: notificationData.notificationId || notificationData._id?.toString() || '',
+        type: notificationData.type || 'normal',
+        priority: notificationData.priority || 'medium'
+      },
+      android: {
+        priority: notificationData.priority === 'high' ? 'high' : 'normal',
+        notification: {
+          channelId: getChannelId(notificationData.priority),
+          priority: notificationData.priority === 'high' ? 'max' : 'default',
+          sound: 'default'
+        }
+      },
+      apns: {
+        payload: {
+          aps: {
+            contentAvailable: true, // ← KEY FOR BACKGROUND DELIVERY
+            sound: 'default',
+            alert: {
+              title: notificationData.title || 'New Notification',
+              body: notificationData.description || notificationData.message || 'You have a new notification'
+            }
+          }
+        }
       }
-    }
+    };
 
-    // Check for errors in tickets
-    const errors = tickets.filter(ticket => ticket.status === 'error');
-    console.log("notification err: ", errors);
+    // Send to all active tokens
+    const results = await Promise.allSettled(
+      activeTokens.map(token =>
+        admin.messaging().send({ ...message, token })
+      )
+    );
 
-    const successful = tickets.filter(ticket => ticket.status === 'ok');
+    const successful = results.filter(r => r.status === 'fulfilled').length;
+    const failed = results.filter(r => r.status === 'rejected').length;
 
-    if (errors.length > 0) {
-      console.warn(`⚠️ ${errors.length} notifications failed for user ${uniqueCode}`);
-    }
+    // Log failures
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        console.error(`❌ FCM send failed for token ${index}:`, result.reason);
+      }
+    });
 
     return {
       success: true,
       message: 'Notifications sent successfully',
       data: {
-        successful: successful.length,
-        failed: errors.length,
-        total: tickets.length,
-        tickets: tickets
+        successful,
+        failed,
+        total: activeTokens.length
       }
     };
 
@@ -1688,17 +1717,15 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
 
     // Collect all active tokens
     const allTokens = [];
-    const userTokenMap = new Map();
 
     users.forEach(user => {
       if (user.pushTokens && user.pushTokens.length > 0) {
         const activeTokens = user.pushTokens
-          .filter(tokenData => tokenData.isActive && Expo.isExpoPushToken(tokenData.token))
+          .filter(tokenData => tokenData.isActive && tokenData.token)
           .map(tokenData => tokenData.token);
 
         if (activeTokens.length > 0) {
           allTokens.push(...activeTokens);
-          userTokenMap.set(user.uniqueCode, activeTokens.length);
         }
       }
     });
@@ -1710,32 +1737,44 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
       };
     }
 
-    // Prepare messages
-    const messages = allTokens.map(token => ({
-      to: token,
-      sound: 'default',
-      title: notificationData.title || 'New Notification',
-      body: notificationData.body || notificationData.message || 'You have a new notification',
-      data: notificationData.data || notificationData,
-      priority: notificationData.priority === 'high' ? 'high' : 'normal',
-      channelId: getChannelId(notificationData.priority)
-    }));
-
-    // Send notifications in chunks
-    const chunks = expo.chunkPushNotifications(messages);
-    const tickets = [];
-
-    for (let chunk of chunks) {
-      try {
-        const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
-        tickets.push(...ticketChunk);
-      } catch (error) {
-        console.error('❌ Error sending bulk notification chunk:', error);
+    // 🆕 SEND VIA FIREBASE CLOUD MESSAGING
+    const message = {
+      notification: {
+        title: notificationData.title || 'New Notification',
+        body: notificationData.description || notificationData.message || 'You have a new notification'
+      },
+      data: {
+        ...notificationData,
+        notificationId: notificationData.notificationId || notificationData._id?.toString() || '',
+        type: notificationData.type || 'normal'
+      },
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: getChannelId(notificationData.priority),
+          priority: 'max',
+          sound: 'default'
+        }
+      },
+      apns: {
+        payload: {
+          aps: {
+            contentAvailable: true,
+            sound: 'default'
+          }
+        }
       }
-    }
+    };
 
-    const errors = tickets.filter(ticket => ticket.status === 'error');
-    const successful = tickets.filter(ticket => ticket.status === 'ok');
+    // Send to all tokens
+    const results = await Promise.allSettled(
+      allTokens.map(token =>
+        admin.messaging().send({ ...message, token })
+      )
+    );
+
+    const successful = results.filter(r => r.status === 'fulfilled').length;
+    const failed = results.filter(r => r.status === 'rejected').length;
 
     return {
       success: true,
@@ -1743,9 +1782,9 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
       data: {
         usersFound: users.length,
         tokensFound: allTokens.length,
-        successful: successful.length,
-        failed: errors.length,
-        total: tickets.length
+        successful,
+        failed,
+        total: allTokens.length
       }
     };
 
@@ -2148,9 +2187,9 @@ const cleanupInvalidTokens = async (uniqueCode = null) => {
       if (user.pushTokens && user.pushTokens.length > 0) {
         const initialLength = user.pushTokens.length;
 
-        // Remove invalid tokens
+        // Remove invalid tokens (basic validation for FCM)
         user.pushTokens = user.pushTokens.filter(tokenData =>
-          Expo.isExpoPushToken(tokenData.token)
+          tokenData.token && typeof tokenData.token === 'string' && tokenData.token.length > 100
         );
 
         const cleaned = initialLength - user.pushTokens.length;
