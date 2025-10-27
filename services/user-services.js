@@ -1655,36 +1655,27 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
     console.log('📤 Step 5: Preparing FCM message');
     console.log('Notification data:', JSON.stringify(notificationData, null, 2));
 
-    // Send notification...
+    // ✅ FIXED: Send data-only payload for killed app support
     const message = {
-      notification: {
-        title: notificationData.title || 'New Notification',
-        body: notificationData.description || notificationData.message || 'You have a new notification'
-      },
       data: {
-        title: String(notificationData.title || ''),
-        description: String(notificationData.description || ''),
+        title: String(notificationData.title || 'New Notification'),
+        body: String(notificationData.description || notificationData.message || ''),
         notificationId: String(notificationData.notificationId || notificationData._id?.toString() || ''),
         type: String(notificationData.type || 'normal'),
         priority: String(notificationData.priority || 'medium')
       },
       android: {
-        priority: notificationData.priority === 'high' ? 'high' : 'normal',
-        notification: {
-          channelId: getChannelId(notificationData.priority),
-          priority: notificationData.priority === 'high' ? 'max' : 'default',
-          sound: 'default'
-        }
+        priority: 'high',
       },
       apns: {
+        headers: {
+          'apns-priority': '10',
+          'apns-push-type': 'background'
+        },
         payload: {
           aps: {
             contentAvailable: true,
-            sound: 'default',
-            alert: {
-              title: notificationData.title || 'New Notification',
-              body: notificationData.description || notificationData.message || 'You have a new notification'
-            }
+            'mutable-content': 1
           }
         }
       }
