@@ -40,6 +40,9 @@ class OperatorController {
     try {
       const { qatarId } = req.body;
 
+      console.log(qatarId);
+      
+
       if (!qatarId) {
         return res.status(400).json({
           success: false,

@@ -45,7 +45,7 @@ class ComplaintService {
       );
 
       return complaintData;
-    } catch (error) {
+    } catch (error) { 
       console.error('Error creating complaint:', error);
       throw error;
     }

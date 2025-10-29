@@ -646,6 +646,11 @@ const getUserRoles = async (req, res) => {
         SUB_ADMIN: process.env.SUB_ADMIN,
         ASSISTANT_OFFICE_ADMIN: process.env.ASSISTANT_OFFICE_ADMIN,
         OFFICE_ADMIN: process.env.OFFICE_ADMIN,
+        CEO: process.env.CEO,
+        ACCOUNTANT: process.env.ACCOUNTANT,
+        PURCHASE_MANAGER: process.env.PURCHASE_MANAGER,
+        MD: process.env.MD,
+        MANAGER: process.env.MANAGER,
       }
     })
   } else {
@@ -655,13 +660,17 @@ const getUserRoles = async (req, res) => {
     if (!process.env.MAINTENANCE_HEAD) missingVars.push('MAINTENANCE_HEAD');
     if (!process.env.OPERATOR) missingVars.push('OPERATOR');
     if (!process.env.CAMP_BOSS) missingVars.push('CAMP_BOSS');
-    if (!process.env.MECHANIC_HEAD) missingVars.push('MECHANIC_HEAD');
+    if (!process.env.MECHANIC_HEAD) missingVars.push('MECHANIC_HEAD'); 
     if (!process.env.SUPER_ADMIN) missingVars.push('SUPER_ADMIN');
     if (!process.env.JALEEL_KA) missingVars.push('JALEEL_KA');
     if (!process.env.SUB_ADMIN) missingVars.push('SUB_ADMIN');
     if (!process.env.WORKSHOP_MANAGER) missingVars.push('WORKSHOP_MANAGER');
     if (!process.env.OFFICE_ADMIN) missingVars.push('OFFICE_ADMIN');
     if (!process.env.ASSISTANT_OFFICE_ADMIN) missingVars.push('ASSISTANT_OFFICE_ADMIN');
+    if (!process.env.CEO) missingVars.push('CEO');
+    if (!process.env.ACCOUNTANT) missingVars.push('ACCOUNTANT');
+    if (!process.env.MD) missingVars.push('MD');
+    if (!process.env.MANAGER) missingVars.push('MANAGER');
 
     console.log("Missing environment variables:", missingVars);
     res.status(500).json({

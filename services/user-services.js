@@ -1723,6 +1723,137 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
   }
 };
 
+// old function 
+// const sendNotificationToUser = async (uniqueCode, notificationData) => {
+//   try {
+//     console.log('🔍 Step 1: Finding user with uniqueCode:', uniqueCode);
+    
+//     // Find user with push tokens
+//     let user = await User.findOne({ uniqueCode }).select('uniqueCode name pushTokens');
+
+//     if (!user) {
+//       user = await Operator.findOne({ uniqueCode }).select('uniqueCode name pushTokens');
+//     }
+
+//     if (!user) {
+//       user = await Mechanic.findOne({ uniqueCode }).select('uniqueCode name pushTokens');
+//     }
+
+//     if (!user) {
+//       console.log('❌ User not found');
+//       return {
+//         success: false,
+//         message: 'User not found'
+//       };
+//     }
+
+//     console.log('✅ Step 2: User found:', user.name);
+//     console.log('📱 Step 3: Push tokens:', JSON.stringify(user.pushTokens, null, 2));
+
+//     if (!user.pushTokens || user.pushTokens.length === 0) {
+//       console.log('❌ No push tokens array');
+//       return {
+//         success: false,
+//         message: 'No push tokens found for this user'
+//       };
+//     }
+
+//     // Get active FCM tokens
+//     const activeTokens = user.pushTokens
+//       .filter(tokenData => tokenData.isActive && tokenData.token)
+//       .map(tokenData => tokenData.token);
+
+//     console.log('✅ Step 4: Active tokens count:', activeTokens.length);
+//     console.log('📋 Active tokens (first 30 chars):', activeTokens.map(t => t.substring(0, 30)));
+
+//     if (activeTokens.length === 0) {
+//       console.log('❌ No active tokens after filtering');
+//       return {
+//         success: false,
+//         message: 'No valid push tokens found for this user'
+//       };
+//     }
+
+//     console.log('📤 Step 5: Preparing FCM message');
+//     console.log('Notification data:', JSON.stringify(notificationData, null, 2));
+
+//     // Send notification...
+//     const message = {
+//       notification: {
+//         title: notificationData.title || 'New Notification',
+//         body: notificationData.description || notificationData.message || 'You have a new notification'
+//       },
+//       data: {
+//         title: String(notificationData.title || ''),
+//         description: String(notificationData.description || ''),
+//         notificationId: String(notificationData.notificationId || notificationData._id?.toString() || ''),
+//         type: String(notificationData.type || 'normal'),
+//         priority: String(notificationData.priority || 'medium')
+//       },
+//       android: {
+//         priority: notificationData.priority === 'high' ? 'high' : 'normal',
+//         notification: {
+//           channelId: getChannelId(notificationData.priority),
+//           priority: notificationData.priority === 'high' ? 'max' : 'default',
+//           sound: 'default'
+//         }
+//       },
+//       apns: {
+//         payload: {
+//           aps: {
+//             contentAvailable: true,
+//             sound: 'default',
+//             alert: {
+//               title: notificationData.title || 'New Notification',
+//               body: notificationData.description || notificationData.message || 'You have a new notification'
+//             }
+//           }
+//         }
+//       }
+//     };
+
+//     console.log('📨 Step 6: Sending to', activeTokens.length, 'tokens');
+
+//     const results = await Promise.allSettled(
+//       activeTokens.map((token, index) => {
+//         console.log(`Sending to token ${index + 1}...`);
+//         return admin.messaging().send({ ...message, token });
+//       })
+//     );
+
+//     const successful = results.filter(r => r.status === 'fulfilled').length;
+//     const failed = results.filter(r => r.status === 'rejected').length;
+
+//     console.log(`✅ Step 7: Results - ${successful} successful, ${failed} failed`);
+
+//     results.forEach((result, index) => {
+//       if (result.status === 'rejected') {
+//         console.error(`❌ Token ${index + 1} failed:`, result.reason);
+//       } else {
+//         console.log(`✅ Token ${index + 1} success:`, result.value);
+//       }
+//     });
+
+//     return {
+//       success: successful > 0,
+//       message: `Sent: ${successful} successful, ${failed} failed`,
+//       data: {
+//         successful,
+//         failed,
+//         total: activeTokens.length
+//       }
+//     };
+
+//   } catch (error) {
+//     console.error('❌ ERROR:', error);
+//     return {
+//       success: false,
+//       message: 'Failed to send notification',
+//       error: error.message
+//     };
+//   }
+// };
+// may be need to return 
 
 const sendBulkNotifications = async (uniqueCodes, notificationData) => {
   try {
