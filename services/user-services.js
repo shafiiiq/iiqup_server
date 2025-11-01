@@ -1991,73 +1991,42 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
 const sendBulkNotifications = async (uniqueCodes, notificationData) => {
   try {
     const superAdminCode = process.env.SUPER_ADMIN;
-    console.log('🔍 Finding SUPER_ADMIN:', superAdminCode);
-
-    // Find SUPER_ADMIN user only (for testing)
+    
     let user = await User.findOne({ uniqueCode: superAdminCode }).select('uniqueCode name pushTokens');
+    if (!user) user = await Operator.findOne({ uniqueCode: superAdminCode }).select('uniqueCode name pushTokens');
+    if (!user) user = await Mechanic.findOne({ uniqueCode: superAdminCode }).select('uniqueCode name pushTokens');
 
-    if (!user) {
-      user = await Operator.findOne({ uniqueCode: superAdminCode }).select('uniqueCode name pushTokens');
+    if (!user || !user.pushTokens || user.pushTokens.length === 0) {
+      return { success: false, message: 'No tokens found' };
     }
 
-    if (!user) {
-      user = await Mechanic.findOne({ uniqueCode: superAdminCode }).select('uniqueCode name pushTokens');
-    }
-
-    if (!user) {
-      return {
-        success: false,
-        message: 'SUPER_ADMIN not found'
-      };
-    }
-
-    console.log('✅ User found:', user.name);
-
-    if (!user.pushTokens || user.pushTokens.length === 0) {
-      return {
-        success: false,
-        message: 'No push tokens found'
-      };
-    }
-
-    // Get active FCM tokens (filter out Expo tokens)
     const activeTokens = user.pushTokens
-      .filter(tokenData => {
-        const isValid = tokenData.isActive &&
-          tokenData.token &&
-          !tokenData.token.startsWith('ExponentPushToken[') &&
-          tokenData.token.length > 100;
-
-        if (tokenData.token) {
-          console.log(`Token: ${tokenData.token.substring(0, 40)}...`);
-          console.log(`Platform: ${tokenData.platform || 'unknown'}`); // 👈 ADD THIS
-          console.log(`Valid: ${isValid}`);
-        }
-
-        return isValid;
-      })
-      .map(tokenData => tokenData.token);
-
-    console.log(`📱 Active FCM tokens: ${activeTokens.length}`);
+      .filter(t => t.isActive && t.token && t.token.length > 100)
+      .map(t => t.token);
 
     if (activeTokens.length === 0) {
-      return {
-        success: false,
-        message: 'No valid FCM tokens found'
-      };
+      return { success: false, message: 'No valid tokens' };
     }
+
+    // ✅ FIX: Clean the data - remove null/undefined and convert to strings
+    const cleanData = {};
+    Object.keys(notificationData).forEach(key => {
+      const value = notificationData[key];
+      // Only add if value exists and is not null/undefined
+      if (value !== null && value !== undefined && value !== '') {
+        cleanData[key] = String(value);
+      }
+    });
 
     const message = {
       data: {
         title: String(notificationData.title || 'New Notification'),
         body: String(notificationData.description || notificationData.message || ''),
-        notificationId: String(notificationData.notificationId || notificationData._id?.toString() || ''),
+        notificationId: String(notificationData.notificationId || notificationData._id || Date.now()),
         type: String(notificationData.type || 'normal'),
         priority: String(notificationData.priority || 'medium')
       },
-      android: {
-        priority: 'high',
-      },
+      android: { priority: 'high' },
       apns: {
         headers: {
           'apns-priority': '10',
@@ -2072,8 +2041,6 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
       }
     };
 
-    console.log('📨 Sending to', activeTokens.length, 'tokens...');
-
     const results = await Promise.allSettled(
       activeTokens.map(token => admin.messaging().send({ ...message, token }))
     );
@@ -2081,32 +2048,17 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
     const successful = results.filter(r => r.status === 'fulfilled').length;
     const failed = results.filter(r => r.status === 'rejected').length;
 
-    // Log only failures
-    results.forEach((result, index) => {
-      if (result.status === 'rejected') {
-        console.error(`❌ Token ${index + 1} failed:`, result.reason?.code, result.reason?.message);
-      }
-    });
-
-    console.log(`✅ Results: ${successful} sent, ${failed} failed`);
+    console.log(`✅ Sent: ${successful}, Failed: ${failed}`);
 
     return {
       success: successful > 0,
-      message: `Sent: ${successful} successful, ${failed} failed`,
-      data: {
-        successful,
-        failed,
-        total: activeTokens.length
-      }
+      message: `Sent: ${successful}/${activeTokens.length}`,
+      data: { successful, failed, total: activeTokens.length }
     };
 
   } catch (error) {
     console.error('❌ Error:', error.message);
-    return {
-      success: false,
-      message: 'Failed to send notification',
-      error: error.message
-    };
+    return { success: false, message: error.message };
   }
 };
 
