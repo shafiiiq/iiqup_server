@@ -1605,7 +1605,7 @@ const getUserPushTokens = async (uniqueCode) => {
 const sendNotificationToUser = async (uniqueCode, notificationData) => {
   try {
     console.log('🔍 Step 1: Finding user with uniqueCode:', uniqueCode);
-    
+
     // Find user with push tokens
     let user = await User.findOne({ uniqueCode }).select('uniqueCode name pushTokens');
 
@@ -1727,7 +1727,7 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
 // const sendNotificationToUser = async (uniqueCode, notificationData) => {
 //   try {
 //     console.log('🔍 Step 1: Finding user with uniqueCode:', uniqueCode);
-    
+
 //     // Find user with push tokens
 //     let user = await User.findOne({ uniqueCode }).select('uniqueCode name pushTokens');
 
@@ -1858,7 +1858,7 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
 // const sendBulkNotifications = async (uniqueCodes, notificationData) => {
 //   try {
 //     console.log('🔍 Step 1: Finding users with uniqueCodes:', uniqueCodes);
-    
+
 //     // Find all users with push tokens across all collections
 //     const users = await User.find({
 //       uniqueCode: { $in: uniqueCodes }
@@ -1891,7 +1891,7 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
 
 //     allUsers.forEach(user => {
 //       console.log(`📱 Checking tokens for ${user.name}:`, JSON.stringify(user.pushTokens, null, 2));
-      
+
 //       if (user.pushTokens && user.pushTokens.length > 0) {
 //         const activeTokens = user.pushTokens
 //           .filter(tokenData => tokenData.isActive && tokenData.token)
@@ -1992,7 +1992,7 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
   try {
     const superAdminCode = process.env.SUPER_ADMIN;
     console.log('🔍 Finding SUPER_ADMIN:', superAdminCode);
-    
+
     // Find SUPER_ADMIN user only (for testing)
     let user = await User.findOne({ uniqueCode: superAdminCode }).select('uniqueCode name pushTokens');
 
@@ -2023,15 +2023,17 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
     // Get active FCM tokens (filter out Expo tokens)
     const activeTokens = user.pushTokens
       .filter(tokenData => {
-        const isValid = tokenData.isActive && 
-                       tokenData.token && 
-                       !tokenData.token.startsWith('ExponentPushToken[') &&
-                       tokenData.token.length > 100;
-        
+        const isValid = tokenData.isActive &&
+          tokenData.token &&
+          !tokenData.token.startsWith('ExponentPushToken[') &&
+          tokenData.token.length > 100;
+
         if (tokenData.token) {
-          console.log(`Token: ${tokenData.token.substring(0, 40)}... Valid: ${isValid}`);
+          console.log(`Token: ${tokenData.token.substring(0, 40)}...`);
+          console.log(`Platform: ${tokenData.platform || 'unknown'}`); // 👈 ADD THIS
+          console.log(`Valid: ${isValid}`);
         }
-        
+
         return isValid;
       })
       .map(tokenData => tokenData.token);
