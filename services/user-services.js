@@ -1960,7 +1960,7 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
 
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
-        console.error(`❌ Token ${index + 1} failed:`, result.reason);
+        // console.error(`❌ Token ${index + 1} failed:`, result.reason);
       } else {
         console.log(`✅ Token ${index + 1} success:`, result.value);
       }
@@ -1979,7 +1979,7 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
     };
 
   } catch (error) {
-    console.error('❌ Error sending bulk notifications:', error);
+    // console.error('❌ Error sending bulk notifications:', error);
     return {
       success: false,
       message: 'Failed to send bulk notifications',
