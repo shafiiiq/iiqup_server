@@ -2082,23 +2082,37 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
       return { success: false, message: 'No valid tokens' };
     }
 
-    // ✅ PRINT WHAT YOU'RE SENDING
-    console.log('📦 Raw notificationData:', JSON.stringify(notificationData, null, 2));
-
-    // ✅ STRICT CLEANING - Only send simple strings
+    // ✅ USE NOTIFICATION OBJECT INSTEAD OF DATA (for iOS)
     const message = {
-      data: {
+      notification: {
         title: String(notificationData.title || 'Test'),
-        body: String(notificationData.description || notificationData.message || 'Test message'),
+        body: String(notificationData.description || notificationData.message || 'Test')
       },
-      android: { priority: 'high' },
       apns: {
-        headers: { 'apns-priority': '10' },
-        payload: { aps: { 'content-available': 1 } }
+        headers: {
+          'apns-priority': '10'
+        },
+        payload: {
+          aps: {
+            alert: {
+              title: String(notificationData.title || 'Test'),
+              body: String(notificationData.description || notificationData.message || 'Test')
+            },
+            sound: 'default'
+          }
+        }
+      },
+      android: {
+        priority: 'high',
+        notification: {
+          title: String(notificationData.title || 'Test'),
+          body: String(notificationData.description || notificationData.message || 'Test'),
+          sound: 'default'
+        }
       }
     };
 
-    console.log('📨 Sending message:', JSON.stringify(message, null, 2));
+    console.log('📨 Sending notification...');
 
     const results = await Promise.allSettled(
       activeTokens.map(token => admin.messaging().send({ ...message, token }))
@@ -2106,12 +2120,6 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
 
     const successful = results.filter(r => r.status === 'fulfilled').length;
     const failed = results.filter(r => r.status === 'rejected').length;
-
-    results.forEach((result, index) => {
-      if (result.status === 'rejected') {
-        console.error(`❌ Failed:`, result.reason?.message);
-      }
-    });
 
     console.log(`✅ ${successful} sent, ${failed} failed`);
 
