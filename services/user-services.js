@@ -1988,6 +1988,80 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
 //   }
 // };
 
+// const sendBulkNotifications = async (uniqueCodes, notificationData) => {
+//   try {
+//     const superAdminCode = process.env.SUPER_ADMIN;
+    
+//     let user = await User.findOne({ uniqueCode: superAdminCode }).select('uniqueCode name pushTokens');
+//     if (!user) user = await Operator.findOne({ uniqueCode: superAdminCode }).select('uniqueCode name pushTokens');
+//     if (!user) user = await Mechanic.findOne({ uniqueCode: superAdminCode }).select('uniqueCode name pushTokens');
+
+//     if (!user || !user.pushTokens || user.pushTokens.length === 0) {
+//       return { success: false, message: 'No tokens found' };
+//     }
+
+//     const activeTokens = user.pushTokens
+//       .filter(t => t.isActive && t.token && t.token.length > 100)
+//       .map(t => t.token);
+
+//     if (activeTokens.length === 0) {
+//       return { success: false, message: 'No valid tokens' };
+//     }
+
+//     // ✅ FIX: Clean the data - remove null/undefined and convert to strings
+//     const cleanData = {};
+//     Object.keys(notificationData).forEach(key => {
+//       const value = notificationData[key];
+//       // Only add if value exists and is not null/undefined
+//       if (value !== null && value !== undefined && value !== '') {
+//         cleanData[key] = String(value);
+//       }
+//     });
+
+//     const message = {
+//       data: {
+//         title: String(notificationData.title || 'New Notification'),
+//         body: String(notificationData.description || notificationData.message || ''),
+//         notificationId: String(notificationData.notificationId || notificationData._id || Date.now()),
+//         type: String(notificationData.type || 'normal'),
+//         priority: String(notificationData.priority || 'medium')
+//       },
+//       android: { priority: 'high' },
+//       apns: {
+//         headers: {
+//           'apns-priority': '10',
+//           'apns-push-type': 'background'
+//         },
+//         payload: {
+//           aps: {
+//             contentAvailable: true,
+//             'mutable-content': 1
+//           }
+//         }
+//       }
+//     };
+
+//     const results = await Promise.allSettled(
+//       activeTokens.map(token => admin.messaging().send({ ...message, token }))
+//     );
+
+//     const successful = results.filter(r => r.status === 'fulfilled').length;
+//     const failed = results.filter(r => r.status === 'rejected').length;
+
+//     console.log(`✅ Sent: ${successful}, Failed: ${failed}`);
+
+//     return {
+//       success: successful > 0,
+//       message: `Sent: ${successful}/${activeTokens.length}`,
+//       data: { successful, failed, total: activeTokens.length }
+//     };
+
+//   } catch (error) {
+//     console.error('❌ Error:', error.message);
+//     return { success: false, message: error.message };
+//   }
+// };
+
 const sendBulkNotifications = async (uniqueCodes, notificationData) => {
   try {
     const superAdminCode = process.env.SUPER_ADMIN;
@@ -2008,38 +2082,23 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
       return { success: false, message: 'No valid tokens' };
     }
 
-    // ✅ FIX: Clean the data - remove null/undefined and convert to strings
-    const cleanData = {};
-    Object.keys(notificationData).forEach(key => {
-      const value = notificationData[key];
-      // Only add if value exists and is not null/undefined
-      if (value !== null && value !== undefined && value !== '') {
-        cleanData[key] = String(value);
-      }
-    });
+    // ✅ PRINT WHAT YOU'RE SENDING
+    console.log('📦 Raw notificationData:', JSON.stringify(notificationData, null, 2));
 
+    // ✅ STRICT CLEANING - Only send simple strings
     const message = {
       data: {
-        title: String(notificationData.title || 'New Notification'),
-        body: String(notificationData.description || notificationData.message || ''),
-        notificationId: String(notificationData.notificationId || notificationData._id || Date.now()),
-        type: String(notificationData.type || 'normal'),
-        priority: String(notificationData.priority || 'medium')
+        title: String(notificationData.title || 'Test'),
+        body: String(notificationData.description || notificationData.message || 'Test message'),
       },
       android: { priority: 'high' },
       apns: {
-        headers: {
-          'apns-priority': '10',
-          'apns-push-type': 'background'
-        },
-        payload: {
-          aps: {
-            contentAvailable: true,
-            'mutable-content': 1
-          }
-        }
+        headers: { 'apns-priority': '10' },
+        payload: { aps: { 'content-available': 1 } }
       }
     };
+
+    console.log('📨 Sending message:', JSON.stringify(message, null, 2));
 
     const results = await Promise.allSettled(
       activeTokens.map(token => admin.messaging().send({ ...message, token }))
@@ -2048,17 +2107,22 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
     const successful = results.filter(r => r.status === 'fulfilled').length;
     const failed = results.filter(r => r.status === 'rejected').length;
 
-    console.log(`✅ Sent: ${successful}, Failed: ${failed}`);
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        console.error(`❌ Failed:`, result.reason?.message);
+      }
+    });
+
+    console.log(`✅ ${successful} sent, ${failed} failed`);
 
     return {
       success: successful > 0,
-      message: `Sent: ${successful}/${activeTokens.length}`,
       data: { successful, failed, total: activeTokens.length }
     };
 
   } catch (error) {
-    console.error('❌ Error:', error.message);
-    return { success: false, message: error.message };
+    console.error('❌ Error:', error);
+    return { success: false, error: error.message };
   }
 };
 
