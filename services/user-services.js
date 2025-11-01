@@ -1886,7 +1886,7 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
     console.log('✅ Step 2: Users found:', allUsers.length);
     console.log('Users:', allUsers.map(u => `${u.name} (${u.uniqueCode})`).join(', '));
 
-    // Collect all active tokens
+    // Collect all active FCM tokens
     const allTokens = [];
 
     allUsers.forEach(user => {
@@ -1946,7 +1946,6 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
 
     console.log(`📨 Step 5: Sending to ${allTokens.length} tokens`);
 
-    // Send to all tokens
     const results = await Promise.allSettled(
       allTokens.map((token, index) => {
         console.log(`Sending to token ${index + 1}/${allTokens.length}...`);
