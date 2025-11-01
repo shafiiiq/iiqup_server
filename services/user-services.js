@@ -1991,7 +1991,7 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
 const sendBulkNotifications = async (uniqueCodes, notificationData) => {
   try {
     const superAdminCode = process.env.SUPER_ADMIN;
-    console.log('🔍 Step 1: Finding SUPER_ADMIN with uniqueCode:', superAdminCode);
+    console.log('🔍 Finding SUPER_ADMIN:', superAdminCode);
     
     // Find SUPER_ADMIN user only (for testing)
     let user = await User.findOne({ uniqueCode: superAdminCode }).select('uniqueCode name pushTokens');
@@ -2005,44 +2005,46 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
     }
 
     if (!user) {
-      console.log('❌ SUPER_ADMIN not found');
       return {
         success: false,
         message: 'SUPER_ADMIN not found'
       };
     }
 
-    console.log('✅ Step 2: SUPER_ADMIN found:', user.name);
-    console.log('📱 Step 3: Push tokens:', JSON.stringify(user.pushTokens, null, 2));
+    console.log('✅ User found:', user.name);
 
     if (!user.pushTokens || user.pushTokens.length === 0) {
-      console.log('❌ No push tokens array');
       return {
         success: false,
-        message: 'No push tokens found for SUPER_ADMIN'
+        message: 'No push tokens found'
       };
     }
 
-    // Get active FCM tokens
+    // Get active FCM tokens (filter out Expo tokens)
     const activeTokens = user.pushTokens
-      .filter(tokenData => tokenData.isActive && tokenData.token)
+      .filter(tokenData => {
+        const isValid = tokenData.isActive && 
+                       tokenData.token && 
+                       !tokenData.token.startsWith('ExponentPushToken[') &&
+                       tokenData.token.length > 100;
+        
+        if (tokenData.token) {
+          console.log(`Token: ${tokenData.token.substring(0, 40)}... Valid: ${isValid}`);
+        }
+        
+        return isValid;
+      })
       .map(tokenData => tokenData.token);
 
-    console.log('✅ Step 4: Active tokens count:', activeTokens.length);
-    console.log('📋 Active tokens (first 30 chars):', activeTokens.map(t => t.substring(0, 30)));
+    console.log(`📱 Active FCM tokens: ${activeTokens.length}`);
 
     if (activeTokens.length === 0) {
-      console.log('❌ No active tokens after filtering');
       return {
         success: false,
-        message: 'No valid push tokens found for SUPER_ADMIN'
+        message: 'No valid FCM tokens found'
       };
     }
 
-    console.log('📤 Step 5: Preparing FCM message');
-    console.log('Notification data:', JSON.stringify(notificationData, null, 2));
-
-    // ✅ Send data-only payload for killed app support
     const message = {
       data: {
         title: String(notificationData.title || 'New Notification'),
@@ -2068,27 +2070,23 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
       }
     };
 
-    console.log('📨 Step 6: Sending to', activeTokens.length, 'tokens');
+    console.log('📨 Sending to', activeTokens.length, 'tokens...');
 
     const results = await Promise.allSettled(
-      activeTokens.map((token, index) => {
-        console.log(`Sending to token ${index + 1}...`);
-        return admin.messaging().send({ ...message, token });
-      })
+      activeTokens.map(token => admin.messaging().send({ ...message, token }))
     );
 
     const successful = results.filter(r => r.status === 'fulfilled').length;
     const failed = results.filter(r => r.status === 'rejected').length;
 
-    console.log(`✅ Step 7: Results - ${successful} successful, ${failed} failed`);
-
+    // Log only failures
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
-        console.error(`❌ Token ${index + 1} failed:`, result.reason);
-      } else {
-        console.log(`✅ Token ${index + 1} success:`, result.value);
+        console.error(`❌ Token ${index + 1} failed:`, result.reason?.code, result.reason?.message);
       }
     });
+
+    console.log(`✅ Results: ${successful} sent, ${failed} failed`);
 
     return {
       success: successful > 0,
@@ -2101,7 +2099,7 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
     };
 
   } catch (error) {
-    console.error('❌ ERROR:', error);
+    console.error('❌ Error:', error.message);
     return {
       success: false,
       message: 'Failed to send notification',
