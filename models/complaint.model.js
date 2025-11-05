@@ -81,7 +81,7 @@ const lpoTrackingSchema = new mongoose.Schema({
   ceoApprovalDate: { type: Date },
   status: {
     type: String,
-    enum: ['created', 'uploaded', 'purchase_approved', 'accounts_approved', 'manager_approved', 'ceo_approved', 'items_procured'],
+    enum: ['created', 'uploaded', 'purchase_approved', 'accounts_approved', 'manager_approved', 'ceo_approved', 'md_approved', 'items_procured'],
     default: 'created'
   },
   // PMR fields
@@ -195,10 +195,42 @@ const lpoTrackingSchema = new mongoose.Schema({
   CEOapprovedLocation: {
     type: String,
   },
+
+  // MD fields
+  // MD fields
+  MDsigned: {
+    type: Boolean,
+    default: false
+  },
+  MDauthorised: {
+    type: Boolean,
+    default: false
+  },
+  MDapprovedBy: {
+    type: String,
+  },
+  MDapprovedDate: {
+    type: String,
+  },
+  MDapprovedFrom: {
+    type: String,
+  },
+  MDapprovedIP: {
+    type: String,
+  },
+  MDapprovedBDevice: {
+    type: String,
+  },
+  MDapprovedLocation: {
+    type: String,
+  },
+
+  mdApprovalDate: { type: Date },
 });
 
 const complaintSchema = new mongoose.Schema({
   uniqueCode: { type: String, required: true },
+  complaintId: { type: String, unique: true },
   regNo: { type: String },
   brand: { type: String },
   machine: { type: String },
@@ -239,6 +271,7 @@ const complaintSchema = new mongoose.Schema({
       'purchase_approved',    // Approved by purchase manager
       'accounts_approved',    // Approved by accounts
       'manager_approved',     // Approved by manager
+       'md_approved',         // Approved by md
       'ceo_approved',         // Approved by CEO
       'items_available',      // Items available for mechanic
       'work_in_progress',     // Mechanic started work

@@ -1655,28 +1655,37 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
     console.log('📤 Step 5: Preparing FCM message');
     console.log('Notification data:', JSON.stringify(notificationData, null, 2));
 
-    // ✅ FIXED: Send data-only payload for killed app support
+    // ✅ USE NOTIFICATION OBJECT INSTEAD OF DATA (for iOS)
     const message = {
-      data: {
+      notification: {
         title: String(notificationData.title || 'New Notification'),
-        body: String(notificationData.description || notificationData.message || ''),
+        body: String(notificationData.description || notificationData.message || '')
+      },
+      data: {
         notificationId: String(notificationData.notificationId || notificationData._id?.toString() || ''),
         type: String(notificationData.type || 'normal'),
         priority: String(notificationData.priority || 'medium')
       },
-      android: {
-        priority: 'high',
-      },
       apns: {
         headers: {
-          'apns-priority': '10',
-          'apns-push-type': 'background'
+          'apns-priority': '10'
         },
         payload: {
           aps: {
-            contentAvailable: true,
-            'mutable-content': 1
+            alert: {
+              title: String(notificationData.title || 'New Notification'),
+              body: String(notificationData.description || notificationData.message || '')
+            },
+            sound: 'default'
           }
+        }
+      },
+      android: {
+        priority: 'high',
+        notification: {
+          title: String(notificationData.title || 'New Notification'),
+          body: String(notificationData.description || notificationData.message || ''),
+          sound: 'default'
         }
       }
     };
@@ -2135,8 +2144,6 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
 };
 
 const getAuthSignKey = async (password) => {
-  console.log("password", password);
-
   const response = await verifyDocAuthUserCreds(password)
   console.log("response", response);
 

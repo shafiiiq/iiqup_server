@@ -528,7 +528,8 @@ class ComplaintController {
         approvedFrom,
         approvedIP,
         approvedBDevice,
-        approvedLocation
+        approvedLocation,
+        authUser
       } = req.body;
 
       if (!approvedBy) {
@@ -553,7 +554,8 @@ class ComplaintController {
         complaintId,
         approvedBy,
         comments,
-        approvedCreds
+        approvedCreds,
+        authUser
       );
 
       res.status(200).json(result);

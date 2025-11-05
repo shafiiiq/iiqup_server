@@ -13,8 +13,12 @@ class ComplaintService {
     try {
       const equipment = await Equipment.findOne({ regNo: complaint.regNo });
 
+      // Generate unique complaint ID
+      const complaintId = await this.generateComplaintId();
+
       const complaintData = new Complaint({
         ...complaint,
+        complaintId: complaintId,
         workflowStatus: 'registered',
         status: 'pending'
       });
@@ -27,7 +31,7 @@ class ComplaintService {
         description: `${complaint.name} registered complaint for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Please assign a mechanic.`,
         priority: "high",
         sourceId: complaintData._id,
-        recipient: process.env.MAINTENANCE_HEAD, // ✅ Single user
+        recipient: process.env.MAINTENANCE_HEAD,
         time: new Date(),
         navigateTo: `/(screens)/assignMechanic/${complaintData._id}`,
         navigateText: 'Assign Mechanic',
@@ -45,10 +49,46 @@ class ComplaintService {
       );
 
       return complaintData;
-    } catch (error) { 
+    } catch (error) {
       console.error('Error creating complaint:', error);
       throw error;
     }
+  }
+
+  static async generateComplaintId() {
+    const now = new Date();
+
+    // Format date components
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = String(now.getFullYear()).slice(-2);
+
+    // Format time components
+    let hours = now.getHours();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12 || 12; // Convert to 12-hour format
+    const formattedHours = String(hours).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+
+    // Get start and end of today for counting
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+    // Count complaints created today
+    const todayCount = await Complaint.countDocuments({
+      createdAt: {
+        $gte: startOfDay,
+        $lte: endOfDay
+      }
+    });
+
+    // Increment count for this new complaint
+    const complaintNumber = todayCount + 1;
+
+    // Build complaint ID: DDMMYYHHMM(AM/PM)CP{count}
+    const complaintId = `${day}${month}${year}${formattedHours}${minutes}${ampm}CP${complaintNumber}`;
+
+    return complaintId;
   }
 
   // Step 2: MAINTENANCE_HEAD assigns mechanic
@@ -651,7 +691,7 @@ class ComplaintService {
         throw { status: 404, message: 'Complaint not found' };
       }
 
-      let target
+      let target, screen
       // Update LPO with managerSigned: true
       if (complaint.lpoDetails && complaint.lpoDetails.lpoId) {
         await LPO.updateOne(
@@ -664,10 +704,12 @@ class ComplaintService {
         const lpoData = await Complaint.findById(complaint.lpoDetails.lpoId)
         if (lpoData.signatures.authorizedSignatoryTitle === 'CEO') {
           target = process.env.CEO
+          screen = `/(screens)/ceoSign/${complaint._id}`
         }
 
         if (lpoData.signatures.authorizedSignatoryTitle === 'MD') {
           target = process.env.MD
+          screen = `/(screens)/mdSign/${complaint._id}`
         }
         throw { status: 404, message: 'Invalid auth position' };
       }
@@ -706,32 +748,36 @@ class ComplaintService {
   }
 
   // After ceoApproval
-  static async ceoApproval(complaintId, approvedBy, comments = '', approvedCreds) {
+  static async ceoApproval(complaintId, approvedBy, comments = '', approvedCreds, authUser) {
     try {
+      // Determine if it's MD or CEO
+      const approverType = authUser === 'MD' ? 'MD' : 'CEO';
+      const approvalStatus = `${approverType.toLowerCase()}_approved`;
+
       const updateFields = {
-        'lpoDetails.ceoApprovalDate': new Date(),
-        'lpoDetails.status': 'ceo_approved',
-        'workflowStatus': 'ceo_approved',
+        [`lpoDetails.${approverType.toLowerCase()}ApprovalDate`]: new Date(),
+        'lpoDetails.status': approvalStatus,
+        'workflowStatus': approvalStatus,
         $push: {
           approvalTrail: {
             approvedBy: approvedBy,
-            role: 'CEO',
+            role: approverType,
             action: 'approved',
-            comments: comments || 'CEO approved'
+            comments: comments || `${approverType} approved`
           }
         }
       };
 
       if (approvedCreds && approvedCreds.signed) {
-        updateFields['lpoDetails.CEOsigned'] = true;
-        updateFields['lpoDetails.CEOauthorised'] = approvedCreds.authorised;
-        updateFields['lpoDetails.CEOapprovedBy'] = approvedCreds.approvedBy;
-        updateFields['lpoDetails.CEOapprovedDate'] = approvedCreds.approvedDate || new Date().toISOString();
+        updateFields[`lpoDetails.${approverType}signed`] = true;
+        updateFields[`lpoDetails.${approverType}authorised`] = approvedCreds.authorised;
+        updateFields[`lpoDetails.${approverType}approvedBy`] = approvedCreds.approvedBy;
+        updateFields[`lpoDetails.${approverType}approvedDate`] = approvedCreds.approvedDate || new Date().toISOString();
 
-        if (approvedCreds.approvedFrom) updateFields['lpoDetails.CEOapprovedFrom'] = approvedCreds.approvedFrom;
-        if (approvedCreds.approvedIP) updateFields['lpoDetails.CEOapprovedIP'] = approvedCreds.approvedIP;
-        if (approvedCreds.approvedBDevice) updateFields['lpoDetails.CEOapprovedBDevice'] = approvedCreds.approvedBDevice;
-        if (approvedCreds.approvedLocation) updateFields['lpoDetails.CEOapprovedLocation'] = approvedCreds.approvedLocation;
+        if (approvedCreds.approvedFrom) updateFields[`lpoDetails.${approverType}approvedFrom`] = approvedCreds.approvedFrom;
+        if (approvedCreds.approvedIP) updateFields[`lpoDetails.${approverType}approvedIP`] = approvedCreds.approvedIP;
+        if (approvedCreds.approvedBDevice) updateFields[`lpoDetails.${approverType}approvedBDevice`] = approvedCreds.approvedBDevice;
+        if (approvedCreds.approvedLocation) updateFields[`lpoDetails.${approverType}approvedLocation`] = approvedCreds.approvedLocation;
       }
 
       const complaint = await Complaint.findByIdAndUpdate(
@@ -744,17 +790,18 @@ class ComplaintService {
         throw { status: 404, message: 'Complaint not found' };
       }
 
-      // Update LPO with ceoSigned: true
+      // Update LPO with dynamic field
       if (complaint.lpoDetails && complaint.lpoDetails.lpoId) {
+        const lpoUpdateField = approverType === 'MD' ? { mdSigned: true } : { ceoSigned: true };
         await LPO.updateOne(
           { _id: complaint.lpoDetails.lpoId },
-          { ceoSigned: true }
+          lpoUpdateField
         );
       }
 
       const notification = await createNotification({
         title: `Approved - LPO ${complaint.lpoDetails.lpoRef}`,
-        description: `CEO approved LPO for complaint ${complaint.regNo}. Items can now be procured.`,
+        description: `${approverType} approved LPO for complaint ${complaint.regNo}. Items can now be procured.`,
         priority: "high",
         sourceId: 'final_approval',
         recipient: [process.env.MAINTENANCE_HEAD, process.env.JALEEL_KA],
@@ -768,7 +815,7 @@ class ComplaintService {
       await PushNotificationService.sendGeneralNotification(
         [process.env.MAINTENANCE_HEAD, process.env.JALEEL_KA],
         `Approved - LPO ${complaint.lpoDetails.lpoRef}`,
-        `CEO approved LPO for complaint ${complaint.regNo}. Items can now be procured.`,
+        `${approverType} approved LPO for complaint ${complaint.regNo}. Items can now be procured.`,
         'high',
         'normal',
         notification.data._id.toString()
@@ -776,11 +823,11 @@ class ComplaintService {
 
       return {
         status: 200,
-        message: 'CEO approval completed',
+        message: `${approverType} approval completed`,
         data: complaint
       };
     } catch (error) {
-      console.error('Error in CEO approval:', error);
+      console.error(`Error in ${authUser || 'CEO'} approval:`, error);
       throw error;
     }
   }
@@ -909,9 +956,13 @@ class ComplaintService {
       });
 
       await PushNotificationService.sendGeneralNotification(
-        null,
+        [proces.env.MAINTENANCE_HEAD, process.env.WORKSHOP_MANAGER,
+        process.env.PURCHASE_MANAGER,
+        process.env.ACCOUNTANT, process.env.CEO,
+        process.env.MD,
+        ],
         `Work Completed - ${complaint.regNo}`,
-         `${mechanic} completed work on ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Equipment ready to work.`,
+        `${mechanic} completed work on ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Equipment ready to work.`,
         'medium',
         'normal'
       );
@@ -964,7 +1015,7 @@ class ComplaintService {
   // New method to get complaints assigned to a specific mechanic
   static async getComplaintsByMechanic(email) {
     try {
-      const mechanic = await Mechanic.findOne({ email})
+      const mechanic = await Mechanic.findOne({ email })
       const data = await Complaint.find({
         'assignedMechanic.mechanicId': mechanic.userId
       }).sort({ createdAt: -1 });
