@@ -125,6 +125,10 @@ const lpoSchema = new mongoose.Schema({
     type: Boolean,
     required: true,
     default: false
+  },
+   complaintId: {
+    type: String,
+    default: null
   }
 }, {
   timestamps: true
