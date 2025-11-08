@@ -93,6 +93,10 @@ const verifyCEO = async (req, res) => {
 const verifyUser = async (req, res) => {
   const { email, password, type } = req.body;
 
+  console.log(email)
+  console.log(password)
+  console.log(type)
+
   if (!email || !password) {
     return res.status(400).json({
       success: false,
