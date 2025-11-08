@@ -25,13 +25,6 @@ const generateAndSendOTP = async (email, demo_opr = false) => {
 
     // Check if user exists with this email
     user = await User.findOne({ authMail: email });
-    if (!user) {
-      return {
-        status: 404,
-        success: false,
-        message: 'No user found with this email address'
-      };
-    }
 
     if (!user) {
       user = await Mechanic.findOne({ authMail: email });
