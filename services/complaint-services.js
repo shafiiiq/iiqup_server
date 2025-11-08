@@ -123,6 +123,27 @@ class ComplaintService {
       const equipment = await Equipment.findOne({ regNo: complaint.regNo });
 
       // Notify assigned mechanic
+      const notificationAlert = await createNotification({
+        title: `Hamsa assigned - ${complaint.regNo}`,
+        description: `You have been assigned to work on ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Please check the complaint details.`,
+        priority: "high",
+        sourceId: 'job_assignment',
+        recipient: process.env.OFFICE_USERS,
+        time: new Date(),
+        navigteToId: complaint._id,
+        hasButton: true
+      });
+
+      await PushNotificationService.sendGeneralNotification(
+        mechanicData.mechanicId,
+        `New Job Assignment`,
+        `You've been assigned to work on ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}`,
+        'high',
+        'normal',
+        notificationAlert.data._id.toString()
+      );
+
+      // Notify assigned mechanic
       const notification = await createNotification({
         title: `New Job Assigned - ${complaint.regNo}`,
         description: `You have been assigned to work on ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Please check the complaint details.`,
