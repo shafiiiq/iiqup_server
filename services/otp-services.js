@@ -21,14 +21,27 @@ const generateAndSendOTP = async (email, demo_opr = false) => {
       };
     }
 
+    let user
+
     // Check if user exists with this email
-    const user = await User.findOne({ authMail: email });
+    user = await User.findOne({ authMail: email });
     if (!user) {
       return {
         status: 404,
         success: false,
         message: 'No user found with this email address'
       };
+    }
+
+    if (!user) {
+      user = await Mechanic.findOne({ authMail: email });
+      if (!user) {
+        return {
+          status: 404,
+          success: false,
+          message: 'No user found with this email address'
+        };
+      }
     }
 
     // Generate a random 6-digit OTP
@@ -48,7 +61,7 @@ const generateAndSendOTP = async (email, demo_opr = false) => {
         verified: false
       },
       { upsert: true, new: true }
-    ); 
+    );
 
     // Send OTP via email
     if (demo_opr) {
@@ -58,12 +71,12 @@ const generateAndSendOTP = async (email, demo_opr = false) => {
     }
 
     if (process.env.DEMO_OFFICE == user.email) {
-      console.log("yesss same"); 
+      console.log("yesss same");
     }
- 
+
     console.log("DEMO_OFFICE", process.env.DEMO_OFFICE);
     console.log("user.email", user.email);
-    
+
 
     return {
       status: 200,
