@@ -31,7 +31,7 @@ class ComplaintService {
         description: `${complaint.name} registered complaint for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Please assign a mechanic.`,
         priority: "high",
         sourceId: complaintData._id,
-        recipient: process.env.MAINTENANCE_HEAD,
+        recipient: process.env.OFFICE_HERO,
         time: new Date(),
         navigateTo: `/(screens)/assignMechanic/${complaintData._id}`,
         navigateText: 'Assign Mechanic',
@@ -40,7 +40,7 @@ class ComplaintService {
       });
 
       await PushNotificationService.sendGeneralNotification(
-        process.env.MAINTENANCE_HEAD,
+        process.env.OFFICE_HERO,
         `New Complaint - ${complaint.regNo}`,
         `New complaint needs mechanic assignment for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'}`,
         'high',
@@ -120,50 +120,32 @@ class ComplaintService {
         throw { status: 404, message: 'Complaint not found' };
       }
 
+      const mechanic = await Mechanic.findOneAndUpdate(
+        mechanicData.userId,
+        {
+          status: 'engaged'
+        }
+      )
+
       const equipment = await Equipment.findOne({ regNo: complaint.regNo });
 
       // Notify assigned mechanic
       const notificationAlert = await createNotification({
-        title: `Hamsa assigned - ${complaint.regNo}`,
-        description: `You have been assigned to work on ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Please check the complaint details.`,
+        title: `Hamsa assigned - ${mechanicData.name} to ${complaint.regNo}`,
+        description: `Hamsa assigned - ${mechanicData.mechanicName} to ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo} for complaint rectification.`,
         priority: "high",
-        sourceId: 'job_assignment',
-        recipient: process.env.OFFICE_USERS,
+        sourceId: 'job_assignment-annoucement',
+        recipient: process.env.OFFICE_HERO,
         time: new Date(),
-        navigteToId: complaint._id,
-        hasButton: true
       });
 
       await PushNotificationService.sendGeneralNotification(
-        mechanicData.mechanicId,
-        `New Job Assignment`,
-        `You've been assigned to work on ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}`,
+        process.env.OFFICE_HERO,
+        `Hamsa assigned - ${mechanicData.mechanicName} to ${complaint.regNo}`,
+        `Hamsa assigned - ${mechanicData.mechanicName} to ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo} for complaint rectification.`,
         'high',
         'normal',
         notificationAlert.data._id.toString()
-      );
-
-      // Notify assigned mechanic
-      const notification = await createNotification({
-        title: `New Job Assigned - ${complaint.regNo}`,
-        description: `You have been assigned to work on ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Please check the complaint details.`,
-        priority: "high",
-        sourceId: 'job_assignment',
-        recipient: mechanicData.mechanicId,
-        time: new Date(),
-        navigateTo: `/(screens)/mehanicsJobs/${complaint._id}`,
-        navigateText: 'View and Do',
-        navigteToId: complaint._id,
-        hasButton: true
-      });
-
-      await PushNotificationService.sendGeneralNotification(
-        mechanicData.mechanicId,
-        `New Job Assignment`,
-        `You've been assigned to work on ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}`,
-        'high',
-        'normal',
-        notification.data._id.toString()
       );
 
       return {
@@ -966,6 +948,13 @@ class ComplaintService {
       console.log('Updated complaint with solutions:', complaint.solutions.length);
 
       const equipment = await Equipment.findOne({ regNo: complaint.regNo });
+
+       const mechanic = await Mechanic.findOneAndUpdate(
+        mechanicData.userId,
+        {
+          status: 'available'
+        }
+      )
 
       await createNotification({
         title: `Work Completed - ${complaint.regNo}`,
