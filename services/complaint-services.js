@@ -127,6 +127,9 @@ class ComplaintService {
         }
       )
 
+      console.log("mechanic", mechanic);
+      
+
       const equipment = await Equipment.findOne({ regNo: complaint.regNo });
 
       // Notify assigned mechanic
