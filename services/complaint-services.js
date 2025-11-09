@@ -121,14 +121,13 @@ class ComplaintService {
       }
 
       const mechanic = await Mechanic.findOneAndUpdate(
-        mechanicData.userId,
-        {
-          status: 'engaged'
-        }
-      )
+        { userId: mechanicData.userId },
+        { status: 'engaged' },            
+        { new: true }              
+      );
 
       console.log("mechanic", mechanic);
-      
+
 
       const equipment = await Equipment.findOne({ regNo: complaint.regNo });
 

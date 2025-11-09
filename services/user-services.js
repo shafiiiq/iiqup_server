@@ -1604,8 +1604,6 @@ const getUserPushTokens = async (uniqueCode) => {
 
 const sendNotificationToUser = async (uniqueCode, notificationData) => {
   try {
-    console.log('🔍 Step 1: Finding user with uniqueCode:', uniqueCode);
-
     // Find user with push tokens
     let user = await User.findOne({ uniqueCode }).select('uniqueCode name pushTokens');
 
@@ -1618,15 +1616,11 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
     }
 
     if (!user) {
-      console.log('❌ User not found');
       return {
         success: false,
         message: 'User not found'
       };
     }
-
-    console.log('✅ Step 2: User found:', user.name);
-    console.log('📱 Step 3: Push tokens:', JSON.stringify(user.pushTokens, null, 2));
 
     if (!user.pushTokens || user.pushTokens.length === 0) {
       console.log('❌ No push tokens array');
@@ -1641,9 +1635,6 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
       .filter(tokenData => tokenData.isActive && tokenData.token)
       .map(tokenData => tokenData.token);
 
-    console.log('✅ Step 4: Active tokens count:', activeTokens.length);
-    console.log('📋 Active tokens (first 30 chars):', activeTokens.map(t => t.substring(0, 30)));
-
     if (activeTokens.length === 0) {
       console.log('❌ No active tokens after filtering');
       return {
@@ -1651,10 +1642,6 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
         message: 'No valid push tokens found for this user'
       };
     }
-
-    console.log('📤 Step 5: Preparing FCM message');
-    console.log('Notification data:', JSON.stringify(notificationData, null, 2));
-
     // ✅ USE NOTIFICATION OBJECT INSTEAD OF DATA (for iOS)
     const message = {
       notification: {
@@ -1690,11 +1677,8 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
       }
     };
 
-    console.log('📨 Step 6: Sending to', activeTokens.length, 'tokens');
-
     const results = await Promise.allSettled(
       activeTokens.map((token, index) => {
-        console.log(`Sending to token ${index + 1}...`);
         return admin.messaging().send({ ...message, token });
       })
     );
@@ -1702,13 +1686,10 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
     const successful = results.filter(r => r.status === 'fulfilled').length;
     const failed = results.filter(r => r.status === 'rejected').length;
 
-    console.log(`✅ Step 7: Results - ${successful} successful, ${failed} failed`);
-
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
-        console.error(`❌ Token ${index + 1} failed:`, result.reason);
+        console.error(`❌ Token ${index + 1} failed:`);
       } else {
-        console.log(`✅ Token ${index + 1} success:`, result.value);
       }
     });
 
