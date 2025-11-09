@@ -31,7 +31,7 @@ class ComplaintService {
         description: `${complaint.name} registered complaint for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Please assign a mechanic.`,
         priority: "high",
         sourceId: complaintData._id,
-        recipient: process.env.OFFICE_HERO,
+        recipient: JSON.parse(process.env.OFFICE_HERO),
         time: new Date(),
         navigateTo: `/(screens)/assignMechanic/${complaintData._id}`,
         navigateText: 'Assign Mechanic',
@@ -131,16 +131,16 @@ class ComplaintService {
 
       // Notify assigned mechanic
       const notificationAlert = await createNotification({
-        title: `Hamsa assigned - ${mechanicData.name} to ${complaint.regNo}`,
+        title: `Hamsa assigned - ${mechanicData.mechanicName} to ${complaint.regNo}`,
         description: `Hamsa assigned - ${mechanicData.mechanicName} to ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo} for complaint rectification.`,
         priority: "high",
         sourceId: 'job_assignment-annoucement',
-        recipient: process.env.OFFICE_HERO,
+        recipient: JSON.parse(process.env.OFFICE_HERO),
         time: new Date(),
       });
 
       await PushNotificationService.sendGeneralNotification(
-        process.env.OFFICE_HERO,
+        JSON.parse(process.env.OFFICE_HERO),
         `Hamsa assigned - ${mechanicData.mechanicName} to ${complaint.regNo}`,
         `Hamsa assigned - ${mechanicData.mechanicName} to ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo} for complaint rectification.`,
         'high',
@@ -189,7 +189,7 @@ class ComplaintService {
         description: `${complaint.assignedMechanic.mechanicName} needs items for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Request: ${requestData.requestText}`,
         priority: "high",
         sourceId: 'mechanic_request',
-        recipient: process.env.MAINTENANCE_HEAD,
+        recipient: JSON.parse(process.env.OFFICE_HERO),
         time: new Date(),
         navigateTo: `/(screens)/assignMechanic/${complaint._id}`,
         navigateText: 'View mechanic request',
@@ -198,7 +198,7 @@ class ComplaintService {
       });
 
       await PushNotificationService.sendGeneralNotification(
-        process.env.MAINTENANCE_HEAD,
+        JSON.parse(process.env.OFFICE_HERO),
         `Mechanic Item Request`,
         `${complaint.assignedMechanic.mechanicName} needs items for ${complaint.regNo}`,
         'high',
@@ -289,7 +289,7 @@ class ComplaintService {
         description: notificationMessage,
         priority: "high",
         sourceId: 'lpo_request',
-        recipient: process.env.WORKSHOP_MANAGER,
+        recipient: JSON.parse(process.env.OFFICE_MAIN),
         time: new Date(),
         navigateTo: `/(screens)/QuotationRequest/${complaint._id}`,
         navigateText: `View Hamza's request`,
@@ -303,7 +303,7 @@ class ComplaintService {
       }
 
       await PushNotificationService.sendGeneralNotification(
-        process.env.WORKSHOP_MANAGER,
+        JSON.parse(process.env.OFFICE_MAIN),
         `LPO Creation Request`,
         pushNotificationBody,
         'high',
@@ -359,7 +359,7 @@ class ComplaintService {
         description: `LPO ${lpo.lpoRef} is created for complaint with ${complaint.regNo}, Await until lpo is uploaded`,
         priority: "high",
         sourceId: 'lpo_approval',
-        recipient: process.env.PURCHASE_MANAGER,
+        recipient: [process.env.PURCHASE_MANAGER, process.env.ACCOUNTANT, process.env.MANAGER, process.env.CEO, process.env.MD, process.env.ASARU, process.env.CHARISHMA],
         time: new Date(),
         navigateTo: `/(screens)/purchaseManagerSign/${complaint._id}`,
         navigateText: `View and Sign`,
@@ -368,7 +368,7 @@ class ComplaintService {
       });
 
       await PushNotificationService.sendGeneralNotification(
-        process.env.PURCHASE_MANAGER,
+        [process.env.PURCHASE_MANAGER, process.env.ACCOUNTANT, process.env.MANAGER, process.env.CEO, process.env.MD, process.env.ASARU, process.env.CHARISHMA],
         `LPO ${lpo.lpoRef} Created`,
         `LPO ${lpo.lpoRef} is created for complaint with ${complaint.regNo}, Await until lpo is uploaded`,
         'high',
@@ -439,7 +439,7 @@ class ComplaintService {
         description: `New LPO created for complaint ${complaint.regNo}. LPO Ref: ${lpoRef}. Please review and approve.`,
         priority: "high",
         sourceId: 'lpo_approval',
-        recipient: process.env.PURCHASE_MANAGER,
+        recipient: [process.env.PURCHASE_MANAGER, process.env.ACCOUNTANT, process.env.MANAGER, process.env.CEO, process.env.MD, process.env.ASARU, process.env.CHARISHMA],
         time: new Date(),
         navigateTo: `/(screens)/purchaseManagerSign/${complaint._id}`,
         navigateText: `View and Sign`,
@@ -448,7 +448,7 @@ class ComplaintService {
       });
 
       await PushNotificationService.sendGeneralNotification(
-        process.env.PURCHASE_MANAGER,
+        [process.env.PURCHASE_MANAGER, process.env.ACCOUNTANT, process.env.MANAGER, process.env.CEO, process.env.MD, process.env.ASARU, process.env.CHARISHMA],
         `LPO Approval Needed`,
         `Please approve LPO ${lpoRef} for complaint ${complaint.regNo}`,
         'high',
@@ -636,7 +636,7 @@ class ComplaintService {
       });
 
       await PushNotificationService.sendGeneralNotification(
-        [process.env.MAINTENANCE_HEAD, process.env.JALEEL_KA],
+        process.env.MANAGER,
         `MANAGER Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`,
         `Accounts ${approvedCreds?.signed ? 'signed and ' : ''}approved LPO for complaint ${complaint.regNo}. Manager approval needed.`,
         'high',
@@ -949,7 +949,7 @@ class ComplaintService {
 
       const equipment = await Equipment.findOne({ regNo: complaint.regNo });
 
-       const mechanic = await Mechanic.findOneAndUpdate(
+      const mechanic = await Mechanic.findOneAndUpdate(
         mechanicData.userId,
         {
           status: 'available'
