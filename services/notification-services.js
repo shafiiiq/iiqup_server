@@ -29,8 +29,6 @@ const getAllNotificationsService = async (uniqueCode) => {
 
 const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
   try {
-    console.log('📬 Fetching pending notifications...');
-    console.log('User:', uniqueCode);
 
     if (!uniqueCode) {
       throw new Error('uniqueCode is required');
@@ -38,8 +36,6 @@ const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
 
     const sevenDaysAgo = new Date(Date.now() - (7 * 24 * 60 * 60 * 1000));
     const fetchFromDate = sevenDaysAgo;
-
-    console.log(`📅 Fetching from: ${fetchFromDate.toISOString()}`);
 
     // ✅ UPDATED QUERY: Check if user is in targetUsers OR it's a broadcast
     const normalNotifications = await Notification.find({
@@ -71,8 +67,6 @@ const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
         return notifDate >= fetchFromDate;
       });
     }
-
-    console.log(`⭐ Found ${specialNotifications.length} special notifications`);
 
     // Combine all notifications
     const allNotifications = [

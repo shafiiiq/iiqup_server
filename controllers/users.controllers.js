@@ -93,10 +93,6 @@ const verifyCEO = async (req, res) => {
 const verifyUser = async (req, res) => {
   const { email, password, type } = req.body;
 
-  console.log(email)
-  console.log(password)
-  console.log(type)
-
   if (!email || !password) {
     return res.status(400).json({
       success: false,
@@ -259,7 +255,6 @@ const cleanupFiles = (files) => {
     try {
       if (fs.existsSync(file.path)) {
         fs.unlinkSync(file.path);
-        console.log(`Cleaned up file: ${file.filename}`);
       }
     } catch (error) {
       console.error(`Error cleaning up file ${file.filename}:`, error.message);
@@ -676,7 +671,6 @@ const getUserRoles = async (req, res) => {
     if (!process.env.MD) missingVars.push('MD');
     if (!process.env.MANAGER) missingVars.push('MANAGER');
 
-    console.log("Missing environment variables:", missingVars);
     res.status(500).json({
       message: 'Cannot get all roles',
       missingVariables: missingVars

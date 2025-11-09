@@ -49,10 +49,7 @@ const sendNotificationToUser = (uniqueCode, notification) => {
         targetUser: uniqueCode,  // This is the uniqueCode from backend
         sentAt: new Date().toISOString()
       }
-    };
-
-    console.log(enrichedNotification);
-    
+    };    
     
     global.io.to(`user_${uniqueCode}`).emit('new_notification', enrichedNotification);
   }

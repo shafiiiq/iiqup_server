@@ -241,8 +241,6 @@ module.exports = {
                 const now = new Date();
                 const oneYearAgo = new Date(now);
                 oneYearAgo.setFullYear(now.getFullYear() - 1);
-
-                console.log(oneYearAgo);
                 
                 
                 // Initialize result with separated arrays for each collection

@@ -139,7 +139,6 @@ const getPendingNotifications = async (req, res) => {
     const { uniqueCode, since, limit = 100 } = req.body;
     
     console.log('📨 getPendingNotifications called');
-    console.log('Body:', req.body);
     
     if (!uniqueCode) {
       return res.status(400).json({ 

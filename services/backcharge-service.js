@@ -243,13 +243,11 @@ class BackchargeService {
 
             // Extract number from refNo format: ATE193-09-25
             const refParts = latestBackcharge.refNo.split('-');
-            console.log('RefNo parts:', refParts);
 
             if (refParts.length >= 1 && refParts[0].startsWith('ATE')) {
                 // Extract numeric part from "ATE193" -> "193"
                 const numericString = refParts[0].replace('ATE', '');
                 const numericPart = parseInt(numericString) || 140;
-                console.log('Extracted number:', numericPart);
                 return numericPart;
             }
 

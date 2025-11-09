@@ -8,8 +8,6 @@ const otpServices = require('../services/otp-services');
 const requestOTP = async (req, res) => {
   let { email } = req.body;
 
-  console.log(email)
-
   if (email === 'DOCUMENT_VERIFIER_AUTH_MAIL') {
     email = process.env.AUTH_OTP_USER_EMAIL
   }
@@ -23,7 +21,6 @@ const requestOTP = async (req, res) => {
 
   try {
     const result = await otpServices.generateAndSendOTP(email);
-    console.log(result);
 
     res.status(result.status).json(result);
   } catch (err) {
@@ -44,9 +41,6 @@ const verifyOTP = async (req, res) => {
   const { otp } = req.body;
   let { email, type } = req.body;
 
-  console.log(email)
-  console.log(type)
-
   if (email === 'DOCUMENT_VERIFIER_AUTH_MAIL') {
     email = process.env.AUTH_OTP_USER_EMAIL
     type = 'office'
@@ -58,11 +52,6 @@ const verifyOTP = async (req, res) => {
       message: 'Email and OTP are required'
     });
   }
-
-  console.log('otp', otp);
-  console.log('email', email);
-  console.log('type', type);
-
 
   try {
     const result = await otpServices.verifyOTP(email, otp, type, type === 'operator' ? req.body.qatarId : null);

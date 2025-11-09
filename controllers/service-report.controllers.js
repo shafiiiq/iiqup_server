@@ -44,9 +44,7 @@ const updateServiceReportWithId = async (req, res) => {
   const id = req.params.id;
   reportServices.updateServiceReportWith(id, req.body)
     .then((fetchedUsers) => {
-      if (fetchedUsers) {
-        console.log(fetchedUsers);
-        
+      if (fetchedUsers) {        
         res.status(fetchedUsers.status).json(fetchedUsers)
       }
     })

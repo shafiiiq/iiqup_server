@@ -272,8 +272,6 @@ class ComplaintController {
       const { complaintId } = req.params;
       const { lpoData, createdBy } = req.body;
 
-      console.log('complaint id', complaintId)
-
       if (!lpoData || !createdBy) {
         return res.status(400).json({
           status: 400,

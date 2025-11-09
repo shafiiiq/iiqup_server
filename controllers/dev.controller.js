@@ -678,8 +678,6 @@ class DevController {
             const deviceid = req.headers['deviceid'] || req.headers['deviceId'];
             const timestamp = req.headers['timestamp'];
 
-            console.log('Received headers:', { attestationtoken, deviceid, timestamp });
-
             if (!attestationtoken || !deviceid || !timestamp) {
                 return res.status(403).json({
                     success: false,

@@ -217,9 +217,7 @@ async function debugAuditLogs(req, res) {
 
 // Function to create test data that will trigger audit logs
 async function createTestData(req, res) {
-  try {
-    console.log('🧪 Creating test data to trigger audit logs...');
-    
+  try {    
     const testDataCreated = [];
     
     // Test Equipment creation
@@ -326,7 +324,6 @@ async function updateTestData(req, res) {
         
         if (updated) {
           updates.push({ type: 'equipment', id: updated._id, action: 'updated' });
-          console.log('✅ Updated equipment:', updated._id);
         }
       }
     } catch (error) {

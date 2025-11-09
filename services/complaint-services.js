@@ -348,9 +348,6 @@ class ComplaintService {
         { new: true }
       );
 
-      console.log(complaint)
-      console.log('complaint id', complaintId)
-
       if (!complaint) {
         throw { status: 404, message: 'Complaint not found' };
       }
@@ -919,8 +916,6 @@ class ComplaintService {
         return fileData;
       }));
 
-      console.log('Solution files to be added:', solutionFiles);
-
       // Use a single update operation with both $push and $set
       const complaint = await Complaint.findByIdAndUpdate(
         complaintId,
@@ -946,9 +941,6 @@ class ComplaintService {
       if (!complaint) {
         throw { status: 404, message: 'Complaint not found' };
       }
-
-      console.log('Updated complaint with solutions:', complaint.solutions.length);
-
       const equipment = await Equipment.findOne({ regNo: complaint.regNo });
 
       const mechanic = await Mechanic.findOneAndUpdate(

@@ -38,10 +38,7 @@ class OperatorController {
 
   static async verifyOperator(req, res) {
     try {
-      const { qatarId } = req.body;
-
-      console.log(qatarId);
-      
+      const { qatarId } = req.body;      
 
       if (!qatarId) {
         return res.status(400).json({

@@ -152,10 +152,6 @@ const verifyOTP = async (email, otp, type, qatarId = null) => {
       uniqueCode: user.uniqueCode
     });
 
-    console.log(user);
-
-
-
     return {
       status: 200,
       success: true,

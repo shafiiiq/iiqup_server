@@ -163,10 +163,7 @@ class LPOController {
   // Get latest LPO
   async getLatestLPO(req, res) {
     try {
-      const latestLPO = await lpoService.getLatestLPO();
-
-      console.log(latestLPO);
-      
+      const latestLPO = await lpoService.getLatestLPO();      
 
       res.status(200).json({
         success: true,

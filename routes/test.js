@@ -23,10 +23,7 @@ router.get('/put-the-item', async (req, res) => {
     const result = await Mechanic.updateMany(
       {}, // empty filter means all documents
       { status: "available" }
-    );
-
-    console.log(result);
-    
+    );    
     
     res.status(200).json({
       success: true,

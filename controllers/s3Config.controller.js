@@ -1,9 +1,7 @@
 const s3Services = require('../services/s3Config-services')
 
 const getS3Config = async (req, res) => {
-    if (req.body.isAuthSign) {
-        console.log("req.body.isAuthSign", req.body.isAuthSign);
-        
+    if (req.body.isAuthSign) {        
         s3Services.fetchPresignedURL(req.body.key, req.body.isLong, req.body.isAuthSign)
             .then((s3Data) => {
                 if (s3Data) {
