@@ -124,7 +124,7 @@ class ComplaintService {
       
 
       const mechanic = await Mechanic.findOneAndUpdate(
-        { userId: mechanicData.userId },
+        { userId: mechanicData.mechanicId },
         { status: 'engaged' },            
         { new: true }              
       );
