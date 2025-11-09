@@ -40,7 +40,7 @@ class ComplaintService {
       });
 
       await PushNotificationService.sendGeneralNotification(
-        process.env.OFFICE_HERO,
+        JSON.parse(process.env.OFFICE_HERO),
         `New Complaint - ${complaint.regNo}`,
         `New complaint needs mechanic assignment for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'}`,
         'high',
