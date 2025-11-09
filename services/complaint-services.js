@@ -120,6 +120,9 @@ class ComplaintService {
         throw { status: 404, message: 'Complaint not found' };
       }
 
+      console.log("mechanicData", mechanicData);
+      
+
       const mechanic = await Mechanic.findOneAndUpdate(
         { userId: mechanicData.userId },
         { status: 'engaged' },            
