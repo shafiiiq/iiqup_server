@@ -153,7 +153,7 @@ app.use('/complaints', complaintsRouter);
 app.use('/applications', authMiddleware, applicationRouter);
 app.use('/hunter-eye', securityRouter);
 app.use('/0auth', _0authRouter);
-app.use('/s3Config', s3Config);
+app.use('/s3Config', authMiddleware, s3Config);
 app.use('/fuels', FuelsRouter);
 app.use('/attendance', attendanceRoutes);
 app.use('/backcharge', backchargeRouter);
