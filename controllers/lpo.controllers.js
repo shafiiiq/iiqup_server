@@ -35,11 +35,9 @@ class LPOController {
 
       // Map paymentTerms to termsAndConditions if they exist
       if (lpoData.paymentTerms && Array.isArray(lpoData.paymentTerms)) {
-        // Filter out empty terms and ensure "Terms & Conditions" is first
         const filteredTerms = lpoData.paymentTerms.filter(term => term.trim() !== '');
         lpoData.termsAndConditions = ['Terms & Conditions', ...filteredTerms];
       } else {
-        // Default terms if paymentTerms not provided
         lpoData.termsAndConditions = [
           'Terms & Conditions',
           'Payment will be made within 90 days from the day of submission of invoice'
@@ -52,10 +50,14 @@ class LPOController {
           accountsDept: 'ROSHAN SHA',
           purchasingManager: 'ABDUL MALIK',
           operationsManager: 'SURESHKANTH',
-          authorizedSignatory: 'AHAMMED KAMAL', // Default to CEO
+          authorizedSignatory: 'AHAMMED KAMAL',
           authorizedSignatoryTitle: 'CEO'
         };
       }
+
+      // IMPORTANT: Initialize amendment fields for new LPO
+      lpoData.isAmendmented = false;
+      lpoData.amendments = [];
 
       const lpo = await lpoService.createLPO(lpoData);
 
@@ -142,7 +144,7 @@ class LPOController {
   // Get latest LPO reference
   async getLatestLPORef(req, res) {
     try {
-      
+
       const latestRef = await lpoService.getLatestLPORef();
 
       res.status(200).json({
@@ -163,7 +165,7 @@ class LPOController {
   // Get latest LPO
   async getLatestLPO(req, res) {
     try {
-      const latestLPO = await lpoService.getLatestLPO();      
+      const latestLPO = await lpoService.getLatestLPO();
 
       res.status(200).json({
         success: true,
@@ -191,14 +193,21 @@ class LPOController {
         });
       }
 
-      const lpo = await lpoService.updateLPO(refNo, updateData);
+      // Decode the reference number
+      const decodedRefNo = decodeURIComponent(refNo);
+      console.log('Updating LPO with ref:', decodedRefNo);
+
+      const lpo = await lpoService.updateLPO(decodedRefNo, updateData);
 
       res.status(200).json({
         success: true,
-        message: 'LPO updated successfully',
+        message: updateData.isAmendmented
+          ? 'LPO amended successfully'
+          : 'LPO updated successfully',
         data: lpo
       });
     } catch (error) {
+      console.error('Error updating LPO:', error);
       const statusCode = error.message === 'LPO not found' ? 404 : 500;
       res.status(statusCode).json({
         success: false,

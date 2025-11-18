@@ -68,6 +68,13 @@ const lpoSchema = new mongoose.Schema({
   totalDiscountAmount: {
     type: Number,
   },
+  discount: {
+    type: Number,
+  },
+  showDiscountInTotal: {
+    type: Boolean,
+    default: false
+  },
   termsAndConditions: {
     type: [String],
     default: [
@@ -126,10 +133,64 @@ const lpoSchema = new mongoose.Schema({
     required: true,
     default: false
   },
-   complaintId: {
+  complaintId: {
     type: String,
     default: null
-  }
+  },
+  // FIELDS FOR AMENDMENT TRACKING
+  isAmendmented: {
+    type: Boolean,
+    default: false
+  },
+  amendments: [{
+    amendmentDate: {
+      type: Date,
+      default: Date.now
+    },
+    amendedBy: {
+      type: String
+    },
+    amendedItems: [{
+      id: {
+        type: Number,
+        required: true
+      },
+      description: {
+        type: String,
+        required: true
+      },
+      quantity: {
+        type: Number,
+        required: true
+      },
+      unitPrice: {
+        type: Number,
+        required: true
+      },
+      totalPrice: {
+        type: Number,
+        required: true
+      }
+    }],
+    amendedTotalAmount: {
+      type: Number
+    },
+    amendedDiscount: {
+      type: Number
+    },
+    amendedCompany: {
+      vendor: String,
+      attention: String,
+      designation: String
+    },
+    amendedEquipments: [String],
+    amendedQuoteNo: String,
+    amendedRequestText: String,
+    amendedTermsAndConditions: [String],
+    reason: {
+      type: String
+    }
+  }]
 }, {
   timestamps: true
 });

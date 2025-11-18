@@ -105,7 +105,7 @@ class ComplaintController {
     try {
       const { complaintId } = req.params;
       const { mechanicId, mechanicName, assignedBy } = req.body;
-      const mechanic = await Mechanic.findOne({mechanicId: mechanicId})
+      const mechanic = await Mechanic.findOne({ mechanicId: mechanicId })
 
       if (!mechanicId || !mechanicName || !assignedBy) {
         return res.status(400).json({
@@ -113,7 +113,7 @@ class ComplaintController {
           message: 'mechanicId, mechanicName, and assignedBy are required'
         });
       }
- 
+
       const result = await ComplaintService.assignMechanic(
         complaintId,
         { mechanicId, mechanicName },
@@ -298,16 +298,17 @@ class ComplaintController {
   static async uploadLPOForComplaint(req, res) {
     try {
       const { complaintId } = req.params;
-      const { uploadedBy, lpoRef, description, fileName, } = req.body;
+      const { uploadedBy, lpoRef, description, fileName, isAmendment } = req.body;
 
       if (!uploadedBy || !lpoRef) {
         return res.status(400).json({
           status: 400,
-          message: 'uploadedBy, lpoRef, and htmlContent are required'
+          message: 'uploadedBy and lpoRef are required'
         });
       }
 
-      const finalFilename = fileName || `lpo-${complaintId}-${Date.now()}.pdf`;
+      const amendmentSuffix = isAmendment ? '-amendment' : '';
+      const finalFilename = fileName || `lpo-${complaintId}${amendmentSuffix}-${Date.now()}.pdf`;
       const s3Key = `complaint-lpos/${complaintId}/${finalFilename}`;
 
       // Generate pre-signed URL for S3 upload
@@ -326,18 +327,18 @@ class ComplaintController {
         uploadDate: new Date()
       };
 
-      // Pass htmlContent to service
       const result = await ComplaintService.uploadLPOForComplaint(
         complaintId,
         lpoFileData,
         uploadedBy,
         lpoRef,
         description,
+        isAmendment
       );
 
       res.status(200).json({
         status: 200,
-        message: 'Pre-signed URL generated successfully',
+        message: `Pre-signed URL generated successfully ${isAmendment ? '(Amendment)' : ''}`,
         uploadUrl: uploadUrl,
         data: {
           complaint: result,

@@ -120,17 +120,11 @@ class ComplaintService {
         throw { status: 404, message: 'Complaint not found' };
       }
 
-      console.log("mechanicData", mechanicData);
-      
-
       const mechanic = await Mechanic.findOneAndUpdate(
         { userId: mechanicData.mechanicId },
-        { status: 'engaged' },            
-        { new: true }              
+        { status: 'engaged' },
+        { new: true }
       );
-
-      console.log("mechanic", mechanic);
-
 
       const equipment = await Equipment.findOne({ regNo: complaint.regNo });
 
@@ -329,10 +323,13 @@ class ComplaintService {
 
       const lpo = await lpoModel.findOne({ lpoRef: lpoData.lpoRef })
 
+      console.log("lpo", lpo.lpoRef);
+      
+
       const complaint = await Complaint.findByIdAndUpdate(
         complaintId,
         {
-          lpoDetails: {
+          lpoDetails: {  
             lpoId: lpo._id,
             lpoRef: lpo.lpoRef,
             createdBy: createdBy,
@@ -344,7 +341,7 @@ class ComplaintService {
               approvedBy: createdBy,
               role: 'WORKSHOP_MANAGER',
               action: 'approved',
-              comments: `LPO created ${lpo.lpoRef}`
+              comments: `LPO created ${lpo.lpoRef}` 
             }
           }
         },
@@ -389,24 +386,29 @@ class ComplaintService {
     }
   }
 
-  static async uploadLPOForComplaint(complaintId, lpoFileData, uploadedBy, lpoRef, description) {
+  static async uploadLPOForComplaint(complaintId, lpoFileData, uploadedBy, lpoRef, description, isAmendment = false) {
     try {
       const complaint = await Complaint.findById(complaintId);
 
       if (!complaint) {
         const error = new Error('Complaint not found');
-        error.status = 404;
+        error.status = 404; 
         throw error;
       }
 
-      if (complaint.workflowStatus !== 'lpo_created' && complaint.workflowStatus !== 'sent_to_workshop') {
-        const error = new Error('Invalid workflow status for LPO upload');
+      // For amendment, allow from various approved statuses
+      const validStatuses = isAmendment
+        ? ['lpo_uploaded', 'purchase_approved', 'accounts_approved', 'manager_approved', 'ceo_approved', 'md_approved']
+        : ['lpo_created', 'sent_to_workshop'];
+
+      if (!validStatuses.includes(complaint.workflowStatus)) {
+        const error = new Error(`Invalid workflow status for LPO ${isAmendment ? 'amendment' : 'upload'}`);
         error.status = 400;
         throw error;
       }
 
       const updateData = {
-        workflowStatus: 'lpo_uploaded',
+        workflowStatus: isAmendment ? 'lpo_amended' : 'lpo_uploaded', 
         updatedAt: new Date()
       };
 
@@ -417,11 +419,32 @@ class ComplaintService {
       updateData['lpoDetails.uploadedDate'] = new Date();
       updateData['lpoDetails.status'] = 'uploaded';
 
+      // Set amendment fields
+      if (isAmendment) {
+        updateData['lpoDetails.isAmendment'] = true;
+        updateData['lpoDetails.amendmentDate'] = new Date().toLocaleDateString('en-GB');
+
+        // Reset all approval flags for re-signing
+        updateData['lpoDetails.PMRsigned'] = false;
+        updateData['lpoDetails.PMRauthorised'] = false;
+        updateData['lpoDetails.MANAGERsigned'] = false;
+        updateData['lpoDetails.MANAGERauthorised'] = false;
+        updateData['lpoDetails.ACCOUNTSsigned'] = false;
+        updateData['lpoDetails.ACCOUNTSauthorised'] = false;
+        updateData['lpoDetails.CEOsigned'] = false;
+        updateData['lpoDetails.CEOauthorised'] = false;
+        updateData['lpoDetails.MDsigned'] = false;
+        updateData['lpoDetails.MDauthorised'] = false;
+        updateData['lpoDetails.status'] = 'amended';
+      }
+
       const approvalEntry = {
         approvedBy: uploadedBy,
         role: 'WORKSHOP_MANAGER',
         approvalDate: new Date(),
-        comments: `LPO document uploaded: ${lpoRef}`,
+        comments: isAmendment
+          ? `LPO amendment uploaded: ${lpoRef}`
+          : `LPO document uploaded: ${lpoRef}`,
         action: 'uploaded'
       };
 
@@ -435,13 +458,29 @@ class ComplaintService {
         { new: true, runValidators: true }
       );
 
-      // Notify PM
+      // Notify relevant parties
+      const notificationTitle = isAmendment
+        ? `LPO Amendment Approval Needed - ${lpoRef}`
+        : `LPO Approval Needed - ${lpoRef}`;
+
+      const notificationDescription = isAmendment
+        ? `LPO has been amended for complaint ${complaint.regNo}. LPO Ref: ${lpoRef}. Please review and approve the amendment.`
+        : `New LPO created for complaint ${complaint.regNo}. LPO Ref: ${lpoRef}. Please review and approve.`;
+
       const notification = await createNotification({
-        title: `LPO Approval Needed - ${lpoRef}`,
-        description: `New LPO created for complaint ${complaint.regNo}. LPO Ref: ${lpoRef}. Please review and approve.`,
+        title: notificationTitle,
+        description: notificationDescription,
         priority: "high",
         sourceId: 'lpo_approval',
-        recipient: [process.env.PURCHASE_MANAGER, process.env.ACCOUNTANT, process.env.MANAGER, process.env.CEO, process.env.MD, process.env.ASARU, process.env.CHARISHMA],
+        recipient: [
+          process.env.PURCHASE_MANAGER,
+          process.env.ACCOUNTANT,
+          process.env.MANAGER,
+          process.env.CEO,
+          process.env.MD,
+          process.env.ASARU,
+          process.env.CHARISHMA
+        ],
         time: new Date(),
         navigateTo: `/(screens)/purchaseManagerSign/${complaint._id}`,
         navigateText: `View and Sign`,
@@ -449,10 +488,13 @@ class ComplaintService {
         hasButton: true
       });
 
+      console.log("notification", notification);
+      
+
       await PushNotificationService.sendGeneralNotification(
-        [process.env.PURCHASE_MANAGER, process.env.ACCOUNTANT, process.env.MANAGER, process.env.CEO, process.env.MD, process.env.ASARU, process.env.CHARISHMA],
-        `LPO Approval Needed`,
-        `Please approve LPO ${lpoRef} for complaint ${complaint.regNo}`,
+        "SAD-c6e8d3",
+        notificationTitle,
+        notificationDescription,
         'high',
         'normal',
         notification.data._id.toString()
@@ -460,7 +502,9 @@ class ComplaintService {
 
       return {
         status: 202,
-        message: 'LPO uploaded successfully and sent to PURCHASE_MANAGER for approval',
+        message: isAmendment
+          ? 'LPO amendment uploaded successfully and sent for re-approval'
+          : 'LPO uploaded successfully and sent to PURCHASE_MANAGER for approval',
         data: updatedComplaint
       };
     } catch (error) {
@@ -946,12 +990,11 @@ class ComplaintService {
       }
       const equipment = await Equipment.findOne({ regNo: complaint.regNo });
 
-      const mechanic = await Mechanic.findOneAndUpdate(
-        mechanicData.userId,
-        {
-          status: 'available'
-        }
-      )
+      await Mechanic.findOneAndUpdate(
+        { userId: complaint.assignedMechanic.mechanicId },
+        { status: 'engaged' },
+        { new: true }
+      );
 
       await createNotification({
         title: `Work Completed - ${complaint.regNo}`,

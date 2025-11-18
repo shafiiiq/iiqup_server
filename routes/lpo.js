@@ -21,7 +21,7 @@ router.get('/check-latest-lpo-ref', lpoController.getLatestLPORef);
 router.get('/check-latest-lpo', lpoController.getLatestLPO);
 
 // Update LPO
-router.put('/update-lpo/:refNo', lpoController.updateLPO);
+router.put('/update-lpo/:refNo(*)', lpoController.updateLPO);
 
 // Delete LPO
 router.delete('/delete-lpo/:refNo', lpoController.deleteLPO);

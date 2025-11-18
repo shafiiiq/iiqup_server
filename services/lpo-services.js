@@ -7,7 +7,12 @@ class LPOService {
   async createLPO(lpoData) {
     try {
       // Calculate total amount from items
-      const totalAmount = lpoData.items.reduce((sum, item) => sum + item.totalPrice, 0);
+      let totalAmount = lpoData.items.reduce((sum, item) => sum + item.totalPrice, 0);
+
+      // Apply discount if provided and showDiscountInTotal is true
+      if (lpoData.showDiscountInTotal && lpoData.discount) {
+        totalAmount -= lpoData.discount;
+      }
 
       // Ensure signatures object exists with proper structure
       if (!lpoData.signatures) {
@@ -19,7 +24,6 @@ class LPOService {
           authorizedSignatoryTitle: 'CEO'
         };
       } else {
-        // Ensure all required signature fields exist
         lpoData.signatures = {
           accountsDept: lpoData.signatures.accountsDept || 'ROSHAN SHA',
           purchasingManager: lpoData.signatures.purchasingManager || 'ABDUL MALIK',
@@ -29,14 +33,17 @@ class LPOService {
         };
       }
 
+      // Initialize amendment fields for new LPO
       const lpoWithTotal = {
         ...lpoData,
-        totalAmount
+        totalAmount,
+        isAmendmented: false,
+        amendments: []
       };
 
       const lpo = new LPO(lpoWithTotal);
-      
 
+      // Create notification
       const notification = await createNotification({
         title: `New LPO`,
         description: `LPO: ${lpoData.lpoRef} for ${lpoData.company.vendor} for ${lpoData.equipments}`,
@@ -46,11 +53,11 @@ class LPOService {
       });
 
       await PushNotificationService.sendGeneralNotification(
-        null, // broadcast to all users
-        `New LPO`, //title
-        `LPO: ${lpoData.lpoRef} for ${lpoData.company.vendor} for ${lpoData.equipments}`, //decription
-        'high', //priority
-        'normal', // type
+        null,
+        `New LPO`,
+        `LPO: ${lpoData.lpoRef} for ${lpoData.company.vendor} for ${lpoData.equipments}`,
+        'high',
+        'normal',
         notification.data._id.toString()
       );
 
@@ -135,22 +142,107 @@ class LPOService {
   // Update LPO
   async updateLPO(refNo, updateData) {
     try {
-      // Recalculate total amount if items are updated
-      if (updateData.items) {
-        updateData.totalAmount = updateData.items.reduce((sum, item) => sum + item.totalPrice, 0);
-      }
+      // Find the existing LPO first
+      const existingLPO = await LPO.findOne({ lpoRef: refNo.trim() });
 
-      const lpo = await LPO.findOneAndUpdate(
-        { lpoRef: refNo },
-        updateData,
-        { new: true, runValidators: true }
-      );
-
-      if (!lpo) {
+      if (!existingLPO) {
         throw new Error('LPO not found');
       }
 
-      return lpo;
+      // Check if this is an amendment
+      if (updateData.isAmendmented === true) {
+        // Create amendment record
+        const amendment = {
+          amendmentDate: new Date(),
+          amendedBy: updateData.amendedBy || 'System',
+          reason: updateData.amendmentReason || 'Amendment requested'
+        };
+
+        // Add amended items if provided
+        if (updateData.items && updateData.items.length > 0) {
+          amendment.amendedItems = updateData.items;
+
+          // Calculate amended total amount
+          amendment.amendedTotalAmount = updateData.items.reduce(
+            (sum, item) => sum + (item.totalPrice || 0),
+            0
+          );
+
+          // Apply discount if needed
+          if (updateData.showDiscountInTotal && updateData.discount) {
+            amendment.amendedTotalAmount -= updateData.discount;
+            amendment.amendedDiscount = updateData.discount;
+          }
+        }
+
+        // Add other amended fields if provided
+        if (updateData.company) {
+          amendment.amendedCompany = updateData.company;
+        }
+
+        if (updateData.equipments) {
+          amendment.amendedEquipments = updateData.equipments;
+        }
+
+        if (updateData.quoteNo) {
+          amendment.amendedQuoteNo = updateData.quoteNo;
+        }
+
+        if (updateData.requestText) {
+          amendment.amendedRequestText = updateData.requestText;
+        }
+
+        if (updateData.termsAndConditions) {
+          amendment.amendedTermsAndConditions = updateData.termsAndConditions;
+        }
+
+        // Update the LPO with amendment
+        const lpo = await LPO.findOneAndUpdate(
+          { lpoRef: refNo.trim() },
+          {
+            $set: {
+              isAmendmented: true,
+              // Reset signature flags for amendment
+              pmSigned: false,
+              accountsSigned: false,
+              managerSigned: false,
+              ceoSigned: false
+            },
+            $push: { amendments: amendment }
+          },
+          { new: true, runValidators: true }
+        );
+
+        return lpo;
+
+      } else {
+        // Regular update (not an amendment)
+        // Recalculate total amount if items are updated
+        if (updateData.items && updateData.items.length > 0) {
+          updateData.totalAmount = updateData.items.reduce(
+            (sum, item) => sum + (item.totalPrice || 0),
+            0
+          );
+        }
+
+        // If discount is being applied and showDiscountInTotal is true
+        if (updateData.showDiscountInTotal && updateData.discount) {
+          updateData.totalAmount = (updateData.totalAmount || 0) - (updateData.discount || 0);
+        }
+
+        // Remove amendment-specific fields from regular update
+        delete updateData.amendedBy;
+        delete updateData.amendmentReason;
+
+        // Find and update with trimmed ref
+        const lpo = await LPO.findOneAndUpdate(
+          { lpoRef: refNo.trim() },
+          { $set: updateData },
+          { new: true, runValidators: true }
+        );
+
+        return lpo;
+      }
     } catch (error) {
       throw new Error(`Error updating LPO: ${error.message}`);
     }

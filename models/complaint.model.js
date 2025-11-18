@@ -64,6 +64,15 @@ const lpoTrackingSchema = new mongoose.Schema({
 
   htmlContent: { type: String },
 
+  isAmendment: {
+    type: Boolean,
+    default: false
+  },
+  amendmentDate: {
+    type: String,
+    default: null
+  },
+
   // Add LPO file information
   lpoFile: {
     fileName: { type: String },
@@ -81,7 +90,7 @@ const lpoTrackingSchema = new mongoose.Schema({
   ceoApprovalDate: { type: Date },
   status: {
     type: String,
-    enum: ['created', 'uploaded', 'purchase_approved', 'accounts_approved', 'manager_approved', 'ceo_approved', 'md_approved', 'items_procured'],
+    enum: ['created', 'uploaded', 'purchase_approved', 'accounts_approved', 'manager_approved', 'ceo_approved', 'md_approved', 'items_procured', 'amended'],
     default: 'created'
   },
   // PMR fields
@@ -268,10 +277,11 @@ const complaintSchema = new mongoose.Schema({
       'sent_to_workshop',     // Sent to workshop manager
       'lpo_created',          // LPO created by workshop manager
       'lpo_uploaded',         // LPO uploaded by workshop manager
+      'lpo_amended',          // LPO amended by workshop manager
       'purchase_approved',    // Approved by purchase manager
       'accounts_approved',    // Approved by accounts
       'manager_approved',     // Approved by manager
-       'md_approved',         // Approved by md
+      'md_approved',          // Approved by md
       'ceo_approved',         // Approved by CEO
       'items_available',      // Items available for mechanic
       'work_in_progress',     // Mechanic started work
