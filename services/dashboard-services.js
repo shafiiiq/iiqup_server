@@ -52,12 +52,12 @@ module.exports = {
                 // Get current date and time
                 const now = new Date();
                 const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                
+
                 // Initialize result with separated arrays for each collection
                 const updatesByCollection = {};
                 // Also maintain a combined array for backward compatibility
                 const allUpdates = [];
-                
+
                 // Process each model
                 for (const { model, source, content } of models) {
                     const todayUpdates = await model.find({
@@ -66,17 +66,17 @@ module.exports = {
                             { updatedAt: { $gte: todayStart } }
                         ]
                     }).lean();
-                    
+
                     // Add source and content info
                     const updatesWithInfo = addSourceInfo(todayUpdates, source, content);
-                    
+
                     // Add to the collection-specific array
                     updatesByCollection[content] = updatesWithInfo;
-                    
+
                     // Also add to the combined array
                     allUpdates.push(...updatesWithInfo);
                 }
-                
+
                 // Create result object
                 const result = {
                     status: 200,
@@ -96,7 +96,7 @@ module.exports = {
                         modelCounts: getModelCounts(allUpdates)
                     }
                 };
-                
+
                 resolve(result);
             } catch (err) {
                 console.error('Error fetching daily updates:', err);
@@ -104,7 +104,7 @@ module.exports = {
             }
         });
     },
-    
+
     /**
      * Fetch weekly updates from all models
      */
@@ -115,12 +115,12 @@ module.exports = {
                 const now = new Date();
                 const oneWeekAgo = new Date(now);
                 oneWeekAgo.setDate(now.getDate() - 7);
-                
+
                 // Initialize result with separated arrays for each collection
                 const updatesByCollection = {};
                 // Also maintain a combined array for backward compatibility
                 const allUpdates = [];
-                
+
                 // Process each model
                 for (const { model, source, content } of models) {
                     const weeklyUpdates = await model.find({
@@ -129,17 +129,17 @@ module.exports = {
                             { updatedAt: { $gte: oneWeekAgo } }
                         ]
                     }).lean();
-                    
+
                     // Add source and content info
                     const updatesWithInfo = addSourceInfo(weeklyUpdates, source, content);
-                    
+
                     // Add to the collection-specific array
                     updatesByCollection[content] = updatesWithInfo;
-                    
+
                     // Also add to the combined array
                     allUpdates.push(...updatesWithInfo);
                 }
-                
+
                 // Create result object
                 const result = {
                     status: 200,
@@ -159,7 +159,7 @@ module.exports = {
                         modelCounts: getModelCounts(allUpdates)
                     }
                 };
-                
+
                 resolve(result);
             } catch (err) {
                 console.error('Error fetching weekly updates:', err);
@@ -167,7 +167,7 @@ module.exports = {
             }
         });
     },
-    
+
     /**
      * Fetch monthly updates from all models
      */
@@ -178,12 +178,12 @@ module.exports = {
                 const now = new Date();
                 const oneMonthAgo = new Date(now);
                 oneMonthAgo.setMonth(now.getMonth() - 1);
-                
+
                 // Initialize result with separated arrays for each collection
                 const updatesByCollection = {};
                 // Also maintain a combined array for backward compatibility
                 const allUpdates = [];
-                
+
                 // Process each model
                 for (const { model, source, content } of models) {
                     const monthlyUpdates = await model.find({
@@ -192,17 +192,17 @@ module.exports = {
                             { updatedAt: { $gte: oneMonthAgo } }
                         ]
                     }).lean();
-                    
+
                     // Add source and content info
                     const updatesWithInfo = addSourceInfo(monthlyUpdates, source, content);
-                    
+
                     // Add to the collection-specific array
                     updatesByCollection[content] = updatesWithInfo;
-                    
+
                     // Also add to the combined array
                     allUpdates.push(...updatesWithInfo);
                 }
-                
+
                 // Create result object
                 const result = {
                     status: 200,
@@ -222,7 +222,7 @@ module.exports = {
                         modelCounts: getModelCounts(allUpdates)
                     }
                 };
-                
+
                 resolve(result);
             } catch (err) {
                 console.error('Error fetching monthly updates:', err);
@@ -230,7 +230,7 @@ module.exports = {
             }
         });
     },
-    
+
     /**
      * Fetch yearly updates from all models
      */
@@ -241,13 +241,13 @@ module.exports = {
                 const now = new Date();
                 const oneYearAgo = new Date(now);
                 oneYearAgo.setFullYear(now.getFullYear() - 1);
-                
-                
+
+
                 // Initialize result with separated arrays for each collection
                 const updatesByCollection = {};
                 // Also maintain a combined array for backward compatibility
                 const allUpdates = [];
-                
+
                 // Process each model
                 for (const { model, source, content } of models) {
                     const yearlyUpdates = await model.find({
@@ -256,17 +256,17 @@ module.exports = {
                             { updatedAt: { $gte: oneYearAgo } }
                         ]
                     }).lean();
-                    
+
                     // Add source and content info
                     const updatesWithInfo = addSourceInfo(yearlyUpdates, source, content);
-                    
+
                     // Add to the collection-specific array
                     updatesByCollection[content] = updatesWithInfo;
-                    
+
                     // Also add to the combined array
                     allUpdates.push(...updatesWithInfo);
                 }
-                
+
                 // Create result object
                 const result = {
                     status: 200,
@@ -286,7 +286,7 @@ module.exports = {
                         modelCounts: getModelCounts(allUpdates)
                     }
                 };
-                
+
                 resolve(result);
             } catch (err) {
                 console.error('Error fetching yearly updates:', err);
@@ -294,7 +294,7 @@ module.exports = {
             }
         });
     },
-    
+
     /**
      * Helper function to format data by collection
      */
@@ -311,7 +311,7 @@ module.exports = {
             toolkit: updatesByCollection['toolkit'] || []
         };
     },
-    
+
     /**
      * Fetch all updates (daily, weekly, monthly, yearly) at once
      */
@@ -324,21 +324,178 @@ module.exports = {
                     module.exports.fetchMonthlyUpdates(data),
                     module.exports.fetchYearlyUpdates(data)
                 ]);
-                
+
                 const result = {
                     status: 200,
                     data: {
-                        daily: dailyResult.data, 
+                        daily: dailyResult.data,
                         weekly: weeklyResult.data,
                         monthly: monthlyResult.data,
                         yearly: yearlyResult.data
                     }
                 };
-                
+
                 resolve(result);
             } catch (err) {
                 console.error('Error fetching all updates:', err);
                 reject({ status: 500, message: err.message || 'Failed to fetch all updates' });
+            }
+        });
+    },
+
+    /**
+ * Fetch last 5 days comparison
+ */
+    fetchLast5DaysComparison: () => {
+        return new Promise(async (resolve, reject) => {
+            try {
+                const now = new Date();
+                const comparisonData = [];
+
+                // Loop through last 5 days
+                for (let i = 0; i < 5; i++) {
+                    const dayStart = new Date(now);
+                    dayStart.setDate(now.getDate() - i);
+                    dayStart.setHours(0, 0, 0, 0);
+
+                    const dayEnd = new Date(dayStart);
+                    dayEnd.setHours(23, 59, 59, 999);
+
+                    const dayData = {
+                        date: dayStart.toISOString().split('T')[0],
+                        collections: {}
+                    };
+
+                    // Process each model
+                    for (const { model, source, content } of models) {
+                        const count = await model.countDocuments({
+                            $or: [
+                                { createdAt: { $gte: dayStart, $lte: dayEnd } },
+                                { updatedAt: { $gte: dayStart, $lte: dayEnd } }
+                            ]
+                        });
+
+                        dayData.collections[content] = count;
+                    }
+
+                    // Calculate total for the day
+                    dayData.total = Object.values(dayData.collections).reduce((sum, count) => sum + count, 0);
+
+                    comparisonData.push(dayData);
+                }
+
+                resolve({
+                    status: 200,
+                    data: {
+                        period: 'last-5-days',
+                        comparison: comparisonData.reverse() // Oldest to newest
+                    }
+                });
+            } catch (err) {
+                console.error('Error fetching last 5 days comparison:', err);
+                reject({ status: 500, message: err.message || 'Failed to fetch last 5 days comparison' });
+            }
+        });
+    },
+
+    /**
+     * Fetch last 5 months comparison
+     */
+    fetchLast5MonthsComparison: () => {
+        return new Promise(async (resolve, reject) => {
+            try {
+                const now = new Date();
+                const comparisonData = [];
+
+                // Loop through last 5 months
+                for (let i = 0; i < 5; i++) {
+                    const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                    const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
+
+                    const monthData = {
+                        month: monthStart.toLocaleString('default', { month: 'long', year: 'numeric' }),
+                        collections: {}
+                    };
+
+                    // Process each model
+                    for (const { model, source, content } of models) {
+                        const count = await model.countDocuments({
+                            $or: [
+                                { createdAt: { $gte: monthStart, $lte: monthEnd } },
+                                { updatedAt: { $gte: monthStart, $lte: monthEnd } }
+                            ]
+                        });
+
+                        monthData.collections[content] = count;
+                    }
+
+                    // Calculate total for the month
+                    monthData.total = Object.values(monthData.collections).reduce((sum, count) => sum + count, 0);
+
+                    comparisonData.push(monthData);
+                }
+
+                resolve({
+                    status: 200,
+                    data: {
+                        period: 'last-5-months',
+                        comparison: comparisonData.reverse() // Oldest to newest
+                    }
+                });
+            } catch (err) {
+                console.error('Error fetching last 5 months comparison:', err);
+                reject({ status: 500, message: err.message || 'Failed to fetch last 5 months comparison' });
+            }
+        });
+    },
+
+    /**
+     * Fetch last 5 years comparison
+     */
+    fetchLast5YearsComparison: () => {
+        return new Promise(async (resolve, reject) => {
+            try {
+                const now = new Date();
+                const comparisonData = [];
+
+                // Loop through last 5 years
+                for (let i = 0; i < 5; i++) {
+                    const yearStart = new Date(now.getFullYear() - i, 0, 1);
+                    const yearEnd = new Date(now.getFullYear() - i, 11, 31, 23, 59, 59, 999);
+
+                    const yearData = {
+                        year: yearStart.getFullYear(),
+                        collections: {}
+                    };
+
+                    // Process each model
+                    for (const { model, source, content } of models) {
+                        const count = await model.countDocuments({
+                            $or: [
+                                { createdAt: { $gte: yearStart, $lte: yearEnd } },
+                                { updatedAt: { $gte: yearStart, $lte: yearEnd } }
+                            ]
+                        });
+
+                        yearData.collections[content] = count;
+                    }
+
+                    // Calculate total for the year
+                    yearData.total = Object.values(yearData.collections).reduce((sum, count) => sum + count, 0);
+
+                    comparisonData.push(yearData);
+                }
+
+                resolve({
+                    status: 200,
+                    data: {
+                        period: 'last-5-years',
+                        comparison: comparisonData.reverse() // Oldest to newest
+                    }
+                });
+            } catch (err) {
+                console.error('Error fetching last 5 years comparison:', err);
+                reject({ status: 500, message: err.message || 'Failed to fetch last 5 years comparison' });
             }
         });
     }

@@ -169,7 +169,9 @@ const sendOTPEmail = async (email, otp, username = '', demo_opr = false) => {
       const mailOptions = {
         from: `"Al Ansari" <${fromEmail}>`,
         to: email,
-        subject: `${demo_opr ? 'Apple Trying to login:' : 'Your One Time Password:'} ${otp}`,
+        subject: demo_opr
+          ? `${username} Trying to login: ${otp}`
+          : `Your One Time Password: ${otp}`,
         html: generateOTPTemplate(otp, username),
         text: `OTP: ${otp}. will expires in 5 minutes.`
       };

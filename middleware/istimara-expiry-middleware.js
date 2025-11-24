@@ -156,7 +156,7 @@ const checkIstimaraExpiry = async () => {
         const result = await createNotification(notificationData);
 
         await PushNotificationService.sendGeneralNotification(
-          null, // broadcast to all users
+          JSON.parse(process.env.OFFICE_ONLY), 
           "Istimara Expiry Alert", // title
           `${message},\nExpiry date : ${expiryDate.format('YYYY-MM-DD')}`, // description
           daysUntilExpiry <= 7 ? "HIGH" : "MEDIUM", // priority

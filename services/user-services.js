@@ -615,6 +615,121 @@ const verifyUserCredentials = async (email, password, type) => {
   }
 };
 
+const changePassword = async (email, currentPassword, newPassword) => {
+  try {
+    // Find user by email
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return {
+        status: 401,
+        success: false,
+        message: 'Invalid email or password',
+      };
+    }
+
+    // Check if user is active
+    if (!user.isActive) {
+      return {
+        status: 403,
+        success: false,
+        message: 'Your account has been deactivated. Please contact an administrator.'
+      };
+    }
+
+    // Verify current password
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+
+    if (!isPasswordValid) {
+      return {
+        status: 401,
+        success: false,
+        message: 'Current password is incorrect'
+      };
+    }
+
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // Update password using user._id (not email)
+    const updatedUser = await User.findByIdAndUpdate(
+      user._id,  // Use _id from found user
+      { password: hashedPassword },  // Update password field
+      { new: true, select: '-password' } // Return updated document without password
+    );
+
+    return {
+      status: 200,
+      success: true,
+      message: 'Password changed successfully',
+      data: updatedUser
+    };
+  } catch (error) {
+    return {
+      status: 500,
+      success: false,
+      message: 'Password change failed',
+      error: error.message
+    };
+  }
+};
+
+const resetPassword = async (email, type) => {
+  try {
+
+    let user
+    // Find user by email
+    if (type === 'mechanic') {
+      user = await Mechanic.findOne({ email });
+    } else if (type === 'operator') {
+      user = await Operator.findOne({ email });
+    } else {
+      user = await User.findOne({ email });
+    }
+
+    if (!user) {
+      return {
+        status: 401,
+        success: false,
+        message: 'Invalid email or password',
+      };
+    }
+
+    // Check if user is active
+    if (!user.isActive) {
+      return {
+        status: 403,
+        success: false,
+        message: 'Your account has been deactivated. Please contact an administrator.'
+      };
+    }
+
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(process.env.INIT_PSWD, salt);
+
+    const updatedUser = await User.findByIdAndUpdate(
+      user._id,  // Use _id from found user
+      { password: hashedPassword },  // reset password field
+      { new: true, select: '-password' } // Return updated document without password
+    );
+
+    return {
+      status: 200,
+      success: true,
+      message: 'Reset changed successfully',
+      data: updatedUser
+    };
+  } catch (error) {
+    return {
+      status: 500,
+      success: false,
+      message: 'Password reset failed',
+      error: error.message
+    };
+  }
+};
 
 /**
  * Verify doc auth user credentials for login
@@ -1981,7 +2096,7 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
 // const sendBulkNotifications = async (uniqueCodes, notificationData) => {
 //   try {
 //     const superAdminCode = process.env.SUPER_ADMIN;
-    
+
 //     let user = await User.findOne({ uniqueCode: superAdminCode }).select('uniqueCode name pushTokens');
 //     if (!user) user = await Operator.findOne({ uniqueCode: superAdminCode }).select('uniqueCode name pushTokens');
 //     if (!user) user = await Mechanic.findOne({ uniqueCode: superAdminCode }).select('uniqueCode name pushTokens');
@@ -2055,7 +2170,7 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
 const sendBulkNotifications = async (uniqueCodes, notificationData) => {
   try {
     const superAdminCode = process.env.SUPER_ADMIN;
-    
+
     let user = await User.findOne({ uniqueCode: superAdminCode }).select('uniqueCode name pushTokens');
     if (!user) user = await Operator.findOne({ uniqueCode: superAdminCode }).select('uniqueCode name pushTokens');
     if (!user) user = await Mechanic.findOne({ uniqueCode: superAdminCode }).select('uniqueCode name pushTokens');
@@ -2644,5 +2759,7 @@ module.exports = {
   getAuthSealKey,
   activateSignatureAccess,
   verifyTrustedDevice,
+  changePassword,
+  resetPassword,
   USER_ROLES,
 };

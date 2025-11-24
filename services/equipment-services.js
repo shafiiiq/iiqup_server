@@ -172,9 +172,48 @@ module.exports = {
     });
   },
 
-  updateEquipments: (regNo, updatedData) => {
+  updateEquipments: (regNo, updatedData, equipmentNumber = null, operatorName = null) => {
     return new Promise(async (resolve, reject) => {
       try {
+        //  Check for equipmentNumber and operatorName (not updateData === null)
+        if (equipmentNumber && operatorName) {
+          const equipment = await equipmentModel.findOne({ regNo: equipmentNumber });
+          if (!equipment) {
+            return reject({ status: 404, ok: false, message: 'Equipment not found' });
+          }
+
+          // Fixed: Properly update operator field
+          const result = await equipmentModel.findOneAndUpdate(
+            { regNo: equipmentNumber },
+            { operator: operatorName }, // Fixed: Pass as object with operator field
+            { new: true, runValidators: true }
+          );
+
+          const notification = await createNotification({
+            title: "Operator Updated",
+            description: `${equipment.machine} - ${equipment.regNo}'s new operator is ${operatorName}`,
+            priority: "medium",
+            sourceId: equipment._id,
+            time: new Date()
+          });
+
+          await PushNotificationService.sendGeneralNotification(
+            null, // broadcast to all users
+            'Operator Updated', //title
+            `${equipment.machine} - ${equipment.regNo}'s new operator is ${operatorName}`, //description
+            'medium', //priority
+            'normal', // type
+            notification.data._id.toString()
+          );
+
+          return resolve({ // Added return
+            status: 200,
+            ok: true,
+            message: 'Equipment updated successfully',
+            data: result
+          });
+        }
+
         const equipment = await equipmentModel.findOne({ regNo: regNo });
         if (!equipment) {
           return reject({ status: 404, ok: false, message: 'Equipment not found' });
@@ -187,11 +226,9 @@ module.exports = {
         const { _id, __v, createdAt, ...cleanUpdatedData } = updatedData;
 
         // Handle operator addition to certificationBody
-        let addedOperator = null;
         const updateData = { ...cleanUpdatedData };
 
         if (cleanUpdatedData.operator) {
-          addedOperator = cleanUpdatedData.operator;
           // Use $push to add to certificationBody array
           updateData.$push = { certificationBody: cleanUpdatedData.operator };
           delete updateData.operator;
@@ -206,24 +243,23 @@ module.exports = {
         // Send notification for equipment update
         try {
           const changes = [];
+
           // Check if site changed with proper type checking
           if (updatedData.site && JSON.stringify(originalEquipment.site) !== JSON.stringify(updatedData.site)) {
             let siteText;
-
             if (Array.isArray(updatedData.site)) {
               siteText = updatedData.site.join(', ');
             } else {
-              siteText = String(updatedData.site); // Convert to string if it's not an array
+              siteText = String(updatedData.site);
             }
-
             changes.push(`site is: ${siteText}`);
           }
 
-          // Check if certificationBody changed (compare array lengths or last item)
-          if (JSON.stringify(originalEquipment.certificationBody) !== JSON.stringify(updatedData.certificationBody)) {
-            // Ensure certificationBody is an array and has items
-            if (Array.isArray(updatedData.certificationBody) && updatedData.certificationBody.length > 0) {
-              const lastOperator = updatedData.certificationBody[updatedData.certificationBody.length - 1];
+          // Fixed: Check against result's certificationBody, not updatedData
+          if (result.certificationBody &&
+            JSON.stringify(originalEquipment.certificationBody) !== JSON.stringify(result.certificationBody)) {
+            if (Array.isArray(result.certificationBody) && result.certificationBody.length > 0) {
+              const lastOperator = result.certificationBody[result.certificationBody.length - 1];
               changes.push(`operator is: ${lastOperator}`);
             }
           }
@@ -261,7 +297,7 @@ module.exports = {
           data: result
         });
       } catch (error) {
-        console.error('Error in updateEquipments:', error); // Added logging
+        console.error('Error in updateEquipments:', error);
         reject({ status: 500, ok: false, message: 'Unable to update equipment' });
       }
     });

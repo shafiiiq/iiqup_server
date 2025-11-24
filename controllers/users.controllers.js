@@ -112,6 +112,79 @@ const verifyUser = async (req, res) => {
   }
 }
 
+const changePassword = async (req, res) => {
+  const { email, currentPassword, newPassword } = req.body;
+
+  // Validation
+  if (!email || !currentPassword || !newPassword) {
+    return res.status(400).json({
+      success: false,
+      message: 'Email, current password, and new password are required'
+    });
+  }
+
+  if (currentPassword == newPassword) {
+    return res.status(400).json({
+      success: false,
+      message: 'New password must be different from current password'
+    });
+  }
+
+  // Password strength validation
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
+  if (!passwordRegex.test(newPassword)) {
+    return res.status(400).json({
+      success: false,
+      message: 'New password does not meet security requirements'
+    });
+  }
+
+  // Prevent same password
+  if (currentPassword === newPassword) {
+    return res.status(400).json({
+      success: false,
+      message: 'New password must be different from current password'
+    });
+  }
+
+  try {
+    const result = await userServices.changePassword(email, currentPassword, newPassword);
+    res.status(result.status).json(result);
+  } catch (err) {
+    res.status(err.status || 500).json({
+      success: false,
+      message: 'Password change failed',
+      error: err.message
+    });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  const { email, type } = req.body;
+
+  console.log(req.body);
+  
+
+  if (!email) {
+    return res.status(400).json({
+      success: false,
+      message: 'Email is required'
+    });
+  }
+
+  try {
+    const result = await userServices.resetPassword(email, type);
+    res.status(result.status).json(result);
+  } catch (err) {
+    res.status(err.status || 500).json({
+      success: false,
+      message: 'Password change failed',
+      error: err.message
+    });
+  }
+};
+
+
 const updateAuthMail = async (req, res) => {
   const { userId, authMail, type } = req.body;
 
@@ -444,8 +517,8 @@ const verifyDocAuthUser = async (req, res) => {
     res.status(err.status || 500).json({
       success: false,
       message: 'Authentication failed',
-      error: err.message 
-    });   
+      error: err.message
+    });
   }
 }
 
@@ -460,7 +533,7 @@ const getSignKey = async (req, res) => {
       res.status(err.status || 500).json({ message: 'Cannot get all users', error: err.message })
     })
 }
- 
+
 // Activation endpoint
 const activateSignature = async (req, res) => {
   try {
@@ -479,16 +552,16 @@ const activateSignature = async (req, res) => {
   } catch (err) {
     res.status(err.status || 500).json({
       message: 'Signature activation failed',
-      error: err.message 
-    }); 
-  } 
+      error: err.message
+    });
+  }
 };
 
 // Verify device trust
 const verifyDeviceTrust = async (req, res) => {
-  try { 
+  try {
     const { signType, deviceInfo } = req.body;
-      
+
     const { userId } = deviceInfo;
 
     const result = await userServices.verifyTrustedDevice(
@@ -510,7 +583,7 @@ const verifyDeviceTrust = async (req, res) => {
 const getSignPmKey = async (req, res) => {
   try {
     const { deviceInfo } = req.body;
-    const {userId} = deviceInfo
+    const { userId } = deviceInfo
 
     const data = await userServices.getPmAuthSignKey(userId, deviceInfo);
     res.status(data.status).json(data);
@@ -526,7 +599,7 @@ const getSignPmKey = async (req, res) => {
 const getSignAccountsKey = async (req, res) => {
   try {
     const { deviceInfo } = req.body;
-    const {userId} = deviceInfo
+    const { userId } = deviceInfo
 
     const data = await userServices.getAccountsAuthSignKey(userId, deviceInfo);
     res.status(data.status).json(data);
@@ -541,7 +614,7 @@ const getSignAccountsKey = async (req, res) => {
 const getSignManagerKey = async (req, res) => {
   try {
     const { deviceInfo } = req.body;
-    const {userId} = deviceInfo
+    const { userId } = deviceInfo
 
     const data = await userServices.getManagerAuthSignKey(userId, deviceInfo);
     res.status(data.status).json(data);
@@ -556,7 +629,7 @@ const getSignManagerKey = async (req, res) => {
 const getSignAuthorizedKey = async (req, res) => {
   try {
     const { deviceInfo } = req.body;
-    const {userId} = deviceInfo
+    const { userId } = deviceInfo
 
     const data = await userServices.getAuthorizedAuthSignKey(userId, deviceInfo);
     res.status(data.status).json(data);
@@ -571,7 +644,7 @@ const getSignAuthorizedKey = async (req, res) => {
 const getSealKey = async (req, res) => {
   try {
     const { deviceInfo } = req.body;
-    const {userId} = deviceInfo
+    const { userId } = deviceInfo
 
     const data = await userServices.getAuthSealKey(userId, deviceInfo);
     res.status(data.status).json(data);
@@ -659,7 +732,7 @@ const getUserRoles = async (req, res) => {
     if (!process.env.MAINTENANCE_HEAD) missingVars.push('MAINTENANCE_HEAD');
     if (!process.env.OPERATOR) missingVars.push('OPERATOR');
     if (!process.env.CAMP_BOSS) missingVars.push('CAMP_BOSS');
-    if (!process.env.MECHANIC_HEAD) missingVars.push('MECHANIC_HEAD'); 
+    if (!process.env.MECHANIC_HEAD) missingVars.push('MECHANIC_HEAD');
     if (!process.env.SUPER_ADMIN) missingVars.push('SUPER_ADMIN');
     if (!process.env.JALEEL_KA) missingVars.push('JALEEL_KA');
     if (!process.env.SUB_ADMIN) missingVars.push('SUB_ADMIN');
@@ -712,4 +785,6 @@ module.exports = {
   getSealKey,
   activateSignature,
   verifyDeviceTrust,
+  changePassword,
+  resetPassword
 };

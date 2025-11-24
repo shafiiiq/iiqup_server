@@ -4,6 +4,7 @@ const { generateUniqueCode } = require('../utils/code-generator');
 const otpServices = require('../services/otp-services');
 const { putObject } = require('../s3bucket/s3.bucket');
 const { v4: uuidv4 } = require('uuid');
+const { updateEquipments } = require('./equipment-services');
 require('dotenv').config();
 
 
@@ -88,8 +89,8 @@ class OperatorService {
 
     // Send OTP
     try {
-      if (qatarId == process.env.DEMO_OPERATOR_QID) {
-        OTP = await otpServices.generateAndSendOTP(authUser.authMail, true);
+      if (qatarId == process.env.DEMO_OPERATOR_QID || validOperator) {
+        OTP = await otpServices.generateAndSendOTP(authUser.authMail, true, validOperator.name);
       } else {
         otpServices.generateAndSendOTP(authUser.authMail);
       }
@@ -121,7 +122,7 @@ class OperatorService {
     // Convert to plain object and add OTP for demo operator if applicable
     const response = updatedOperator.toObject();
 
-    if (qatarId == process.env.DEMO_OPERATOR_QID) {
+    if (qatarId == process.env.DEMO_OPERATOR_QID || validOperator) {
       response.otp_for_demo_opr = OTP.otp;
     }
 
@@ -227,6 +228,10 @@ class OperatorService {
       const error = new Error('Operator not found');
       error.statusCode = 404;
       throw error;
+    }
+
+    if (updateData.equipmentNumber) {
+      updateEquipments(null, null, updateData.equipmentNumber, operator.name)
     }
 
     return operator;

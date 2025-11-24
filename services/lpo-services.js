@@ -244,10 +244,10 @@ class LPOService {
         return lpo;
       }
     } catch (error) {
-      throw new Error(`Error updating LPO: ${error.message}`);
+      throw  new Error(`Error updating LPO: ${error.message}`);
     }
   }
-
+  
   // Delete LPO
   async deleteLPO(refNo) {
     try {

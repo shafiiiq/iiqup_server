@@ -54,7 +54,7 @@ const verifyOTP = async (req, res) => {
   }
 
   try {
-    const result = await otpServices.verifyOTP(email, otp, type, type === 'operator' ? req.body.qatarId : null);
+    const result = await otpServices.verifyOTP(email, otp, type, type === 'operator' ? req.body.qatarId : null);   
 
     res.status(result.status).json(result);
   } catch (err) {

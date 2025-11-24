@@ -65,10 +65,54 @@ const getAllUpdates = async (req, res) => {
     });
 };
 
+/**
+ * Controller to fetch last 5 days comparison
+ */
+const getLast5DaysComparison = async (req, res) => {
+  console.log("yessssssssss");
+  
+  dashboardServices.fetchLast5DaysComparison()
+    .then((result) => {
+      res.status(result.status).json(result);
+    })
+    .catch((err) => {
+      res.status(err.status || 500).json({ error: err.message });
+    });
+};
+
+/**
+ * Controller to fetch last 5 months comparison
+ */
+const getLast5MonthsComparison = async (req, res) => {
+  dashboardServices.fetchLast5MonthsComparison()
+    .then((result) => {
+      res.status(result.status).json(result);
+    })
+    .catch((err) => {
+      res.status(err.status || 500).json({ error: err.message });
+    });
+};
+
+/**
+ * Controller to fetch last 5 years comparison
+ */
+const getLast5YearsComparison = async (req, res) => {
+  dashboardServices.fetchLast5YearsComparison()
+    .then((result) => {
+      res.status(result.status).json(result);
+    })
+    .catch((err) => {
+      res.status(err.status || 500).json({ error: err.message });
+    });
+};
+
 module.exports = {
   getDailyUpdates,
   getWeeklyUpdates,
   getMonthlyUpdates,
   getYearlyUpdates,
-  getAllUpdates
+  getAllUpdates,
+  getLast5DaysComparison,
+  getLast5MonthsComparison,
+  getLast5YearsComparison
 };

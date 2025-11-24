@@ -324,12 +324,12 @@ class ComplaintService {
       const lpo = await lpoModel.findOne({ lpoRef: lpoData.lpoRef })
 
       console.log("lpo", lpo.lpoRef);
-      
+
 
       const complaint = await Complaint.findByIdAndUpdate(
         complaintId,
         {
-          lpoDetails: {  
+          lpoDetails: {
             lpoId: lpo._id,
             lpoRef: lpo.lpoRef,
             createdBy: createdBy,
@@ -341,7 +341,7 @@ class ComplaintService {
               approvedBy: createdBy,
               role: 'WORKSHOP_MANAGER',
               action: 'approved',
-              comments: `LPO created ${lpo.lpoRef}` 
+              comments: `LPO created ${lpo.lpoRef}`
             }
           }
         },
@@ -392,7 +392,7 @@ class ComplaintService {
 
       if (!complaint) {
         const error = new Error('Complaint not found');
-        error.status = 404; 
+        error.status = 404;
         throw error;
       }
 
@@ -401,6 +401,8 @@ class ComplaintService {
         ? ['lpo_uploaded', 'purchase_approved', 'accounts_approved', 'manager_approved', 'ceo_approved', 'md_approved']
         : ['lpo_created', 'sent_to_workshop'];
 
+      console.log("complaint.workflowStatus", complaint.workflowStatus)
+
       if (!validStatuses.includes(complaint.workflowStatus)) {
         const error = new Error(`Invalid workflow status for LPO ${isAmendment ? 'amendment' : 'upload'}`);
         error.status = 400;
@@ -408,7 +410,7 @@ class ComplaintService {
       }
 
       const updateData = {
-        workflowStatus: isAmendment ? 'lpo_amended' : 'lpo_uploaded', 
+        workflowStatus: isAmendment ? 'lpo_amended' : 'lpo_uploaded',
         updatedAt: new Date()
       };
 
@@ -489,7 +491,7 @@ class ComplaintService {
       });
 
       console.log("notification", notification);
-      
+
 
       await PushNotificationService.sendGeneralNotification(
         "SAD-c6e8d3",
@@ -535,10 +537,11 @@ class ComplaintService {
         throw { status: 404, message: 'Complaint not found' };
       }
 
-      if (existingComplaint.workflowStatus !== 'lpo_uploaded') {
+      const validStatuses = ['lpo_uploaded', 'lpo_amended'];
+      if (!validStatuses.includes(existingComplaint.workflowStatus)) {
         throw {
           status: 400,
-          message: `Invalid workflow status. Expected 'lpo_uploaded', got '${existingComplaint.workflowStatus}'`
+          message: `Invalid workflow status. Expected 'lpo_uploaded' or 'lpo_amended', got '${existingComplaint.workflowStatus}'`
         };
       }
 

@@ -16,6 +16,8 @@ router.post('/grant-access', authMiddleware, userController.grantAccess);
 router.post('/get-grantaccess-data', authMiddleware, userController.getGrantAccessData);
 router.delete('/delete-special-notification/:id', authMiddleware, userController.deleteSpecialNotification);
 router.post('/verify-user', userController.verifyUser);
+router.post('/change-password', userController.changePassword);
+router.post('/reset-password', userController.resetPassword);
 router.post('/update-auth-mail', userController.updateAuthMail);  // Optional endpoint to update phone number
 router.post('/get-special-notification', userController.getSpecialNotification);
 router.post('/register-push-token', userController.addPushToken);
