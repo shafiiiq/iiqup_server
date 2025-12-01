@@ -31,7 +31,8 @@ class ComplaintService {
         description: `${complaint.name} registered complaint for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Please assign a mechanic.`,
         priority: "high",
         sourceId: complaintData._id,
-        recipient: JSON.parse(process.env.OFFICE_HERO),
+        // recipient: JSON.parse(process.env.OFFICE_HERO),
+        recipient: process.env.SUPER_ADMIN,
         time: new Date(),
         navigateTo: `/(screens)/assignMechanic/${complaintData._id}`,
         navigateText: 'Assign Mechanic',
@@ -40,7 +41,7 @@ class ComplaintService {
       });
 
       await PushNotificationService.sendGeneralNotification(
-        JSON.parse(process.env.OFFICE_HERO),
+        process.env.SUPER_ADMIN,
         `New Complaint - ${complaint.regNo}`,
         `New complaint needs mechanic assignment for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'}`,
         'high',
