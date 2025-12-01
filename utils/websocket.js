@@ -1,6 +1,6 @@
 // utils/websocket.js
 const connectedUsers = new Map(); // Store connected users with their socket IDs
-const { sendNetworkReconnectPush } = require('./notifications'); // 🆕 Import the function
+const { sendNetworkReconnectPush } = require('../services/user-services'); // 🆕 Import the function
 
 const setupWebSocket = (io) => {
   io.on('connection', (socket) => {
