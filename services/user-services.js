@@ -1721,22 +1721,18 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
   try {
     // Find user with push tokens
     let user = await User.findOne({ uniqueCode }).select('uniqueCode name pushTokens');
-
     if (!user) {
       user = await Operator.findOne({ uniqueCode }).select('uniqueCode name pushTokens');
     }
-
     if (!user) {
       user = await Mechanic.findOne({ uniqueCode }).select('uniqueCode name pushTokens');
     }
-
     if (!user) {
       return {
         success: false,
         message: 'User not found'
       };
     }
-
     if (!user.pushTokens || user.pushTokens.length === 0) {
       console.log('❌ No push tokens array');
       return {
@@ -1757,7 +1753,8 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
         message: 'No valid push tokens found for this user'
       };
     }
-    // ✅ USE NOTIFICATION OBJECT INSTEAD OF DATA (for iOS)
+
+    // ✅ EXISTING MESSAGE (Android + iOS foreground)
     const message = {
       notification: {
         title: String(notificationData.title || 'New Notification'),
@@ -1792,6 +1789,7 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
       }
     };
 
+    // Send regular notifications
     const results = await Promise.allSettled(
       activeTokens.map((token, index) => {
         return admin.messaging().send({ ...message, token });
@@ -1804,7 +1802,6 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
         console.error(`❌ Token ${index + 1} failed:`);
-      } else {
       }
     });
 
@@ -1817,7 +1814,6 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
         total: activeTokens.length
       }
     };
-
   } catch (error) {
     console.error('❌ ERROR:', error);
     return {
@@ -1828,344 +1824,62 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
   }
 };
 
-// old function 
-// const sendNotificationToUser = async (uniqueCode, notificationData) => {
-//   try {
-//     console.log('🔍 Step 1: Finding user with uniqueCode:', uniqueCode);
+// 🆕 NEW FUNCTION - Send silent push for iOS network reconnection
+const sendNetworkReconnectPush = async (uniqueCode) => {
+  try {
+    // Find user
+    let user = await User.findOne({ uniqueCode }).select('uniqueCode pushTokens');
+    if (!user) {
+      user = await Operator.findOne({ uniqueCode }).select('uniqueCode pushTokens');
+    }
+    if (!user) {
+      user = await Mechanic.findOne({ uniqueCode }).select('uniqueCode pushTokens');
+    }
+    if (!user) {
+      return { success: false, message: 'User not found' };
+    }
 
-//     // Find user with push tokens
-//     let user = await User.findOne({ uniqueCode }).select('uniqueCode name pushTokens');
+    // Get only iOS tokens (you need to store platform in pushTokens)
+    const iosTokens = user.pushTokens
+      .filter(tokenData => tokenData.isActive && tokenData.platform === 'ios')
+      .map(tokenData => tokenData.token);
 
-//     if (!user) {
-//       user = await Operator.findOne({ uniqueCode }).select('uniqueCode name pushTokens');
-//     }
+    if (iosTokens.length === 0) {
+      return { success: false, message: 'No iOS tokens' };
+    }
 
-//     if (!user) {
-//       user = await Mechanic.findOne({ uniqueCode }).select('uniqueCode name pushTokens');
-//     }
+    // Silent push message (iOS only)
+    const silentMessage = {
+      data: {
+        type: 'network-reconnect',
+        action: 'sync',
+        timestamp: Date.now().toString()
+      },
+      apns: {
+        headers: {
+          'apns-push-type': 'background',
+          'apns-priority': '5',
+        },
+        payload: {
+          aps: {
+            'content-available': 1
+          }
+        }
+      }
+    };
 
-//     if (!user) {
-//       console.log('❌ User not found');
-//       return {
-//         success: false,
-//         message: 'User not found'
-//       };
-//     }
+    // Send to iOS tokens only
+    await Promise.allSettled(
+      iosTokens.map(token => admin.messaging().send({ ...silentMessage, token }))
+    );
 
-//     console.log('✅ Step 2: User found:', user.name);
-//     console.log('📱 Step 3: Push tokens:', JSON.stringify(user.pushTokens, null, 2));
-
-//     if (!user.pushTokens || user.pushTokens.length === 0) {
-//       console.log('❌ No push tokens array');
-//       return {
-//         success: false,
-//         message: 'No push tokens found for this user'
-//       };
-//     }
-
-//     // Get active FCM tokens
-//     const activeTokens = user.pushTokens
-//       .filter(tokenData => tokenData.isActive && tokenData.token)
-//       .map(tokenData => tokenData.token);
-
-//     console.log('✅ Step 4: Active tokens count:', activeTokens.length);
-//     console.log('📋 Active tokens (first 30 chars):', activeTokens.map(t => t.substring(0, 30)));
-
-//     if (activeTokens.length === 0) {
-//       console.log('❌ No active tokens after filtering');
-//       return {
-//         success: false,
-//         message: 'No valid push tokens found for this user'
-//       };
-//     }
-
-//     console.log('📤 Step 5: Preparing FCM message');
-//     console.log('Notification data:', JSON.stringify(notificationData, null, 2));
-
-//     // Send notification...
-//     const message = {
-//       notification: {
-//         title: notificationData.title || 'New Notification',
-//         body: notificationData.description || notificationData.message || 'You have a new notification'
-//       },
-//       data: {
-//         title: String(notificationData.title || ''),
-//         description: String(notificationData.description || ''),
-//         notificationId: String(notificationData.notificationId || notificationData._id?.toString() || ''),
-//         type: String(notificationData.type || 'normal'),
-//         priority: String(notificationData.priority || 'medium')
-//       },
-//       android: {
-//         priority: notificationData.priority === 'high' ? 'high' : 'normal',
-//         notification: {
-//           channelId: getChannelId(notificationData.priority),
-//           priority: notificationData.priority === 'high' ? 'max' : 'default',
-//           sound: 'default'
-//         }
-//       },
-//       apns: {
-//         payload: {
-//           aps: {
-//             contentAvailable: true,
-//             sound: 'default',
-//             alert: {
-//               title: notificationData.title || 'New Notification',
-//               body: notificationData.description || notificationData.message || 'You have a new notification'
-//             }
-//           }
-//         }
-//       }
-//     };
-
-//     console.log('📨 Step 6: Sending to', activeTokens.length, 'tokens');
-
-//     const results = await Promise.allSettled(
-//       activeTokens.map((token, index) => {
-//         console.log(`Sending to token ${index + 1}...`);
-//         return admin.messaging().send({ ...message, token });
-//       })
-//     );
-
-//     const successful = results.filter(r => r.status === 'fulfilled').length;
-//     const failed = results.filter(r => r.status === 'rejected').length;
-
-//     console.log(`✅ Step 7: Results - ${successful} successful, ${failed} failed`);
-
-//     results.forEach((result, index) => {
-//       if (result.status === 'rejected') {
-//         console.error(`❌ Token ${index + 1} failed:`, result.reason);
-//       } else {
-//         console.log(`✅ Token ${index + 1} success:`, result.value);
-//       }
-//     });
-
-//     return {
-//       success: successful > 0,
-//       message: `Sent: ${successful} successful, ${failed} failed`,
-//       data: {
-//         successful,
-//         failed,
-//         total: activeTokens.length
-//       }
-//     };
-
-//   } catch (error) {
-//     console.error('❌ ERROR:', error);
-//     return {
-//       success: false,
-//       message: 'Failed to send notification',
-//       error: error.message
-//     };
-//   }
-// };
-// may be need to return 
-
-// const sendBulkNotifications = async (uniqueCodes, notificationData) => {
-//   try {
-//     console.log('🔍 Step 1: Finding users with uniqueCodes:', uniqueCodes);
-
-//     // Find all users with push tokens across all collections
-//     const users = await User.find({
-//       uniqueCode: { $in: uniqueCodes }
-//     }).select('uniqueCode name pushTokens');
-
-//     const operators = await Operator.find({
-//       uniqueCode: { $in: uniqueCodes }
-//     }).select('uniqueCode name pushTokens');
-
-//     const mechanics = await Mechanic.find({
-//       uniqueCode: { $in: uniqueCodes }
-//     }).select('uniqueCode name pushTokens');
-
-//     // Combine all found users
-//     const allUsers = [...users, ...operators, ...mechanics];
-
-//     if (allUsers.length === 0) {
-//       console.log('❌ No users found');
-//       return {
-//         success: false,
-//         message: 'No users found'
-//       };
-//     }
-
-//     console.log('✅ Step 2: Users found:', allUsers.length);
-//     console.log('Users:', allUsers.map(u => `${u.name} (${u.uniqueCode})`).join(', '));
-
-//     // Collect all active FCM tokens
-//     const allTokens = [];
-
-//     allUsers.forEach(user => {
-//       console.log(`📱 Checking tokens for ${user.name}:`, JSON.stringify(user.pushTokens, null, 2));
-
-//       if (user.pushTokens && user.pushTokens.length > 0) {
-//         const activeTokens = user.pushTokens
-//           .filter(tokenData => tokenData.isActive && tokenData.token)
-//           .map(tokenData => tokenData.token);
-
-//         if (activeTokens.length > 0) {
-//           console.log(`✅ Found ${activeTokens.length} active token(s) for ${user.name}`);
-//           allTokens.push(...activeTokens);
-//         }
-//       }
-//     });
-
-//     console.log('✅ Step 3: Total active tokens count:', allTokens.length);
-//     console.log('📋 Active tokens (first 30 chars):', allTokens.map(t => t.substring(0, 30)));
-
-//     if (allTokens.length === 0) {
-//       console.log('❌ No active tokens found for any users');
-//       return {
-//         success: false,
-//         message: 'No valid push tokens found for any users'
-//       };
-//     }
-
-//     console.log('📤 Step 4: Preparing FCM message');
-//     console.log('Notification data:', JSON.stringify(notificationData, null, 2));
-
-//     // ✅ FIXED: Send data-only payload for killed app support
-//     const message = {
-//       data: {
-//         title: String(notificationData.title || 'New Notification'),
-//         body: String(notificationData.description || notificationData.message || ''),
-//         notificationId: String(notificationData.notificationId || notificationData._id?.toString() || ''),
-//         type: String(notificationData.type || 'normal'),
-//         priority: String(notificationData.priority || 'medium')
-//       },
-//       android: {
-//         priority: 'high',
-//       },
-//       apns: {
-//         headers: {
-//           'apns-priority': '10',
-//           'apns-push-type': 'background'
-//         },
-//         payload: {
-//           aps: {
-//             contentAvailable: true,
-//             'mutable-content': 1
-//           }
-//         }
-//       }
-//     };
-
-//     console.log(`📨 Step 5: Sending to ${allTokens.length} tokens`);
-
-//     const results = await Promise.allSettled(
-//       allTokens.map((token, index) => {
-//         // console.log(`Sending to token ${index + 1}/${allTokens.length}...`);
-//         return admin.messaging().send({ ...message, token });
-//       })
-//     );
-
-//     const successful = results.filter(r => r.status === 'fulfilled').length;
-//     const failed = results.filter(r => r.status === 'rejected').length;
-
-//     console.log(`✅ Step 6: Results - ${successful} successful, ${failed} failed`);
-
-//     results.forEach((result, index) => {
-//       if (result.status === 'rejected') {
-//         // console.error(`❌ Token ${index + 1} failed:`, result.reason);
-//       } else {
-//         console.log(`✅ Token ${index + 1} success:`, result.value);
-//       }
-//     });
-
-//     return {
-//       success: successful > 0,
-//       message: `Bulk notifications sent: ${successful} successful, ${failed} failed`,
-//       data: {
-//         usersFound: allUsers.length,
-//         tokensFound: allTokens.length,
-//         successful,
-//         failed,
-//         total: allTokens.length
-//       }
-//     };
-
-//   } catch (error) {
-//     // console.error('❌ Error sending bulk notifications:', error);
-//     return {
-//       success: false,
-//       message: 'Failed to send bulk notifications',
-//       error: error.message
-//     };
-//   }
-// };
-
-// const sendBulkNotifications = async (uniqueCodes, notificationData) => {
-//   try {
-//     const superAdminCode = process.env.SUPER_ADMIN;
-
-//     let user = await User.findOne({ uniqueCode: superAdminCode }).select('uniqueCode name pushTokens');
-//     if (!user) user = await Operator.findOne({ uniqueCode: superAdminCode }).select('uniqueCode name pushTokens');
-//     if (!user) user = await Mechanic.findOne({ uniqueCode: superAdminCode }).select('uniqueCode name pushTokens');
-
-//     if (!user || !user.pushTokens || user.pushTokens.length === 0) {
-//       return { success: false, message: 'No tokens found' };
-//     }
-
-//     const activeTokens = user.pushTokens
-//       .filter(t => t.isActive && t.token && t.token.length > 100)
-//       .map(t => t.token);
-
-//     if (activeTokens.length === 0) {
-//       return { success: false, message: 'No valid tokens' };
-//     }
-
-//     // ✅ FIX: Clean the data - remove null/undefined and convert to strings
-//     const cleanData = {};
-//     Object.keys(notificationData).forEach(key => {
-//       const value = notificationData[key];
-//       // Only add if value exists and is not null/undefined
-//       if (value !== null && value !== undefined && value !== '') {
-//         cleanData[key] = String(value);
-//       }
-//     });
-
-//     const message = {
-//       data: {
-//         title: String(notificationData.title || 'New Notification'),
-//         body: String(notificationData.description || notificationData.message || ''),
-//         notificationId: String(notificationData.notificationId || notificationData._id || Date.now()),
-//         type: String(notificationData.type || 'normal'),
-//         priority: String(notificationData.priority || 'medium')
-//       },
-//       android: { priority: 'high' },
-//       apns: {
-//         headers: {
-//           'apns-priority': '10',
-//           'apns-push-type': 'background'
-//         },
-//         payload: {
-//           aps: {
-//             contentAvailable: true,
-//             'mutable-content': 1
-//           }
-//         }
-//       }
-//     };
-
-//     const results = await Promise.allSettled(
-//       activeTokens.map(token => admin.messaging().send({ ...message, token }))
-//     );
-
-//     const successful = results.filter(r => r.status === 'fulfilled').length;
-//     const failed = results.filter(r => r.status === 'rejected').length;
-
-//     console.log(`✅ Sent: ${successful}, Failed: ${failed}`);
-
-//     return {
-//       success: successful > 0,
-//       message: `Sent: ${successful}/${activeTokens.length}`,
-//       data: { successful, failed, total: activeTokens.length }
-//     };
-
-//   } catch (error) {
-//     console.error('❌ Error:', error.message);
-//     return { success: false, message: error.message };
-//   }
-// };
+    console.log(`✅ Sent network reconnect push to ${iosTokens.length} iOS devices`);
+    return { success: true };
+  } catch (error) {
+    console.error('❌ Silent push error:', error);
+    return { success: false, error: error.message };
+  }
+};
 
 const sendBulkNotifications = async (uniqueCodes, notificationData) => {
   try {
@@ -2761,5 +2475,6 @@ module.exports = {
   verifyTrustedDevice,
   changePassword,
   resetPassword,
+  sendNetworkReconnectPush,
   USER_ROLES,
 };

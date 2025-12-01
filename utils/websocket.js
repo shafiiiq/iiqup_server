@@ -1,12 +1,16 @@
 // utils/websocket.js
 const connectedUsers = new Map(); // Store connected users with their socket IDs
+const { sendNetworkReconnectPush } = require('./notifications'); // 🆕 Import the function
 
 const setupWebSocket = (io) => {
   io.on('connection', (socket) => {
     // Handle user authentication/registration
-    socket.on('authenticate', (data) => {
+    socket.on('authenticate', async (data) => { // 🆕 Make it async
       const { uniqueCode, userId } = data;
       if (uniqueCode) {
+        // 🆕 Check if user was previously disconnected
+        const wasDisconnected = !connectedUsers.has(uniqueCode);
+        
         connectedUsers.set(uniqueCode, {
           socketId: socket.id,
           userId: userId,
@@ -16,15 +20,21 @@ const setupWebSocket = (io) => {
         
         // Send confirmation
         socket.emit('authenticated', { success: true, message: 'Connected successfully' });
+        
+        // 🆕 If user was disconnected and now reconnected, send silent push to iOS
+        if (wasDisconnected) {
+          console.log(`📡 User ${uniqueCode} reconnected - sending iOS silent push`);
+          await sendNetworkReconnectPush(uniqueCode);
+        }
       }
     });
 
     // Handle user disconnection
     socket.on('disconnect', () => {
-      
       // Remove user from connected users map
       for (const [uniqueCode, userData] of connectedUsers.entries()) {
         if (userData.socketId === socket.id) {
+          console.log(`❌ User ${uniqueCode} disconnected`);
           connectedUsers.delete(uniqueCode);
           break;
         }
@@ -50,7 +60,6 @@ const sendNotificationToUser = (uniqueCode, notification) => {
         sentAt: new Date().toISOString()
       }
     };    
-    
     global.io.to(`user_${uniqueCode}`).emit('new_notification', enrichedNotification);
   }
 };
