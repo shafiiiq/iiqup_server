@@ -288,7 +288,8 @@ class ComplaintService {
         description: notificationMessage,
         priority: "high",
         sourceId: 'lpo_request',
-        recipient: JSON.parse(process.env.OFFICE_MAIN),
+        // recipient: JSON.parse(process.env.OFFICE_MAIN),
+        recipient: process.env.SUPER_ADMIN,
         time: new Date(),
         navigateTo: `/(screens)/QuotationRequest/${complaint._id}`,
         navigateText: `View Hamza's request`,
@@ -302,7 +303,7 @@ class ComplaintService {
       }
 
       await PushNotificationService.sendGeneralNotification(
-        JSON.parse(process.env.OFFICE_MAIN),
+        process.env.SUPER_ADMIN,
         `LPO Creation Request`,
         pushNotificationBody,
         'high',
