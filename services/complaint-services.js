@@ -25,6 +25,9 @@ class ComplaintService {
 
       await complaintData.save();
 
+
+      console.log("yeahhhh 1223")
+
       // Notify MAINTENANCE_HEAD only
       const notification = await createNotification({
         title: `New Complaint Registered - ${complaint.regNo}`,

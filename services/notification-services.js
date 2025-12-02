@@ -10,6 +10,10 @@ const getAllNotificationsService = async (uniqueCode) => {
       process.env.SUPER_ADMIN
     ];
 
+     const adminRoles = [
+      process.env.SUPER_ADMIN
+    ];
+
     // Fetch all notifications from the database
     let notifications = await Notification.find();
 
@@ -17,6 +21,12 @@ const getAllNotificationsService = async (uniqueCode) => {
     if (!allowedRoles.includes(uniqueCode)) {
       notifications = notifications.filter(
         notification => notification.sourceId !== 'attendance'
+      );
+    }
+    
+    if (!adminRoles.includes(uniqueCode)) {
+      notifications = notifications.filter(
+        notification => notification.sourceId !== 'login_attemps'
       );
     }
 
@@ -125,9 +135,9 @@ const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
 //     // before the "mark as read" and "pending notification" features were implemented.
 //     // Once all users are on track (after a few weeks), remove this and use only sevenDaysAgo logic.
 //     const TEMPORARY_CUTOFF_DATE = new Date('2025-10-21T09:00:00.000Z'); // October 21, 2025, 9:00 AM UTC
-    
+
 //     const sevenDaysAgo = new Date(Date.now() - (7 * 24 * 60 * 60 * 1000));
-    
+
 //     // Use the LATER date between cutoff and 7 days ago
 //     // This ensures we never fetch notifications before October 21, 2024, 9 PM
 //     const fetchFromDate = TEMPORARY_CUTOFF_DATE > sevenDaysAgo ? TEMPORARY_CUTOFF_DATE : sevenDaysAgo;
@@ -162,7 +172,7 @@ const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
 //     if (user && user.specialNotification) {
 //       specialNotifications = user.specialNotification.filter(notif => {
 //         const notifDate = new Date(notif.time || notif.createdAt);
-        
+
 //         // ⚠️ TEMPORARY FIX - REMOVE IN FUTURE
 //         // Apply the same cutoff date for special notifications
 //         return notifDate >= fetchFromDate;

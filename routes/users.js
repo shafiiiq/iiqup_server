@@ -46,4 +46,9 @@ router.get('/verify-token', authMiddleware, (req, res) => {
     });
 });
 
+// Session routes (all require authentication)
+router.get('/sessions', authMiddleware, userController.getUserSessions);
+router.delete('/sessions/:sessionId', authMiddleware, userController.logoutSession);
+router.post('/sessions/:sessionId/block', authMiddleware, userController.blockDevice);
+router.delete('/sessions/logout-all', authMiddleware, userController.logoutAllSessions);
 module.exports = router;

@@ -84,6 +84,7 @@ const authMiddleware = (req, res, next) => {
     const decoded = verifyToken(token);
 
     req.user = decoded;
+    req.userId = decoded.id;
     next();
   } catch (error) {
     console.log('Auth middleware error:', error.message);

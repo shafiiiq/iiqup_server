@@ -91,8 +91,7 @@ const verifyCEO = async (req, res) => {
 }
 
 const verifyUser = async (req, res) => {
-  const { email, password, type } = req.body;
-
+  const { email, password, type, deviceInfo } = req.body;
   if (!email || !password) {
     return res.status(400).json({
       success: false,
@@ -101,7 +100,13 @@ const verifyUser = async (req, res) => {
   }
 
   try {
-    const result = await userServices.verifyUserCredentials(email, password, type);
+    const result = await userServices.verifyUserCredentials(
+      email,
+      password,
+      type,
+      deviceInfo
+    );
+
     res.status(result.status).json(result);
   } catch (err) {
     res.status(err.status || 500).json({
@@ -110,7 +115,7 @@ const verifyUser = async (req, res) => {
       error: err.message
     });
   }
-}
+};
 
 const changePassword = async (req, res) => {
   const { email, currentPassword, newPassword } = req.body;
@@ -163,7 +168,7 @@ const resetPassword = async (req, res) => {
   const { email, type } = req.body;
 
   console.log(req.body);
-  
+
 
   if (!email) {
     return res.status(400).json({
@@ -751,6 +756,76 @@ const getUserRoles = async (req, res) => {
   }
 }
 
+// Get all user sessions
+const getUserSessions = async (req, res) => {
+  try {
+    const userId = req.user.id; // Changed from req.user._id
+    console.log("userId", userId)
+    const currentSessionToken = req.headers.authorization?.split(' ')[1];
+
+    const result = await userServices.getUserSessions(userId, currentSessionToken);
+    res.status(result.status).json(result);
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch sessions',
+      error: err.message
+    });
+  }
+};
+
+// Logout specific session
+const logoutSession = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const userId = req.user.id; // Changed from req.user._id
+    const currentSessionToken = req.headers.authorization?.split(' ')[1];
+
+    const result = await userServices.logoutSession(sessionId, userId, currentSessionToken);
+    res.status(result.status).json(result);
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to logout session',
+      error: err.message
+    });
+  }
+};
+
+// Block device
+const blockDevice = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const userId = req.user.id; // Changed from req.user._id
+
+    const result = await userServices.blockDevice(sessionId, userId);
+    res.status(result.status).json(result);
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to block device',
+      error: err.message
+    });
+  }
+};
+
+// Logout all other sessions
+const logoutAllSessions = async (req, res) => {
+  try {
+    const userId = req.user.id; // Changed from req.user._id
+    const currentSessionToken = req.headers.authorization?.split(' ')[1];
+
+    const result = await userServices.logoutAllSessions(userId, currentSessionToken);
+    res.status(result.status).json(result);
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to logout all sessions',
+      error: err.message
+    });
+  }
+};
+
 module.exports = {
   addUsers,
   getUsers,
@@ -786,5 +861,9 @@ module.exports = {
   activateSignature,
   verifyDeviceTrust,
   changePassword,
-  resetPassword
+  resetPassword,
+  getUserSessions,
+  logoutSession,
+  blockDevice,
+  logoutAllSessions,
 };

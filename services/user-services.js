@@ -8,6 +8,8 @@ const { default: mongoose } = require('mongoose');
 const { renameFilesWithRequestId } = require('../multer/overtime-upload'); // Check this file too
 const admin = require('firebase-admin');
 const { createNotification } = require('../utils/notification-jobs');
+const UAParser = require('ua-parser-js');
+const Session = require('../models/sessions.model');
 
 // Initialize Firebase Admin
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
@@ -538,23 +540,59 @@ const verifyCEOcreds = async (email) => {
   }
 };
 
+const createSession = async (userId, userModel, deviceInfo, location) => {
+  try {
+    // Generate unique session token
+    const sessionToken = crypto.randomBytes(32).toString('hex');
+
+    // Session expires in 30 days
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+
+    const session = new Session({
+      userId,
+      userModel,
+      sessionToken,
+      deviceInfo,
+      location,  // Store location separately
+      isActive: true,
+      expiresAt
+    });
+
+    await session.save();
+
+    return sessionToken;
+  } catch (error) {
+    throw error;
+  }
+};
+// helper function for session management end
+
 /**
  * Verify user credentials for login
  * @param {string} email - User's email
  * @param {string} password - User's password
+ * @param {string} type - User's type
+ * @param {string} userAgent - User's userAgent
+ * @param {string} ipAddress - User's ipAddress
  * @returns {Promise} - Promise with the result of the operation
  */
-const verifyUserCredentials = async (email, password, type) => {
+const verifyUserCredentials = async (email, password, type, deviceInfo) => {
   try {
+    const PushNotificationService = require('../utils/push-notification-jobs');
+    let user;
+    let userModel;
 
-    let user
     // Find user by email
     if (type === 'mechanic') {
       user = await Mechanic.findOne({ email });
+      userModel = 'Mechanic';
     } else if (type === 'operator') {
       user = await Operator.findOne({ email });
+      userModel = 'Operator';
     } else {
       user = await User.findOne({ email });
+      userModel = 'User';
     }
 
     if (!user) {
@@ -585,6 +623,49 @@ const verifyUserCredentials = async (email, password, type) => {
       };
     }
 
+    const notification = await createNotification({
+      title: `Are you certain this is you?`,
+      description: `login attempt detected. If this wasn't  you, your credentials may be compromised. Update them immediately`,
+      priority: "high",
+      sourceId: 'login_attempst',
+      recipient: user.uniqueCode,
+      time: new Date(),
+    });
+
+    await PushNotificationService.sendGeneralNotification(
+      user.uniqueCode,
+      `Are you certain this is you?`,
+      `login attempt detected. If this wasn't  you, your credentials may be compromised. Update them immediately`,
+      'high',
+      'normal',
+      notification.data._id.toString()
+    );
+
+    // Merge device info from frontend with backend parsing
+    const deviceData = {
+      deviceName: deviceInfo?.deviceName || 'Unknown Device',
+      deviceModel: deviceInfo?.deviceModel || 'Unknown Model',
+      deviceId: deviceInfo?.deviceId || 'Unknown ID',
+      brand: deviceInfo?.brand || 'Unknown',
+      osName: deviceInfo?.osName || 'Unknown OS',
+      osVersion: deviceInfo?.osVersion || 'Unknown',
+      platform: deviceInfo?.platform || 'Unknown',
+      loginTime: deviceInfo?.loginTime || new Date().toISOString(),
+      ipAddress: deviceInfo?.ipAddress || 'Unknown IP',
+      locationAddress: deviceInfo?.locationAddress || 'Unknown'
+    };
+
+    // Add location if available
+    const locationData = deviceInfo?.location || null;
+
+    // Create session
+    const sessionToken = await createSession(
+      user._id,
+      userModel,
+      deviceData,
+      locationData  // Pass location separately
+    );
+
     // Return user data without password
     const userData = {
       _id: user._id,
@@ -596,7 +677,8 @@ const verifyUserCredentials = async (email, password, type) => {
       uniqueCode: user.uniqueCode,
       permissions: user.permissions,
       lastLogin: user.lastLogin,
-      authMail: user.authMail
+      authMail: user.authMail,
+      sessionToken
     };
 
     return {
@@ -1719,6 +1801,8 @@ const getUserPushTokens = async (uniqueCode) => {
 
 const sendNotificationToUser = async (uniqueCode, notificationData) => {
   try {
+    console.log("user code ", uniqueCode);
+    
     // Find user with push tokens
     let user = await User.findOne({ uniqueCode }).select('uniqueCode name pushTokens');
     if (!user) {
@@ -1801,7 +1885,7 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
 
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
-        console.error(`❌ Token ${index + 1} failed:`);
+        // console.error(`❌ Token ${index + 1} failed:`);
       }
     });
 
@@ -2436,6 +2520,152 @@ const convertToAMPM = (isoString) => {
   });
 };
 
+// Get all sessions for a user
+const getUserSessions = async (userId, currentSessionToken) => {
+  try {
+    const sessions = await Session.find({
+      userId,
+      isActive: true
+    }).sort({ lastActivity: -1 });
+
+    // Mark current session
+    const sessionsWithCurrent = sessions.map(session => ({
+      ...session.toObject(),
+      isCurrent: session.sessionToken === currentSessionToken
+    }));
+
+    return {
+      status: 200,
+      success: true,
+      message: 'Sessions retrieved successfully',
+      data: {
+        sessions: sessionsWithCurrent,
+        total: sessions.length
+      }
+    };
+  } catch (error) {
+    return {
+      status: 500,
+      success: false,
+      message: 'Failed to retrieve sessions',
+      error: error.message
+    };
+  }
+};
+
+// Logout specific session
+const logoutSession = async (sessionId, userId, currentSessionToken) => {
+  try {
+    const session = await Session.findOne({
+      _id: sessionId,
+      userId
+    });
+
+    if (!session) {
+      return {
+        status: 404,
+        success: false,
+        message: 'Session not found'
+      };
+    }
+
+    // Prevent logging out current session
+    if (session.sessionToken === currentSessionToken) {
+      return {
+        status: 400,
+        success: false,
+        message: 'Cannot logout current session. Use logout instead.'
+      };
+    }
+
+    // Deactivate session
+    session.isActive = false;
+    await session.save();
+
+    return {
+      status: 200,
+      success: true,
+      message: 'Session logged out successfully'
+    };
+  } catch (error) {
+    return {
+      status: 500,
+      success: false,
+      message: 'Failed to logout session',
+      error: error.message
+    };
+  }
+};
+
+// Block device
+const blockDevice = async (sessionId, userId) => {
+  try {
+    const session = await Session.findOne({
+      _id: sessionId,
+      userId
+    });
+
+    if (!session) {
+      return {
+        status: 404,
+        success: false,
+        message: 'Session not found'
+      };
+    }
+
+    // Delete session permanently (blocking)
+    await Session.deleteOne({ _id: sessionId });
+
+    // Optionally: Add device ID to blocked devices list in User model
+    // This would prevent this device from logging in again
+
+    return {
+      status: 200,
+      success: true,
+      message: 'Device blocked successfully'
+    };
+  } catch (error) {
+    return {
+      status: 500,
+      success: false,
+      message: 'Failed to block device',
+      error: error.message
+    };
+  }
+};
+
+// Logout all other sessions
+const logoutAllSessions = async (userId, currentSessionToken) => {
+  try {
+    const result = await Session.updateMany(
+      {
+        userId,
+        sessionToken: { $ne: currentSessionToken },
+        isActive: true
+      },
+      {
+        $set: { isActive: false }
+      }
+    );
+
+    return {
+      status: 200,
+      success: true,
+      message: 'All other sessions logged out successfully',
+      data: {
+        loggedOutCount: result.modifiedCount
+      }
+    };
+  } catch (error) {
+    return {
+      status: 500,
+      success: false,
+      message: 'Failed to logout all sessions',
+      error: error.message
+    };
+  }
+};
+
 module.exports = {
   insertUser,
   fetchUsers,
@@ -2476,5 +2706,9 @@ module.exports = {
   changePassword,
   resetPassword,
   sendNetworkReconnectPush,
+  getUserSessions,
+  logoutSession,
+  blockDevice,
+  logoutAllSessions,
   USER_ROLES,
 };
