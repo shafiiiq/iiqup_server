@@ -70,7 +70,7 @@ const corsOptions = {
     const whitelist = [
       'https://iiqup.netlify.app',
       'https://ansarigroup.online',
-      'https://www.ansarigroup.online',
+      'https://www.ansarigroup.online'
     ];
 
     if (whitelist.indexOf(origin) !== -1) {
