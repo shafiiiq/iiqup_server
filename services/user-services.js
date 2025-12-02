@@ -623,22 +623,12 @@ const verifyUserCredentials = async (email, password, type, deviceInfo) => {
       };
     }
 
-    const notification = await createNotification({
-      title: `Are you certain this is you?`,
-      description: `login attempt detected. If this wasn't  you, your credentials may be compromised. Update them immediately`,
-      priority: "high",
-      sourceId: 'login_attempst',
-      recipient: user.uniqueCode,
-      time: new Date(),
-    });
-
     await PushNotificationService.sendGeneralNotification(
       user.uniqueCode,
       `Are you certain this is you?`,
       `login attempt detected. If this wasn't  you, your credentials may be compromised. Update them immediately`,
       'high',
       'normal',
-      notification.data._id.toString()
     );
 
     // Merge device info from frontend with backend parsing
@@ -1801,22 +1791,24 @@ const getUserPushTokens = async (uniqueCode) => {
 
 const sendNotificationToUser = async (uniqueCode, notificationData) => {
   try {
-    console.log("user code ", uniqueCode);
-    
     // Find user with push tokens
     let user = await User.findOne({ uniqueCode }).select('uniqueCode name pushTokens');
+
     if (!user) {
       user = await Operator.findOne({ uniqueCode }).select('uniqueCode name pushTokens');
     }
+
     if (!user) {
       user = await Mechanic.findOne({ uniqueCode }).select('uniqueCode name pushTokens');
     }
+
     if (!user) {
       return {
         success: false,
         message: 'User not found'
       };
     }
+
     if (!user.pushTokens || user.pushTokens.length === 0) {
       console.log('❌ No push tokens array');
       return {
@@ -1837,8 +1829,7 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
         message: 'No valid push tokens found for this user'
       };
     }
-
-    // ✅ EXISTING MESSAGE (Android + iOS foreground)
+    // ✅ USE NOTIFICATION OBJECT INSTEAD OF DATA (for iOS)
     const message = {
       notification: {
         title: String(notificationData.title || 'New Notification'),
@@ -1873,7 +1864,6 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
       }
     };
 
-    // Send regular notifications
     const results = await Promise.allSettled(
       activeTokens.map((token, index) => {
         return admin.messaging().send({ ...message, token });
@@ -1886,6 +1876,7 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
     results.forEach((result, index) => {
       if (result.status === 'rejected') {
         // console.error(`❌ Token ${index + 1} failed:`);
+      } else {
       }
     });
 
@@ -1898,6 +1889,7 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
         total: activeTokens.length
       }
     };
+
   } catch (error) {
     console.error('❌ ERROR:', error);
     return {
