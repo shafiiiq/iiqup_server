@@ -23,12 +23,6 @@ const getAllNotificationsService = async (uniqueCode) => {
         notification => notification.sourceId !== 'attendance'
       );
     }
-    
-    if (!adminRoles.includes(uniqueCode)) {
-      notifications = notifications.filter(
-        notification => notification.sourceId !== 'login_attemps'
-      );
-    }
 
     return notifications;
   } catch (error) {
