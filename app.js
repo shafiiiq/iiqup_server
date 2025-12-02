@@ -62,23 +62,13 @@ var server = http.createServer(app);
 
 // CORS configuration for Express
 const corsOptions = {
-  origin: function (origin, callback) {
-    // allow requests with no origin (React Native app)
-    if (!origin) return callback(null, true);
-
-    // whitelist of allowed domains for web
-    const whitelist = [
-      'https://iiqup.netlify.app',
-      'https://ansarigroup.online',
-      'https://www.ansarigroup.online'
-    ];
-
-    if (whitelist.indexOf(origin) !== -1) {
-      callback(null, true); // allow
-    } else {
-      callback(new Error('Not allowed by CORS')); // block
-    }
-  },
+  origin: [
+    'https://iiqup.netlify.app',
+    'https://ansarigroup.online',
+    'https://www.ansarigroup.online',
+    'http://localhost:3000',
+    "http://192.168.100.53:3000"
+  ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [
     'Origin',
