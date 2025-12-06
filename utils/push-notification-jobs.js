@@ -1,6 +1,6 @@
 // services/pushNotificationService.js
 const userService = require('../services/user-services');
-const { sendNotificationToUser: sendWebSocketNotification, broadcastNotification: broadcastWebSocketNotification } = require('../utils/websocket');
+const { sendNotificationToUser: sendWebSocketNotification, broadcastNotification: broadcastWebSocketNotification } = require('../utils/websocket').default;
 const User = require('../models/user.model');
 
 /**

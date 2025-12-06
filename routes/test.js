@@ -15,6 +15,8 @@ const Mechanic = require('../models/mechanic.model.js');
 const Fuels = require('../models/fuels.model.js');
 const User = require('../models/user.model.js');
 const equipModel = require('../models/equip.model.js');
+const PushNotificationService = require('../utils/push-notification-jobs');
+const { createNotification } = require('../utils/notification-jobs');
 
 
 router.get('/put-the-item', async (req, res) => {
@@ -23,8 +25,8 @@ router.get('/put-the-item', async (req, res) => {
     const result = await Mechanic.updateMany(
       {}, // empty filter means all documents
       { status: "available" }
-    );    
-    
+    );
+
     res.status(200).json({
       success: true,
       message: `Updated ${result.modifiedCount} mechanics to available status`,
@@ -42,143 +44,143 @@ router.get('/put-the-item', async (req, res) => {
 
 // GET /api/fuels/equipment-consumption - Get fuel consumption for all equipment
 router.get('/match-and-store', async (req, res) => {
-    try {
-        const bulkOperations = equipmentsData.map(equipData => ({
-            updateOne: {
-                filter: { regNo: equipData.regNo },
-                update: {
-                    $addToSet: { certificationBody: equipData.operator },
-                    $set: { updatedAt: new Date() }
-                }
-            }
-        }));
+  try {
+    const bulkOperations = equipmentsData.map(equipData => ({
+      updateOne: {
+        filter: { regNo: equipData.regNo },
+        update: {
+          $addToSet: { certificationBody: equipData.operator },
+          $set: { updatedAt: new Date() }
+        }
+      }
+    }));
 
-        const result = await Equipment.bulkWrite(bulkOperations);
+    const result = await Equipment.bulkWrite(bulkOperations);
 
-        res.status(200).json({
-            success: true,
-            message: 'Equipment operators updated successfully',
-            result: {
-                matchedCount: result.matchedCount,
-                modifiedCount: result.modifiedCount,
-                total: equipmentsData.length
-            }
-        });
+    res.status(200).json({
+      success: true,
+      message: 'Equipment operators updated successfully',
+      result: {
+        matchedCount: result.matchedCount,
+        modifiedCount: result.modifiedCount,
+        total: equipmentsData.length
+      }
+    });
 
-    } catch (error) {
-        console.error('Error updating equipment operators:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error updating equipment operators',
-            error: error.message
-        });
-    }
+  } catch (error) {
+    console.error('Error updating equipment operators:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating equipment operators',
+      error: error.message
+    });
+  }
 });
 
 router.get('/match-and-store', async (req, res) => {
-    try {
-        const bulkOperations = equipmentsData.map(equipData => ({
-            updateOne: {
-                filter: { regNo: equipData.regNo },
-                update: {
-                    $addToSet: { certificationBody: equipData.operator },
-                    $set: { updatedAt: new Date() }
-                }
-            }
-        }));
+  try {
+    const bulkOperations = equipmentsData.map(equipData => ({
+      updateOne: {
+        filter: { regNo: equipData.regNo },
+        update: {
+          $addToSet: { certificationBody: equipData.operator },
+          $set: { updatedAt: new Date() }
+        }
+      }
+    }));
 
-        const result = await Equipment.bulkWrite(bulkOperations);
+    const result = await Equipment.bulkWrite(bulkOperations);
 
-        res.status(200).json({
-            success: true,
-            message: 'Equipment operators updated successfully',
-            result: {
-                matchedCount: result.matchedCount,
-                modifiedCount: result.modifiedCount,
-                total: equipmentsData.length
-            }
-        });
+    res.status(200).json({
+      success: true,
+      message: 'Equipment operators updated successfully',
+      result: {
+        matchedCount: result.matchedCount,
+        modifiedCount: result.modifiedCount,
+        total: equipmentsData.length
+      }
+    });
 
-    } catch (error) {
-        console.error('Error updating equipment operators:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error updating equipment operators',
-            error: error.message
-        });
-    }
+  } catch (error) {
+    console.error('Error updating equipment operators:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating equipment operators',
+      error: error.message
+    });
+  }
 });
 
 router.get('/activate-equipment', async (req, res) => {
-    try {
-        const regNumbers = equipmentsData.map(equipData => equipData.regNo);
+  try {
+    const regNumbers = equipmentsData.map(equipData => equipData.regNo);
 
-        const result = await Equipment.updateMany(
-            { 
-                regNo: { $in: regNumbers },
-                status: { $ne: "active" }
-            },
-            {
-                $set: { 
-                    status: "active",
-                    updatedAt: new Date() 
-                }
-            }
-        );
+    const result = await Equipment.updateMany(
+      {
+        regNo: { $in: regNumbers },
+        status: { $ne: "active" }
+      },
+      {
+        $set: {
+          status: "active",
+          updatedAt: new Date()
+        }
+      }
+    );
 
-        res.status(200).json({
-            success: true,
-            message: 'Equipment status updated to active',
-            result: {
-                matchedCount: result.matchedCount,
-                modifiedCount: result.modifiedCount,
-                total: equipmentsData.length
-            }
-        });
+    res.status(200).json({
+      success: true,
+      message: 'Equipment status updated to active',
+      result: {
+        matchedCount: result.matchedCount,
+        modifiedCount: result.modifiedCount,
+        total: equipmentsData.length
+      }
+    });
 
-    } catch (error) {
-        console.error('Error updating equipment status:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error updating equipment status',
-            error: error.message
-        });
-    }
+  } catch (error) {
+    console.error('Error updating equipment status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating equipment status',
+      error: error.message
+    });
+  }
 });
 
 
 router.get('/update-sites', async (req, res) => {
-    try {
-        const bulkOperations = equipmentsData.map(equipData => ({
-            updateOne: {
-                filter: { regNo: equipData.regNo },
-                update: {
-                    $addToSet: { site: equipData.site },
-                    $set: { updatedAt: new Date() }
-                }
-            }
-        }));
+  try {
+    const bulkOperations = equipmentsData.map(equipData => ({
+      updateOne: {
+        filter: { regNo: equipData.regNo },
+        update: {
+          $addToSet: { site: equipData.site },
+          $set: { updatedAt: new Date() }
+        }
+      }
+    }));
 
-        const result = await Equipment.bulkWrite(bulkOperations);
+    const result = await Equipment.bulkWrite(bulkOperations);
 
-        res.status(200).json({
-            success: true,
-            message: 'Equipment sites updated successfully',
-            result: {
-                matchedCount: result.matchedCount,
-                modifiedCount: result.modifiedCount,
-                total: equipmentsData.length
-            }
-        });
+    res.status(200).json({
+      success: true,
+      message: 'Equipment sites updated successfully',
+      result: {
+        matchedCount: result.matchedCount,
+        modifiedCount: result.modifiedCount,
+        total: equipmentsData.length
+      }
+    });
 
-    } catch (error) {
-        console.error('Error updating equipment sites:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error updating equipment sites',
-            error: error.message
-        });
-    }
+  } catch (error) {
+    console.error('Error updating equipment sites:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error updating equipment sites',
+      error: error.message
+    });
+  }
 });
 
 
@@ -272,15 +274,34 @@ router.post('/add-activation-key', async (req, res) => {
   }
 });
 
+
+router.get('/push-test', async (req, res) => {
+  const notification = await createNotification({
+    title: `This is the testing`,
+    description: `This is message is for testing purpose. please be quit. nothing action required`,
+    priority: "high",
+    sourceId: 'complaintData._id',
+    recipient: process.env.SUPER_ADMIN,
+    time: new Date(),
+  });
+
+  const result = await PushNotificationService.sendGeneralNotification(
+    process.env.SUPER_ADMIN,
+    `This is the testing`,
+    `This is message is for testing purpose. please be quit. nothing action required`,
+    'high',
+    'normal',
+    notification.data._id.toString()
+  );
+
+  res.json({
+    status: 200,
+    message: "success",
+    result: result
+  })
+});
+
 module.exports = router;
-
-
-
-
-
-
-
-
 
 
 

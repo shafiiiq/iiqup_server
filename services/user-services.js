@@ -2574,6 +2574,11 @@ const logoutSession = async (sessionId, userId, currentSessionToken) => {
     session.isActive = false;
     await session.save();
 
+    const userToLogout = await User.findById(userId);
+    if (userToLogout) {
+      const websocket = await import('../utils/websocket.js');
+      websocket.default.forceLogoutUser(userToLogout.uniqueCode, userToLogout._id, session.sessionToken, 'Logged out from another device');
+    }
     return {
       status: 200,
       success: true,
@@ -2608,6 +2613,12 @@ const blockDevice = async (sessionId, userId) => {
     // Delete session permanently (blocking)
     await Session.deleteOne({ _id: sessionId });
 
+    const userToBlock = await User.findById(userId);
+    if (userToBlock) {
+      const websocket = await import('../utils/websocket.js');
+      websocket.default.forceLogoutUser(userToLogout.uniqueCode, userToLogout._id, session.sessionToken, 'Device blocked');
+    }
+
     // Optionally: Add device ID to blocked devices list in User model
     // This would prevent this device from logging in again
 
@@ -2640,6 +2651,12 @@ const logoutAllSessions = async (userId, currentSessionToken) => {
       }
     );
 
+    const userToLogout = await User.findById(userId);
+    if (userToLogout) {
+      const websocket = await import('../utils/websocket.js');
+      websocket.default.forceLogoutUser(userToLogout.uniqueCode, userToLogout._id, result.sessionToken, 'Logged out from all devices');
+    }
+
     return {
       status: 200,
       success: true,
@@ -2653,6 +2670,60 @@ const logoutAllSessions = async (userId, currentSessionToken) => {
       status: 500,
       success: false,
       message: 'Failed to logout all sessions',
+      error: error.message
+    };
+  }
+};
+
+// Check if session is logged out or blocked
+const checkSessionStatus = async (sessionId, userId) => {
+  try {
+    const session = await Session.findOne({
+      sessionToken: sessionId,
+      userId
+    });
+
+    // Session doesn't exist - it was blocked/deleted
+    if (!session) {
+      return {
+        status: 401,
+        success: false,
+        sessionStatus: 'blocked',
+        message: 'Session was blocked from another device',
+        action: 'redirect_to_login' // Suggest action for frontend
+      };
+    }
+
+    // Session exists but is inactive - it was logged out
+    if (!session.isActive) {
+      return {
+        status: 401,
+        success: false,
+        sessionStatus: 'logged_out',
+        message: 'Session was logged out from another device',
+        action: 'redirect_to_login'
+      };
+    }
+
+    // Session is active and valid
+    return {
+      status: 200,
+      success: true,
+      sessionStatus: 'active',
+      message: 'Session is active',
+      action: 'continue_to_work',
+      session: {
+        id: session._id,
+        deviceInfo: session.deviceInfo,
+        lastActivity: session.lastActivity
+      }
+    };
+
+  } catch (error) {
+    return {
+      status: 500,
+      success: false,
+      message: 'Failed to check session status',
       error: error.message
     };
   }
@@ -2702,5 +2773,6 @@ module.exports = {
   logoutSession,
   blockDevice,
   logoutAllSessions,
+  checkSessionStatus,
   USER_ROLES,
 };

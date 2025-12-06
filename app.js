@@ -16,7 +16,8 @@ const { overtimeCleanupMiddleware } = require('./middleware/cleanup-middleware')
 const { istimaraExpiryMiddleware } = require('./middleware/istimara-expiry-middleware');
 
 // Import WebSocket handler
-const { setupWebSocket } = require('./utils/websocket');
+const websocket = require('./utils/websocket');
+const setupWebSocket = websocket.default.setupWebSocket;
 const { autoBackup } = require('./utils/backup-data');
 const { connectDevDB } = require('./config/dev.connection');
 
@@ -66,7 +67,6 @@ const corsOptions = {
     'https://iiqup.netlify.app',
     'https://ansarigroup.online',
     'https://www.ansarigroup.online',
-    'http://localhost:3000',
     "http://192.168.100.53:3000"
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
@@ -85,19 +85,12 @@ const corsOptions = {
 // Socket.IO CORS (same logic)
 const io = socketIo(server, {
   cors: {
-    origin: function (origin, callback) {
-      if (!origin) return callback(null, true);
-      const whitelist = [
-        'https://iiqup.netlify.app',
-        'https://ansarigroup.online',
-        'https://www.ansarigroup.online'
-      ];
-      if (whitelist.indexOf(origin) !== -1) callback(null, true);
-      else callback(new Error('Not allowed by CORS'));
-    },
+    origin: '*', // or add your local IP
     methods: ['GET', 'POST'],
     credentials: true,
   },
+  transports: ['websocket', 'polling'], // Add polling fallback
+  allowEIO3: true
 });
 
 // Setup WebSocket handlers
