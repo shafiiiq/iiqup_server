@@ -5,7 +5,7 @@ const addEquipments = async (req, res) => {
     .then((addedUser) => {
       if (addedUser) {
         res.status(addedUser.status).json(addedUser)
-      }
+      } 
     })
     .catch((err) => {
       res.status(err.status || 500).json({ error: err.message })

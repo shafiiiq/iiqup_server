@@ -196,6 +196,9 @@ class LPOService {
           amendment.amendedTermsAndConditions = updateData.termsAndConditions;
         }
 
+        console.log("refNo", refNo);
+        
+
         // Update the LPO with amendment
         const lpo = await LPO.findOneAndUpdate(
           { lpoRef: refNo.trim() },

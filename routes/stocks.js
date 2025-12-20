@@ -36,4 +36,7 @@ router.get('/movements/mechanic/:mechanicId', stocksController.getStockMovements
 // ===== REPORTING ROUTES =====
 router.get('/reports/accountability', stocksController.getStockAccountabilityReport);
 
+// Barcode Scanner Route
+router.get('/scan/:objectId', stocksController.scanStockByBarcode);
+
 module.exports = router;

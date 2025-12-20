@@ -22,4 +22,6 @@ router.get('/toolkit-stock-history/:toolkitId', toolKitsController.getToolkitSto
 // Search route
 router.get('/search-toolkits', toolKitsController.searchToolkits);
 
+router.get('/scan/:objectId', toolKitsController.scanToolkitByBarcode);
+
 module.exports = router;

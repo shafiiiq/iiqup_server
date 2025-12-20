@@ -6,7 +6,8 @@ const tyreModel = require('../models/tyre.model.js');
 const batteryModel = require('../models/batery.model.js');
 const stocksModel = require('../models/stocks.model.js');
 const equipmnentModel = require('../models/equip.model.js');
-const toolkitModel = require('../models/toolkit.model.js');
+const toolkitModel = require('../models/toolkit.model.js'); 
+const complaintModel = require('../models/complaint.model.js');
 
 // Define all models with their source names
 const models = [
@@ -17,7 +18,8 @@ const models = [
     { model: batteryModel, source: 'batteryModel', content: 'battery-history' },
     { model: equipmnentModel, source: 'equipmnentModel', content: 'equipment' },
     { model: stocksModel, source: 'stocksModel', content: 'stocks' },
-    { model: toolkitModel, source: 'toolkitModel', content: 'toolkit' }
+    { model: toolkitModel, source: 'toolkitModel', content: 'toolkit' },
+    { model: complaintModel, source: 'complaintModel', content: 'complaints' }
 ];
 
 /**
@@ -90,6 +92,7 @@ module.exports = {
                         equipment: updatesByCollection['equipment'] || [],
                         stocks: updatesByCollection['stocks'] || [],
                         toolkit: updatesByCollection['toolkit'] || [],
+                        complaints: updatesByCollection['complaints'] || [],
                         // Combined data (for backward compatibility)
                         updates: allUpdates,
                         total: allUpdates.length,
@@ -153,6 +156,7 @@ module.exports = {
                         equipment: updatesByCollection['equipment'] || [],
                         stocks: updatesByCollection['stocks'] || [],
                         toolkit: updatesByCollection['toolkit'] || [],
+                        complaints: updatesByCollection['complaints'] || [],
                         // Combined data (for backward compatibility)
                         updates: allUpdates,
                         total: allUpdates.length,
@@ -216,6 +220,7 @@ module.exports = {
                         equipment: updatesByCollection['equipment'] || [],
                         stocks: updatesByCollection['stocks'] || [],
                         toolkit: updatesByCollection['toolkit'] || [],
+                        complaints: updatesByCollection['complaints'] || [],
                         // Combined data (for backward compatibility)
                         updates: allUpdates,
                         total: allUpdates.length,
@@ -280,6 +285,7 @@ module.exports = {
                         equipment: updatesByCollection['equipment'] || [],
                         stocks: updatesByCollection['stocks'] || [],
                         toolkit: updatesByCollection['toolkit'] || [],
+                        complaints: updatesByCollection['complaints'] || [],
                         // Combined data (for backward compatibility)
                         updates: allUpdates,
                         total: allUpdates.length,
@@ -308,7 +314,8 @@ module.exports = {
             batteryHistory: updatesByCollection['battery-history'] || [],
             equipment: updatesByCollection['equipment'] || [],
             stocks: updatesByCollection['stocks'] || [],
-            toolkit: updatesByCollection['toolkit'] || []
+            toolkit: updatesByCollection['toolkit'] || [],
+            complaints: updatesByCollection['complaints'] || [],
         };
     },
 

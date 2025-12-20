@@ -1,13 +1,10 @@
 const stockHandoverModel = require('../models/equip-hand-over-stock.model');
 const path = require('path');
 const Stock = require('../models/stocks.model');
-const config = {
-  baseUrl: process.env.BASE_URL || 'http://localhost:3001',
-  // Add other configuration options as needed
-}
 const userServices = require('../services/user-services.js')
 const { createNotification } = require('../utils/notification-jobs'); // Import notification service
 const PushNotificationService = require('../utils/push-notification-jobs');
+const mongoose = require('mongoose');
 
 module.exports = {
   insertEquipmentStocks: (data) => {
@@ -279,7 +276,7 @@ module.exports = {
         const existingStock = await Stock.findOne({ serialNumber: data.serialNumber });
         if (existingStock) {
           console.log("stock is existing");
-          
+
           return reject({
             status: 409,
             message: 'Stock with this serial number already exists'
@@ -1035,5 +1032,87 @@ module.exports = {
         });
       }
     });
-  }
+  },
+
+  scanStockByBarcode: (objectId) => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Validate ObjectId format
+        if (!mongoose.Types.ObjectId.isValid(objectId)) {
+          return reject({
+            status: 400,
+            message: 'Invalid barcode format. Please scan a valid stock barcode.'
+          });
+        }
+
+        // Find stock by ObjectId
+        const stock = await Stock.findOne({
+          _id: objectId,
+          isDeleted: { $ne: true }
+        });
+
+        if (!stock) {
+          return reject({
+            status: 404,
+            message: 'Stock not found. This item may have been deleted or does not exist.'
+          });
+        }
+
+        // Sort movements by date (most recent first)
+        if (stock.movements && stock.movements.length > 0) {
+          stock.movements.sort((a, b) => new Date(b.date) - new Date(a.date));
+        }
+
+        // Calculate additional metrics
+        const totalMovements = stock.movements ? stock.movements.length : 0;
+        const totalAdded = stock.movements
+          ? stock.movements
+            .filter(m => m.type === 'add')
+            .reduce((sum, m) => sum + (m.quantity || 0), 0)
+          : 0;
+        const totalDeducted = stock.movements
+          ? stock.movements
+            .filter(m => m.type === 'deduct')
+            .reduce((sum, m) => sum + (m.quantity || 0), 0)
+          : 0;
+
+        // Get last activity
+        let lastActivity = null;
+        let lastActionBy = null;
+        if (stock.movements && stock.movements.length > 0) {
+          const lastMovement = stock.movements[0]; // Already sorted
+          lastActivity = lastMovement.date;
+          if (lastMovement.type === 'deduct') {
+            lastActionBy = lastMovement.mechanicName || 'Unknown';
+          } else if (lastMovement.type === 'add') {
+            lastActionBy = `System (${lastMovement.reason || 'Stock Added'})`;
+          }
+        }
+
+        resolve({
+          status: 200,
+          success: true,
+          message: 'Stock scanned successfully',
+          data: {
+            ...stock.toObject(),
+            metrics: {
+              totalMovements,
+              totalAdded,
+              totalDeducted,
+              lastActivity,
+              lastActionBy,
+              totalValue: stock.rate * stock.stockCount,
+              stockAge: Math.floor((Date.now() - new Date(stock.createdAt)) / (1000 * 60 * 60 * 24)) // Age in days
+            }
+          }
+        });
+      } catch (error) {
+        console.error('Error scanning stock barcode:', error);
+        reject({
+          status: 500,
+          message: 'Error scanning stock barcode'
+        });
+      }
+    });
+  },
 };

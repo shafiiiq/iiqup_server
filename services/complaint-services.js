@@ -403,7 +403,7 @@ class ComplaintService {
 
       // For amendment, allow from various approved statuses
       const validStatuses = isAmendment
-        ? ['lpo_uploaded', 'purchase_approved', 'accounts_approved', 'manager_approved', 'ceo_approved', 'md_approved']
+        ? ['lpo_uploaded', 'purchase_approved', 'accounts_approved', 'manager_approved', 'ceo_approved', 'md_approved', 'completed']
         : ['lpo_created', 'sent_to_workshop'];
 
       console.log("complaint.workflowStatus", complaint.workflowStatus)
@@ -594,9 +594,20 @@ class ComplaintService {
         );
       }
 
+      let title, description
+      const lpoData = await LPO.findById(complaint.lpoDetails.lpoId)
+
+      if (lpoData.isAmendmented) {
+        title = `Amendment! ACCOUNTS Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`
+        description = `Purchase manager ${signed ? 'signed and ' : ''}approved amendment LPO for complaint ${complaint.regNo}. ACCOUNTS approval needed.`
+      } else {
+        title = `ACCOUNTS Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`
+        description = `Purchase manager ${signed ? 'signed and ' : ''}approved LPO for complaint ${complaint.regNo}. ACCOUNTS approval needed.`
+      }
+
       const notification = await createNotification({
-        title: `ACCOUNTS Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`,
-        description: `Purchase manager ${signed ? 'signed and ' : ''}approved LPO for complaint ${complaint.regNo}. ACCOUNTS approval needed.`,
+        title: title,
+        description: title,
         priority: "high",
         sourceId: 'accounts_approval',
         recipient: process.env.ACCOUNTS,
@@ -609,8 +620,8 @@ class ComplaintService {
 
       await PushNotificationService.sendGeneralNotification(
         process.env.ACCOUNTS,
-        `ACCOUNTS Approval Needed`,
-        `ACCOUNTS approval needed for LPO ${complaint.lpoDetails.lpoRef}`,
+        title,
+        description,
         'high',
         'normal',
         notification.data._id.toString()
@@ -676,23 +687,34 @@ class ComplaintService {
         );
       }
 
+      let title, description
+      const lpoData = await LPO.findById(complaint.lpoDetails.lpoId)
+
+      if (lpoData.isAmendmented) {
+        title = `Amendment! MANAGER Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`
+        description = `Accounts ${approvedCreds?.signed ? 'signed and ' : ''}approved amendment LPO for complaint ${complaint.regNo}. Manager approval needed.`
+      } else {
+        title = `MANAGER Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`
+        description = `Accounts ${approvedCreds?.signed ? 'signed and ' : ''}approved LPO for complaint ${complaint.regNo}. Manager approval needed.`
+      }
+
       const notification = await createNotification({
-        title: `MANAGER Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`,
-        description: `Accounts ${approvedCreds?.signed ? 'signed and ' : ''}approved LPO for complaint ${complaint.regNo}. Manager approval needed.`,
+        title: title,
+        description: description,
         priority: "high",
         sourceId: 'manager_approval',
         recipient: process.env.MANAGER,
         time: new Date(),
         navigateTo: `/(screens)/managerSign/${complaint._id}`,
-        navigateText: `View the item required`,
+        navigateText: `View and Sign`,
         navigteToId: complaint._id,
         hasButton: true
       });
 
       await PushNotificationService.sendGeneralNotification(
         process.env.MANAGER,
-        `MANAGER Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`,
-        `Accounts ${approvedCreds?.signed ? 'signed and ' : ''}approved LPO for complaint ${complaint.regNo}. Manager approval needed.`,
+        title,
+        description,
         'high',
         'normal',
         notification.data._id.toString()
@@ -748,7 +770,7 @@ class ComplaintService {
         throw { status: 404, message: 'Complaint not found' };
       }
 
-      let target, screen
+      let target, screen, title, description, source
       // Update LPO with managerSigned: true
       if (complaint.lpoDetails && complaint.lpoDetails.lpoId) {
         await LPO.updateOne(
@@ -758,36 +780,60 @@ class ComplaintService {
       }
 
       if (complaint.lpoDetails && complaint.lpoDetails.lpoId) {
-        const lpoData = await Complaint.findById(complaint.lpoDetails.lpoId)
-        if (lpoData.signatures.authorizedSignatoryTitle === 'CEO') {
+        const lpoData = await LPO.findById(complaint.lpoDetails.lpoId)
+        console.log(lpoData.signatures.authorizedSignatoryTitle)
+
+        if (lpoData.signatures.authorizedSignatoryTitle === 'CEO' && !lpoData.isAmendmented) {
           target = process.env.CEO
           screen = `/(screens)/ceoSign/${complaint._id}`
-        }
+          title = `CEO Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`
+          description = `Manager ${approvedCreds?.signed ? 'signed and ' : ''}approved LPO for complaint ${complaint.regNo}. CEO approval needed.`
+          source = 'ceo_approval'
 
-        if (lpoData.signatures.authorizedSignatoryTitle === 'MD') {
+        } else if (lpoData.signatures.authorizedSignatoryTitle === 'MANAGING DIRECTOR' && !lpoData.isAmendmented) {
           target = process.env.MD
           screen = `/(screens)/mdSign/${complaint._id}`
+          title = `MD Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`
+          description = `Manager ${approvedCreds?.signed ? 'signed and ' : ''}approved LPO for complaint ${complaint.regNo}. MD approval needed.`
+          source = 'md_approval'
+
+        } else if (lpoData.signatures.authorizedSignatoryTitle === 'CEO' && lpoData.isAmendmented) {
+          target = process.env.CEO
+          screen = `/(screens)/ceoSign/${complaint._id}`
+          title = `Amendment! CEO Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`
+          description = `Manager ${approvedCreds?.signed ? 'signed and ' : ''}approved amendment LPO for complaint ${complaint.regNo}. CEO approval needed.`
+          source = 'ceo_approval'
+
+        } else if (lpoData.signatures.authorizedSignatoryTitle === 'MANAGING DIRECTOR' && lpoData.isAmendmented) {
+          target = process.env.MD
+          screen = `/(screens)/mdSign/${complaint._id}`
+          title = `Amendment! MD Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`
+          description = `Manager ${approvedCreds?.signed ? 'signed and ' : ''}approved amendment LPO for complaint ${complaint.regNo}. MD approval needed.`
+          source = 'md_approval'
+
+        } else {
+          // Only throw if it's neither CEO nor MANAGING DIRECTOR
+          throw { status: 404, message: 'Invalid auth position' }
         }
-        throw { status: 404, message: 'Invalid auth position' };
       }
 
       const notification = await createNotification({
-        title: `CEO Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`,
-        description: `Manager ${approvedCreds?.signed ? 'signed and ' : ''}approved LPO for complaint ${complaint.regNo}. CEO approval needed.`,
+        title: title,
+        description: description,
         priority: "high",
-        sourceId: 'ceo_approval',
+        sourceId: source,
         recipient: target,
         time: new Date(),
-        navigateTo: `/(screens)/ceoSign/${complaint._id}`,
-        navigateText: `View the item required`,
+        navigateTo: screen,
+        navigateText: `View and Sign`,
         navigteToId: complaint._id,
         hasButton: true
       });
 
       await PushNotificationService.sendGeneralNotification(
         [process.env.CEO],
-        `CEO Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`,
-        `Manager ${approvedCreds?.signed ? 'signed and ' : ''}approved LPO for complaint ${complaint.regNo}. CEO approval needed.`,
+        title,
+        description,
         'high',
         'normal',
         notification.data._id.toString()
@@ -856,9 +902,20 @@ class ComplaintService {
         );
       }
 
+      let title, description
+      const lpoData = await LPO.findById(complaint.lpoDetails.lpoId)
+
+      if (lpoData.isAmendmented) {
+        title = `Amendment! Approved - LPO ${complaint.lpoDetails.lpoRef}` 
+        description = `${approverType} approved amendment LPO for complaint ${complaint.regNo}`
+      } else {
+        title = `Approved - LPO ${complaint.lpoDetails.lpoRef}`
+        description = `${approverType} approved LPO for complaint ${complaint.regNo}. Items can now be procured.`
+      }
+
       const notification = await createNotification({
-        title: `Approved - LPO ${complaint.lpoDetails.lpoRef}`,
-        description: `${approverType} approved LPO for complaint ${complaint.regNo}. Items can now be procured.`,
+        title: title,
+        description: description,
         priority: "high",
         sourceId: 'final_approval',
         recipient: [process.env.MAINTENANCE_HEAD, process.env.JALEEL_KA],
@@ -871,8 +928,8 @@ class ComplaintService {
 
       await PushNotificationService.sendGeneralNotification(
         [process.env.MAINTENANCE_HEAD, process.env.JALEEL_KA],
-        `Approved - LPO ${complaint.lpoDetails.lpoRef}`,
-        `${approverType} approved LPO for complaint ${complaint.regNo}. Items can now be procured.`,
+        title,
+        description,
         'high',
         'normal',
         notification.data._id.toString()
@@ -913,21 +970,17 @@ class ComplaintService {
         throw { status: 404, message: 'Complaint not found' };
       }
 
-      const mechanic = await Mechanic.findById(complaint.assignedMechanic.mechanicId)
+      const mechanic = await Mechanic.findOne({ userId: complaint.assignedMechanic.mechanicId })
       const uniqueCode = mechanic.uniqueCode
 
       // Notify mechanic that items are ready
       const notification = await createNotification({
         title: `Items Ready - ${complaint.regNo}`,
-        description: `All requested items are now available. You can start working on ${complaint.regNo}.`,
+        description: `All requested items are now available. Mechanic ${mechanic.name} can start working on ${complaint.regNo}.`,
         priority: "high",
         sourceId: 'items_ready',
         recipient: uniqueCode,
         time: new Date(),
-        navigateTo: `/(screens)/mehanicsJobs/${complaint._id}`,
-        navigateText: `Complete and send video`,
-        navigteToId: complaint._id,
-        hasButton: true
       });
 
       await PushNotificationService.sendGeneralNotification(
@@ -1014,7 +1067,7 @@ class ComplaintService {
       });
 
       await PushNotificationService.sendGeneralNotification(
-        [proces.env.MAINTENANCE_HEAD, process.env.WORKSHOP_MANAGER,
+        [process.env.MAINTENANCE_HEAD, process.env.WORKSHOP_MANAGER,
         process.env.PURCHASE_MANAGER,
         process.env.ACCOUNTANT, process.env.CEO,
         process.env.MD,

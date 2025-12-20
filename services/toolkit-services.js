@@ -4,6 +4,7 @@ const Toolkit = require('../models/toolkit.model');
 const User = require('../models/user.model');
 const { createNotification } = require('../utils/notification-jobs'); // Import notification service
 const PushNotificationService = require('../utils/push-notification-jobs');
+const mongoose = require('mongoose');
 
 /**
  * Helper function to add stock history entry
@@ -703,6 +704,82 @@ const searchToolkits = async (searchTerm) => {
   }
 };
 
+const scanToolkitByBarcode = async (objectId) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      // Validate ObjectId format
+      if (!mongoose.Types.ObjectId.isValid(objectId)) {
+        return reject({
+          status: 400,
+          message: 'Invalid barcode format. Please scan a valid toolkit barcode.'
+        });
+      }
+
+      // Find toolkit by ObjectId
+      const toolkit = await Toolkit.findById(objectId);
+
+      if (!toolkit) {
+        return reject({
+          status: 404,
+          message: 'Toolkit not found. This item may have been deleted or does not exist.'
+        });
+      }
+
+      // Sort variants by status (available first, then low, then out)
+      if (toolkit.variants && toolkit.variants.length > 0) {
+        toolkit.variants.sort((a, b) => {
+          const statusOrder = { available: 0, low: 1, out: 2 };
+          return statusOrder[a.status] - statusOrder[b.status];
+        });
+
+        // Sort stock history for each variant (most recent first)
+        toolkit.variants.forEach(variant => {
+          if (variant.stockHistory && variant.stockHistory.length > 0) {
+            variant.stockHistory.sort((a, b) =>
+              new Date(b.timestamp) - new Date(a.timestamp)
+            );
+          }
+        });
+      }
+
+      // Calculate additional metrics
+      const totalVariants = toolkit.variants ? toolkit.variants.length : 0;
+      const inStockVariants = toolkit.variants
+        ? toolkit.variants.filter(v => v.status === 'available').length
+        : 0;
+      const lowStockVariants = toolkit.variants
+        ? toolkit.variants.filter(v => v.status === 'low').length
+        : 0;
+      const outOfStockVariants = toolkit.variants
+        ? toolkit.variants.filter(v => v.status === 'out').length
+        : 0;
+
+      resolve({
+        status: 200,
+        success: true,
+        message: 'Toolkit scanned successfully',
+        data: {
+          ...toolkit.toObject(),
+          metrics: {
+            totalVariants,
+            inStockVariants,
+            lowStockVariants,
+            outOfStockVariants,
+            totalStock: toolkit.totalStock,
+            overallStatus: toolkit.overallStatus
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error scanning toolkit barcode:', error);
+      reject({
+        status: 500,
+        message: 'Error scanning toolkit barcode'
+      });
+    }
+  });
+}
+
 module.exports = {
   insertToolkit,
   fetchToolkits,
@@ -713,5 +790,6 @@ module.exports = {
   searchToolkits,
   reduceStock,
   getStockHistory,
-  getToolkitStockHistory
+  getToolkitStockHistory,
+  scanToolkitByBarcode
 };

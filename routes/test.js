@@ -301,6 +301,73 @@ router.get('/push-test', async (req, res) => {
   })
 });
 
+router.get('/add-assignedDate-field', async (req, res) => {
+  try {
+    const toolkits = await Toolkit.find({}).lean(); // Use lean() to get raw data
+    
+    let updatedCount = 0;
+    let totalHistoryRecords = 0;
+
+    for (const toolkit of toolkits) {
+      const bulkOps = [];
+
+      for (let vIndex = 0; vIndex < toolkit.variants.length; vIndex++) {
+        const variant = toolkit.variants[vIndex];
+        
+        for (let hIndex = 0; hIndex < variant.stockHistory.length; hIndex++) {
+          const history = variant.stockHistory[hIndex];
+          totalHistoryRecords++;
+
+          // Check if assignedDate actually exists in the document
+          if (!history.hasOwnProperty('assignedDate')) {
+            const dateToSet = history.timestamp || new Date();
+            
+            bulkOps.push({
+              updateOne: {
+                filter: { 
+                  _id: toolkit._id,
+                  [`variants.${vIndex}.stockHistory.${hIndex}._id`]: history._id
+                },
+                update: {
+                  $set: {
+                    [`variants.${vIndex}.stockHistory.${hIndex}.assignedDate`]: dateToSet
+                  }
+                }
+              }
+            });
+            
+            updatedCount++;
+          }
+        }
+      }
+
+      // Execute bulk operations for this toolkit
+      if (bulkOps.length > 0) {
+        await Toolkit.bulkWrite(bulkOps);
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'assignedDate field added to stock history records',
+      data: {
+        totalToolkits: toolkits.length,
+        totalHistoryRecords: totalHistoryRecords,
+        updatedRecords: updatedCount
+      }
+    });
+
+  } catch (error) {
+    console.error('Error adding assignedDate field:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to add assignedDate field',
+      error: error.message
+    });
+  }
+});
+
+
 module.exports = router;
 
 

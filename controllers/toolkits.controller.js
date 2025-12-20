@@ -153,6 +153,28 @@ const getToolkitStockHistory = async (req, res) => {
     });
 };
 
+const scanToolkitByBarcode = async (req, res) => {
+  try {
+    const { objectId } = req.params;
+
+    if (!objectId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Barcode data is required'
+      });
+    }
+
+    const result = await toolkitServices.scanToolkitByBarcode(objectId);
+
+    res.status(result.status).json(result);
+  } catch (err) {
+    res.status(err.status || 500).json({
+      success: false,
+      message: err.message
+    });
+  }
+};
+
 module.exports = {
   addToolKits,
   getToolKits,
@@ -163,5 +185,6 @@ module.exports = {
   searchToolkits,
   reduceStock,
   getStockHistory,
-  getToolkitStockHistory
+  getToolkitStockHistory,
+  scanToolkitByBarcode
 };

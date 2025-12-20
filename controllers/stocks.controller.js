@@ -38,7 +38,7 @@ const addEquipmentImage = async (req, res) => {
     const filesWithUploadData = await Promise.all(
       files.map(async (file, index) => {
         const imageLabel = file.label || 'Unlabeled';
-        
+
         const ext = path.extname(file.fileName);
         const finalFilename = `${equipmentNo}-${Date.now()}-${index}${ext}`;
         const s3Key = `equipment-images/${equipmentNo}/${finalFilename}`;
@@ -485,6 +485,28 @@ const getStockMovements = async (req, res) => {
   }
 };
 
+const scanStockByBarcode = async (req, res) => {
+  try {
+    const { objectId } = req.params;
+
+    if (!objectId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Barcode data is required'
+      });
+    }
+
+    const result = await stockServices.scanStockByBarcode(objectId);
+
+    res.status(result.status).json(result);
+  } catch (err) {
+    res.status(err.status || 500).json({
+      success: false,
+      message: err.message
+    });
+  }
+};
+
 module.exports = {
   // Original controllers
   addEquipmentStocks,
@@ -507,6 +529,6 @@ module.exports = {
   adjustStockQuantity,
   getStockById,
   getStockMovements,
-
+  scanStockByBarcode,
   updateProduct
 };

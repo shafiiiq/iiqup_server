@@ -131,17 +131,54 @@ module.exports = {
           });
         }
       }
+    }); 
+  },
+   
+  sortData: (data, key, direction) => { 
+    return [...data].sort((a, b) => {
+      let aValue = a[key];
+      let bValue = b[key];
+
+      // Handle null/undefined values
+      if (aValue === null || aValue === undefined) return 1;
+      if (bValue === null || bValue === undefined) return -1;
+
+      // Handle year sorting - convert to numbers
+      if (key === 'year') {
+        aValue = parseInt(aValue) || 0;
+        bValue = parseInt(bValue) || 0;
+      }
+
+      // Handle string sorting
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        aValue = aValue.toLowerCase();
+        bValue = bValue.toLowerCase();
+      }
+
+      // Simplified comparison
+      if (aValue === bValue) return 0;
+
+      if (direction === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
     });
   },
 
-  fetchEquipments: () => {
+  fetchEquipments: function () {
     return new Promise(async (resolve, reject) => {
       try {
+        const sortConfig = {
+          key: 'year',
+          direction: 'desc' // desc for latest first, asc for oldest first
+        }
         const data = await equipmentModel.find({ outside: false });
+        const sortedResults = this.sortData(data, sortConfig.key, sortConfig.direction);
         resolve({
           status: 200,
           ok: true,
-          data: data
+          data: sortedResults
         });
       } catch (error) {
         reject({
