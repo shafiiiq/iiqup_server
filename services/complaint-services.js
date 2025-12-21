@@ -34,8 +34,7 @@ class ComplaintService {
         description: `${complaint.name} registered complaint for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Please assign a mechanic.`,
         priority: "high",
         sourceId: complaintData._id,
-        // recipient: JSON.parse(process.env.OFFICE_HERO),
-        recipient: process.env.SUPER_ADMIN,
+        recipient: JSON.parse(process.env.OFFICE_HERO),
         time: new Date(),
         navigateTo: `/(screens)/assignMechanic/${complaintData._id}`,
         navigateText: 'Assign Mechanic',
@@ -292,8 +291,7 @@ class ComplaintService {
         description: notificationMessage,
         priority: "high",
         sourceId: 'lpo_request',
-        // recipient: JSON.parse(process.env.OFFICE_MAIN),
-        recipient: process.env.SUPER_ADMIN,
+        recipient: JSON.parse(process.env.OFFICE_MAIN),
         time: new Date(),
         navigateTo: `/(screens)/QuotationRequest/${complaint._id}`,
         navigateText: `View Hamza's request`,
@@ -307,7 +305,7 @@ class ComplaintService {
       }
 
       await PushNotificationService.sendGeneralNotification(
-        process.env.SUPER_ADMIN,
+        JSON.parse(process.env.OFFICE_MAIN),
         `LPO Creation Request`,
         pushNotificationBody,
         'high',
@@ -479,15 +477,7 @@ class ComplaintService {
         description: notificationDescription,
         priority: "high",
         sourceId: 'lpo_approval',
-        recipient: [
-          process.env.PURCHASE_MANAGER,
-          process.env.ACCOUNTANT,
-          process.env.MANAGER,
-          process.env.CEO,
-          process.env.MD,
-          process.env.ASARU,
-          process.env.CHARISHMA
-        ],
+        recipient: process.env.PURCHASE_MANAGER,
         time: new Date(),
         navigateTo: `/(screens)/purchaseManagerSign/${complaint._id}`,
         navigateText: `View and Sign`,
@@ -499,7 +489,7 @@ class ComplaintService {
 
 
       await PushNotificationService.sendGeneralNotification(
-        "SAD-c6e8d3",
+        process.env.PURCHASE_MANAGER,
         notificationTitle,
         notificationDescription,
         'high',
@@ -610,7 +600,7 @@ class ComplaintService {
         description: title,
         priority: "high",
         sourceId: 'accounts_approval',
-        recipient: process.env.ACCOUNTS,
+        recipient: process.env.ACCOUNTANT,
         time: new Date(),
         navigateTo: `/(screens)/accountsSign/${complaint._id}`,
         navigateText: `View and Sign`,
@@ -618,8 +608,11 @@ class ComplaintService {
         hasButton: true
       });
 
+      console.log("notification", notification);
+      
+
       await PushNotificationService.sendGeneralNotification(
-        process.env.ACCOUNTS,
+        process.env.ACCOUNTANT,
         title,
         description,
         'high',
@@ -906,7 +899,7 @@ class ComplaintService {
       const lpoData = await LPO.findById(complaint.lpoDetails.lpoId)
 
       if (lpoData.isAmendmented) {
-        title = `Amendment! Approved - LPO ${complaint.lpoDetails.lpoRef}` 
+        title = `Amendment! Approved - LPO ${complaint.lpoDetails.lpoRef}`
         description = `${approverType} approved amendment LPO for complaint ${complaint.regNo}`
       } else {
         title = `Approved - LPO ${complaint.lpoDetails.lpoRef}`
