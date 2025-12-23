@@ -74,7 +74,7 @@ const generateAndSendOTP = async (email, demo_opr = false, name) => {
       user = await Mechanic.findOne({ authMail: email });
       if (!user) {
         return {
-          status: 404,
+          status: 404, 
           success: false,
           message: 'No user found with this email address'
         };
@@ -82,10 +82,7 @@ const generateAndSendOTP = async (email, demo_opr = false, name) => {
     }
 
     // Generate a cryptographically secure OTP
-    const otp = generateSecureOTP();
-
-    console.log("otp", otp);
-    
+    const otp = generateSecureOTP();    
 
     // Hash the OTP before storing
     const hashedOTP = await hashOTP(otp);
