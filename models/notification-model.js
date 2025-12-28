@@ -37,6 +37,13 @@ const NotificationSchema = new mongoose.Schema({
   navigteToId: {
     type: String
   },
+  directApproval: {
+    type: Boolean,
+    default: false
+  },
+  approvalPort: {
+    type: String
+  },
   targetUsers: [{
     type: String, // Array of uniqueCodes
     default: []

@@ -26,8 +26,6 @@ class ComplaintService {
       await complaintData.save();
 
 
-      console.log("yeahhhh 1223")
-
       // Notify MAINTENANCE_HEAD only
       const notification = await createNotification({
         title: `New Complaint Registered - ${complaint.regNo}`,
@@ -43,7 +41,7 @@ class ComplaintService {
       });
 
       await PushNotificationService.sendGeneralNotification(
-        process.env.SUPER_ADMIN,
+        JSON.parse(process.env.OFFICE_HERO),
         `New Complaint - ${complaint.regNo}`,
         `New complaint needs mechanic assignment for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'}`,
         'high',
@@ -95,24 +93,32 @@ class ComplaintService {
   }
 
   // Step 2: MAINTENANCE_HEAD assigns mechanic
-  static async assignMechanic(complaintId, mechanicData, assignedBy) {
+  static async assignMechanic(complaintId, mechanicsArray, assignedBy) {
     try {
+      const assignedDate = new Date();
+
+      // Prepare mechanics data for database
+      const mechanicsData = mechanicsArray.map(m => ({
+        mechanicId: m.mechanicId,
+        mechanicName: m.mechanicName,
+        assignedBy: assignedBy,
+        assignedDate: assignedDate
+      }));
+
+      // Get mechanic names for notification
+      const mechanicNames = mechanicsArray.map(m => m.mechanicName).join(', ');
+
       const complaint = await Complaint.findByIdAndUpdate(
         complaintId,
         {
-          assignedMechanic: {
-            mechanicId: mechanicData.mechanicId,
-            mechanicName: mechanicData.mechanicName,
-            assignedBy: assignedBy,
-            assignedDate: new Date()
-          },
+          assignedMechanic: mechanicsData, // Now an array
           workflowStatus: 'assigned_to_mechanic',
           $push: {
             approvalTrail: {
               approvedBy: assignedBy,
               role: 'MAINTENANCE_HEAD',
               action: 'forwarded',
-              comments: `Assigned to mechanic: ${mechanicData.mechanicName}`
+              comments: `Assigned to ${mechanicsArray.length} mechanic(s): ${mechanicNames}`
             }
           }
         },
@@ -123,18 +129,31 @@ class ComplaintService {
         throw { status: 404, message: 'Complaint not found' };
       }
 
-      const mechanic = await Mechanic.findOneAndUpdate(
-        { userId: mechanicData.mechanicId },
-        { status: 'engaged' },
-        { new: true }
+      // Update all mechanics status to 'engaged'
+      const mechanicUpdatePromises = mechanicsArray.map(m =>
+        Mechanic.findOneAndUpdate(
+          { userId: m.mechanicId },
+          { status: 'engaged' },
+          { new: true }
+        )
       );
+
+      await Promise.all(mechanicUpdatePromises);
 
       const equipment = await Equipment.findOne({ regNo: complaint.regNo });
 
-      // Notify assigned mechanic
+      // Notify about assignment
+      const notificationTitle = mechanicsArray.length === 1
+        ? `Hamsa assigned - ${mechanicNames} to ${complaint.regNo}`
+        : `Hamsa assigned - ${mechanicsArray.length} mechanics to ${complaint.regNo}`;
+
+      const notificationDescription = mechanicsArray.length === 1
+        ? `Hamsa assigned - ${mechanicNames} to ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo} for complaint rectification.`
+        : `Hamsa assigned - ${mechanicsArray.length} mechanics (${mechanicNames}) to ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo} for complaint rectification.`;
+
       const notificationAlert = await createNotification({
-        title: `Hamsa assigned - ${mechanicData.mechanicName} to ${complaint.regNo}`,
-        description: `Hamsa assigned - ${mechanicData.mechanicName} to ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo} for complaint rectification.`,
+        title: notificationTitle,
+        description: notificationDescription,
         priority: "high",
         sourceId: 'job_assignment-annoucement',
         recipient: JSON.parse(process.env.OFFICE_HERO),
@@ -143,8 +162,8 @@ class ComplaintService {
 
       await PushNotificationService.sendGeneralNotification(
         JSON.parse(process.env.OFFICE_HERO),
-        `Hamsa assigned - ${mechanicData.mechanicName} to ${complaint.regNo}`,
-        `Hamsa assigned - ${mechanicData.mechanicName} to ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo} for complaint rectification.`,
+        notificationTitle,
+        notificationDescription,
         'high',
         'normal',
         notificationAlert.data._id.toString()
@@ -152,11 +171,11 @@ class ComplaintService {
 
       return {
         status: 200,
-        message: 'Mechanic assigned successfully',
+        message: `${mechanicsArray.length} mechanic(s) assigned successfully`,
         data: complaint
       };
     } catch (error) {
-      console.error('Error assigning mechanic:', error);
+      console.error('Error assigning mechanics:', error);
       throw error;
     }
   }
@@ -186,9 +205,13 @@ class ComplaintService {
       const equipment = await Equipment.findOne({ regNo: complaint.regNo });
 
       // Notify MAINTENANCE_HEAD about mechanic request
+      const mechanicNames = complaint.assignedMechanic && complaint.assignedMechanic.length > 0
+        ? complaint.assignedMechanic.map(m => m.mechanicName).join(', ')
+        : 'Mechanic';
+
       const notification = await createNotification({
         title: `Mechanic Item Request - ${complaint.regNo}`,
-        description: `${complaint.assignedMechanic.mechanicName} needs items for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Request: ${requestData.requestText}`,
+        description: `${mechanicNames} needs items for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Request: ${requestData.requestText}`,
         priority: "high",
         sourceId: 'mechanic_request',
         recipient: JSON.parse(process.env.OFFICE_HERO),
@@ -202,7 +225,7 @@ class ComplaintService {
       await PushNotificationService.sendGeneralNotification(
         JSON.parse(process.env.OFFICE_HERO),
         `Mechanic Item Request`,
-        `${complaint.assignedMechanic.mechanicName} needs items for ${complaint.regNo}`,
+        `${mechanicNames} needs items for ${complaint.regNo}`,
         'high',
         'normal',
         notification.data._id.toString()
@@ -320,6 +343,149 @@ class ComplaintService {
     }
   }
 
+  static async forwardToWorkshopWithoutLPO(complaintId, approvedBy, comments = '') {
+    try {
+      // Prepare update object
+      const updateObj = {
+        'mechanicRequests.$[].status': 'approved_by_maintenance',
+        workflowStatus: 'sent_to_workshop_without_lpo'
+      };
+
+      // Prepare approval trail entry
+      const approvalTrailEntry = {
+        approvedBy: approvedBy,
+        role: 'MAINTENANCE_HEAD',
+        action: 'approved',
+        comments: comments || 'Approved and forwarded to workshop manager and purchase manager'
+      };
+
+      // Add approval trail entry to push operation
+      if (updateObj.$push) {
+        updateObj.$push.approvalTrail = approvalTrailEntry;
+      } else {
+        updateObj.$push = {
+          approvalTrail: approvalTrailEntry
+        };
+      }
+
+      const complaint = await Complaint.findByIdAndUpdate(
+        complaintId,
+        updateObj,
+        { new: true }
+      );
+
+      if (!complaint) {
+        throw { status: 404, message: 'Complaint not found' };
+      }
+
+      const equipment = await Equipment.findOne({ regNo: complaint.regNo });
+
+      const notification = await createNotification({
+        title: `Approval Needed! - ${equipment.machine} - ${equipment.regNo}`,
+        description: `Hamza requested : ${comments}`,
+        priority: "high",
+        sourceId: 'wihtout_lpo_request',
+        recipient: JSON.parse(process.env.OFFICE_MAIN),
+        time: new Date(),
+        navigateTo: `/(screens)/assignMechanic/${complaint._id}`,
+        navigateText: `Approve`,
+        directApproval: true,
+        approvalPort: `complaints/approve-item/without-lpo/${complaint._id}`,
+        navigteToId: complaint._id,
+        hasButton: true
+      });
+
+      await PushNotificationService.sendGeneralNotification(
+        JSON.parse(process.env.OFFICE_MAIN),
+        `Approval Needed! - ${equipment.machine} - ${equipment.regNo}`,
+        `Hamza requested : ${comments}`,
+        'high',
+        'normal',
+        notification.data._id.toString()
+      );
+
+      return complaint;
+    } catch (error) {
+      console.error('Error forwarding to workshop:', error);
+      throw error;
+    }
+  }
+
+  static async approveItemWithoutLPO(complaintId, approvedBy) {
+    try {
+      const existingComplaint = await Complaint.findById(complaintId);
+
+      if (!existingComplaint) {
+        throw { status: 404, message: 'Complaint not found' };
+      }
+
+      const validStatuses = ['sent_to_workshop_without_lpo'];
+      if (!validStatuses.includes(existingComplaint.workflowStatus)) {
+        throw {
+          status: 400,
+          message: `Already Approved`
+        };
+      }
+
+      // Prepare update object
+      const updateObj = {
+        workflowStatus: 'approved_without_lpo'
+      };
+
+      // Prepare approval trail entry
+      const approvalTrailEntry = {
+        approvedBy: approvedBy,
+        role: 'PURCHASE_MANAGER',
+        action: 'approved',
+      };
+
+      // Add approval trail entry to push operation
+      if (updateObj.$push) {
+        updateObj.$push.approvalTrail = approvalTrailEntry;
+      } else {
+        updateObj.$push = {
+          approvalTrail: approvalTrailEntry
+        };
+      }
+
+      const complaint = await Complaint.findByIdAndUpdate(
+        complaintId,
+        updateObj,
+        { new: true }
+      );
+
+      if (!complaint) {
+        throw { status: 404, message: 'Complaint not found' };
+      }
+
+      const equipment = await Equipment.findOne({ regNo: complaint.regNo });
+
+      // Notify WORKSHOP_MANAGER
+      const notification = await createNotification({
+        title: `Item Approved - ${equipment.machine} - ${equipment.regNo}`,
+        description: `Hamza requested item is approved by purchase manager of ${equipment.machine} - ${equipment.regNo}`,
+        priority: "high",
+        sourceId: 'approved_wihtout_lpo_request',
+        recipient: JSON.parse(process.env.OFFICE_MAIN),
+        time: new Date(),
+      });
+
+      await PushNotificationService.sendGeneralNotification(
+        JSON.parse(process.env.OFFICE_MAIN),
+        `Item Approved - ${equipment.machine} - ${equipment.regNo}`,
+        `Hamza requested item is approved by purchase manager of ${equipment.machine} - ${equipment.regNo}`,
+        'high',
+        'normal',
+        notification.data._id.toString()
+      );
+
+      return complaint;
+    } catch (error) {
+      console.error('Error forwarding to workshop:', error);
+      throw error;
+    }
+  }
+
   // Step 5: WORKSHOP_MANAGER creates LPO
   static async createLPOForComplaint(complaintId, lpoData, createdBy) {
     try {
@@ -361,7 +527,7 @@ class ComplaintService {
         description: `LPO ${lpo.lpoRef} is created for complaint with ${complaint.regNo}, Await until lpo is uploaded`,
         priority: "high",
         sourceId: 'lpo_approval',
-        recipient: [process.env.PURCHASE_MANAGER, process.env.ACCOUNTANT, process.env.MANAGER, process.env.CEO, process.env.MD, process.env.ASARU, process.env.CHARISHMA],
+        recipient: JSON.parse(process.env.OFFICE_MAIN),
         time: new Date(),
         navigateTo: `/(screens)/purchaseManagerSign/${complaint._id}`,
         navigateText: `View and Sign`,
@@ -370,7 +536,7 @@ class ComplaintService {
       });
 
       await PushNotificationService.sendGeneralNotification(
-        [process.env.PURCHASE_MANAGER, process.env.ACCOUNTANT, process.env.MANAGER, process.env.CEO, process.env.MD, process.env.ASARU, process.env.CHARISHMA],
+        JSON.parse(process.env.OFFICE_MAIN),
         `LPO ${lpo.lpoRef} Created`,
         `LPO ${lpo.lpoRef} is created for complaint with ${complaint.regNo}, Await until lpo is uploaded`,
         'high',
@@ -401,7 +567,7 @@ class ComplaintService {
 
       // For amendment, allow from various approved statuses
       const validStatuses = isAmendment
-        ? ['lpo_uploaded', 'purchase_approved', 'accounts_approved', 'manager_approved', 'ceo_approved', 'md_approved', 'completed']
+        ? ['lpo_uploaded', 'purchase_approved', 'accounts_approved', 'manager_approved', 'ceo_approved', 'md_approved', 'completed', 'items_available']
         : ['lpo_created', 'sent_to_workshop'];
 
       console.log("complaint.workflowStatus", complaint.workflowStatus)
@@ -469,15 +635,15 @@ class ComplaintService {
         : `LPO Approval Needed - ${lpoRef}`;
 
       const notificationDescription = isAmendment
-        ? `LPO has been amended for complaint ${complaint.regNo}. LPO Ref: ${lpoRef}. Please review and approve the amendment.`
-        : `New LPO created for complaint ${complaint.regNo}. LPO Ref: ${lpoRef}. Please review and approve.`;
+        ? `LPO has been amended for complaint ${complaint.regNo}. LPO Ref: ${lpoRef}. Purchase Manager Approval Needed! Please review and approve the amendment.`
+        : `New LPO created for complaint ${complaint.regNo}. LPO Ref: ${lpoRef}. Purchase Manager Approval Needed! Please review and approve.`;
 
       const notification = await createNotification({
         title: notificationTitle,
         description: notificationDescription,
         priority: "high",
         sourceId: 'lpo_approval',
-        recipient: process.env.PURCHASE_MANAGER,
+        recipient: JSON.parse(process.env.OFFICE_HERO),
         time: new Date(),
         navigateTo: `/(screens)/purchaseManagerSign/${complaint._id}`,
         navigateText: `View and Sign`,
@@ -485,11 +651,9 @@ class ComplaintService {
         hasButton: true
       });
 
-      console.log("notification", notification);
-
 
       await PushNotificationService.sendGeneralNotification(
-        process.env.PURCHASE_MANAGER,
+        JSON.parse(process.env.OFFICE_HERO),
         notificationTitle,
         notificationDescription,
         'high',
@@ -510,7 +674,6 @@ class ComplaintService {
     }
   }
 
-  // Step 6: PURCHASE_MANAGER approves
   // After purchaseApproval
   static async purchaseApproval(complaintId, approvalData) {
     try {
@@ -588,11 +751,11 @@ class ComplaintService {
       const lpoData = await LPO.findById(complaint.lpoDetails.lpoId)
 
       if (lpoData.isAmendmented) {
-        title = `Amendment! ACCOUNTS Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`
-        description = `Purchase manager ${signed ? 'signed and ' : ''}approved amendment LPO for complaint ${complaint.regNo}. ACCOUNTS approval needed.`
+        title = `Amendment! MANAGER Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`
+        description = `Purchace Manager signed and approved amendment LPO for complaint ${complaint.regNo}. Manager approval needed.`
       } else {
-        title = `ACCOUNTS Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`
-        description = `Purchase manager ${signed ? 'signed and ' : ''}approved LPO for complaint ${complaint.regNo}. ACCOUNTS approval needed.`
+        title = `MANAGER Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`
+        description = `Purchace Manager signed and approved LPO for complaint ${complaint.regNo}. Manager approval needed.`
       }
 
       const notification = await createNotification({
@@ -600,19 +763,16 @@ class ComplaintService {
         description: title,
         priority: "high",
         sourceId: 'accounts_approval',
-        recipient: process.env.ACCOUNTANT,
+        recipient: JSON.parse(process.env.OFFICE_HERO),
         time: new Date(),
-        navigateTo: `/(screens)/accountsSign/${complaint._id}`,
+        navigateTo: `/(screens)/managerSign/${complaint._id}`,
         navigateText: `View and Sign`,
         navigteToId: complaint._id,
         hasButton: true
       });
 
-      console.log("notification", notification);
-      
-
       await PushNotificationService.sendGeneralNotification(
-        process.env.ACCOUNTANT,
+        JSON.parse(process.env.OFFICE_HERO),
         title,
         description,
         'high',
@@ -629,97 +789,6 @@ class ComplaintService {
       };
     } catch (error) {
       console.error('Error in purchase approval:', error);
-      throw error;
-    }
-  }
-
-  // After accountsApproval
-  static async accountsApproval(complaintId, approvedBy, comments = '', approvedCreds) {
-    try {
-      const updateFields = {
-        'lpoDetails.accountsApprovalDate': new Date(),
-        'lpoDetails.status': 'accounts_approved',
-        'workflowStatus': 'accounts_approved',
-        $push: {
-          approvalTrail: {
-            approvedBy: approvedBy,
-            role: 'ACCOUNTS',
-            action: 'approved',
-            comments: comments || 'ACCOUNTS approved'
-          }
-        }
-      };
-
-      if (approvedCreds && approvedCreds.signed) {
-        updateFields['lpoDetails.ACCOUNTSsigned'] = true;
-        updateFields['lpoDetails.ACCOUNTSauthorised'] = approvedCreds.authorised;
-        updateFields['lpoDetails.ACCOUNTSapprovedBy'] = approvedCreds.approvedBy;
-        updateFields['lpoDetails.ACCOUNTSapprovedDate'] = approvedCreds.approvedDate || new Date().toISOString();
-
-        if (approvedCreds.approvedFrom) updateFields['lpoDetails.ACCOUNTSapprovedFrom'] = approvedCreds.approvedFrom;
-        if (approvedCreds.approvedIP) updateFields['lpoDetails.ACCOUNTSapprovedIP'] = approvedCreds.approvedIP;
-        if (approvedCreds.approvedBDevice) updateFields['lpoDetails.ACCOUNTSapprovedBDevice'] = approvedCreds.approvedBDevice;
-        if (approvedCreds.approvedLocation) updateFields['lpoDetails.ACCOUNTSapprovedLocation'] = approvedCreds.approvedLocation;
-      }
-
-      const complaint = await Complaint.findByIdAndUpdate(
-        complaintId,
-        updateFields,
-        { new: true }
-      );
-
-      if (!complaint) {
-        throw { status: 404, message: 'Complaint not found' };
-      }
-
-      // Update LPO with accountsSigned: true
-      if (complaint.lpoDetails && complaint.lpoDetails.lpoId) {
-        await LPO.updateOne(
-          { _id: complaint.lpoDetails.lpoId },
-          { accountsSigned: true }
-        );
-      }
-
-      let title, description
-      const lpoData = await LPO.findById(complaint.lpoDetails.lpoId)
-
-      if (lpoData.isAmendmented) {
-        title = `Amendment! MANAGER Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`
-        description = `Accounts ${approvedCreds?.signed ? 'signed and ' : ''}approved amendment LPO for complaint ${complaint.regNo}. Manager approval needed.`
-      } else {
-        title = `MANAGER Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`
-        description = `Accounts ${approvedCreds?.signed ? 'signed and ' : ''}approved LPO for complaint ${complaint.regNo}. Manager approval needed.`
-      }
-
-      const notification = await createNotification({
-        title: title,
-        description: description,
-        priority: "high",
-        sourceId: 'manager_approval',
-        recipient: process.env.MANAGER,
-        time: new Date(),
-        navigateTo: `/(screens)/managerSign/${complaint._id}`,
-        navigateText: `View and Sign`,
-        navigteToId: complaint._id,
-        hasButton: true
-      });
-
-      await PushNotificationService.sendGeneralNotification(
-        process.env.MANAGER,
-        title,
-        description,
-        'high',
-        'normal',
-        notification.data._id.toString()
-      );
-
-      return {
-        status: 200,
-        message: 'ACCOUNTS approval completed',
-        data: complaint
-      };
-    } catch (error) {
-      console.error('Error in ACCOUNTS approval:', error);
       throw error;
     }
   }
@@ -774,7 +843,6 @@ class ComplaintService {
 
       if (complaint.lpoDetails && complaint.lpoDetails.lpoId) {
         const lpoData = await LPO.findById(complaint.lpoDetails.lpoId)
-        console.log(lpoData.signatures.authorizedSignatoryTitle)
 
         if (lpoData.signatures.authorizedSignatoryTitle === 'CEO' && !lpoData.isAmendmented) {
           target = process.env.CEO
@@ -815,7 +883,7 @@ class ComplaintService {
         description: description,
         priority: "high",
         sourceId: source,
-        recipient: target,
+        recipient: JSON.parse(process.env.OFFICE_HERO),
         time: new Date(),
         navigateTo: screen,
         navigateText: `View and Sign`,
@@ -824,7 +892,7 @@ class ComplaintService {
       });
 
       await PushNotificationService.sendGeneralNotification(
-        [process.env.CEO],
+        JSON.parse(process.env.OFFICE_HERO),
         title,
         description,
         'high',
@@ -898,29 +966,31 @@ class ComplaintService {
       let title, description
       const lpoData = await LPO.findById(complaint.lpoDetails.lpoId)
 
-      if (lpoData.isAmendmented) {
-        title = `Amendment! Approved - LPO ${complaint.lpoDetails.lpoRef}`
-        description = `${approverType} approved amendment LPO for complaint ${complaint.regNo}`
-      } else {
-        title = `Approved - LPO ${complaint.lpoDetails.lpoRef}`
-        description = `${approverType} approved LPO for complaint ${complaint.regNo}. Items can now be procured.`
-      }
+      console.log(lpoData)
+
+      const isAmendment = lpoData.isAmendmented
+      const isCEO = lpoData.signatures.authorizedSignatoryTitle === 'CEO'
+      const signatoryTitle = isCEO ? 'CEO' : 'MD'
+
+      const prefix = isAmendment ? 'Amendment! ' : ''
+      title = `${prefix}ACCOUNTS Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`
+      description = `${signatoryTitle} signed and approved ${isAmendment ? 'amendment ' : ''}LPO for complaint ${complaint.regNo}. ACCOUNTS approval needed.`
 
       const notification = await createNotification({
         title: title,
         description: description,
         priority: "high",
         sourceId: 'final_approval',
-        recipient: [process.env.MAINTENANCE_HEAD, process.env.JALEEL_KA],
+        recipient: JSON.parse(process.env.OFFICE_HERO),
         time: new Date(),
-        navigateTo: `/(screens)/signedLpo/${complaint._id}`,
-        navigateText: `View the item required`,
+        navigateTo: `/(screens)/accountsSign/${complaint._id}`,
+        navigateText: `View and Sign`,
         navigteToId: complaint._id,
         hasButton: true
       });
 
       await PushNotificationService.sendGeneralNotification(
-        [process.env.MAINTENANCE_HEAD, process.env.JALEEL_KA],
+        JSON.parse(process.env.OFFICE_HERO),
         title,
         description,
         'high',
@@ -935,6 +1005,97 @@ class ComplaintService {
       };
     } catch (error) {
       console.error(`Error in ${authUser || 'CEO'} approval:`, error);
+      throw error;
+    }
+  }
+
+  // After accountsApproval
+  static async accountsApproval(complaintId, approvedBy, comments = '', approvedCreds) {
+    try {
+      const updateFields = {
+        'lpoDetails.accountsApprovalDate': new Date(),
+        'lpoDetails.status': 'accounts_approved',
+        'workflowStatus': 'accounts_approved',
+        $push: {
+          approvalTrail: {
+            approvedBy: approvedBy,
+            role: 'ACCOUNTS',
+            action: 'approved',
+            comments: comments || 'ACCOUNTS approved'
+          }
+        }
+      };
+
+      if (approvedCreds && approvedCreds.signed) {
+        updateFields['lpoDetails.ACCOUNTSsigned'] = true;
+        updateFields['lpoDetails.ACCOUNTSauthorised'] = approvedCreds.authorised;
+        updateFields['lpoDetails.ACCOUNTSapprovedBy'] = approvedCreds.approvedBy;
+        updateFields['lpoDetails.ACCOUNTSapprovedDate'] = approvedCreds.approvedDate || new Date().toISOString();
+
+        if (approvedCreds.approvedFrom) updateFields['lpoDetails.ACCOUNTSapprovedFrom'] = approvedCreds.approvedFrom;
+        if (approvedCreds.approvedIP) updateFields['lpoDetails.ACCOUNTSapprovedIP'] = approvedCreds.approvedIP;
+        if (approvedCreds.approvedBDevice) updateFields['lpoDetails.ACCOUNTSapprovedBDevice'] = approvedCreds.approvedBDevice;
+        if (approvedCreds.approvedLocation) updateFields['lpoDetails.ACCOUNTSapprovedLocation'] = approvedCreds.approvedLocation;
+      }
+
+      const complaint = await Complaint.findByIdAndUpdate(
+        complaintId,
+        updateFields,
+        { new: true }
+      );
+
+      if (!complaint) {
+        throw { status: 404, message: 'Complaint not found' };
+      }
+
+      // Update LPO with accountsSigned: true
+      if (complaint.lpoDetails && complaint.lpoDetails.lpoId) {
+        await LPO.updateOne(
+          { _id: complaint.lpoDetails.lpoId },
+          { accountsSigned: true }
+        );
+      }
+
+      let title, description
+      const lpoData = await LPO.findById(complaint.lpoDetails.lpoId)
+
+      if (lpoData.isAmendmented) {
+        title = `Amendment! Approved - LPO ${complaint.lpoDetails.lpoRef}`
+        description = `Accounts approved amendment LPO for complaint ${complaint.regNo}. Items can now be procured.`
+      } else {
+        title = `Approved - LPO ${complaint.lpoDetails.lpoRef}`
+        description = `Accounts approved LPO for complaint ${complaint.regNo}. Items can now be procured.`
+      }
+
+      const notification = await createNotification({
+        title: title,
+        description: description,
+        priority: "high",
+        sourceId: 'manager_approval',
+        recipient: JSON.parse(process.env.OFFICE_MAIN),
+        time: new Date(),
+        navigateTo: `/(screens)/signedLpo/${complaint._id}`,
+        navigateText: `View the item required`,
+        navigteToId: complaint._id,
+        hasButton: true
+      });
+
+      await PushNotificationService.sendGeneralNotification(
+        JSON.parse(process.env.OFFICE_MAIN),
+        title,
+        description,
+        'high',
+        'normal',
+        notification.data._id.toString()
+      );
+
+      return {
+        status: 200,
+        message: 'ACCOUNTS approval completed',
+        data: complaint
+      };
+    } catch (error) {
+      console.error('Error in ACCOUNTS approval:', error);
       throw error;
     }
   }
@@ -972,12 +1133,12 @@ class ComplaintService {
         description: `All requested items are now available. Mechanic ${mechanic.name} can start working on ${complaint.regNo}.`,
         priority: "high",
         sourceId: 'items_ready',
-        recipient: uniqueCode,
+        recipient: JSON.parse(process.env.OFFICE_HERO),
         time: new Date(),
       });
 
       await PushNotificationService.sendGeneralNotification(
-        uniqueCode,
+        JSON.parse(process.env.OFFICE_HERO),
         `Items Ready`,
         `Items available for ${complaint.regNo}. You can start working now.`,
         'high',
@@ -1017,7 +1178,6 @@ class ComplaintService {
         return fileData;
       }));
 
-      // Use a single update operation with both $push and $set
       const complaint = await Complaint.findByIdAndUpdate(
         complaintId,
         {
@@ -1042,29 +1202,29 @@ class ComplaintService {
       if (!complaint) {
         throw { status: 404, message: 'Complaint not found' };
       }
+
       const equipment = await Equipment.findOne({ regNo: complaint.regNo });
 
-      await Mechanic.findOneAndUpdate(
-        { userId: complaint.assignedMechanic.mechanicId },
-        { status: 'engaged' },
-        { new: true }
-      );
+      if (complaint.assignedMechanic && complaint.assignedMechanic.length > 0) {
+        const mechanicIds = complaint.assignedMechanic.map(m => m.mechanicId);
+
+        await Mechanic.updateMany(
+          { userId: { $in: mechanicIds } },
+          { $set: { status: 'available' } }
+        );
+      }
 
       await createNotification({
         title: `Work Completed - ${complaint.regNo}`,
         description: `${mechanic} completed work on ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Equipment ready to work.`,
         priority: "medium",
         sourceId: 'work_completed',
-        recipient: null,
+        recipient: JSON.parse(process.env.OFFICE_HERO),
         time: new Date()
       });
 
       await PushNotificationService.sendGeneralNotification(
-        [process.env.MAINTENANCE_HEAD, process.env.WORKSHOP_MANAGER,
-        process.env.PURCHASE_MANAGER,
-        process.env.ACCOUNTANT, process.env.CEO,
-        process.env.MD,
-        ],
+        JSON.parse(process.env.OFFICE_HERO),
         `Work Completed - ${complaint.regNo}`,
         `${mechanic} completed work on ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Equipment ready to work.`,
         'medium',
@@ -1119,11 +1279,20 @@ class ComplaintService {
   // New method to get complaints assigned to a specific mechanic
   static async getComplaintsByMechanic(email) {
     try {
-      const mechanic = await Mechanic.findOne({ email })
+      const mechanic = await Mechanic.findOne({ email });
+
+      if (!mechanic) {
+        throw new Error('Mechanic not found');
+      }
+
+      // Now search in the array of assigned mechanics
       const data = await Complaint.find({
-        'assignedMechanic.mechanicId': mechanic.userId
+        'assignedMechanic': {
+          $elemMatch: { mechanicId: mechanic.userId }
+        }
       }).sort({ createdAt: -1 });
-      return data
+
+      return data;
     } catch (error) {
       throw error;
     }

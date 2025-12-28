@@ -80,7 +80,7 @@ module.exports = {
 
       document.files.push({
         date: formattedDate,
-        expiry: formattedExpiry,
+        expiry: formattedExpiry,  
         filename: finalFilename,
         path: s3Key,
         mimetype: file.mimeType || file.fileName.split('.').pop()
@@ -99,7 +99,7 @@ module.exports = {
         `New document added`, //title
         `Document ${documentType} is uploaded for ${regNo}, Now you can access new one`, //description
         'high', //priority
-        'normal', // type
+        'normal', // type 
          notification.data._id.toString()
       );
 

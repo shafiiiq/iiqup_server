@@ -104,28 +104,45 @@ class ComplaintController {
   static async assignMechanic(req, res) {
     try {
       const { complaintId } = req.params;
-      const { mechanicId, mechanicName, assignedBy } = req.body;
-      const mechanic = await Mechanic.findOne({ mechanicId: mechanicId })
+      const { mechanics, assignedBy } = req.body; // Changed from single to array
 
-      if (!mechanicId || !mechanicName || !assignedBy) {
+      // Validate input
+      if (!mechanics || !Array.isArray(mechanics) || mechanics.length === 0) {
         return res.status(400).json({
           status: 400,
-          message: 'mechanicId, mechanicName, and assignedBy are required'
+          message: 'mechanics array is required and must contain at least one mechanic'
         });
+      }
+
+      if (!assignedBy) {
+        return res.status(400).json({
+          status: 400,
+          message: 'assignedBy is required'
+        });
+      }
+
+      // Validate each mechanic object
+      for (const mechanic of mechanics) {
+        if (!mechanic.mechanicId || !mechanic.mechanicName) {
+          return res.status(400).json({
+            status: 400,
+            message: 'Each mechanic must have mechanicId and mechanicName'
+          });
+        }
       }
 
       const result = await ComplaintService.assignMechanic(
         complaintId,
-        { mechanicId, mechanicName },
+        mechanics,
         assignedBy
       );
 
       res.status(200).json(result);
     } catch (error) {
-      console.error('Error assigning mechanic:', error);
+      console.error('Error assigning mechanics:', error);
       res.status(error.status || 500).json({
         status: error.status || 500,
-        message: error.message || 'Failed to assign mechanic'
+        message: error.message || 'Failed to assign mechanics'
       });
     }
   }
@@ -266,6 +283,75 @@ class ComplaintController {
     }
   }
 
+  static async forwardToWorkshopWithoutLPO(req, res) {
+    try {
+      const { complaintId } = req.params;
+      const { approvedBy, comments } = req.body;
+
+      if (!approvedBy) {
+        return res.status(400).json({
+          status: 400,
+          message: 'approvedBy is required'
+        });
+      }
+
+      const result = await ComplaintService.forwardToWorkshopWithoutLPO(
+        complaintId,
+        approvedBy,
+        comments,
+      );
+
+      // Prepare response
+      const response = {
+        status: 200,
+        message: 'Request forwarded to workshop manager',
+        data: result
+      };
+
+      res.status(200).json(response);
+    } catch (error) {
+      console.error('Error forwarding to workshop:', error);
+      res.status(error.status || 500).json({
+        status: error.status || 500,
+        message: error.message || 'Failed to forward to workshop'
+      });
+    }
+  }
+
+  static async approveItemWithoutLPO(req, res) {
+    try {
+      const { complaintId } = req.params;
+      const { approvedBy } = req.body;
+
+      if (!approvedBy) {
+        return res.status(400).json({
+          status: 400,
+          message: 'approvedBy is required'
+        });
+      }
+
+      const result = await ComplaintService.approveItemWithoutLPO(
+        complaintId,
+        approvedBy,
+      );
+
+      // Prepare response
+      const response = {
+        status: 200,
+        message: 'Request forwarded to workshop manager',
+        data: result
+      };
+
+      res.status(200).json(response);
+    } catch (error) {
+      console.error('Error forwarding to workshop:', error);
+      res.status(error.status || 500).json({
+        status: error.status || 500,
+        message: error.message || 'Failed to forward to workshop'
+      });
+    }
+  }
+
   // Step 5: WORKSHOP_MANAGER creates LPO
   static async createLPOForComplaint(req, res) {
     try {
@@ -313,7 +399,7 @@ class ComplaintController {
 
       // Generate pre-signed URL for S3 upload
       const uploadUrl = await putObject(
-        finalFilename,
+        finalFilename, 
         s3Key,
         'application/pdf',
       );
@@ -412,57 +498,6 @@ class ComplaintController {
   }
 
   // Step 7: CEO final approval
-  static async accountsApproval(req, res) {
-    try {
-      const { complaintId } = req.params;
-      const {
-        approvedBy,
-        comments,
-        signed,
-        authorised,
-        approvedDate,
-        approvedFrom,
-        approvedIP,
-        approvedBDevice,
-        approvedLocation
-      } = req.body;
-
-      if (!approvedBy) {
-        return res.status(400).json({
-          status: 400,
-          message: 'approvedBy is required'
-        });
-      }
-
-      const approvedCreds = {
-        signed: signed || false,
-        authorised: authorised || false,
-        approvedDate,
-        approvedFrom,
-        approvedIP,
-        approvedBDevice,
-        approvedLocation,
-        approvedBy,
-      }
-
-      const result = await ComplaintService.accountsApproval(
-        complaintId,
-        approvedBy,
-        comments,
-        approvedCreds
-      );
-
-      res.status(200).json(result);
-    } catch (error) {
-      console.error('Error in CEO approval:', error);
-      res.status(error.status || 500).json({
-        status: error.status || 500,
-        message: error.message || 'Failed to get CEO approval'
-      });
-    }
-  }
-
-  // Step 7: CEO final approval
   static async managerApproval(req, res) {
     try {
       const { complaintId } = req.params;
@@ -555,6 +590,56 @@ class ComplaintController {
         comments,
         approvedCreds,
         authUser
+      );
+
+      res.status(200).json(result);
+    } catch (error) {
+      console.error('Error in CEO approval:', error);
+      res.status(error.status || 500).json({
+        status: error.status || 500,
+        message: error.message || 'Failed to get CEO approval'
+      });
+    }
+  }
+
+  static async accountsApproval(req, res) {
+    try {
+      const { complaintId } = req.params;
+      const {
+        approvedBy,
+        comments,
+        signed,
+        authorised,
+        approvedDate,
+        approvedFrom,
+        approvedIP,
+        approvedBDevice,
+        approvedLocation
+      } = req.body;
+
+      if (!approvedBy) {
+        return res.status(400).json({
+          status: 400,
+          message: 'approvedBy is required'
+        });
+      }
+
+      const approvedCreds = {
+        signed: signed || false,
+        authorised: authorised || false,
+        approvedDate,
+        approvedFrom,
+        approvedIP,
+        approvedBDevice,
+        approvedLocation,
+        approvedBy,
+      }
+
+      const result = await ComplaintService.accountsApproval(
+        complaintId,
+        approvedBy,
+        comments,
+        approvedCreds
       );
 
       res.status(200).json(result);

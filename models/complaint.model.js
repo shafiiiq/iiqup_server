@@ -247,12 +247,12 @@ const complaintSchema = new mongoose.Schema({
   mediaFiles: [mediaFileSchema],
 
   // Assignment tracking
-  assignedMechanic: {
+  assignedMechanic: [{
     mechanicId: { type: String },
     mechanicName: { type: String },
     assignedBy: { type: String }, // MAINTENANCE_HEAD
     assignedDate: { type: Date }
-  },
+  }],
 
   // Mechanic requests for items/tools
   mechanicRequests: [mechanicRequestSchema],
@@ -275,6 +275,8 @@ const complaintSchema = new mongoose.Schema({
       'mechanic_requested',   // Mechanic requested items
       'maintenance_approved', // Maintenance head approved request
       'sent_to_workshop',     // Sent to workshop manager
+      'sent_to_workshop_without_lpo',     // Sent to workshop manager without lpo
+      'approved_without_lpo',     // Approved without lpo
       'lpo_created',          // LPO created by workshop manager
       'lpo_uploaded',         // LPO uploaded by workshop manager
       'lpo_amended',          // LPO amended by workshop manager

@@ -26,6 +26,8 @@ const createNotification = async (notificationData) => {
       navigateText,
       navigteToId,
       hasButton,
+      directApproval,
+      approvalPort,
       type = 'normal'
     } = notificationData;
 
@@ -58,6 +60,8 @@ const createNotification = async (notificationData) => {
       navigteToId,
       hasButton: hasButton || false,
       type,
+      directApproval: directApproval || false,
+      approvalPort,
       targetUsers, // ✅ Store who should receive it
       isBroadcast, // ✅ Store if it's broadcast
       createdAt: new Date(),

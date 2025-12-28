@@ -14,6 +14,10 @@ router.post('/mechanic-request/:complaintId', ComplaintController.mechanicReques
 // Step 4: MAINTENANCE_HEAD forwards to WORKSHOP_MANAGER
 router.post('/forward-to-workshop/:complaintId', ComplaintController.forwardToWorkshop);
 
+router.post('/forward-to-workshop/without-lpo/:complaintId', ComplaintController.forwardToWorkshopWithoutLPO);
+
+router.post('/approve-item/without-lpo/:complaintId', ComplaintController.approveItemWithoutLPO);
+
 // Step 5: WORKSHOP_MANAGER creates LPO
 router.post('/create-lpo/:complaintId', ComplaintController.createLPOForComplaint);
 
@@ -21,11 +25,11 @@ router.post('/upload-lpo/:complaintId', ComplaintController.uploadLPOForComplain
 
 router.post('/purchase-approval/:complaintId', ComplaintController.purchaseApproval);
 
-router.post('/accounts-approval/:complaintId', ComplaintController.accountsApproval);
-
 router.post('/manager-approval/:complaintId', ComplaintController.managerApproval);
 
 router.post('/ceo-approval/:complaintId', ComplaintController.ceoApproval);
+
+router.post('/accounts-approval/:complaintId', ComplaintController.accountsApproval);
 
 // Step 8: Mark items as available (by JALEEL_KA or MAINTENANCE_HEAD)
 router.post('/items-available/:complaintId', ComplaintController.markItemsAvailable);
@@ -43,3 +47,4 @@ router.get('/status/:status', ComplaintController.getComplaintsByStatus);
 router.post('/mechanic-jobs', ComplaintController.getMechanicComplaints);
 
 module.exports = router;
+
