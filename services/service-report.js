@@ -48,11 +48,12 @@ module.exports = {
           description: `At ${data.location}\nServiced Hours: ${data.serviceHrs}\nNext Service: ${data.nextServiceHrs}\n${data.remarks}\nMechanics: ${data.mechanics}`,
           priority: "high",
           sourceId: 'from applications',
+          recipient: JSON.parse(process.env.OFFICE_MAIN),
           time: new Date()
         });
 
         await PushNotificationService.sendGeneralNotification(
-          null, // broadcast to all users
+          JSON.parse(process.env.OFFICE_MAIN),
           `${data.machine} - ${data.regNo} serviced`, //title
           `At ${data.location}\nServiced Hours: ${data.serviceHrs}\nNext Service: ${data.nextServiceHrs}\n${data.remarks}\nMechanics: ${data.mechanics}`, //decription
           'high', //priority

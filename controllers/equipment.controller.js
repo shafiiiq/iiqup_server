@@ -1,11 +1,11 @@
 const userServices = require('../services/equipment-services')
 
-const addEquipments = async (req, res) => {  
+const addEquipments = async (req, res) => {
   userServices.insertEquipments(req.body)
     .then((addedUser) => {
       if (addedUser) {
         res.status(addedUser.status).json(addedUser)
-      } 
+      }
     })
     .catch((err) => {
       res.status(err.status || 500).json({ error: err.message })
@@ -39,7 +39,9 @@ const getEquipmentsByReg = async (req, res) => {
 
 const updateEquipments = async (req, res) => {
   const { regNo } = req.params;
-  const updateData = req.body;  
+  const updateData = req.body;
+
+  console.log("updateData", updateData);
 
   userServices.updateEquipments(regNo, updateData)
     .then((updatedUser) => {
@@ -53,7 +55,7 @@ const updateEquipments = async (req, res) => {
 }
 
 
-const deleteEquipments= async (req, res) => {  
+const deleteEquipments = async (req, res) => {
   const { regNo } = req.params;
 
   userServices.deleteEquipments(regNo)

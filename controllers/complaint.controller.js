@@ -771,7 +771,7 @@ class ComplaintController {
   static async getAllComplaints(req, res, next) {
     try {
       const complaint = await ComplaintService.getFullComplaints();
-
+      
       if (!complaint) {
         return res.status(404).json({ error: 'Complaints not found' });
       }

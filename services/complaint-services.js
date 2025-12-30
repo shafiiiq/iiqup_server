@@ -1261,7 +1261,11 @@ class ComplaintService {
 
   static async getFullComplaints() {
     try {
-      return await Complaint.find({}).sort({ createdAt: -1 });
+      const result = await Complaint.find({}).sort({ createdAt: -1 });
+      return {
+        status: 200,
+        data: result
+      }
     } catch (error) {
       throw error;
     }

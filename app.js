@@ -116,6 +116,10 @@ app.use(cookieParser());
 // Static file serving
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.get('/', (req, res) => {
+  res.send('Server is running!');
+});
+
 // Routes
 app.use('/', ztech);
 app.use('/users', userRouter);

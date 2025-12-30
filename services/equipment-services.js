@@ -131,10 +131,10 @@ module.exports = {
           });
         }
       }
-    }); 
+    });
   },
-   
-  sortData: (data, key, direction) => { 
+
+  sortData: (data, key, direction) => {
     return [...data].sort((a, b) => {
       let aValue = a[key];
       let bValue = b[key];
