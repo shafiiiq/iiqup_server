@@ -64,7 +64,7 @@ var server = http.createServer(app);
 // CORS configuration for Express
 const corsOptions = {
   origin: [
-    'https://iiqup.netlify.app',
+    'https://iiqup.vercel.app',
     'https://ansarigroup.online',
     'https://www.ansarigroup.online',
     "http://192.168.100.53:3000"
