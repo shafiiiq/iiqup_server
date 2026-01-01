@@ -275,24 +275,20 @@ router.post('/add-activation-key', async (req, res) => {
 });
 
 
-router.get('/push-test', async (req, res) => {
-  const notification = await createNotification({
-    title: `This is the testing`,
-    description: `This is message is for testing purpose. please be quit. nothing action required`,
-    priority: "high",
-    sourceId: 'complaintData._id',
-    recipient: process.env.SUPER_ADMIN,
-    time: new Date(),
-  });
+router.post('/push-test', async (req, res) => {
+  const user = await User.findOne({ email: req.body.email })
+
+  console.log(user.uniqueCode);
 
   const result = await PushNotificationService.sendGeneralNotification(
-    process.env.SUPER_ADMIN,
-    `This is the testing`,
+    user.uniqueCode,
+    `This is a test! Please confirm you received it.`,
     `This is message is for testing purpose. please be quit. nothing action required`,
     'high',
     'normal',
-    notification.data._id.toString()
   );
+
+  console.log(result); 
 
   res.json({
     status: 200,
@@ -304,7 +300,7 @@ router.get('/push-test', async (req, res) => {
 router.get('/add-assignedDate-field', async (req, res) => {
   try {
     const toolkits = await Toolkit.find({}).lean(); // Use lean() to get raw data
-    
+
     let updatedCount = 0;
     let totalHistoryRecords = 0;
 
@@ -313,7 +309,7 @@ router.get('/add-assignedDate-field', async (req, res) => {
 
       for (let vIndex = 0; vIndex < toolkit.variants.length; vIndex++) {
         const variant = toolkit.variants[vIndex];
-        
+
         for (let hIndex = 0; hIndex < variant.stockHistory.length; hIndex++) {
           const history = variant.stockHistory[hIndex];
           totalHistoryRecords++;
@@ -321,10 +317,10 @@ router.get('/add-assignedDate-field', async (req, res) => {
           // Check if assignedDate actually exists in the document
           if (!history.hasOwnProperty('assignedDate')) {
             const dateToSet = history.timestamp || new Date();
-            
+
             bulkOps.push({
               updateOne: {
-                filter: { 
+                filter: {
                   _id: toolkit._id,
                   [`variants.${vIndex}.stockHistory.${hIndex}._id`]: history._id
                 },
@@ -335,7 +331,7 @@ router.get('/add-assignedDate-field', async (req, res) => {
                 }
               }
             });
-            
+
             updatedCount++;
           }
         }
