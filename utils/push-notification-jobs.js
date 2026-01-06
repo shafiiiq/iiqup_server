@@ -23,7 +23,7 @@ class PushNotificationService {
 
             // 1. Send via WebSocket (real-time)
             try {
-                await userService.sendNotificationToUser(uniqueCode, notificationData);
+                await sendNotificationToUser(uniqueCode, notificationData);
                 results.websocket = { success: true, message: 'WebSocket notification sent' };
             } catch (error) {
                 console.error('❌ WebSocket notification failed:', error);
