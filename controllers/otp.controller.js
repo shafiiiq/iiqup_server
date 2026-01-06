@@ -6,7 +6,7 @@ const otpServices = require('../services/otp-services');
  * @param {Object} res - Express response object
  */
 const requestOTP = async (req, res) => {
-  let { email } = req.body;
+  let { email } = req.body; 
 
   if (email === 'DOCUMENT_VERIFIER_AUTH_MAIL') {
     email = process.env.AUTH_OTP_USER_EMAIL

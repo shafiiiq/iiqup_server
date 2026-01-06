@@ -2,29 +2,37 @@
 const Notification = require('../models/notification-model'); // Adjust path as needed
 const User = require('../models/user.model');
 
-const getAllNotificationsService = async (uniqueCode) => {
+const getAllNotificationsService = async (uniqueCode, page = 1, limit = 200) => {
   try {
     const allowedRoles = [
       process.env.MAINTENANCE_HEAD,
-      process.env.WORKSHOP_MANAGER,
+      process.env.WORKSHOP_MANAGER, 
       process.env.SUPER_ADMIN
     ];
 
-     const adminRoles = [
-      process.env.SUPER_ADMIN
-    ];
-
-    // Fetch all notifications from the database
-    let notifications = await Notification.find();
-
-    // If uniqueCode is NOT in allowed roles, filter out attendance notifications
+    let query = {};
     if (!allowedRoles.includes(uniqueCode)) {
-      notifications = notifications.filter(
-        notification => notification.sourceId !== 'attendance'
-      );
+      query.sourceId = { $ne: 'attendance' };
     }
 
-    return notifications;
+    const skip = (page - 1) * limit;
+    const totalCount = await Notification.countDocuments(query);
+
+    const notifications = await Notification.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    const totalPages = Math.ceil(totalCount / limit);
+
+    return {
+      notifications,
+      currentPage: page,
+      totalPages,
+      totalCount,
+      hasNextPage: page < totalPages
+    };
   } catch (error) {
     console.error('Error in getAllNotificationsService:', error);
     throw new Error('Failed to retrieve notifications from database');

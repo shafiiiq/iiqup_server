@@ -59,7 +59,7 @@ const generateAndSendOTP = async (email, demo_opr = false, name) => {
     // Validate email format
     if (!email || !email.match(/^\S+@\S+\.\S+$/)) {
       return {
-        status: 400,
+        status: 400, 
         success: false,
         message: 'Valid email address is required'
       };

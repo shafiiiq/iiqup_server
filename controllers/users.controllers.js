@@ -505,7 +505,7 @@ const getUserPushTokens = async (req, res) => {
 const verifyDocAuthUser = async (req, res) => {
   const { password } = req.body;
 
-  if (!password) {
+  if (!password) { 
     return res.status(400).json({
       success: false,
       message: 'Email and password are required'

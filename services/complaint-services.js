@@ -492,9 +492,6 @@ class ComplaintService {
 
       const lpo = await lpoModel.findOne({ lpoRef: lpoData.lpoRef })
 
-      console.log("lpo", lpo.lpoRef);
-
-
       const complaint = await Complaint.findByIdAndUpdate(
         complaintId,
         {
@@ -529,10 +526,6 @@ class ComplaintService {
         sourceId: 'lpo_approval',
         recipient: JSON.parse(process.env.OFFICE_MAIN),
         time: new Date(),
-        navigateTo: `/(screens)/purchaseManagerSign/${complaint._id}`,
-        navigateText: `View and Sign`,
-        navigteToId: complaint._id,
-        hasButton: true
       });
 
       await PushNotificationService.sendGeneralNotification(

@@ -1,4 +1,5 @@
 const lpoService = require('../services/lpo-services');
+const { putObject } = require('../s3bucket/s3.bucket');
 
 class LPOController {
   // Add new LPO
@@ -71,6 +72,303 @@ class LPOController {
         status: 500,
         success: false,
         message: error.message
+      });
+    }
+  }
+
+  async uploadLPO(req, res) {
+    try {
+      const { uploadedBy, lpoRef, description, fileName, isAmendment } = req.body;
+
+      if (!uploadedBy || !lpoRef) {
+        return res.status(400).json({
+          status: 400,
+          message: 'uploadedBy and lpoRef are required'
+        });
+      }
+
+      const amendmentSuffix = isAmendment ? '-amendment' : '';
+      const finalFilename = fileName || `lpo-${lpoRef}${amendmentSuffix}-${Date.now()}.pdf`;
+      const s3Key = `lpos/${lpoRef}/${finalFilename}`;
+
+      // Generate pre-signed URL for S3 upload
+      const uploadUrl = await putObject(
+        finalFilename,
+        s3Key,
+        'application/pdf',
+      );
+
+      const lpoFileData = {
+        fileName: finalFilename,
+        originalName: finalFilename,
+        filePath: s3Key,
+        mimeType: 'application/pdf',
+        uploadUrl: uploadUrl,
+        uploadDate: new Date()
+      }; 
+
+      const result = await lpoService.uploadLPO(
+        lpoFileData,
+        uploadedBy,
+        lpoRef,
+        description,
+        isAmendment
+      );
+
+      res.status(200).json({
+        status: 200,
+        message: `Pre-signed URL generated successfully ${isAmendment ? '(Amendment)' : ''}`,
+        uploadUrl: uploadUrl,
+        data: {
+          complaint: result,
+          uploadData: lpoFileData
+        }
+      });
+
+    } catch (error) {
+      console.error('Error uploading LPO:', error);
+      res.status(error.status || 500).json({
+        status: error.status || 500,
+        message: error.message || 'Failed to upload LPO'
+      });
+    }
+  }
+
+  // Step 6: PURCHASE_MANAGER approves
+  async purchaseApproval(req, res) {
+    try {
+      const { lpoRef } = req.params;
+      const {
+        approvedBy,
+        comments,
+        signed,
+        authorised,
+        approvedDate,
+        approvedFrom,
+        approvedIP,
+        approvedBDevice,
+        approvedLocation
+      } = req.body;
+
+      if (!approvedBy) {
+        return res.status(400).json({
+          status: 400,
+          message: 'approvedBy is required'
+        });
+      }
+
+      // Validate required signing fields if signed is true
+      if (signed && (!approvedDate || !approvedFrom)) {
+        return res.status(400).json({
+          status: 400,
+          message: 'approvedDate and approvedFrom are required for signing'
+        });
+      }
+
+      const result = await lpoService.purchaseApproval(
+        lpoRef,
+        {
+          approvedBy,
+          comments,
+          signed: signed || false,
+          authorised: authorised || false,
+          approvedDate,
+          approvedFrom,
+          approvedIP,
+          approvedBDevice,
+          approvedLocation
+        }
+      );
+
+      res.status(200).json(result);
+    } catch (error) {
+      console.error('Error in purchase approval:', error);
+      res.status(error.status || 500).json({
+        status: error.status || 500,
+        message: error.message || 'Failed to approve purchase'
+      });
+    }
+  }
+
+  // Step 7: CEO final approval
+  async managerApproval(req, res) {
+    try {
+      const { lpoRef } = req.params;
+      const {
+        approvedBy,
+        comments,
+        signed,
+        authorised,
+        approvedDate,
+        approvedFrom,
+        approvedIP,
+        approvedBDevice,
+        approvedLocation
+      } = req.body;
+
+      if (!approvedBy) {
+        return res.status(400).json({
+          status: 400,
+          message: 'approvedBy is required'
+        });
+      }
+
+      const approvedCreds = {
+        signed: signed || false,
+        authorised: authorised || false,
+        approvedDate,
+        approvedFrom,
+        approvedIP,
+        approvedBDevice,
+        approvedLocation,
+        approvedBy,
+      }
+
+      const result = await lpoService.managerApproval(
+        lpoRef,
+        approvedBy,
+        comments,
+        approvedCreds
+      );
+
+      res.status(200).json(result);
+    } catch (error) {
+      console.error('Error in CEO approval:', error);
+      res.status(error.status || 500).json({
+        status: error.status || 500,
+        message: error.message || 'Failed to get CEO approval'
+      });
+    }
+  }
+
+
+  // Step 7: CEO final approval
+  async ceoApproval(req, res) {
+    try {
+      const { lpoRef } = req.params;
+      const {
+        approvedBy,
+        comments,
+        signed,
+        authorised,
+        approvedDate,
+        approvedFrom,
+        approvedIP,
+        approvedBDevice,
+        approvedLocation,
+        authUser
+      } = req.body;
+
+      if (!approvedBy) {
+        return res.status(400).json({
+          status: 400,
+          message: 'approvedBy is required'
+        });
+      }
+
+      const approvedCreds = {
+        signed: signed || false,
+        authorised: authorised || false,
+        approvedDate,
+        approvedFrom,
+        approvedIP,
+        approvedBDevice,
+        approvedLocation,
+        approvedBy,
+      }
+
+      const result = await lpoService.ceoApproval(
+        lpoRef,
+        approvedBy,
+        comments,
+        approvedCreds,
+        authUser
+      );
+
+      res.status(200).json(result);
+    } catch (error) {
+      console.error('Error in CEO approval:', error);
+      res.status(error.status || 500).json({
+        status: error.status || 500,
+        message: error.message || 'Failed to get CEO approval'
+      });
+    }
+  }
+
+  async accountsApproval(req, res) {
+    try {
+      const { lpoRef } = req.params;
+      const {
+        approvedBy,
+        comments,
+        signed,
+        authorised,
+        approvedDate,
+        approvedFrom,
+        approvedIP,
+        approvedBDevice,
+        approvedLocation
+      } = req.body;
+
+      if (!approvedBy) {
+        return res.status(400).json({
+          status: 400,
+          message: 'approvedBy is required'
+        });
+      }
+
+      const approvedCreds = {
+        signed: signed || false,
+        authorised: authorised || false,
+        approvedDate,
+        approvedFrom,
+        approvedIP,
+        approvedBDevice,
+        approvedLocation,
+        approvedBy,
+      }
+
+      const result = await lpoService.accountsApproval(
+        lpoRef,
+        approvedBy,
+        comments,
+        approvedCreds
+      );
+
+      res.status(200).json(result);
+    } catch (error) {
+      console.error('Error in CEO approval:', error);
+      res.status(error.status || 500).json({
+        status: error.status || 500,
+        message: error.message || 'Failed to get CEO approval'
+      });
+    }
+  }
+
+  // Step 8: Mark items as available
+  async markItemsAvailable(req, res) {
+    try {
+      const { lpoRef } = req.params;
+      const { markedBy } = req.body;
+
+      if (!markedBy) {
+        return res.status(400).json({
+          status: 400,
+          message: 'markedBy is required'
+        });
+      }
+
+      const result = await lpoService.markItemsAvailable(
+        lpoRef,
+        markedBy
+      );
+
+      res.status(200).json(result);
+    } catch (error) {
+      console.error('Error marking items available:', error);
+      res.status(error.status || 500).json({
+        status: error.status || 500,
+        message: error.message || 'Failed to mark items as available'
       });
     }
   }

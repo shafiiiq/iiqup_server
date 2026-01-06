@@ -198,7 +198,7 @@ const addAttendance = async (attendanceData) => {
       console.log(`🔔 Notification sent for ${standardizedName}`);
 
       // Send WhatsApp message automatically
-      await sendWhatsAppMessage(standardizedName, savedAttendance.punchType, formattedTime, formattedDate);
+      // await sendWhatsAppMessage(standardizedName, savedAttendance.punchType, formattedTime, formattedDate);
 
     } catch (error) {
       console.error('❌ Error sending notifications:', error);

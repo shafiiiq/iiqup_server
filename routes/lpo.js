@@ -5,6 +5,18 @@ const lpoController = require('../controllers/lpo.controllers');
 // Add new LPO
 router.post('/add-lpo', lpoController.addLPO);
 
+router.post('/upload-lpo', lpoController.uploadLPO);
+
+router.post('/purchase-approval/:lpoRef(*)', lpoController.purchaseApproval);
+
+router.post('/manager-approval/:lpoRef(*)', lpoController.managerApproval);
+
+router.post('/ceo-approval/:lpoRef(*)', lpoController.ceoApproval);
+
+router.post('/accounts-approval/:lpoRef(*)', lpoController.accountsApproval);
+
+router.post('/items-available/:lpoRef(*)', lpoController.markItemsAvailable);
+
 // Get all LPOs
 router.get('/get-all-lpo', lpoController.getAllLPOs);
 

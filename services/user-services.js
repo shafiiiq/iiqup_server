@@ -2032,7 +2032,7 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
 const getAuthSignKey = async (password) => {
   const response = await verifyDocAuthUserCreds(password)
   console.log("response", response);
-
+ 
   try {
     if (response.status !== 200) {
       return {

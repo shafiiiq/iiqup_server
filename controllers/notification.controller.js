@@ -1,19 +1,27 @@
 // controllers/notification.controller.js
-const notificationsService  = require('../services/notification-services');
+const notificationsService = require('../services/notification-services');
 const { sendNotificationToUser, broadcastNotification } = require('../utils/websocket');
-// Import your notification model here
-// const Notification = require('../models/notification.model');
 
 const getAllNotifications = async (req, res) => {
-  try {    
-    // Get all notifications from the service
-    const notifications = await notificationsService.getAllNotificationsService(req.body.uniqueCode);
-    
+  try {
+    const { uniqueCode, page = 1, limit = 100 } = req.body;
+
+    const result = await notificationsService.getAllNotificationsService(
+      uniqueCode,
+      parseInt(page),
+      parseInt(limit)
+    );
+
     res.status(200).json({
       status: 200,
-      message: 'Notifications retrieved successfully',
-      data: notifications,
-      count: notifications.length
+      message: 'Notifications retrieved successfully', 
+      data: result.notifications,
+      pagination: {
+        currentPage: result.currentPage,
+        totalPages: result.totalPages,
+        totalCount: result.totalCount,
+        hasMore: result.hasNextPage
+      }
     });
   } catch (error) {
     console.error('Error getting notifications:', error);
@@ -28,7 +36,7 @@ const getAllNotifications = async (req, res) => {
 const createNotification = async (req, res) => {
   try {
     const { title, description, priority, type, targetUser } = req.body;
-    
+
     // Create notification in database
     const newNotification = {
       title,
@@ -38,10 +46,10 @@ const createNotification = async (req, res) => {
       time: new Date().toISOString(),
       _id: new Date().getTime().toString() // Generate temporary ID
     };
-    
+
     // Save to database (implement your database logic here)
     // const savedNotification = await Notification.create(newNotification);
-    
+
     // Send real-time notification
     if (targetUser) {
       // Send to specific user
@@ -50,7 +58,7 @@ const createNotification = async (req, res) => {
       // Broadcast to all users
       broadcastNotification(newNotification);
     }
-    
+
     res.status(201).json({
       status: 201,
       message: 'Notification created and sent successfully',
@@ -76,7 +84,7 @@ const getNotificationStats = async (req, res) => {
       highPriority: 0,
       unread: 0
     };
-    
+
     res.status(200).json({
       status: 200,
       message: 'Stats retrieved successfully',
@@ -95,10 +103,10 @@ const getNotificationStats = async (req, res) => {
 const markAsRead = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Update notification as read in database
     await Notification.findByIdAndUpdate(id, { isRead: true });
-    
+
     res.status(200).json({
       status: 200,
       message: 'Notification marked as read'
@@ -116,10 +124,10 @@ const markAsRead = async (req, res) => {
 const deleteNotification = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Delete notification from database
     await Notification.findByIdAndDelete(id);
-    
+
     res.status(200).json({
       status: 200,
       message: 'Notification deleted successfully'
@@ -137,20 +145,20 @@ const deleteNotification = async (req, res) => {
 const getPendingNotifications = async (req, res) => {
   try {
     const { uniqueCode, since, limit = 100 } = req.body;
-    
+
     console.log('📨 getPendingNotifications called');
-    
+
     if (!uniqueCode) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'uniqueCode is required' 
+        error: 'uniqueCode is required'
       });
     }
 
     // Call the service
     const result = await notificationsService.getPendingNotifications(
-      uniqueCode, 
-      since, 
+      uniqueCode,
+      since,
       limit
     );
 
@@ -163,10 +171,10 @@ const getPendingNotifications = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error in getPendingNotifications controller:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       error: 'Failed to fetch pending notifications',
-      message: error.message 
+      message: error.message
     });
   }
 };
@@ -174,16 +182,16 @@ const getPendingNotifications = async (req, res) => {
 const markNotificationAsDelivered = async (req, res) => {
   try {
     const { notificationId, uniqueCode } = req.body;
-    
+
     if (!notificationId || !uniqueCode) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'notificationId and uniqueCode are required' 
+      return res.status(400).json({
+        success: false,
+        error: 'notificationId and uniqueCode are required'
       });
     }
 
     const result = await notificationsService.markNotificationAsDelivered(
-      notificationId, 
+      notificationId,
       uniqueCode
     );
 
@@ -191,9 +199,9 @@ const markNotificationAsDelivered = async (req, res) => {
 
   } catch (error) {
     console.error('Error marking notification as delivered:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
+    res.status(500).json({
+      success: false,
+      error: error.message
     });
   }
 };

@@ -23,7 +23,7 @@ const getObjectUrl = async (key, isLong, isAuthSign = false) => {
     } else if (isAuthSign) {
         expiresIn = 10;  // 10 seconds
     } else {
-        expiresIn = 86400; // 24 hours
+        expiresIn = 86400; // 24 hours 
     }
     
     const url = await getSignedUrl(s3Client, command, { expiresIn });
