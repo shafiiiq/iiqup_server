@@ -82,7 +82,7 @@ const setupWebSocket = (io) => {
       socket.emit('pong');
     });
   });
-};
+}; 
 
 // Function to send notification to specific user (ALL sessions)
 const sendNotificationToUser = (uniqueCode, notification) => {
