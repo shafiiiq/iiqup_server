@@ -2032,7 +2032,7 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
 const getAuthSignKey = async (password) => {
   const response = await verifyDocAuthUserCreds(password)
   console.log("response", response);
- 
+
   try {
     if (response.status !== 200) {
       return {
@@ -2509,7 +2509,7 @@ const convertToAMPM = (isoString) => {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true
-  });
+  }); 
 };
 
 // Get all sessions for a user
@@ -2729,6 +2729,209 @@ const checkSessionStatus = async (sessionId, userId) => {
   }
 };
 
+const generateBiometricToken = async (uniqueCode, deviceInfo) => {
+  try {
+    const user = await User.findOne({ uniqueCode });
+
+    if (!user) {
+      return {
+        success: false,
+        message: 'User not found'
+      };
+    }
+
+    // Generate secure random token
+    const biometricToken = crypto.randomBytes(64).toString('hex');
+
+    // Token expires in 90 days
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 90);
+
+    // Check if token exists for this device, update or create new
+    const existingTokenIndex = user.biometricTokens.findIndex(
+      t => t.deviceInfo.deviceId === deviceInfo.deviceId
+    );
+
+    if (existingTokenIndex !== -1) {
+      // Update existing token
+      user.biometricTokens[existingTokenIndex] = {
+        token: biometricToken,
+        deviceInfo,
+        createdAt: new Date(),
+        expiresAt,
+        isActive: true,
+        lastUsed: new Date()
+      };
+    } else {
+      // Add new token
+      user.biometricTokens.push({
+        token: biometricToken,
+        deviceInfo,
+        expiresAt,
+        isActive: true
+      });
+    }
+
+    await user.save();
+
+    return {
+      success: true,
+      data: {
+        biometricToken,
+        expiresAt,
+        expiresIn: '90 days'
+      }
+    };
+
+  } catch (error) {
+    console.error('❌ Error generating biometric token:', error);
+    return {
+      success: false,
+      message: 'Failed to generate biometric token',
+      error: error.message
+    };
+  }
+};
+
+const biometricLogin = async (biometricToken, deviceInfo) => {
+  try {
+    // Find user with matching biometric token
+    const user = await User.findOne({
+      'biometricTokens.token': biometricToken,
+      'biometricTokens.isActive': true
+    });
+
+    if (!user) {
+      return {
+        success: false,
+        message: 'Invalid biometric token'
+      };
+    }
+
+    // Find the specific token
+    const tokenData = user.biometricTokens.find(
+      t => t.token === biometricToken && t.isActive
+    );
+
+    if (!tokenData) {
+      return {
+        success: false,
+        message: 'Token not found or inactive'
+      };
+    }
+
+    // Check if token expired
+    if (new Date() > tokenData.expiresAt) {
+      tokenData.isActive = false;
+      await user.save();
+      return {
+        success: false,
+        message: 'Biometric token expired. Please login again.'
+      };
+    }
+
+    // Verify device info matches
+    if (tokenData.deviceInfo.deviceId !== deviceInfo.deviceId) {
+      return {
+        success: false,
+        message: 'Device mismatch. Please login again.'
+      };
+    }
+
+    // Update last used
+    tokenData.lastUsed = new Date();
+    user.lastLogin = new Date();
+    await user.save();
+
+    // Generate auth tokens (same as normal login)
+    const sessionToken = crypto.randomBytes(32).toString('hex');
+    const auth0token = jwt.sign(
+      {
+        userId: user._id,
+        email: user.email,
+        uniqueCode: user.uniqueCode
+      },
+      process.env.JWT_SECRET, 
+      { expiresIn: '7d' }
+    );
+
+    const refresh_token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: '30d' }
+    );
+
+    return {
+      success: true,
+      data: {
+        user: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          userType: user.userType,
+          uniqueCode: user.uniqueCode,
+          auth0token,
+          refresh_token,
+          sessionToken
+        }
+      }
+    };
+
+  } catch (error) {
+    console.error('❌ Error in biometric login:', error);
+    return {
+      success: false,
+      message: 'Failed to login with biometric',
+      error: error.message
+    };
+  }
+};
+
+const revokeBiometricToken = async (uniqueCode, deviceInfo) => {
+  try {
+    const user = await User.findOne({ uniqueCode });
+
+    if (!user) {
+      return {
+        success: false,
+        message: 'User not found'
+      };
+    }
+
+    if (deviceInfo && deviceInfo.deviceId) {
+      // Revoke specific device token
+      const tokenIndex = user.biometricTokens.findIndex(
+        t => t.deviceInfo.deviceId === deviceInfo.deviceId
+      );
+
+      if (tokenIndex !== -1) {
+        user.biometricTokens[tokenIndex].isActive = false;
+      }
+    } else {
+      // Revoke all tokens
+      user.biometricTokens.forEach(token => {
+        token.isActive = false;
+      });
+    }
+
+    await user.save();
+
+    return {
+      success: true,
+      message: 'Biometric token revoked successfully'
+    };
+
+  } catch (error) {
+    console.error('❌ Error revoking biometric token:', error);
+    return {
+      success: false,
+      message: 'Failed to revoke biometric token',
+      error: error.message
+    };
+  }
+};
+
 module.exports = {
   insertUser,
   fetchUsers,
@@ -2774,5 +2977,8 @@ module.exports = {
   blockDevice,
   logoutAllSessions,
   checkSessionStatus,
+  revokeBiometricToken,
+  biometricLogin,
+  generateBiometricToken,
   USER_ROLES,
 };

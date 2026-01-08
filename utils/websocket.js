@@ -80,7 +80,7 @@ const setupWebSocket = (io) => {
     socket.on('ping', () => {
       console.log('🏓 Ping received from:', socket.id);
       socket.emit('pong');
-    });
+    }); 
   });
 }; 
 

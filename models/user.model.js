@@ -28,6 +28,7 @@ const userRoles = {
   PRO: 'PRO',
 };
 
+
 const userSchema = new Schema({
   name: {
     type: String,
@@ -193,6 +194,34 @@ const userSchema = new Schema({
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User'
     },
+  }],
+  biometricTokens: [{
+    token: {
+      type: String,
+      required: true
+    },
+    deviceInfo: {
+      deviceId: String,
+      platform: String,
+      model: String,
+      osVersion: String
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    },
+    expiresAt: {
+      type: Date,
+      required: true
+    },
+    isActive: {
+      type: Boolean,
+      default: true
+    },
+    lastUsed: {
+      type: Date,
+      default: Date.now
+    }
   }]
 });
 

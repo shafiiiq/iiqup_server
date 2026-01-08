@@ -505,7 +505,7 @@ const getUserPushTokens = async (req, res) => {
 const verifyDocAuthUser = async (req, res) => {
   const { password } = req.body;
 
-  if (!password) { 
+  if (!password) {
     return res.status(400).json({
       success: false,
       message: 'Email and password are required'
@@ -757,10 +757,10 @@ const getUserRoles = async (req, res) => {
 const getUserSessions = async (req, res) => {
   try {
     const userId = req.user.id; // Changed from req.user._id
-    console.log("userId", userId)
     const currentSessionToken = req.headers.authorization?.split(' ')[1];
 
     const result = await userServices.getUserSessions(userId, currentSessionToken);
+    console.log("result", result)
     res.status(result.status).json(result);
   } catch (err) {
     res.status(500).json({
@@ -823,6 +823,111 @@ const logoutAllSessions = async (req, res) => {
   }
 };
 
+const generateBiometricToken = async (req, res) => {
+  try {
+    const { uniqueCode, deviceInfo } = req.body;
+
+    if (!uniqueCode || !deviceInfo) {
+      return res.status(400).json({
+        success: false,
+        message: 'uniqueCode and deviceInfo are required'
+      });
+    }
+
+    const result = await userServices.generateBiometricToken(uniqueCode, deviceInfo);
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        data: result.data
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        message: result.message
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error generating biometric token:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+const biometricLogin = async (req, res) => {
+  try {
+    const { biometricToken, deviceInfo } = req.body;
+
+    if (!biometricToken || !deviceInfo) {
+      return res.status(400).json({
+        success: false,
+        message: 'biometricToken and deviceInfo are required'
+      });
+    }
+
+    const result = await userServices.biometricLogin(biometricToken, deviceInfo);
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        authorized: true,
+        message: 'Biometric login successful',
+        data: result.data
+      });
+    } else {
+      res.status(401).json({
+        success: false,
+        authorized: false,
+        message: result.message
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error in biometric login:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+const revokeBiometricToken = async (req, res) => {
+  try {
+    const { uniqueCode, deviceInfo } = req.body;
+
+    if (!uniqueCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'uniqueCode is required'
+      });
+    }
+
+    const result = await userServices.revokeBiometricToken(uniqueCode, deviceInfo);
+
+    if (result.success) {
+      res.status(200).json({
+        success: true,
+        message: result.message
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        message: result.message
+      });
+    }
+  } catch (error) {
+    console.error('❌ Error revoking biometric token:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
 module.exports = {
   addUsers,
   getUsers,
@@ -863,4 +968,7 @@ module.exports = {
   logoutSession,
   blockDevice,
   logoutAllSessions,
+  revokeBiometricToken,
+  biometricLogin,
+  generateBiometricToken
 };

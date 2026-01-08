@@ -26,27 +26,24 @@ router.post('/get-push-tokens', userController.getUserPushTokens);
 router.post('/send-test-notification', userController.sendTestNotification);
 router.get('/get-user-roles', authMiddleware, userController.getUserRoles)
 router.post('/six-digit-auth/verify', authMiddleware, userController.verifyDocAuthUser)
-
 router.post('/doc-0auth-sign-key', authMiddleware, userController.getSignKey)
 router.post('/doc-0auth-pm-sign-key', authMiddleware, userController.getSignPmKey)
 router.post('/doc-0auth-accounts-sign-key', authMiddleware, userController.getSignAccountsKey)
 router.post('/doc-0auth-manager-sign-key', authMiddleware, userController.getSignManagerKey)
 router.post('/doc-0auth-authorized-sign-key', authMiddleware, userController.getSignAuthorizedKey)
 router.post('/doc-0auth-seal-sign-key', authMiddleware, userController.getSealKey)
-
 router.post('/activate-signature', authMiddleware, userController.activateSignature);
 router.post('/verify-device-trust', authMiddleware, userController.verifyDeviceTrust);
-
 router.get('/verify-token', authMiddleware, (req, res) => {
-    // If authMiddleware passes, token is valid
     res.status(200).json({
         success: true,
         valid: true,
         message: 'Token is valid'
     });
 });
-
-// Session routes (all require authentication)
+router.post('/generate-biometric-token', userController.generateBiometricToken);
+router.post('/biometric-login', userController.biometricLogin);
+router.post('/revoke-biometric-token', userController.revokeBiometricToken);
 router.get('/sessions', authMiddleware, userController.getUserSessions);
 router.delete('/sessions/:sessionId', authMiddleware, userController.logoutSession);
 router.post('/sessions/:sessionId/block', authMiddleware, userController.blockDevice);
