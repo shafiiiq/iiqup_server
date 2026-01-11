@@ -34,7 +34,7 @@ const setupWebSocket = (io) => {
       if (uniqueCode) {
         // Get existing sessions or create new array
         const userSessions = connectedUsers.get(uniqueCode) || [];
-        
+
         // Add this session
         userSessions.push({
           socketId: socket.id,
@@ -42,9 +42,9 @@ const setupWebSocket = (io) => {
           sessionToken: sessionToken,
           connectedAt: new Date()
         });
-        
+
         connectedUsers.set(uniqueCode, userSessions);
-        
+
         socket.join(`user_${uniqueCode}`);
         console.log(`✅ User authenticated - uniqueCode: ${uniqueCode}, socketId: ${socket.id}`);
         console.log(`📊 Total sessions for ${uniqueCode}: ${userSessions.length}`);
@@ -64,7 +64,7 @@ const setupWebSocket = (io) => {
       // Remove THIS socket from user's sessions
       for (const [uniqueCode, sessions] of connectedUsers.entries()) {
         const filteredSessions = sessions.filter(s => s.socketId !== socket.id);
-        
+
         if (filteredSessions.length === 0) {
           connectedUsers.delete(uniqueCode);
           console.log(`🗑️ Removed user ${uniqueCode} - no more sessions`);
@@ -80,9 +80,69 @@ const setupWebSocket = (io) => {
     socket.on('ping', () => {
       console.log('🏓 Ping received from:', socket.id);
       socket.emit('pong');
-    }); 
+    });
+
+    // ============ CHAT EVENTS ============
+
+    // Send message
+    socket.on('send_message', async (data) => {
+      // data = { chatId, senderId, senderType, content, messageType, participants }
+      // Save message to DB
+      // Emit to all participants except sender
+    });
+
+    // Typing indicator
+    socket.on('typing', (data) => {
+      // data = { chatId, userId, userName }
+      // Emit to all chat participants except sender
+    });
+
+    socket.on('stop_typing', (data) => {
+      // data = { chatId, userId }
+      // Emit to all chat participants
+    });
+
+    // Message delivered
+    socket.on('message_delivered', (data) => {
+      // data = { messageId, userId }
+      // Update message status in DB
+      // Emit to sender
+    });
+
+    // Message read
+    socket.on('message_read', (data) => {
+      // data = { messageId, chatId, userId }
+      // Update message status in DB
+      // Emit to sender
+    });
+
+    // ============ CALL EVENTS ============
+
+    // Initiate call
+    socket.on('call_user', (data) => {
+      // data = { callerId, receiverUniqueCode, callerName, chatId }
+      // Emit to receiver
+    });
+
+    // Answer call
+    socket.on('call_answer', (data) => {
+      // data = { callerId, receiverId }
+      // Emit to caller
+    });
+
+    // Reject call
+    socket.on('call_reject', (data) => {
+      // data = { callerId, receiverId, reason }
+      // Emit to caller
+    });
+
+    // End call
+    socket.on('call_end', (data) => {
+      // data = { callerId, receiverId, duration }
+      // Emit to both parties
+    });
   });
-}; 
+};
 
 // Function to send notification to specific user (ALL sessions)
 const sendNotificationToUser = (uniqueCode, notification) => {
@@ -130,28 +190,28 @@ const isUserConnected = (uniqueCode) => {
 // Logout SPECIFIC session only
 const forceLogoutUser = (uniqueCode, userId, sessionToken, reason = 'Session terminated') => {
   console.log(`🚪 Force logout session: ${sessionToken} for user: ${uniqueCode}`);
-  
+
   if (global.io) {
     const userSessions = connectedUsers.get(uniqueCode);
     console.log("connectedUsers", connectedUsers);
-    
+
     console.log("userSessions", userSessions);
     if (userSessions) {
-      
+
       // Find session with matching sessionToken 
       const targetSession = userSessions.find(s => s.sessionToken === sessionToken);
       console.log("targetSession", targetSession);
-      
+
       if (targetSession) {
         // Emit ONLY to this specific socketId
         global.io.to(targetSession.socketId).emit('session_invalid', {
           success: false,
           message: reason,
           sessionStatus: 'logged_out',
-          sessionToken: sessionToken  
+          sessionToken: sessionToken
         });
         console.log(`✅ Logout signal sent to socket: ${targetSession.socketId}`);
-        
+
         // Remove this session from the map
         const filteredSessions = userSessions.filter(s => s.sessionToken !== sessionToken);
         if (filteredSessions.length === 0) {
@@ -168,6 +228,27 @@ const forceLogoutUser = (uniqueCode, userId, sessionToken, reason = 'Session ter
   }
 };
 
+// Send message to chat participants
+const sendMessageToChat = (participants, message, excludeUniqueCode = null) => {
+  // participants = [{ uniqueCode, userId, userType }]
+  // Send to all participants except excludeUniqueCode (sender)
+};
+
+// Send typing indicator
+const sendTypingIndicator = (chatId, participants, typingUser) => {
+  // Emit typing event to chat participants
+};
+
+// Update message status
+const updateMessageStatus = (senderUniqueCode, messageId, status) => {
+  // Emit status update to sender
+};
+
+// Send call notification
+const sendCallNotification = (receiverUniqueCode, callData) => {
+  // Emit incoming call to receiver
+};
+
 export default {
   setupWebSocket,
   sendNotificationToUser,
@@ -175,5 +256,9 @@ export default {
   getConnectedUsersCount,
   isUserConnected,
   forceLogoutUser,
+  sendMessageToChat,
+  sendTypingIndicator,
+  updateMessageStatus,
+  sendCallNotification,
   connectedUsers
 };

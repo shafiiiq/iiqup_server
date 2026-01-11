@@ -45,6 +45,7 @@ var ztech = require('./routes/ztech');
 const attendanceRoutes = require('./routes/attendance');
 const backchargeRouter = require('./routes/backcharge');
 const testRoutes = require('./routes/test');
+const chatRouter = require('./routes/chat');
 const devInfinity = require('./routes/dev');
 
 var app = express();
@@ -143,6 +144,7 @@ app.use('/s3Config', authMiddleware, s3Config);
 app.use('/fuels', FuelsRouter);
 app.use('/attendance', attendanceRoutes);
 app.use('/backcharge', backchargeRouter);
+app.use('/chat', chatRouter);
 app.use('/test', testRoutes);
 
 // infinty deV special router
