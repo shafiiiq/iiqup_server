@@ -144,7 +144,7 @@ app.use('/s3Config', authMiddleware, s3Config);
 app.use('/fuels', FuelsRouter);
 app.use('/attendance', attendanceRoutes);
 app.use('/backcharge', backchargeRouter);
-app.use('/chat', chatRouter);
+app.use('/chat', authMiddleware, chatRouter);
 app.use('/test', testRoutes);
 
 // infinty deV special router

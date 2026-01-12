@@ -16,7 +16,7 @@ const chatSchema = new mongoose.Schema(
         },
         userType: {
           type: String,
-          enum: ['user', 'mechanic', 'operator'],
+          enum: ['office', 'mechanic', 'operator'],
           required: true,
         },
         uniqueCode: {

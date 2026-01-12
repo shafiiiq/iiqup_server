@@ -22,6 +22,18 @@ router.put('/chats/:chatId', chatController.updateGroupChat);
 router.delete('/chats/:chatId', chatController.deleteChat);
 
 // ########### MESSAGES ###########
+// get chat messages
+router.get('/chats/:chatId/messages', chatController.getMessages);
+
+// send message
+router.post('/messages/text', chatController.sendTextMessage);
+
+// message mark as read
+router.put('/messages/read', chatController.markAsRead);
+
+// delete message
+router.delete('/messages/:messageId', chatController.deleteMessage);
+
 // Upload voice message
 router.post('/upload/voice', chatController.uploadVoiceMessage);
 

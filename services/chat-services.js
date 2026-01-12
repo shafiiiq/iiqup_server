@@ -24,8 +24,9 @@ const getUserChats = async (userId, userType, teamType = null) => {
 
     // Format response with unread count for this user
     const formattedChats = chats.map(chat => {
-      const unreadCount = chat.unreadCount?.get(userId.toString()) || 0;
-      
+      // With .lean(), unreadCount is a plain object, not a Map
+      const unreadCount = chat.unreadCount?.[userId.toString()] || 0;
+
       return {
         ...chat,
         unreadCount,
@@ -210,9 +211,9 @@ const deleteChatForUser = async (chatId, userId) => {
     // For individual chats, we could keep a deletedFor array
     // For now, we'll just remove the user from participants if it's a group
     // Or mark chat as inactive for the user
-    
+
     const chat = await Chat.findById(chatId);
-    
+
     if (!chat) {
       throw new Error('Chat not found');
     }
@@ -267,7 +268,7 @@ const updateLastMessage = async (chatId, messageContent, senderId, senderName) =
 const incrementUnreadCount = async (chatId, senderId) => {
   try {
     const chat = await Chat.findById(chatId);
-    
+
     if (!chat) {
       throw new Error('Chat not found');
     }

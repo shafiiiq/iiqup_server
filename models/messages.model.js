@@ -15,7 +15,7 @@ const messageSchema = new mongoose.Schema(
     },
     senderType: {
       type: String,
-      enum: ['user', 'mechanic', 'operator'],
+      enum: ['office', 'mechanic', 'operator'],
       required: true,
     },
     senderName: {

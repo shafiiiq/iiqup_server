@@ -8,8 +8,12 @@ const websocket = require('../utils/websocket');
 // Get all chats for a user (with team filter)
 const getUserChats = async (req, res) => {
   try {
-    const { userId, userType } = req.user; // From auth middleware
-    const { teamType } = req.query; // Optional filter
+    
+    const userId = req.user.id; // From auth middleware
+    const { teamType, userType } = req.query; // Optional filter
+    console.log("userId", userId);
+    console.log("teamType", teamType);
+    console.log("userType", userType);
 
     const chats = await chatService.getUserChats(userId, userType, teamType);
 
@@ -31,7 +35,7 @@ const getUserChats = async (req, res) => {
 // Get or create individual chat
 const getOrCreateIndividualChat = async (req, res) => {
   try {
-    const { userId, userType, uniqueCode } = req.user;
+    const { userId, userType, uniqueCode } = req.body;
     const { targetUserId, targetUserType, targetUniqueCode, teamType } = req.body;
 
     if (!targetUserId || !targetUserType || !targetUniqueCode || !teamType) {
@@ -120,7 +124,7 @@ const createGroupChat = async (req, res) => {
 const getChatDetails = async (req, res) => {
   try {
     const { chatId } = req.params;
-    const { userId } = req.user;
+    const userId = req.user.id;
 
     const chat = await chatService.getChatById(chatId, userId);
 
@@ -150,7 +154,7 @@ const getChatDetails = async (req, res) => {
 const updateGroupChat = async (req, res) => {
   try {
     const { chatId } = req.params;
-    const { userId } = req.user;
+    const userId = req.user.id;
     const updates = req.body; // { name, avatar, addParticipants, removeParticipants }
 
     const updatedChat = await chatService.updateGroupChat(chatId, userId, updates);
@@ -190,7 +194,7 @@ const updateGroupChat = async (req, res) => {
 const deleteChat = async (req, res) => {
   try {
     const { chatId } = req.params;
-    const { userId } = req.user;
+    const userId = req.user.id;
 
     await chatService.deleteChatForUser(chatId, userId);
 
@@ -214,11 +218,15 @@ const deleteChat = async (req, res) => {
 const getMessages = async (req, res) => {
   try {
     const { chatId } = req.params;
-    const { userId } = req.user;
+    const userId = req.user.id;
+    console.log("userId", userId);
+
     const { page = 1, limit = 50 } = req.query;
 
     // Verify user has access to this chat
     const hasAccess = await chatService.verifyUserAccess(chatId, userId);
+    console.log("chataaaaaaaaaaaaaaaa", hasAccess);
+
     if (!hasAccess) {
       return res.status(403).json({
         success: false,
@@ -268,7 +276,7 @@ const sendTextMessage = async (req, res) => {
 
     // Get chat participants
     const chat = await chatService.getChatById(chatId, userId);
-    
+
     // Send via WebSocket to all participants
     websocket.sendMessageToChat(chat.participants, message, uniqueCode);
 
@@ -304,7 +312,7 @@ const markAsRead = async (req, res) => {
 
     // Get chat to notify senders
     const chat = await chatService.getChatById(chatId, userId);
-    
+
     // Notify other participants
     chat.participants.forEach(participant => {
       if (participant.uniqueCode !== uniqueCode) {
@@ -330,7 +338,7 @@ const markAsRead = async (req, res) => {
 const deleteMessage = async (req, res) => {
   try {
     const { messageId } = req.params;
-    const { userId } = req.user;
+    const userId = req.user.id;
     const { deleteForEveryone } = req.body; // true/false
 
     await messageService.deleteMessage(messageId, userId, deleteForEveryone);
@@ -545,7 +553,7 @@ const uploadDocument = async (req, res) => {
 // Get call history
 const getCallHistory = async (req, res) => {
   try {
-    const { userId } = req.user;
+    const userId = req.user.id;
     const { page = 1, limit = 20 } = req.query;
 
     const callHistory = await messageService.getCallHistory(userId, page, limit);
@@ -568,7 +576,7 @@ const getCallHistory = async (req, res) => {
 // Save call record
 const saveCallRecord = async (req, res) => {
   try {
-    const { userId } = req.user;
+    const userId = req.user.id;
     const { chatId, receiverId, duration, callType, status } = req.body;
 
     if (!chatId || !receiverId || !callType) {

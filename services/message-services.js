@@ -1,7 +1,7 @@
 // services/message.service.js
 const Message = require('../models/messages.model');
 const Chat = require('../models/chats.model');
-const chatService = require('./chat.service');
+const chatService = require('./chat-services');
 const { putObject, getObjectUrl } = require('../s3bucket/s3.bucket');
 const mongoose = require('mongoose');
 
@@ -21,13 +21,16 @@ const getMessages = async (chatId, page = 1, limit = 50, userId) => {
       .limit(parseInt(limit))
       .lean();
 
+    console.log("Chattttttttttttttttttttttttttssssssssssssssss", messages);
+
+
     // Generate signed URLs for file messages
     const messagesWithUrls = await Promise.all(
       messages.map(async (msg) => {
         if (['image', 'video', 'audio', 'voice', 'document'].includes(msg.messageType)) {
           // Get signed URL for the file
           msg.content = await getObjectUrl(msg.content, false);
-          
+
           // Get signed URL for thumbnail if exists
           if (msg.thumbnail) {
             msg.thumbnail = await getObjectUrl(msg.thumbnail, false);
@@ -204,10 +207,10 @@ const uploadFile = async (file, fileType) => {
     const timestamp = Date.now();
     const fileName = `${timestamp}-${file.originalname}`;
     const key = `chat/${fileType}/${fileName}`;
-    
+
     // Get presigned URL for upload
     const uploadUrl = await putObject(fileName, key, file.mimetype);
-    
+
     // Return the S3 key (store this in DB, not the signed URL)
     return key;
   } catch (error) {
@@ -222,7 +225,7 @@ const generateThumbnail = async (videoKey) => {
     // TODO: Implement thumbnail generation with ffmpeg
     // For now, return null
     // You can use a service like AWS Lambda with ffmpeg layer
-    
+
     console.log(`Thumbnail generation needed for: ${videoKey}`);
     return null;
   } catch (error) {
