@@ -1,7 +1,7 @@
 // services/chat.service.js
 const Chat = require('../models/chats.model');
 const Message = require('../models/messages.model');
-const User = require('../models/user.model');
+const User = require('../models/user.model'); 
 const mongoose = require('mongoose');
 
 // ########### CHAT MANAGEMENT ###########
@@ -310,5 +310,5 @@ module.exports = {
   verifyUserAccess,
   updateLastMessage,
   incrementUnreadCount,
-  resetUnreadCount
+  resetUnreadCount,
 };

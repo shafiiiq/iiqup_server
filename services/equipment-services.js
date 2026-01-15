@@ -2,9 +2,10 @@ const { promises } = require('fs');
 const equipmentModel = require('../models/equip.model');
 const { createNotification } = require('../utils/notification-jobs'); // Import notification service
 const PushNotificationService = require('../utils/push-notification-jobs');
+const EquipmentImageModel = require('../models/equip-hand-over-stock.model');
 
 module.exports = {
-
+ 
   insertEquipments: (data) => {
     return new Promise(async (resolve, reject) => {
       try {
@@ -166,25 +167,105 @@ module.exports = {
     });
   },
 
-  fetchEquipments: function () {
+  fetchEquipments: function (page = 1, limit = 20) {
     return new Promise(async (resolve, reject) => {
       try {
-        const sortConfig = {
-          key: 'year',
-          direction: 'desc' // desc for latest first, asc for oldest first
-        }
-        const data = await equipmentModel.find({ outside: false });
-        const sortedResults = this.sortData(data, sortConfig.key, sortConfig.direction);
+        const skip = (page - 1) * limit;
+
+        // Query for non-outside equipment
+        const query = { outside: false };
+
+        // Get total count
+        const totalCount = await equipmentModel.countDocuments(query);
+
+        // Fetch paginated data
+        const equipments = await equipmentModel.find(query)
+          .sort({ year: -1, createdAt: -1 }) // Sort by year desc, then by creation date
+          .skip(skip)
+          .limit(limit)
+          .lean(); // Use lean() for better performance
+
+        const totalPages = Math.ceil(totalCount / limit);
+
         resolve({
           status: 200,
           ok: true,
-          data: sortedResults
+          equipments,
+          currentPage: page,
+          totalPages,
+          totalCount,
+          hasNextPage: page < totalPages
         });
       } catch (error) {
         reject({
           status: 500,
           ok: false,
-          message: error.message || 'Error fetching users'
+          message: error.message || 'Error fetching equipments'
+        });
+      }
+    });
+  },
+
+  searchEquipments: function (searchTerm, page = 1, limit = 20, searchField = 'all') {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const skip = (page - 1) * limit;
+
+        // Base query - exclude outside equipment
+        let query = { outside: false };
+
+        // Build search query based on searchField
+        if (searchField === 'all') {
+          // Search across multiple fields
+          query.$or = [
+            { machine: { $regex: searchTerm, $options: 'i' } },
+            { regNo: { $regex: searchTerm, $options: 'i' } },
+            { brand: { $regex: searchTerm, $options: 'i' } },
+            { company: { $regex: searchTerm, $options: 'i' } },
+            { status: { $regex: searchTerm, $options: 'i' } },
+            { site: { $regex: searchTerm, $options: 'i' } },
+            { certificationBody: { $regex: searchTerm, $options: 'i' } },
+            { coc: { $regex: searchTerm, $options: 'i' } }
+          ];
+
+          // Check if searchTerm is a number for year search
+          if (!isNaN(searchTerm)) {
+            query.$or.push({ year: parseInt(searchTerm) });
+          }
+        } else if (searchField === 'site') {
+          // Site-specific search
+          query.site = { $regex: searchTerm, $options: 'i' };
+        } else {
+          // Specific field search
+          query[searchField] = { $regex: searchTerm, $options: 'i' };
+        }
+
+        // Get total count for search results
+        const totalCount = await equipmentModel.countDocuments(query);
+
+        // Fetch paginated search results
+        const equipments = await equipmentModel.find(query)
+          .sort({ year: -1, createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .lean();
+
+        const totalPages = Math.ceil(totalCount / limit);
+
+        resolve({
+          status: 200,
+          ok: true,
+          equipments,
+          currentPage: page,
+          totalPages,
+          totalCount,
+          hasNextPage: page < totalPages
+        });
+      } catch (error) {
+        reject({
+          status: 500,
+          ok: false,
+          message: error.message || 'Error searching equipments'
         });
       }
     });
@@ -478,5 +559,219 @@ module.exports = {
         });
       }
     });
-  }
+  },
+
+  addEquipmentImage: (equipmentNo, imagePath, imageLabel, fileName, mimeType) => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Convert equipmentNo to string and ensure all required fields are present
+        const equipmentNoStr = equipmentNo.toString();
+
+        // Validate required fields
+        if (!imagePath || !imageLabel) {
+          return reject({
+            status: 400,
+            success: false,
+            message: 'Image path and label are required'
+          });
+        }
+
+        // Use findOneAndUpdate with upsert to handle both create and update in one atomic operation
+        const equipment = await EquipmentImageModel.findOneAndUpdate(
+          { equipmentNo: equipmentNoStr },
+          {
+            $push: {
+              images: {
+                path: imagePath,
+                label: imageLabel,
+                fileName: fileName,
+                mimeType: mimeType
+              }
+            },
+            $set: {
+              updatedAt: new Date()
+            },
+            $setOnInsert: {
+              equipmentName: `Equipment ${equipmentNoStr}`,
+              createdAt: new Date()
+            }
+          },
+          {
+            upsert: true, // Create if doesn't exist
+            new: true,    // Return updated document
+            runValidators: true
+          }
+        );
+
+        const isNewEquipment = equipment.images.length === 1;
+
+        resolve({
+          status: 200,
+          success: true,
+          message: isNewEquipment ? 'Equipment created with image successfully' : 'Image added to existing equipment successfully',
+          data: {
+            equipmentNo: equipmentNoStr,
+            equipmentName: equipment.equipmentName,
+            totalImages: equipment.images.length,
+            imagePath,
+            imageLabel,
+            fileName,
+            isNewEquipment
+          }
+        });
+
+      } catch (error) {
+        console.error('Error adding equipment image:', error);
+
+        if (error.name === 'ValidationError') {
+          reject({
+            status: 400,
+            success: false,
+            message: 'Validation error: ' + error.message,
+            error: error.message
+          });
+        } else {
+          reject({
+            status: 500,
+            success: false,
+            message: 'Failed to add equipment image',
+            error: error.message
+          });
+        }
+      }
+    });
+  },
+
+  getEquipmentRegNo: (regNo) => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const equipment = await EquipmentImageModel.findOne({ equipmentNo: regNo });
+
+        if (!equipment) {
+          return resolve({
+            status: 404,
+            success: false,
+            message: 'Equipment not found'
+          });
+        }
+
+        const result = equipment.toObject();
+
+        if (result.images && result.images.length > 0) {
+          result.images = result.images.map(image => {
+            let imagePath = image.path;
+
+            // Remove 'public' from the beginning of the path in all variations
+            if (imagePath.startsWith('public/')) {
+              imagePath = imagePath.substring(7); // Remove 'public/'
+            } else if (imagePath.startsWith('/public/')) {
+              imagePath = imagePath.substring(8); // Remove '/public/'
+            } else if (imagePath.startsWith('public\\')) {
+              imagePath = imagePath.substring(7); // Remove 'public\'
+            } else if (imagePath.startsWith('\\public\\')) {
+              imagePath = imagePath.substring(8); // Remove '\public\'
+            }
+
+            // Convert backslashes to forward slashes
+            imagePath = imagePath.replace(/\\/g, '/');
+
+            return {
+              ...image,
+              url: `/${imagePath}`
+            };
+          });
+        }
+
+        resolve({
+          status: 200,
+          success: true,
+          message: 'Equipment details retrieved successfully',
+          data: result
+        });
+      } catch (error) {
+        console.error('Error retrieving equipment details:', error);
+        reject({
+          status: 500,
+          success: false,
+          message: 'Failed to retrieve equipment details',
+          error: error.message
+        });
+      }
+    });
+  },
+
+  getBulkEquipmentImages: (regNos) => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Fetch all equipment images in one query using $in operator
+        const equipmentHandovers = await EquipmentImageModel.find({
+          equipmentNo: { $in: regNos }
+        }).lean();
+
+        // Create a map of regNo -> images
+        const imagesMap = {};
+
+        // Initialize all regNos with empty arrays
+        regNos.forEach(regNo => {
+          imagesMap[regNo] = {
+            success: false,
+            images: []
+          };
+        });
+
+        // Process found equipment
+        equipmentHandovers.forEach(equipment => {
+          let images = [];
+
+          if (equipment.images && equipment.images.length > 0) {
+            images = equipment.images.map(image => {
+              let imagePath = image.path;
+
+              // Remove 'public' from the beginning of the path
+              if (imagePath.startsWith('public/')) {
+                imagePath = imagePath.substring(7);
+              } else if (imagePath.startsWith('/public/')) {
+                imagePath = imagePath.substring(8);
+              } else if (imagePath.startsWith('public\\')) {
+                imagePath = imagePath.substring(7);
+              } else if (imagePath.startsWith('\\public\\')) {
+                imagePath = imagePath.substring(8);
+              }
+
+              // Convert backslashes to forward slashes
+              imagePath = imagePath.replace(/\\/g, '/');
+
+              return {
+                ...image,
+                path: image.path,
+                url: `/${imagePath}`
+              };
+            });
+          }
+
+          imagesMap[equipment.equipmentNo] = {
+            success: true,
+            images: images
+          };
+        });
+
+        resolve({
+          status: 200,
+          success: true,
+          message: 'Bulk equipment images retrieved successfully',
+          data: imagesMap,
+          totalRequested: regNos.length,
+          totalFound: equipmentHandovers.length
+        });
+      } catch (error) {
+        console.error('Error retrieving bulk equipment images:', error);
+        reject({
+          status: 500,
+          success: false,
+          message: 'Failed to retrieve bulk equipment images',
+          error: error.message
+        });
+      }
+    });
+  },
 }

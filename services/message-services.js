@@ -4,6 +4,8 @@ const Chat = require('../models/chats.model');
 const chatService = require('./chat-services');
 const { putObject, getObjectUrl } = require('../s3bucket/s3.bucket');
 const mongoose = require('mongoose');
+const { createNotification } = require('../utils/notification-jobs');
+const User = require('../models/user.model');
 
 // ########### MESSAGE MANAGEMENT ###########
 
@@ -20,9 +22,6 @@ const getMessages = async (chatId, page = 1, limit = 50, userId) => {
       .skip(skip)
       .limit(parseInt(limit))
       .lean();
-
-    console.log("Chattttttttttttttttttttttttttssssssssssssssss", messages);
-
 
     // Generate signed URLs for file messages
     const messagesWithUrls = await Promise.all(
@@ -59,6 +58,7 @@ const sendMessage = async (messageData) => {
       senderAvatar,
       messageType,
       content,
+      recieverId,
       fileName,
       fileSize,
       duration,
@@ -95,6 +95,30 @@ const sendMessage = async (messageData) => {
 
     // Increment unread count for other participants
     await chatService.incrementUnreadCount(chatId, senderId);
+
+    const user = await User.findById(recieverId);
+
+    if (user) {
+      const PushNotificationService = require('../utils/push-notification-jobs');
+
+      const notification = await createNotification({
+        title: senderName,
+        description: messageType === 'text' ? content : `${messageType} message`,
+        priority: "high",
+        sourceId: 'chat',
+        recipient: user.uniqueCode,
+        time: new Date(),
+      });
+
+      await PushNotificationService.sendGeneralNotification(
+        user.uniqueCode,
+        senderName,
+        messageType === 'text' ? content : `${messageType} message`,
+        'high',
+        'normal',
+        notification.data._id.toString()
+      );
+    }
 
     return message;
   } catch (error) {
@@ -202,19 +226,28 @@ const deleteMessage = async (messageId, userId, deleteForEveryone = false) => {
 // ########### FILE UPLOAD ###########
 
 // Upload file to S3
-const uploadFile = async (file, fileType) => {
+const uploadFile = async (userEmail, fileType, mimeType) => {
   try {
     const timestamp = Date.now();
-    const fileName = `${timestamp}-${file.originalname}`;
-    const key = `chat/${fileType}/${fileName}`;
+    const sanitizedFileName = `${timestamp}-${userEmail}`;
+    const key = `chat/${fileType}/${sanitizedFileName}`;
+
+    console.log("");
+
 
     // Get presigned URL for upload
-    const uploadUrl = await putObject(fileName, key, file.mimetype);
+    const uploadUrl = await putObject(sanitizedFileName, key, mimeType);
 
-    // Return the S3 key (store this in DB, not the signed URL)
-    return key;
+    console.log("uploadUrl", uploadUrl);
+
+
+    // Return both uploadUrl and key
+    return {
+      uploadUrl,
+      fileKey: key
+    };
   } catch (error) {
-    console.error('Error uploading file to S3:', error);
+    console.error('Error generating upload URL:', error);
     throw error;
   }
 };
@@ -282,9 +315,9 @@ const getCallHistory = async (userId, page = 1, limit = 20) => {
 // Save call record
 const saveCallRecord = async (callData) => {
   try {
-    const { chatId, callerId, receiverId, duration, callType, status } = callData;
+    const { chatId, callerId, receiverId, duration, callType, status, senderType, messageType } = callData;
 
-    // Get caller name
+    // Get caller name 
     const chat = await Chat.findById(chatId);
     const caller = chat.participants.find(p => p.userId.toString() === callerId.toString());
 
@@ -295,6 +328,8 @@ const saveCallRecord = async (callData) => {
       senderName: caller?.name || 'Unknown',
       messageType: 'call',
       content: `${callType} call - ${status}`,
+      senderType: senderType,
+      messageType: messageType,
       callData: {
         receiverId,
         duration,
@@ -314,6 +349,22 @@ const saveCallRecord = async (callData) => {
 };
 
 // ########### MESSAGE STATISTICS ###########
+
+// Get unread messages for a user
+const getUnreadMessagesForUser = async (chatId, userId) => {
+  try {
+    const messages = await Message.find({
+      chatId,
+      senderId: { $ne: userId }, // Not sent by this user
+      'readBy.userId': { $ne: userId } // Not already read by this user
+    }).lean();
+
+    return messages;
+  } catch (error) {
+    console.error('Error getting unread messages:', error);
+    throw error;
+  }
+};
 
 // Get unread message count for user
 const getUnreadCount = async (userId) => {
@@ -371,5 +422,6 @@ module.exports = {
   saveCallRecord,
   // Statistics
   getUnreadCount,
+  getUnreadMessagesForUser,
   searchMessages
 };

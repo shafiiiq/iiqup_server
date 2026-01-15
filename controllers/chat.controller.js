@@ -2,13 +2,16 @@
 const chatService = require('../services/chat-services');
 const messageService = require('../services/message-services');
 const websocket = require('../utils/websocket');
+const { createNotification } = require('../utils/notification-jobs');
+const PushNotificationService = require('../utils/push-notification-jobs');
+const User = require('../models/user.model');
 
 // ########### CHAT ###########
 
 // Get all chats for a user (with team filter)
 const getUserChats = async (req, res) => {
   try {
-    
+
     const userId = req.user.id; // From auth middleware
     const { teamType, userType } = req.query; // Optional filter
     console.log("userId", userId);
@@ -257,6 +260,9 @@ const sendTextMessage = async (req, res) => {
     const { userId, userType, uniqueCode } = req.user;
     const { chatId, content } = req.body;
 
+    console.log("req.user", req.user);
+
+
     if (!chatId || !content) {
       return res.status(400).json({
         success: false,
@@ -278,7 +284,30 @@ const sendTextMessage = async (req, res) => {
     const chat = await chatService.getChatById(chatId, userId);
 
     // Send via WebSocket to all participants
-    websocket.sendMessageToChat(chat.participants, message, uniqueCode);
+    websocket.default.sendMessageToChat(chat.participants, message, uniqueCode);
+
+    const user = User.findById(userId)
+
+    const notification = await createNotification({
+      title: `${senderName}`,
+      description: `${message}`,
+      priority: "high",
+      sourceId: 'chat',
+      recipient: JSON.parse(user.uniqueCode),
+      time: new Date(),
+    });
+
+    console.log("notification", notification);
+
+
+    await PushNotificationService.sendGeneralNotification(
+      user.uniqueCode,
+      `${senderName}`,
+      `${message}`,
+      'high',
+      'normal',
+      notification.data._id.toString()
+    );
 
     res.status(201).json({
       success: true,
@@ -298,25 +327,32 @@ const sendTextMessage = async (req, res) => {
 // Mark messages as read
 const markAsRead = async (req, res) => {
   try {
-    const { userId, uniqueCode } = req.user;
-    const { chatId, messageIds } = req.body;
+    const { chatId } = req.params;
+    const userId = req.user.id;
+    const { uniqueCode } = req.user;
 
-    if (!chatId || !messageIds || messageIds.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Chat ID and message IDs are required'
+    // Get all unread messages in this chat
+    const unreadMessages = await messageService.getUnreadMessagesForUser(chatId, userId);
+
+    if (unreadMessages.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'No unread messages'
       });
     }
 
+    const messageIds = unreadMessages.map(msg => msg._id);
+
+    // Mark messages as read
     await messageService.markMessagesAsRead(chatId, messageIds, userId);
 
-    // Get chat to notify senders
+    // Get chat to notify sender
     const chat = await chatService.getChatById(chatId, userId);
 
-    // Notify other participants
+    // Notify other participants via WebSocket
     chat.participants.forEach(participant => {
       if (participant.uniqueCode !== uniqueCode) {
-        websocket.updateMessageStatus(participant.uniqueCode, messageIds, 'read');
+        websocket.default.updateMessageStatus(participant.uniqueCode, messageIds, 'read', chatId);
       }
     });
 
@@ -362,9 +398,10 @@ const deleteMessage = async (req, res) => {
 // Upload voice message
 const uploadVoiceMessage = async (req, res) => {
   try {
-    const { userId, userType, uniqueCode } = req.user;
-    const { chatId } = req.body;
-    const file = req.file; // Multer file
+    const { id } = req.user;
+    const { chatId, file } = req.body;
+
+    const userData = await User.findById(id)
 
     if (!chatId || !file) {
       return res.status(400).json({
@@ -373,29 +410,15 @@ const uploadVoiceMessage = async (req, res) => {
       });
     }
 
-    // Upload to cloud storage (S3, Cloudinary, etc.)
-    const fileUrl = await messageService.uploadFile(file, 'voice');
-
-    // Create message
-    const message = await messageService.sendMessage({
-      chatId,
-      senderId: userId,
-      senderType: userType,
-      senderName: req.user.name,
-      senderAvatar: req.user.avatar,
-      messageType: 'voice',
-      content: fileUrl,
-      duration: req.body.duration // Voice duration in seconds
-    });
-
-    // Send via WebSocket
-    const chat = await chatService.getChatById(chatId, userId);
-    websocket.sendMessageToChat(chat.participants, message, uniqueCode);
+    // Get S3 upload URL and key
+    const { uploadUrl, fileKey } = await messageService.uploadFile(userData.email, 'voice', file.mimetype);
 
     res.status(201).json({
       success: true,
       message: 'Voice message sent successfully',
-      data: message
+      uploadUrl,
+      fileKey,
+      messageType: 'Voice Record'
     });
   } catch (error) {
     console.error('Error uploading voice message:', error);
@@ -410,9 +433,12 @@ const uploadVoiceMessage = async (req, res) => {
 // Upload image
 const uploadImage = async (req, res) => {
   try {
-    const { userId, userType, uniqueCode } = req.user;
-    const { chatId } = req.body;
-    const file = req.file;
+    const { id } = req.user
+    const { chatId, file } = req.body;
+
+    const userData = await User.findById(id)
+
+    console.log("fileeeeeee", file)
 
     if (!chatId || !file) {
       return res.status(400).json({
@@ -420,28 +446,15 @@ const uploadImage = async (req, res) => {
         message: 'Chat ID and image file are required'
       });
     }
-
-    const fileUrl = await messageService.uploadFile(file, 'image');
-
-    const message = await messageService.sendMessage({
-      chatId,
-      senderId: userId,
-      senderType: userType,
-      senderName: req.user.name,
-      senderAvatar: req.user.avatar,
-      messageType: 'image',
-      content: fileUrl,
-      fileName: file.originalname,
-      fileSize: file.size
-    });
-
-    const chat = await chatService.getChatById(chatId, userId);
-    websocket.sendMessageToChat(chat.participants, message, uniqueCode);
+    // Get S3 upload URL and key
+    const { uploadUrl, fileKey } = await messageService.uploadFile(userData.email, 'image', file.mimetype);
 
     res.status(201).json({
       success: true,
       message: 'Image sent successfully',
-      data: message
+      uploadUrl,
+      fileKey,
+      messageType: 'Image'
     });
   } catch (error) {
     console.error('Error uploading image:', error);
@@ -456,9 +469,10 @@ const uploadImage = async (req, res) => {
 // Upload video
 const uploadVideo = async (req, res) => {
   try {
-    const { userId, userType, uniqueCode } = req.user;
-    const { chatId } = req.body;
-    const file = req.file;
+    const { id } = req.user
+    const { chatId, file } = req.body;
+
+    const userData = await User.findById(id)
 
     if (!chatId || !file) {
       return res.status(400).json({
@@ -467,30 +481,16 @@ const uploadVideo = async (req, res) => {
       });
     }
 
-    const fileUrl = await messageService.uploadFile(file, 'video');
-    const thumbnailUrl = await messageService.generateThumbnail(fileUrl);
-
-    const message = await messageService.sendMessage({
-      chatId,
-      senderId: userId,
-      senderType: userType,
-      senderName: req.user.name,
-      senderAvatar: req.user.avatar,
-      messageType: 'video',
-      content: fileUrl,
-      fileName: file.originalname,
-      fileSize: file.size,
-      duration: req.body.duration,
-      thumbnail: thumbnailUrl
-    });
-
-    const chat = await chatService.getChatById(chatId, userId);
-    websocket.sendMessageToChat(chat.participants, message, uniqueCode);
+    // Get S3 upload URL and key
+    const { uploadUrl, fileKey } = await messageService.uploadFile(userData.email, 'video', file.mimetype);
+    const thumbnailUrl = await messageService.generateThumbnail(fileKey);
 
     res.status(201).json({
       success: true,
       message: 'Video sent successfully',
-      data: message
+      uploadUrl,
+      fileKey,
+      messageType: 'Video'
     });
   } catch (error) {
     console.error('Error uploading video:', error);
@@ -505,10 +505,12 @@ const uploadVideo = async (req, res) => {
 // Upload document
 const uploadDocument = async (req, res) => {
   try {
-    const { userId, userType, uniqueCode } = req.user;
-    const { chatId } = req.body;
-    const file = req.file;
+    const { id } = req.user
+    const { chatId, file } = req.body;
 
+    const userData = await User.findById(id)
+
+    console.log("fileeeeeee", file)
     if (!chatId || !file) {
       return res.status(400).json({
         success: false,
@@ -516,27 +518,15 @@ const uploadDocument = async (req, res) => {
       });
     }
 
-    const fileUrl = await messageService.uploadFile(file, 'document');
-
-    const message = await messageService.sendMessage({
-      chatId,
-      senderId: userId,
-      senderType: userType,
-      senderName: req.user.name,
-      senderAvatar: req.user.avatar,
-      messageType: 'document',
-      content: fileUrl,
-      fileName: file.originalname,
-      fileSize: file.size
-    });
-
-    const chat = await chatService.getChatById(chatId, userId);
-    websocket.sendMessageToChat(chat.participants, message, uniqueCode);
+    // Get S3 upload URL and key
+    const { uploadUrl, fileKey } = await messageService.uploadFile(userData.email, 'document', file.mimetype);
 
     res.status(201).json({
       success: true,
       message: 'Document sent successfully',
-      data: message
+      uploadUrl,
+      fileKey,
+      messageType: 'Document'
     });
   } catch (error) {
     console.error('Error uploading document:', error);

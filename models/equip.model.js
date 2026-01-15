@@ -72,6 +72,25 @@ const equipmentSchema = new mongoose.Schema({
 });
 
 
+equipmentSchema.index({ machine: 1 });
+equipmentSchema.index({ regNo: 1 });
+equipmentSchema.index({ brand: 1 });
+equipmentSchema.index({ year: -1 });
+equipmentSchema.index({ status: 1 });
+equipmentSchema.index({ site: 1 });
+equipmentSchema.index({ outside: 1 });
+
+// Compound index for common queries
+equipmentSchema.index({ outside: 1, year: -1, createdAt: -1 });
+
+// Text index for full-text search (optional, for even better search)
+equipmentSchema.index({
+  machine: 'text',
+  regNo: 'text',
+  brand: 'text',
+  company: 'text'
+});
+
 // Create the model
 module.exports = mongoose.model('Equipments', equipmentSchema);
 

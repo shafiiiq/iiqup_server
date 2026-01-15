@@ -29,13 +29,13 @@ router.get('/chats/:chatId/messages', chatController.getMessages);
 router.post('/messages/text', chatController.sendTextMessage);
 
 // message mark as read
-router.put('/messages/read', chatController.markAsRead);
+router.post('/chats/:chatId/read', chatController.markAsRead);
 
 // delete message
 router.delete('/messages/:messageId', chatController.deleteMessage);
 
 // Upload voice message
-router.post('/upload/voice', chatController.uploadVoiceMessage);
+router.post('/upload/audio', chatController.uploadVoiceMessage);
 
 // Upload image
 router.post('/upload/image', chatController.uploadImage);
@@ -45,6 +45,7 @@ router.post('/upload/video', chatController.uploadVideo);
 
 // Upload document
 router.post('/upload/document', chatController.uploadDocument);
+
 
 // ########### CALL ###########
 // Get call history

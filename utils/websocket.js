@@ -89,10 +89,10 @@ const setupWebSocket = (io) => {
     // Send message
     socket.on('send_message', async (data) => {
       try {
-        console.log('💬 Message received:', data);
+        console.log('💬 Message received for :', data);
         const { chatId, senderId, senderType, senderName, senderAvatar, content, messageType, participants } = data;
 
-        // Save message to DB
+        // Save message to DB 
         const message = await messageService.sendMessage({
           chatId,
           senderId,
@@ -100,7 +100,8 @@ const setupWebSocket = (io) => {
           senderName,
           senderAvatar,
           messageType: messageType || 'text',
-          content
+          content,
+          recieverId: data.participants[0].userId
         });
 
         console.log('✅ Message saved to DB:', message._id);
@@ -203,11 +204,11 @@ const setupWebSocket = (io) => {
         // Update message status in DB
         await messageService.markMessagesAsRead(chatId, messageIds, userId);
 
-        // Emit to sender
+        // Emit to sender - ADD chatId here
         if (senderUniqueCode) {
           global.io.to(`user_${senderUniqueCode}`).emit('message_status_update', {
             messageIds,
-            chatId,
+            chatId,  // ← This line is already there but make sure it's being sent
             status: 'read',
             userId
           });
@@ -295,7 +296,9 @@ const setupWebSocket = (io) => {
             receiverId,
             duration,
             callType: data.callType || 'voice',
-            status: 'completed'
+            status: 'ended',
+            senderType: 'office',
+            messageType: 'voice call'
           });
         }
 
@@ -456,11 +459,12 @@ const sendTypingIndicator = (chatId, participants, typingUser, excludeUniqueCode
 };
 
 // Update message status
-const updateMessageStatus = (senderUniqueCode, messageIds, status) => {
-  console.log(`✓ Updating message status to: ${status}`);
+const updateMessageStatus = (senderUniqueCode, messageIds, status, chatId) => {
+  console.log(`✓ Updating message status to: ${status} for chat: ${chatId}`);
   if (global.io) {
     global.io.to(`user_${senderUniqueCode}`).emit('message_status_update', {
       messageIds: Array.isArray(messageIds) ? messageIds : [messageIds],
+      chatId,
       status
     });
   }
