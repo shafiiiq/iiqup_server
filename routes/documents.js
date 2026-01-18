@@ -6,8 +6,9 @@ const router = express.Router();
 router.post('/upload-document', authMiddleware, documentController.uploadDocument);
 router.get('/get-documents/:regNo', authMiddleware, documentController.getDocuments);
 router.get('/get-all-documents', authMiddleware, documentController.getAllDocuments);
-
-// Add these new endpoints
+router.get('/get-all-documents-types', authMiddleware, documentController.getAllDocumentsTypes);
+router.post('/merge-pdfs', authMiddleware, documentController.mergePDFs);
+router.post('/split-pdf', authMiddleware, documentController.splitPDF);
 router.get('/download/:documentId', authMiddleware, documentController.downloadDocument);
 router.get('/view/:documentId', documentController.viewDocument);
 

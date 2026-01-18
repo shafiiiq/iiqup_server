@@ -1864,6 +1864,15 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
       }
     };
 
+    if (notificationData.type === 'call') {
+      message.data.callAction = 'incoming';
+      message.data.callerId = String(notificationData.callerId || '');
+      message.data.callerName = String(notificationData.callerName || '');
+      message.android.priority = 'max'; // Maximum priority for calls
+      message.apns.headers['apns-priority'] = '10';
+      message.apns.payload.aps['content-available'] = 1; // Wake iOS
+    }
+
     const results = await Promise.allSettled(
       activeTokens.map((token, index) => {
         return admin.messaging().send({ ...message, token });
@@ -2509,7 +2518,7 @@ const convertToAMPM = (isoString) => {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true
-  }); 
+  });
 };
 
 // Get all sessions for a user
@@ -2851,7 +2860,7 @@ const biometricLogin = async (biometricToken, deviceInfo) => {
         email: user.email,
         uniqueCode: user.uniqueCode
       },
-      process.env.JWT_SECRET, 
+      process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
 

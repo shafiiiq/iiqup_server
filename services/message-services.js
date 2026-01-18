@@ -101,22 +101,12 @@ const sendMessage = async (messageData) => {
     if (user) {
       const PushNotificationService = require('../utils/push-notification-jobs');
 
-      const notification = await createNotification({
-        title: senderName,
-        description: messageType === 'text' ? content : `${messageType} message`,
-        priority: "high",
-        sourceId: 'chat',
-        recipient: user.uniqueCode,
-        time: new Date(),
-      });
-
       await PushNotificationService.sendGeneralNotification(
         user.uniqueCode,
         senderName,
         messageType === 'text' ? content : `${messageType} message`,
         'high',
         'normal',
-        notification.data._id.toString()
       );
     }
 

@@ -1,4 +1,3 @@
-const { promises } = require('fs');
 const serviceHistoryModel = require('../models/service-history.model.js');
 const serviceReportModel = require('../models/service-report.model.js');
 const maintananceHistoryModel = require('../models/maintanance-history.model.js');
@@ -6,307 +5,250 @@ const tyreModel = require('../models/tyre.model.js');
 const batteryModel = require('../models/batery.model.js');
 const stocksModel = require('../models/stocks.model.js');
 const equipmnentModel = require('../models/equip.model.js');
-const toolkitModel = require('../models/toolkit.model.js'); 
+const toolkitModel = require('../models/toolkit.model.js');
 const complaintModel = require('../models/complaint.model.js');
+
+// Simple in-memory cache
+const cache = {
+  data: {},
+  set: (key, value, ttl = 300000) => { // 5 min default
+    cache.data[key] = {
+      value,
+      expires: Date.now() + ttl
+    };
+  },
+  get: (key) => {
+    const item = cache.data[key];
+    if (!item) return null;
+    if (Date.now() > item.expires) {
+      delete cache.data[key];
+      return null;
+    }
+    return item.value;
+  },
+  clear: () => {
+    cache.data = {};
+  }
+};
 
 // Define all models with their source names
 const models = [
-    { model: serviceHistoryModel, source: 'serviceHistoryModel', content: 'service-history' },
-    { model: serviceReportModel, source: 'serviceReportModel', content: 'service-report' },
-    { model: maintananceHistoryModel, source: 'maintananceHistoryModel', content: 'maintanance-history' },
-    { model: tyreModel, source: 'tyreModel', content: 'tyre-history' },
-    { model: batteryModel, source: 'batteryModel', content: 'battery-history' },
-    { model: equipmnentModel, source: 'equipmnentModel', content: 'equipment' },
-    { model: stocksModel, source: 'stocksModel', content: 'stocks' },
-    { model: toolkitModel, source: 'toolkitModel', content: 'toolkit' },
-    { model: complaintModel, source: 'complaintModel', content: 'complaints' }
+  { model: serviceHistoryModel, source: 'serviceHistoryModel', content: 'service-history' },
+  { model: serviceReportModel, source: 'serviceReportModel', content: 'service-report' },
+  { model: maintananceHistoryModel, source: 'maintananceHistoryModel', content: 'maintanance-history' },
+  { model: tyreModel, source: 'tyreModel', content: 'tyre-history' },
+  { model: batteryModel, source: 'batteryModel', content: 'battery-history' },
+  { model: equipmnentModel, source: 'equipmnentModel', content: 'equipment' },
+  { model: stocksModel, source: 'stocksModel', content: 'stocks' },
+  { model: toolkitModel, source: 'toolkitModel', content: 'toolkit' },
+  { model: complaintModel, source: 'complaintModel', content: 'complaints' }
 ];
 
 /**
- * Helper function to add source information to documents
+ * Helper: Get counts only (FAST!)
  */
-const addSourceInfo = (docs, source, content) => {
-    return docs.map(doc => ({
-        ...doc,
-        source,
-        content
-    }));
+const getCountsForPeriod = async (startDate, endDate = null) => {
+  const query = endDate
+    ? {
+      $or: [
+        { createdAt: { $gte: startDate, $lte: endDate } },
+        { updatedAt: { $gte: startDate, $lte: endDate } }
+      ]
+    }
+    : {
+      $or: [
+        { createdAt: { $gte: startDate } },
+        { updatedAt: { $gte: startDate } }
+      ]
+    };
+
+  const counts = await Promise.all(
+    models.map(async ({ model, content }) => ({
+      [content]: await model.countDocuments(query)
+    }))
+  );
+
+  const result = {};
+  counts.forEach(item => Object.assign(result, item));
+  return result;
 };
 
 /**
- * Helper function to get model-specific counts
+ * Helper: Get limited data (for tables/charts)
  */
-const getModelCounts = (updates) => {
-    const counts = {};
-    for (const { source } of models) {
-        counts[source] = updates.filter(item => item.source === source).length;
-    }
-    return counts;
+const getLimitedDataForPeriod = async (startDate, limit = 50) => {
+  const updatesByCollection = {};
+
+  await Promise.all(
+    models.map(async ({ model, content }) => {
+      const docs = await model
+        .find({
+          $or: [
+            { createdAt: { $gte: startDate } },
+            { updatedAt: { $gte: startDate } }
+          ]
+        })
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .lean();
+
+      updatesByCollection[content] = docs.map(doc => ({
+        ...doc,
+        source: model.modelName,
+        content
+      }));
+    })
+  );
+
+  return updatesByCollection;
 };
 
 module.exports = {
-    /**
-     * Fetch today's updates from all models
-     */
-    fetchDailyUpdates: (data) => {
-        return new Promise(async (resolve, reject) => {
-            try {
-                // Get current date and time
-                const now = new Date();
-                const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  /**
+   * OPTIMIZED: Fetch daily counts only
+   */
+  fetchDailyCounts: () => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const cacheKey = 'daily-counts';
+        const cached = cache.get(cacheKey);
+        if (cached) return resolve(cached);
 
-                // Initialize result with separated arrays for each collection
-                const updatesByCollection = {};
-                // Also maintain a combined array for backward compatibility
-                const allUpdates = [];
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-                // Process each model
-                for (const { model, source, content } of models) {
-                    const todayUpdates = await model.find({
-                        $or: [
-                            { createdAt: { $gte: todayStart } },
-                            { updatedAt: { $gte: todayStart } }
-                        ]
-                    }).lean();
+        const counts = await getCountsForPeriod(todayStart);
+        const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
 
-                    // Add source and content info
-                    const updatesWithInfo = addSourceInfo(todayUpdates, source, content);
+        const result = {
+          status: 200,
+          data: { counts, total }
+        };
 
-                    // Add to the collection-specific array
-                    updatesByCollection[content] = updatesWithInfo;
+        cache.set(cacheKey, result, 60000); // Cache 1 min
+        resolve(result);
+      } catch (err) {
+        console.error('Error fetching daily counts:', err);
+        reject({ status: 500, message: err.message });
+      }
+    });
+  },
 
-                    // Also add to the combined array
-                    allUpdates.push(...updatesWithInfo);
-                }
+  /**
+   * OPTIMIZED: Fetch weekly counts only
+   */
+  fetchWeeklyCounts: () => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const cacheKey = 'weekly-counts';
+        const cached = cache.get(cacheKey);
+        if (cached) return resolve(cached);
 
-                // Create result object
-                const result = {
-                    status: 200,
-                    data: {
-                        // Organized by collection type
-                        serviceHistory: updatesByCollection['service-history'] || [],
-                        serviceReports: updatesByCollection['service-report'] || [],
-                        maintenanceHistory: updatesByCollection['maintanance-history'] || [],
-                        tyreHistory: updatesByCollection['tyre-history'] || [],
-                        batteryHistory: updatesByCollection['battery-history'] || [],
-                        equipment: updatesByCollection['equipment'] || [],
-                        stocks: updatesByCollection['stocks'] || [],
-                        toolkit: updatesByCollection['toolkit'] || [],
-                        complaints: updatesByCollection['complaints'] || [],
-                        // Combined data (for backward compatibility)
-                        updates: allUpdates,
-                        total: allUpdates.length,
-                        modelCounts: getModelCounts(allUpdates)
-                    }
-                };
+        const now = new Date();
+        const oneWeekAgo = new Date(now);
+        oneWeekAgo.setDate(now.getDate() - 7);
 
-                resolve(result);
-            } catch (err) {
-                console.error('Error fetching daily updates:', err);
-                reject({ status: 500, message: err.message || 'Failed to fetch daily updates' });
-            }
-        });
-    },
+        const counts = await getCountsForPeriod(oneWeekAgo);
+        const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
 
-    /**
-     * Fetch weekly updates from all models
-     */
-    fetchWeeklyUpdates: (data) => {
-        return new Promise(async (resolve, reject) => {
-            try {
-                // Get current date and time
-                const now = new Date();
-                const oneWeekAgo = new Date(now);
-                oneWeekAgo.setDate(now.getDate() - 7);
+        const result = {
+          status: 200,
+          data: { counts, total }
+        };
 
-                // Initialize result with separated arrays for each collection
-                const updatesByCollection = {};
-                // Also maintain a combined array for backward compatibility
-                const allUpdates = [];
+        cache.set(cacheKey, result, 120000); // Cache 2 min
+        resolve(result);
+      } catch (err) {
+        console.error('Error fetching weekly counts:', err);
+        reject({ status: 500, message: err.message });
+      }
+    });
+  },
 
-                // Process each model
-                for (const { model, source, content } of models) {
-                    const weeklyUpdates = await model.find({
-                        $or: [
-                            { createdAt: { $gte: oneWeekAgo } },
-                            { updatedAt: { $gte: oneWeekAgo } }
-                        ]
-                    }).lean();
+  /**
+   * OPTIMIZED: Fetch monthly counts only
+   */
+  fetchMonthlyCounts: () => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const cacheKey = 'monthly-counts';
+        const cached = cache.get(cacheKey);
+        if (cached) return resolve(cached);
 
-                    // Add source and content info
-                    const updatesWithInfo = addSourceInfo(weeklyUpdates, source, content);
+        const now = new Date();
+        const oneMonthAgo = new Date(now);
+        oneMonthAgo.setMonth(now.getMonth() - 1);
 
-                    // Add to the collection-specific array
-                    updatesByCollection[content] = updatesWithInfo;
+        const counts = await getCountsForPeriod(oneMonthAgo);
+        const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
 
-                    // Also add to the combined array
-                    allUpdates.push(...updatesWithInfo);
-                }
+        const result = {
+          status: 200,
+          data: { counts, total }
+        };
 
-                // Create result object
-                const result = {
-                    status: 200,
-                    data: {
-                        // Organized by collection type
-                        serviceHistory: updatesByCollection['service-history'] || [],
-                        serviceReports: updatesByCollection['service-report'] || [],
-                        maintenanceHistory: updatesByCollection['maintanance-history'] || [],
-                        tyreHistory: updatesByCollection['tyre-history'] || [],
-                        batteryHistory: updatesByCollection['battery-history'] || [],
-                        equipment: updatesByCollection['equipment'] || [],
-                        stocks: updatesByCollection['stocks'] || [],
-                        toolkit: updatesByCollection['toolkit'] || [],
-                        complaints: updatesByCollection['complaints'] || [],
-                        // Combined data (for backward compatibility)
-                        updates: allUpdates,
-                        total: allUpdates.length,
-                        modelCounts: getModelCounts(allUpdates)
-                    }
-                };
+        cache.set(cacheKey, result, 300000); // Cache 5 min
+        resolve(result);
+      } catch (err) {
+        console.error('Error fetching monthly counts:', err);
+        reject({ status: 500, message: err.message });
+      }
+    });
+  },
 
-                resolve(result);
-            } catch (err) {
-                console.error('Error fetching weekly updates:', err);
-                reject({ status: 500, message: err.message || 'Failed to fetch weekly updates' });
-            }
-        });
-    },
+  /**
+   * OPTIMIZED: Fetch yearly counts only
+   */
+  fetchYearlyCounts: () => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const cacheKey = 'yearly-counts';
+        const cached = cache.get(cacheKey);
+        if (cached) return resolve(cached);
 
-    /**
-     * Fetch monthly updates from all models
-     */
-    fetchMonthlyUpdates: (data) => {
-        return new Promise(async (resolve, reject) => {
-            try {
-                // Get current date and time
-                const now = new Date();
-                const oneMonthAgo = new Date(now);
-                oneMonthAgo.setMonth(now.getMonth() - 1);
+        const now = new Date();
+        const oneYearAgo = new Date(now);
+        oneYearAgo.setFullYear(now.getFullYear() - 1);
 
-                // Initialize result with separated arrays for each collection
-                const updatesByCollection = {};
-                // Also maintain a combined array for backward compatibility
-                const allUpdates = [];
+        const counts = await getCountsForPeriod(oneYearAgo);
+        const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
 
-                // Process each model
-                for (const { model, source, content } of models) {
-                    const monthlyUpdates = await model.find({
-                        $or: [
-                            { createdAt: { $gte: oneMonthAgo } },
-                            { updatedAt: { $gte: oneMonthAgo } }
-                        ]
-                    }).lean();
+        const result = {
+          status: 200,
+          data: { counts, total }
+        };
 
-                    // Add source and content info
-                    const updatesWithInfo = addSourceInfo(monthlyUpdates, source, content);
+        cache.set(cacheKey, result, 600000); // Cache 10 min
+        resolve(result);
+      } catch (err) {
+        console.error('Error fetching yearly counts:', err);
+        reject({ status: 500, message: err.message });
+      }
+    });
+  },
 
-                    // Add to the collection-specific array
-                    updatesByCollection[content] = updatesWithInfo;
+  /**
+   * OPTIMIZED: Fetch daily updates with limited data
+   */
+  fetchDailyUpdates: () => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const cacheKey = 'daily-updates';
+        const cached = cache.get(cacheKey);
+        if (cached) return resolve(cached);
 
-                    // Also add to the combined array
-                    allUpdates.push(...updatesWithInfo);
-                }
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-                // Create result object
-                const result = {
-                    status: 200,
-                    data: {
-                        // Organized by collection type
-                        serviceHistory: updatesByCollection['service-history'] || [],
-                        serviceReports: updatesByCollection['service-report'] || [],
-                        maintenanceHistory: updatesByCollection['maintanance-history'] || [],
-                        tyreHistory: updatesByCollection['tyre-history'] || [],
-                        batteryHistory: updatesByCollection['battery-history'] || [],
-                        equipment: updatesByCollection['equipment'] || [],
-                        stocks: updatesByCollection['stocks'] || [],
-                        toolkit: updatesByCollection['toolkit'] || [],
-                        complaints: updatesByCollection['complaints'] || [],
-                        // Combined data (for backward compatibility)
-                        updates: allUpdates,
-                        total: allUpdates.length,
-                        modelCounts: getModelCounts(allUpdates)
-                    }
-                };
+        // Get counts (fast)
+        const counts = await getCountsForPeriod(todayStart);
 
-                resolve(result);
-            } catch (err) {
-                console.error('Error fetching monthly updates:', err);
-                reject({ status: 500, message: err.message || 'Failed to fetch monthly updates' });
-            }
-        });
-    },
+        // Get limited data for display (50 most recent per collection)
+        const updatesByCollection = await getLimitedDataForPeriod(todayStart, 50);
 
-    /**
-     * Fetch yearly updates from all models
-     */
-    fetchYearlyUpdates: (data) => {
-        return new Promise(async (resolve, reject) => {
-            try {
-                // Get current date and time
-                const now = new Date();
-                const oneYearAgo = new Date(now);
-                oneYearAgo.setFullYear(now.getFullYear() - 1);
-
-
-                // Initialize result with separated arrays for each collection
-                const updatesByCollection = {};
-                // Also maintain a combined array for backward compatibility
-                const allUpdates = [];
-
-                // Process each model
-                for (const { model, source, content } of models) {
-                    const yearlyUpdates = await model.find({
-                        $or: [
-                            { createdAt: { $gte: oneYearAgo } },
-                            { updatedAt: { $gte: oneYearAgo } }
-                        ]
-                    }).lean();
-
-                    // Add source and content info
-                    const updatesWithInfo = addSourceInfo(yearlyUpdates, source, content);
-
-                    // Add to the collection-specific array
-                    updatesByCollection[content] = updatesWithInfo;
-
-                    // Also add to the combined array
-                    allUpdates.push(...updatesWithInfo);
-                }
-
-                // Create result object
-                const result = {
-                    status: 200,
-                    data: {
-                        // Organized by collection type
-                        serviceHistory: updatesByCollection['service-history'] || [],
-                        serviceReports: updatesByCollection['service-report'] || [],
-                        maintenanceHistory: updatesByCollection['maintanance-history'] || [],
-                        tyreHistory: updatesByCollection['tyre-history'] || [],
-                        batteryHistory: updatesByCollection['battery-history'] || [],
-                        equipment: updatesByCollection['equipment'] || [],
-                        stocks: updatesByCollection['stocks'] || [],
-                        toolkit: updatesByCollection['toolkit'] || [],
-                        complaints: updatesByCollection['complaints'] || [],
-                        // Combined data (for backward compatibility)
-                        updates: allUpdates,
-                        total: allUpdates.length,
-                        modelCounts: getModelCounts(allUpdates)
-                    }
-                };
-
-                resolve(result);
-            } catch (err) {
-                console.error('Error fetching yearly updates:', err);
-                reject({ status: 500, message: err.message || 'Failed to fetch yearly updates' });
-            }
-        });
-    },
-
-    /**
-     * Helper function to format data by collection
-     */
-    _formatDataByCollection: (updatesByCollection) => {
-        return {
-            // Organized by collection type
+        const result = {
+          status: 200,
+          data: {
             serviceHistory: updatesByCollection['service-history'] || [],
             serviceReports: updatesByCollection['service-report'] || [],
             maintenanceHistory: updatesByCollection['maintanance-history'] || [],
@@ -316,194 +258,287 @@ module.exports = {
             stocks: updatesByCollection['stocks'] || [],
             toolkit: updatesByCollection['toolkit'] || [],
             complaints: updatesByCollection['complaints'] || [],
+            counts,
+            total: Object.values(counts).reduce((sum, count) => sum + count, 0)
+          }
         };
-    },
 
-    /**
-     * Fetch all updates (daily, weekly, monthly, yearly) at once
-     */
-    fetchAllUpdates: (data) => {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const [dailyResult, weeklyResult, monthlyResult, yearlyResult] = await Promise.all([
-                    module.exports.fetchDailyUpdates(data),
-                    module.exports.fetchWeeklyUpdates(data),
-                    module.exports.fetchMonthlyUpdates(data),
-                    module.exports.fetchYearlyUpdates(data)
-                ]);
+        cache.set(cacheKey, result, 60000); // Cache 1 min
+        resolve(result);
+      } catch (err) {
+        console.error('Error fetching daily updates:', err);
+        reject({ status: 500, message: err.message });
+      }
+    });
+  },
 
-                const result = {
-                    status: 200,
-                    data: {
-                        daily: dailyResult.data,
-                        weekly: weeklyResult.data,
-                        monthly: monthlyResult.data,
-                        yearly: yearlyResult.data
-                    }
-                };
+  /**
+   * OPTIMIZED: Fetch weekly updates with limited data
+   */
+  fetchWeeklyUpdates: () => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const cacheKey = 'weekly-updates';
+        const cached = cache.get(cacheKey);
+        if (cached) return resolve(cached);
 
-                resolve(result);
-            } catch (err) {
-                console.error('Error fetching all updates:', err);
-                reject({ status: 500, message: err.message || 'Failed to fetch all updates' });
-            }
-        });
-    },
+        const now = new Date();
+        const oneWeekAgo = new Date(now);
+        oneWeekAgo.setDate(now.getDate() - 7);
 
-    /**
- * Fetch last 5 days comparison
- */
-    fetchLast5DaysComparison: () => {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const now = new Date();
-                const comparisonData = [];
+        const counts = await getCountsForPeriod(oneWeekAgo);
+        const updatesByCollection = await getLimitedDataForPeriod(oneWeekAgo, 50);
 
-                // Loop through last 5 days
-                for (let i = 0; i < 5; i++) {
-                    const dayStart = new Date(now);
-                    dayStart.setDate(now.getDate() - i);
-                    dayStart.setHours(0, 0, 0, 0);
+        const result = {
+          status: 200,
+          data: {
+            serviceHistory: updatesByCollection['service-history'] || [],
+            serviceReports: updatesByCollection['service-report'] || [],
+            maintenanceHistory: updatesByCollection['maintanance-history'] || [],
+            tyreHistory: updatesByCollection['tyre-history'] || [],
+            batteryHistory: updatesByCollection['battery-history'] || [],
+            equipment: updatesByCollection['equipment'] || [],
+            stocks: updatesByCollection['stocks'] || [],
+            toolkit: updatesByCollection['toolkit'] || [],
+            complaints: updatesByCollection['complaints'] || [],
+            counts,
+            total: Object.values(counts).reduce((sum, count) => sum + count, 0)
+          }
+        };
 
-                    const dayEnd = new Date(dayStart);
-                    dayEnd.setHours(23, 59, 59, 999);
+        cache.set(cacheKey, result, 120000); // Cache 2 min
+        resolve(result);
+      } catch (err) {
+        console.error('Error fetching weekly updates:', err);
+        reject({ status: 500, message: err.message });
+      }
+    });
+  },
 
-                    const dayData = {
-                        date: dayStart.toISOString().split('T')[0],
-                        collections: {}
-                    };
+  /**
+   * OPTIMIZED: Fetch monthly updates with limited data
+   */
+  fetchMonthlyUpdates: () => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const cacheKey = 'monthly-updates';
+        const cached = cache.get(cacheKey);
+        if (cached) return resolve(cached);
 
-                    // Process each model
-                    for (const { model, source, content } of models) {
-                        const count = await model.countDocuments({
-                            $or: [
-                                { createdAt: { $gte: dayStart, $lte: dayEnd } },
-                                { updatedAt: { $gte: dayStart, $lte: dayEnd } }
-                            ]
-                        });
+        const now = new Date();
+        const oneMonthAgo = new Date(now);
+        oneMonthAgo.setMonth(now.getMonth() - 1);
 
-                        dayData.collections[content] = count;
-                    }
+        const counts = await getCountsForPeriod(oneMonthAgo);
+        const updatesByCollection = await getLimitedDataForPeriod(oneMonthAgo, 100);
 
-                    // Calculate total for the day
-                    dayData.total = Object.values(dayData.collections).reduce((sum, count) => sum + count, 0);
+        const result = {
+          status: 200,
+          data: {
+            serviceHistory: updatesByCollection['service-history'] || [],
+            serviceReports: updatesByCollection['service-report'] || [],
+            maintenanceHistory: updatesByCollection['maintanance-history'] || [],
+            tyreHistory: updatesByCollection['tyre-history'] || [],
+            batteryHistory: updatesByCollection['battery-history'] || [],
+            equipment: updatesByCollection['equipment'] || [],
+            stocks: updatesByCollection['stocks'] || [],
+            toolkit: updatesByCollection['toolkit'] || [],
+            complaints: updatesByCollection['complaints'] || [],
+            counts,
+            total: Object.values(counts).reduce((sum, count) => sum + count, 0)
+          }
+        };
 
-                    comparisonData.push(dayData);
-                }
+        cache.set(cacheKey, result, 300000); // Cache 5 min
+        resolve(result);
+      } catch (err) {
+        console.error('Error fetching monthly updates:', err);
+        reject({ status: 500, message: err.message });
+      }
+    });
+  },
 
-                resolve({
-                    status: 200,
-                    data: {
-                        period: 'last-5-days',
-                        comparison: comparisonData.reverse() // Oldest to newest
-                    }
-                });
-            } catch (err) {
-                console.error('Error fetching last 5 days comparison:', err);
-                reject({ status: 500, message: err.message || 'Failed to fetch last 5 days comparison' });
-            }
-        });
-    },
+  /**
+   * OPTIMIZED: Fetch yearly updates with limited data
+   */
+  fetchYearlyUpdates: () => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const cacheKey = 'yearly-updates';
+        const cached = cache.get(cacheKey);
+        if (cached) return resolve(cached);
 
-    /**
-     * Fetch last 5 months comparison
-     */
-    fetchLast5MonthsComparison: () => {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const now = new Date();
-                const comparisonData = [];
+        const now = new Date();
+        const oneYearAgo = new Date(now);
+        oneYearAgo.setFullYear(now.getFullYear() - 1);
 
-                // Loop through last 5 months
-                for (let i = 0; i < 5; i++) {
-                    const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                    const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
+        const counts = await getCountsForPeriod(oneYearAgo);
+        const updatesByCollection = await getLimitedDataForPeriod(oneYearAgo, 200);
 
-                    const monthData = {
-                        month: monthStart.toLocaleString('default', { month: 'long', year: 'numeric' }),
-                        collections: {}
-                    };
+        const result = {
+          status: 200,
+          data: {
+            serviceHistory: updatesByCollection['service-history'] || [],
+            serviceReports: updatesByCollection['service-report'] || [],
+            maintenanceHistory: updatesByCollection['maintanance-history'] || [],
+            tyreHistory: updatesByCollection['tyre-history'] || [],
+            batteryHistory: updatesByCollection['battery-history'] || [],
+            equipment: updatesByCollection['equipment'] || [],
+            stocks: updatesByCollection['stocks'] || [],
+            toolkit: updatesByCollection['toolkit'] || [],
+            complaints: updatesByCollection['complaints'] || [],
+            counts,
+            total: Object.values(counts).reduce((sum, count) => sum + count, 0)
+          }
+        };
 
-                    // Process each model
-                    for (const { model, source, content } of models) {
-                        const count = await model.countDocuments({
-                            $or: [
-                                { createdAt: { $gte: monthStart, $lte: monthEnd } },
-                                { updatedAt: { $gte: monthStart, $lte: monthEnd } }
-                            ]
-                        });
+        cache.set(cacheKey, result, 600000); // Cache 10 min
+        resolve(result);
+      } catch (err) {
+        console.error('Error fetching yearly updates:', err);
+        reject({ status: 500, message: err.message });
+      }
+    });
+  },
 
-                        monthData.collections[content] = count;
-                    }
+  /**
+   * Fetch last 5 days comparison (ALREADY OPTIMIZED - uses countDocuments)
+   */
+  fetchLast5DaysComparison: () => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const cacheKey = 'comparison-5-days';
+        const cached = cache.get(cacheKey);
+        if (cached) return resolve(cached);
 
-                    // Calculate total for the month
-                    monthData.total = Object.values(monthData.collections).reduce((sum, count) => sum + count, 0);
+        const now = new Date();
+        const comparisonData = [];
 
-                    comparisonData.push(monthData);
-                }
+        for (let i = 0; i < 5; i++) {
+          const dayStart = new Date(now);
+          dayStart.setDate(now.getDate() - i);
+          dayStart.setHours(0, 0, 0, 0);
 
-                resolve({
-                    status: 200,
-                    data: {
-                        period: 'last-5-months',
-                        comparison: comparisonData.reverse() // Oldest to newest
-                    }
-                });
-            } catch (err) {
-                console.error('Error fetching last 5 months comparison:', err);
-                reject({ status: 500, message: err.message || 'Failed to fetch last 5 months comparison' });
-            }
-        });
-    },
+          const dayEnd = new Date(dayStart);
+          dayEnd.setHours(23, 59, 59, 999);
 
-    /**
-     * Fetch last 5 years comparison
-     */
-    fetchLast5YearsComparison: () => {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const now = new Date();
-                const comparisonData = [];
+          const counts = await getCountsForPeriod(dayStart, dayEnd);
 
-                // Loop through last 5 years
-                for (let i = 0; i < 5; i++) {
-                    const yearStart = new Date(now.getFullYear() - i, 0, 1);
-                    const yearEnd = new Date(now.getFullYear() - i, 11, 31, 23, 59, 59, 999);
+          comparisonData.push({
+            date: dayStart.toISOString().split('T')[0],
+            collections: counts,
+            total: Object.values(counts).reduce((sum, count) => sum + count, 0)
+          });
+        }
 
-                    const yearData = {
-                        year: yearStart.getFullYear(),
-                        collections: {}
-                    };
+        const result = {
+          status: 200,
+          data: {
+            period: 'last-5-days',
+            comparison: comparisonData.reverse()
+          }
+        };
 
-                    // Process each model
-                    for (const { model, source, content } of models) {
-                        const count = await model.countDocuments({
-                            $or: [
-                                { createdAt: { $gte: yearStart, $lte: yearEnd } },
-                                { updatedAt: { $gte: yearStart, $lte: yearEnd } }
-                            ]
-                        });
+        cache.set(cacheKey, result, 300000); // Cache 5 min
+        resolve(result);
+      } catch (err) {
+        console.error('Error fetching last 5 days comparison:', err);
+        reject({ status: 500, message: err.message });
+      }
+    });
+  },
 
-                        yearData.collections[content] = count;
-                    }
+  /**
+   * Fetch last 5 months comparison (ALREADY OPTIMIZED)
+   */
+  fetchLast5MonthsComparison: () => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const cacheKey = 'comparison-5-months';
+        const cached = cache.get(cacheKey);
+        if (cached) return resolve(cached);
 
-                    // Calculate total for the year
-                    yearData.total = Object.values(yearData.collections).reduce((sum, count) => sum + count, 0);
+        const now = new Date();
+        const comparisonData = [];
 
-                    comparisonData.push(yearData);
-                }
+        for (let i = 0; i < 5; i++) {
+          const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+          const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
 
-                resolve({
-                    status: 200,
-                    data: {
-                        period: 'last-5-years',
-                        comparison: comparisonData.reverse() // Oldest to newest
-                    }
-                });
-            } catch (err) {
-                console.error('Error fetching last 5 years comparison:', err);
-                reject({ status: 500, message: err.message || 'Failed to fetch last 5 years comparison' });
-            }
-        });
-    }
-}
+          const counts = await getCountsForPeriod(monthStart, monthEnd);
+
+          comparisonData.push({
+            month: monthStart.toLocaleString('default', { month: 'long', year: 'numeric' }),
+            collections: counts,
+            total: Object.values(counts).reduce((sum, count) => sum + count, 0)
+          });
+        }
+
+        const result = {
+          status: 200,
+          data: {
+            period: 'last-5-months',
+            comparison: comparisonData.reverse()
+          }
+        };
+
+        cache.set(cacheKey, result, 600000); // Cache 10 min
+        resolve(result);
+      } catch (err) {
+        console.error('Error fetching last 5 months comparison:', err);
+        reject({ status: 500, message: err.message });
+      }
+    });
+  },
+
+  /**
+   * Fetch last 5 years comparison (ALREADY OPTIMIZED)
+   */
+  fetchLast5YearsComparison: () => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const cacheKey = 'comparison-5-years';
+        const cached = cache.get(cacheKey);
+        if (cached) return resolve(cached);
+
+        const now = new Date();
+        const comparisonData = [];
+
+        for (let i = 0; i < 5; i++) {
+          const yearStart = new Date(now.getFullYear() - i, 0, 1);
+          const yearEnd = new Date(now.getFullYear() - i, 11, 31, 23, 59, 59, 999);
+
+          const counts = await getCountsForPeriod(yearStart, yearEnd);
+
+          comparisonData.push({
+            year: yearStart.getFullYear(),
+            collections: counts,
+            total: Object.values(counts).reduce((sum, count) => sum + count, 0)
+          });
+        }
+
+        const result = {
+          status: 200,
+          data: {
+            period: 'last-5-years',
+            comparison: comparisonData.reverse()
+          }
+        };
+
+        cache.set(cacheKey, result, 1800000); // Cache 30 min
+        resolve(result);
+      } catch (err) {
+        console.error('Error fetching last 5 years comparison:', err);
+        reject({ status: 500, message: err.message });
+      }
+    });
+  },
+
+  /**
+   * Clear all caches (call this when new data is added)
+   */
+  clearCache: () => {
+    cache.clear();
+    return { status: 200, message: 'Cache cleared successfully' };
+  }
+};

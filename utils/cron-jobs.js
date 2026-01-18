@@ -1,7 +1,7 @@
 const cron = require('node-cron');
 const mechanicService = require('../services/mechanic-service');
 const { checkIstimaraExpiry } = require('../middleware/istimara-expiry-middleware');
-const liveMonitor = require('../jobs/attendance-cron-jobs'); 
+const liveMonitor = require('../jobs/attendance-cron-jobs');
 
 /**
  * Setup cron jobs for the application
@@ -102,6 +102,16 @@ const setupCronJobs = () => {
     scheduled: false
   });
 
+  // Run at midnight
+  const dailyDashStatsJon = cron.schedule('0 0 * * *', async () => {
+    const stats = await calculateDailyStats();
+    await DashboardStats.create({
+      period: 'daily',
+      date: new Date(),
+      stats
+    });
+  });
+
   // Weekly report every Sunday at 6 PM
   const weeklyReportJob = cron.schedule('0 18 * * 0', async () => {
     console.log('📊 Generating weekly report...');
@@ -127,6 +137,7 @@ const setupCronJobs = () => {
         istimaraExpiryJob.start();
         istimaraExpiryBackupJob.start();
         dailyCleanupJob.start();
+        dailyDashStatsJon.start();
         weeklyReportJob.start();
 
         console.log('✅ All scheduled jobs started successfully');

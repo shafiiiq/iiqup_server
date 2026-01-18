@@ -221,20 +221,33 @@ const setupWebSocket = (io) => {
     // ============ CALL EVENTS ============
 
     // Initiate call
-    socket.on('call_user', (data) => {
+    socket.on('call_user', async (data) => {
       try {
         console.log('📞 Initiating call:', data);
         const { callerId, callerUniqueCode, receiverUniqueCode, callerName, chatId, callType } = data;
 
-        // Emit to receiver
-        global.io.to(`user_${receiverUniqueCode}`).emit('incoming_call', {
+        const callData = {
           callerId,
           callerUniqueCode,
           callerName,
           chatId,
           callType: callType || 'voice',
           timestamp: new Date()
-        });
+        };
+
+        // 1. Send via WebSocket
+        global.io.to(`user_${receiverUniqueCode}`).emit('incoming_call', callData);
+
+        // 2. Send FCM push
+        const PushNotificationService = await import('../utils/push-notification-jobs.js');
+        await PushNotificationService.default.sendGeneralNotification(
+          receiverUniqueCode,
+          `Incoming call from ${callerName}`,
+          'Tap to answer',
+          'high',
+          'call',
+          `call_${callerId}_${Date.now()}`
+        );
 
         console.log(`📤 Call notification sent to: ${receiverUniqueCode}`);
       } catch (error) {

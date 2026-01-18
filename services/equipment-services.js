@@ -127,7 +127,7 @@ module.exports = {
           reject({
             status: 500,
             ok: false,
-            message: 'Missing data or an error occurred',
+            message: 'Missing data or an error occurred', 
             error: err.message
           });
         }
@@ -160,9 +160,9 @@ module.exports = {
       if (aValue === bValue) return 0;
 
       if (direction === 'asc') {
-        return aValue > bValue ? 1 : -1;
+        return aValue > bValue ? 1 : -1; 
       } else {
-        return aValue < bValue ? 1 : -1;
+        return aValue < bValue ? 1 : -1; 
       }
     });
   },
