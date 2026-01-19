@@ -310,11 +310,12 @@ module.exports = {
           title: "New Stock Added",
           description: `${data.stockCount} new ${data.serialNumber} - ${data.product} added to stock ${newStock.equipments ? `for ${newStock.equipments}` : ''}`,
           priority: "high",
-          type: 'normal'
+          type: 'normal',
+          target: JSON.parse(process.env.OFFICE_HERO)
         });
 
         await PushNotificationService.sendGeneralNotification(
-          null, // broadcast to all users
+          JSON.parse(process.env.OFFICE_HERO), // broadcast to all users
           "New Stock Added", //title
           `${data.stockCount} new ${data.serialNumber} - ${data.product} added to stock ${newStock.equipments ? `for ${newStock.equipments}` : ''}`, //decription
           'high', //priority
@@ -645,15 +646,16 @@ module.exports = {
             { new: true, runValidators: true }
           );
 
-          const notificaton = await createNotification({
+          const notification = await createNotification({
             title: "Stock Update",
             description: `${quantityChange} ${currentStock.product} with part number ${currentStock.serialNumber} is used by ${mechanicName} for ${equipmentName} ${equipmentNumber}`,
             priority: "high",
-            type: 'normal'
+            type: 'normal',
+            target: JSON.parse(process.env.OFFICE_HERO)
           });
 
           await PushNotificationService.sendGeneralNotification(
-            null, // broadcast to all users
+            JSON.parse(process.env.OFFICE_HERO), // broadcast to all users
             "Stock Update", //title
             `${quantityChange} ${currentStock.product} with part number ${currentStock.serialNumber} is used by ${mechanicName} for ${equipmentName} ${equipmentNumber}`, //decription
             'high', //priority
@@ -682,7 +684,7 @@ module.exports = {
           }
 
           await PushNotificationService.sendGeneralNotification(
-            null, // broadcast to all users
+            JSON.parse(process.env.OFFICE_HERO), // broadcast to all users
             "Low Stock", //title
             message,
             'high', //priority
@@ -693,11 +695,12 @@ module.exports = {
             title: "Stock Update",
             description: `${quantityChange} ${currentStock.product} with part number ${currentStock.serialNumber} is used by ${updateData.mechanicName} for ${updateData.equipmentName} ${updateData.equipmentNumber}`,
             priority: "high",
-            type: 'normal'
+            type: 'normal',
+            target: JSON.parse(process.env.OFFICE_HERO)
           });
 
           await PushNotificationService.sendGeneralNotification(
-            null, // broadcast to all users
+            JSON.parse(process.env.OFFICE_HERO), // broadcast to all users
             "Stock Update", //title
             `${quantityChange} ${currentStock.product} with part number ${currentStock.serialNumber} is used by ${updateData.mechanicName} for ${updateData.equipmentName} ${updateData.equipmentNumber}`, //decription
             'high', //priority
