@@ -34,11 +34,11 @@ module.exports = {
             priority: "high",
             sourceId: equipment._id,
             time: new Date(),
-            recipient: JSON.parse(process.env.OFFICE_HERO)
+            recipient: JSON.parse(process.env.OFFICE_MAIN)
           });
 
           await PushNotificationService.sendGeneralNotification(
-            JSON.parse(process.env.OFFICE_HERO), // broadcast to all users
+            JSON.parse(process.env.OFFICE_MAIN), // broadcast to all users
             "New Asset Launched", //title
             `Alhamdulillah , We are happy to inform to you! We have bought a brand new ${equipment.machine} (${equipment.brand}) today`, //description
             'high', //priority
