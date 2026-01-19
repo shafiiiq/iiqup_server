@@ -5,7 +5,7 @@ const PushNotificationService = require('../utils/push-notification-jobs');
 const EquipmentImageModel = require('../models/equip-hand-over-stock.model');
 
 module.exports = {
- 
+
   insertEquipments: (data) => {
     return new Promise(async (resolve, reject) => {
       try {
@@ -33,11 +33,12 @@ module.exports = {
             description: `Alhamdulillah , We are happy to inform to you! We have bought a brand new ${equipment.machine} (${equipment.brand}) today`,
             priority: "high",
             sourceId: equipment._id,
-            time: new Date()
+            time: new Date(),
+            recipient: JSON.parse(process.env.OFFICE_HERO)
           });
 
           await PushNotificationService.sendGeneralNotification(
-            null, // broadcast to all users
+            JSON.parse(process.env.OFFICE_HERO), // broadcast to all users
             "New Asset Launched", //title
             `Alhamdulillah , We are happy to inform to you! We have bought a brand new ${equipment.machine} (${equipment.brand}) today`, //description
             'high', //priority
@@ -127,7 +128,7 @@ module.exports = {
           reject({
             status: 500,
             ok: false,
-            message: 'Missing data or an error occurred', 
+            message: 'Missing data or an error occurred',
             error: err.message
           });
         }
@@ -160,9 +161,9 @@ module.exports = {
       if (aValue === bValue) return 0;
 
       if (direction === 'asc') {
-        return aValue > bValue ? 1 : -1; 
+        return aValue > bValue ? 1 : -1;
       } else {
-        return aValue < bValue ? 1 : -1; 
+        return aValue < bValue ? 1 : -1;
       }
     });
   },

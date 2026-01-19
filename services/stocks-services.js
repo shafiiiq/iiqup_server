@@ -643,7 +643,7 @@ module.exports = {
           updatedStock = await Stock.findByIdAndUpdate(
             stockId,
             { ...regularUpdateData, updatedAt: new Date() },
-            { new: true, runValidators: true }
+            { new: true, runValidators: true } 
           );
 
           const notification = await createNotification({
