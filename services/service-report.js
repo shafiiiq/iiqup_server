@@ -342,6 +342,137 @@ module.exports = {
     });
   },
 
+  fetchServicesByPeriod: (period) => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const currentDate = new Date();
+        let startDate;
+        let endDate = new Date(currentDate);
+
+        const formatDate = (date) => {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        };
+
+        switch (period) {
+          case 'daily':
+            startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+            endDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+            break;
+
+          case 'yesterday':
+            const yesterday = new Date(currentDate);
+            yesterday.setDate(yesterday.getDate() - 1);
+            startDate = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
+            endDate = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
+            break;
+
+          case 'weekly':
+            startDate = new Date(currentDate);
+            startDate.setDate(startDate.getDate() - 7);
+            break;
+
+          case 'monthly':
+            startDate = new Date(currentDate);
+            startDate.setDate(startDate.getDate() - 30);
+            break;
+
+          case 'yearly':
+            startDate = new Date(currentDate);
+            startDate.setDate(startDate.getDate() - 365);
+            break;
+
+          default:
+            throw new Error('Invalid period specified');
+        }
+
+        const formattedStartDate = formatDate(startDate);
+        const formattedEndDate = formatDate(endDate);
+
+        console.log('Period:', period);
+        console.log('Start Date:', formattedStartDate);
+        console.log('End Date:', formattedEndDate);
+
+        const getReport = await serviceReportModel.find({
+          date: {
+            $gte: formattedStartDate,
+            $lte: formattedEndDate
+          }
+        }).sort({ date: -1, regNo: 1 });
+
+        console.log('Found reports:', getReport.length);
+        console.log('Sample dates from DB:', getReport.slice(0, 3).map(r => r.date));
+
+        const groupedByType = {
+          oil: [],
+          maintenance: [],
+          tyre: [],
+          battery: [],
+          normal: [],
+          other: []
+        };
+
+        const groupedByRegNo = {};
+
+        getReport.forEach(report => {
+          const type = report.serviceType || 'other';
+          if (groupedByType[type]) {
+            groupedByType[type].push(report);
+          } else {
+            groupedByType.other.push(report);
+          }
+
+          if (!groupedByRegNo[report.regNo]) {
+            groupedByRegNo[report.regNo] = [];
+          }
+          groupedByRegNo[report.regNo].push(report);
+        });
+
+        const statistics = {
+          total: getReport.length,
+          totalEquipment: Object.keys(groupedByRegNo).length,
+          byType: {
+            oil: groupedByType.oil.length,
+            maintenance: groupedByType.maintenance.length,
+            tyre: groupedByType.tyre.length,
+            battery: groupedByType.battery.length,
+            normal: groupedByType.normal.length,
+            other: groupedByType.other.length
+          },
+          byEquipment: Object.keys(groupedByRegNo).map(regNo => ({
+            regNo: regNo,
+            count: groupedByRegNo[regNo].length
+          }))
+        };
+
+        resolve({
+          status: 200,
+          ok: true,
+          period: period,
+          dateRange: {
+            from: formattedStartDate,
+            to: formattedEndDate
+          },
+          statistics: statistics,
+          data: {
+            all: getReport,
+            groupedByType: groupedByType,
+            groupedByRegNo: groupedByRegNo
+          }
+        });
+      } catch (error) {
+        console.error(`Error in fetchServicesByPeriod (${period}):`, error);
+        reject({
+          status: 500,
+          ok: false,
+          message: error.message || `Error fetching ${period} services`
+        });
+      }
+    });
+  },
+
   fetchServicesByDateRange: (regNo, startDate, endDate) => {
     return new Promise(async (resolve, reject) => {
       try {

@@ -27,7 +27,7 @@ const getServiceReport = async (req, res) => {
 }
 
 const getServiceReportWithId = async (req, res) => {
-  
+
   const id = req.params.id;
   reportServices.fetchServiceReportWith(id)
     .then((fetchedUsers) => {
@@ -44,7 +44,7 @@ const updateServiceReportWithId = async (req, res) => {
   const id = req.params.id;
   reportServices.updateServiceReportWith(id, req.body)
     .then((fetchedUsers) => {
-      if (fetchedUsers) {        
+      if (fetchedUsers) {
         res.status(fetchedUsers.status).json(fetchedUsers)
       }
     })
@@ -186,6 +186,67 @@ const deleteServiceReport = async (req, res) => {
     })
 }
 
+const getDailyServices = async (req, res) => {
+  reportServices.fetchServicesByPeriod('daily')
+    .then((fetchedServices) => {
+      if (fetchedServices) {
+        res.status(fetchedServices.status).json(fetchedServices)
+      }
+    })
+    .catch((err) => {
+      res.status(err.status || 500).json({ message: 'Cannot get daily services', error: err.message })
+    })
+}
+
+const getYesterdayServices = async (req, res) => {
+  reportServices.fetchServicesByPeriod('yesterday')
+    .then((fetchedServices) => {
+      if (fetchedServices) {
+        res.status(fetchedServices.status).json(fetchedServices)
+      }
+    })
+    .catch((err) => {
+      res.status(err.status || 500).json({ message: 'Cannot get yesterday services', error: err.message })
+    })
+}
+
+const getWeeklyServices = async (req, res) => {
+  reportServices.fetchServicesByPeriod('weekly')
+    .then((fetchedServices) => {
+      if (fetchedServices) {
+        res.status(fetchedServices.status).json(fetchedServices)
+      }
+    })
+    .catch((err) => {
+      res.status(err.status || 500).json({ message: 'Cannot get weekly services', error: err.message })
+    })
+}
+
+const getMonthlyServices = async (req, res) => {
+  console.log("yeahhhhhhhhhhhhhhhhh")
+  reportServices.fetchServicesByPeriod('monthly')
+    .then((fetchedServices) => {
+      if (fetchedServices) {
+        res.status(fetchedServices.status).json(fetchedServices)
+      }
+    })
+    .catch((err) => {
+      res.status(err.status || 500).json({ message: 'Cannot get monthly services', error: err.message })
+    })
+}
+
+const getYearlyServices = async (req, res) => {
+  reportServices.fetchServicesByPeriod('yearly')
+    .then((fetchedServices) => {
+      if (fetchedServices) {
+        res.status(fetchedServices.status).json(fetchedServices)
+      }
+    })
+    .catch((err) => {
+      res.status(err.status || 500).json({ message: 'Cannot get yearly services', error: err.message })
+    })
+}
+
 module.exports = {
   addServiceReport,
   getServiceReport,
@@ -200,5 +261,10 @@ module.exports = {
   getServicesByLastMonths,
   getServiceReportWithId,
   updateServiceReportWithId,
-  removeServiceReportWithId
+  removeServiceReportWithId,
+  getDailyServices,
+  getYesterdayServices,
+  getWeeklyServices,
+  getMonthlyServices,
+  getYearlyServices
 };

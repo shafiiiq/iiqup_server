@@ -366,859 +366,887 @@ router.get('/add-assignedDate-field', async (req, res) => {
 
 module.exports = router;
 
+// router.get('/add-encrypted-password', async (req, res) => {
+//   try {
 
+//     const mail = 'shafeek@ansarigroup.in'
+//     const password = '643902'
 
+//     const salt = await bcrypt.genSalt(10);
+//     const encPasw = await bcrypt.hash(password, salt);
 
+//     const result = await User.updateOne(
+//       { email: mail },
+//       { $set: { docAuthPasw: encPasw } }
+//     );
+//     res.status(200).json({
+//       success: true,
+//       message: `Updated ${result.modifiedCount} documents successfully`,
+//       modifiedCount: result.modifiedCount,
+//       processedAt: new Date().toISOString()
+//     });
 
-// const equipmentsData = [
-//   {
-//     "regNo": "77373",
-//     "operator": "Ishwor Ghimire",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "74991",
-//     "operator": "Manjur alam Nuri",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "69557",
-//     "operator": "Jaman SIngh",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "30931",
-//     "operator": "Major Singh Darshan Singh",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "197300",
-//     "operator": "Anarulla",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "78784",
-//     "operator": "Darmendra Saday",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "75012",
-//     "operator": "Ajmal Hussain",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "194159",
-//     "operator": "Ganesh Bahadhur",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "69862",
-//     "operator": "Intiaj",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "62137",
-//     "operator": "Richard",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "79445",
-//     "operator": "Mohammed Yashik Kunduparambil Yahu",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "78392",
-//     "operator": "MD Shahid",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "14651",
-//     "operator": "Rasheed Puthen peedila",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "224483",
-//     "operator": "Jageshor Bandari.",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "78324",
-//     "operator": "Suneesh",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "72204",
-//     "operator": "Siyaj",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "78357",
-//     "operator": "Santosh",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "69861",
-//     "operator": "MD Nayim",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "281603",
-//     "operator": "HOP Ibrahim Khan",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "105113",
-//     "operator": "HOP Abid Ulla Jan",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "139575",
-//     "operator": "HOP Mahinder Singh",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "-",
-//     "operator": "Shyam Krishna Chimoriya",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "278405",
-//     "operator": "Ram Kumar",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "78971",
-//     "operator": "Muhammad Ikram Jamroz Khan",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "78862",
-//     "operator": "Indika",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "78863",
-//     "operator": "Muhammad Safdar",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "19610",
-//     "operator": "Binaram Bhulon",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "290418",
-//     "operator": "HOP Sher ur Rehman.",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "78554",
-//     "operator": "HOP Shehar yar",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "138773",
-//     "operator": "Yashik",
-//     "site": "Samsung -C & T"
-//   },
-//   {
-//     "regNo": "77371",
-//     "operator": "MD Safikula",
-//     "site": "Gulf Asia Contracting-NFS"
-//   },
-//   {
-//     "regNo": "27160",
-//     "operator": "Amit Pandey",
-//     "site": "Gulf Asia Contracting-NFS"
-//   },
-//   {
-//     "regNo": "69558",
-//     "operator": "Duminda",
-//     "site": "Gulf Asia Contracting-NFS"
-//   },
-//   {
-//     "regNo": "74992",
-//     "operator": "Sanjib Kumar Mandal",
-//     "site": "Gulf Asia Contracting-NFS"
-//   },
-//   {
-//     "regNo": "63438",
-//     "operator": "Eddis Ali Murad",
-//     "site": "Gulf Asia Contracting-NFS"
-//   },
-//   {
-//     "regNo": "71763",
-//     "operator": "Jasvir Kumar",
-//     "site": "Gulf Asia Contracting-NFS"
-//   },
-//   {
-//     "regNo": "77452",
-//     "operator": "Mujammel Hoque",
-//     "site": "Gulf Asia Contracting-NFS"
-//   },
-//   {
-//     "regNo": "78445",
-//     "operator": "Tej",
-//     "site": "Gulf Asia Contracting-NFS"
-//   },
-//   {
-//     "regNo": "78393",
-//     "operator": "Kshetri Tej Bahadur",
-//     "site": "Gulf Asia Contracting-NFS"
-//   },
-//   {
-//     "regNo": "78391",
-//     "operator": "Abdul Manan.",
-//     "site": "Gulf Asia Contracting-NFS"
-//   },
-//   {
-//     "regNo": "72202",
-//     "operator": "HOP Sukhmanjit Singh",
-//     "site": "Gulf Asia Contracting-NFS"
-//   },
-//   {
-//     "regNo": "237737",
-//     "operator": "Nawaraj Subedi.",
-//     "site": "Gulf Asia Contracting-NFS"
-//   },
-//   {
-//     "regNo": "70124",
-//     "operator": "Aseez",
-//     "site": "Gulf Asia Contracting-NFS"
-//   },
-//   {
-//     "regNo": "72203",
-//     "operator": "Shahid Raja",
-//     "site": "Gulf Asia Contracting-NFS"
-//   },
-//   {
-//     "regNo": "45541",
-//     "operator": "Jabir Miya",
-//     "site": "Gulf Asia Contracting-NFS"
-//   },
-//   {
-//     "regNo": "195653",
-//     "operator": "Sanjarul Nath",
-//     "site": "Gulf Asia Contracting-NFS"
-//   },
-//   {
-//     "regNo": "68979",
-//     "operator": "Hasintha",
-//     "site": "Gulf Asia Contracting-NFS"
-//   },
-//   {
-//     "regNo": "78356",
-//     "operator": "Jayakaran",
-//     "site": "Gulf Asia Contracting-NFS"
-//   },
-//   {
-//     "regNo": "77451",
-//     "operator": "Mahesh Kumar Das",
-//     "site": "Gulf Asia Contracting-NFS"
-//   },
-//   {
-//     "regNo": "75392",
-//     "operator": "Meraj Kawari",
-//     "site": "Gulf Asia Contracting-NFS"
-//   },
-//   {
-//     "regNo": "45542",
-//     "operator": "Sanjay Thapa Magar",
-//     "site": "Gulf Asia Contracting-NFS"
-//   },
-//   {
-//     "regNo": "138815",
-//     "operator": "HOP Balwinder Singh",
-//     "site": "Gulf Asia Contracting-NFS"
-//   },
-//   {
-//     "regNo": "282062",
-//     "operator": "HOP Mandeep Singh",
-//     "site": "Gulf Asia Contracting-NFS"
-//   },
-//   {
-//     "regNo": "66777",
-//     "operator": "Tiwari Dav Raj",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "66775",
-//     "operator": "HOP Naka Satya",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "68731",
-//     "operator": "Bikas",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "72129",
-//     "operator": "HOP Gurinder Singh",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "21702",
-//     "operator": "MD Israful Khan",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "62458",
-//     "operator": "Dasuram",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "70893",
-//     "operator": "Ramesh Thing",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "327738",
-//     "operator": "Subramaniyan",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "63259",
-//     "operator": "Jaiju Puthoor Lonappan",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "70669",
-//     "operator": "Jahir",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "70892",
-//     "operator": "Lal Bahadhur",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "44177",
-//     "operator": "Jubaid",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "77269",
-//     "operator": "Muktha Bahadhur",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "70671",
-//     "operator": "MD Hakim",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "65701",
-//     "operator": "Avi Tamang",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "68732",
-//     "operator": "Yadav",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "68729",
-//     "operator": "Rupinder Singh",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "68115",
-//     "operator": "Govinda Mahat",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "68766",
-//     "operator": "Suhag",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "66564",
-//     "operator": "Arsath Aboobakkar Abdul Samadu",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "78132",
-//     "operator": "Lil Bahadhur",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "78133",
-//     "operator": "Miran Miah",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "76011",
-//     "operator": "Muhammad Shah Mir Bangash",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "78325",
-//     "operator": "Inderjit Singh Manjit Singh",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "78325",
-//     "operator": "Jatinder Singh.",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "74875",
-//     "operator": "Mozaher Alam",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "74875",
-//     "operator": "Bhim",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "76116",
-//     "operator": "Gam Bahadur Gurung",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "70374",
-//     "operator": "Tarek",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "70836",
-//     "operator": "Sofikul",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "70893",
-//     "operator": "Ramesh Thing",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "70892",
-//     "operator": "BK Lal Bahadur",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "71118",
-//     "operator": "Mansab Khan",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "75866",
-//     "operator": "HOP Sukhwinder Singh",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "71169",
-//     "operator": "Muhammad Akram Mohammad Yaqoob",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "79268",
-//     "operator": "MD Sarafat miya",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "75013",
-//     "operator": "Avi Tamang",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "76374",
-//     "operator": "Sabir",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "76023",
-//     "operator": "Fakhrul Islam",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "67973",
-//     "operator": "HOP Malkit Singh",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "67822",
-//     "operator": "HOP Akram Khan",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "70750",
-//     "operator": "Numan uddin",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "63447",
-//     "operator": "Gurprit Singh.",
-//     "site": "Gulf Asia Contracting-RLPP 02"
-//   },
-//   {
-//     "regNo": "73366",
-//     "operator": "Dinesh Kumar Shah",
-//     "site": "Gulf Asia Contracting-RLPP 01"
-//   },
-//   {
-//     "regNo": "43998",
-//     "operator": "HOP Varinder Singh Gurdev Singh",
-//     "site": "Gulf Asia Contracting-RLPP 01"
-//   },
-//   {
-//     "regNo": "72097",
-//     "operator": "Keshav",
-//     "site": "Gulf Asia Contracting-RLPP 01"
-//   },
-//   {
-//     "regNo": "68733",
-//     "operator": "Loka Nath Pandey",
-//     "site": "Gulf Asia Contracting-RLPP 01"
-//   },
-//   {
-//     "regNo": "70487",
-//     "operator": "Fazal Moeen",
-//     "site": "Gulf Asia Contracting-RLPP 01"
-//   },
-//   {
-//     "regNo": "47526",
-//     "operator": "Arafath",
-//     "site": "Gulf Asia Contracting-RLPP 01"
-//   },
-//   {
-//     "regNo": "79135",
-//     "operator": "Opi Das Tatma",
-//     "site": "Gulf Asia Contracting-RLPP 01"
-//   },
-//   {
-//     "regNo": "76272",
-//     "operator": "HOP Baljit Singh",
-//     "site": "Gulf Asia Contracting-RLPP 01"
-//   },
-//   {
-//     "regNo": "76273",
-//     "operator": "Rangej Singh",
-//     "site": "Gulf Asia Contracting-RLPP 01"
-//   },
-//   {
-//     "regNo": "70155",
-//     "operator": "Muhammad Gul Gul",
-//     "site": "Gulf Asia Contracting-RLPP 01"
-//   },
-//   {
-//     "regNo": "78129",
-//     "operator": "Salim Ahmed",
-//     "site": "Gulf Asia Contracting-RLPP 01"
-//   },
-//   {
-//     "regNo": "74199",
-//     "operator": "Khet Bahadhur",
-//     "site": "Gulf Asia Contracting-RLPP 01"
-//   },
-//   {
-//     "regNo": "79267",
-//     "operator": "Ranjeet Singh",
-//     "site": "Gulf Asia Contracting-RLPP 01"
-//   },
-//   {
-//     "regNo": "78447",
-//     "operator": "Irsath",
-//     "site": "Gulf Asia Contracting-RLPP 01"
-//   },
-//   {
-//     "regNo": "74919",
-//     "operator": "Kalam",
-//     "site": "Gulf Asia Contracting-RLPP 01"
-//   },
-//   {
-//     "regNo": "77075",
-//     "operator": "Mandeep Kumar",
-//     "site": "Gulf Asia Contracting-RLPP 01"
-//   },
-//   {
-//     "regNo": "75864",
-//     "operator": "HOP Jagroop Singh.",
-//     "site": "Gulf Asia Contracting-RLPP 01"
-//   },
-//   {
-//     "regNo": "79136",
-//     "operator": "Bal Bahadhur Saru Magar.",
-//     "site": "Gulf Asia Contracting-RLPP 01"
-//   },
-//   {
-//     "regNo": "79269",
-//     "operator": "Sharban KC",
-//     "site": "Gulf Asia Contracting-RLPP 01"
-//   },
-//   {
-//     "regNo": "36699",
-//     "operator": "Mahara Laxman Bahadur",
-//     "site": "Gulf Asia Contracting-RLPP 01"
-//   },
-//   {
-//     "regNo": "73582",
-//     "operator": "Mahara Laxman Bahadur",
-//     "site": "Gulf Asia Contracting-RLPP 01 ESP"
-//   },
-//   {
-//     "regNo": "67973",
-//     "operator": "HOP Malkit Singh",
-//     "site": "Gulf Asia Contracting  NFE"
-//   },
-//   {
-//     "regNo": "",
-//     "operator": "Shahin Miah",
-//     "site": "Gulf Asia Contracting  NFE"
-//   },
-//   {
-//     "regNo": "",
-//     "operator": "Khagendra Prasad",
-//     "site": "Gulf Asia Contracting  NFE"
-//   },
-//   {
-//     "regNo": "76199",
-//     "operator": "Mallesh Basakonda",
-//     "site": "Gulf Asia Contracting  NFE"
-//   },
-//   {
-//     "regNo": "74733",
-//     "operator": "Dambar Bahadur Kunwar",
-//     "site": "Gulf Asia Contracting-RO"
-//   },
-//   {
-//     "regNo": "72377",
-//     "operator": "HOP Gursharan singh",
-//     "site": "Gulf Asia Contracting-Umbrika Yard"
-//   },
-//   {
-//     "regNo": "62529",
-//     "operator": "MD Pharamud Rain",
-//     "site": "Gulf Asia Contracting-Umbrika Yard"
-//   },
-//   {
-//     "regNo": "72615",
-//     "operator": "yeasin",
-//     "site": "Gulf Asia Contracting-Umbrika Yard"
-//   },
-//   {
-//     "regNo": "68728",
-//     "operator": "HOP Sharam Singh",
-//     "site": "Draieh Contracting (Ask)"
-//   },
-//   {
-//     "regNo": "71051",
-//     "operator": "Bhim Bahadhur Paudel",
-//     "site": "Draieh Contracting (Ask)"
-//   },
-//   {
-//     "regNo": "70670",
-//     "operator": "Emamul Hossain",
-//     "site": "Draieh Contracting (Ask)"
-//   },
-//   {
-//     "regNo": "66776",
-//     "operator": "Siraj Miya",
-//     "site": "Draieh Contracting (Ask)"
-//   },
-//   {
-//     "regNo": "77393",
-//     "operator": "Slim Mia",
-//     "site": "Draieh Contracting (Ask)"
-//   },
-//   {
-//     "regNo": "78523",
-//     "operator": "Nishan Singh",
-//     "site": "Draieh Contracting (Ask)"
-//   },
-//   {
-//     "regNo": "78523",
-//     "operator": "DHRUP KESH AHIR YADAV.",
-//     "site": "Draieh Contracting (Ask)"
-//   },
-//   {
-//     "regNo": "61979",
-//     "operator": "Ajijurrehman",
-//     "site": "Draieh Contracting (Ask)  QBEC"
-//   },
-//   {
-//     "regNo": "61979",
-//     "operator": "Keshab Sunar",
-//     "site": "Draieh Contracting (Ask)"
-//   },
-//   {
-//     "regNo": "72484",
-//     "operator": "MD Kaphir Miya",
-//     "site": "Draieh Contracting (Ask)"
-//   },
-//   {
-//     "regNo": "43711",
-//     "operator": "Without Operator",
-//     "site": "Draieh Contracting (Ask)"
-//   },
-//   {
-//     "regNo": "46941",
-//     "operator": "HOP Pawandeep Singh",
-//     "site": "Draieh Contracting (Ask)"
-//   },
-//   {
-//     "regNo": "72201",
-//     "operator": "Ghulam Ali",
-//     "site": "New Alfa Trading & Contracting (Ask)"
-//   },
-//   {
-//     "regNo": "70758",
-//     "operator": "Rajeshwar Nyayavanandi",
-//     "site": "CCC"
-//   },
-//   {
-//     "regNo": "75865",
-//     "operator": "Sukhjinder  Singh",
-//     "site": "CCC"
-//   },
-//   {
-//     "regNo": "78516",
-//     "operator": "satpal singh",
-//     "site": "Captains Solutions"
-//   },
-//   {
-//     "regNo": "47326",
-//     "operator": "HOP Baljit Singh Gurmej Singh",
-//     "site": "Hyundai Lusail Plaza Tower"
-//   },
-//   {
-//     "regNo": "43095",
-//     "operator": "HOP Amit Chaudary",
-//     "site": "Hyundai Lusail Plaza Tower"
-//   },
-//   {
-//     "regNo": "72871",
-//     "operator": "HOP Sawinder Singh",
-//     "site": "Hyundai Lusail Plaza Tower"
-//   },
-//   {
-//     "regNo": "78443",
-//     "operator": "HOP PRABHDEEP SINGH",
-//     "site": "Inco International"
-//   },
-//   {
-//     "regNo": "61188",
-//     "operator": "Mofid Rain",
-//     "site": "Inco International"
-//   },
-//   {
-//     "regNo": "72871",
-//     "operator": "Mofid Rain",
-//     "site": "Inco International"
-//   },
-//   {
-//     "regNo": "61188",
-//     "operator": "Mofid Rain",
-//     "site": "Inco International"
-//   },
-//   {
-//     "regNo": "67340",
-//     "operator": "Mohamed Husni",
-//     "site": "Medgulf"
-//   },
-//   {
-//     "regNo": "67339",
-//     "operator": "Abdul Hadi",
-//     "site": "Medgulf"
-//   },
-//   {
-//     "regNo": "310773",
-//     "operator": "HOP Lovedeep Singh",
-//     "site": "Qcon"
-//   },
-//   {
-//     "regNo": "281998",
-//     "operator": "Bishnu",
-//     "site": "Qcon"
-//   },
-//   {
-//     "regNo": "138773",
-//     "operator": "Binu Alathi Velayudhan",
-//     "site": "Qcon"
-//   },
-//   {
-//     "regNo": "282171",
-//     "operator": "Jithin Madathingal Jayan",
-//     "site": "Qcon"
-//   },
-//   {
-//     "regNo": "44182",
-//     "operator": "Roshan Gurung",
-//     "site": "Q Reliance"
-//   },
-//   {
-//     "regNo": "71056",
-//     "operator": "HOP Taz Mohammed",
-//     "site": "AL Bahiya / Tractors Trading"
-//   },
-//   {
-//     "regNo": "71056",
-//     "operator": "Mohammed Rijath",
-//     "site": "UCC PMV"
-//   },
-//   {
-//     "regNo": "72738",
-//     "operator": "Manoj Chathuranga",
-//     "site": "UCC PMV"
-//   },
-//   {
-//     "regNo": "72738",
-//     "operator": "Rajesh Lodh",
-//     "site": "UCC PMV Muaither"
-//   },
-//   {
-//     "regNo": "70125",
-//     "operator": "Prajosh Cheradi Appunni",
-//     "site": "UCC PMV"
-//   },
-//   {
-//     "regNo": "54470",
-//     "operator": "Tiwari Dav Raj",
-//     "site": "UCC PMV"
-//   },
-//   {
-//     "regNo": "70125",
-//     "operator": "Riyas Kalandar Adambawa",
-//     "site": "UCC PMV"
-//   },
-//   {
-//     "regNo": "46942",
-//     "operator": "Prem Bahadhur",
-//     "site": "UCC PMV"
-//   },
-//   {
-//     "regNo": "66774",
-//     "operator": "Hinas, Ajahar Sheikh",
-//     "site": "QNCC"
-//   },
-//   {
-//     "regNo": "73292",
-//     "operator": "Ghulam Ali",
-//     "site": "QNCC"
-//   },
-//   {
-//     "regNo": "68154",
-//     "operator": "HOP Sandeep Singh",
-//     "site": "Hydroserv"
-//   },
-//   {
-//     "regNo": "198331",
-//     "operator": "Ajahar Sekh",
-//     "site": "QD-SBG"
-//   },
-//   {
-//     "regNo": "198331",
-//     "operator": "HOP Chinta Mani sapkota",
-//     "site": "QD-SBG"
-//   },
-//   {
-//     "regNo": "45838",
-//     "operator": "Rahim Mohamad Miya",
-//     "site": "Baldo Tech Trading and Contracting"
-//   },
-//   {
-//     "regNo": "76272",
-//     "operator": "HOP Baljit Singh",
-//     "site": "Baldo Tech Trading and Contracting"
+//   } catch (error) {
+//     console.error('Error updating documents:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'An error occurred while updating documents',
+//       error: error.message
+//     });
 //   }
-// ]
+// });
+
+
+// router.post('/fix-updated-at', async (req, res) => {
+//   var Model
+//   if (req.body.type === 'tyre') {
+//     Model = TyreModel
+//   } else if (req.body.type === 'equipments') {
+//     Model = Equipment
+//   } else if (req.body.type === 'reports') {
+//     Model = serviceReportModel
+//   } else if (req.body.type === 'histories') {
+//     Model = serviceHistoryModel
+//   } else if (req.body.type === 'maintanance') {
+//     Model = MaintananceModel
+//   }else if (req.body.type === 'handover') {
+//     Model = Handover
+//   }else if (req.body.type === 'toolkit') {
+//     Model = Toolkit
+//   }else if (req.body.type === 'stocks') {
+//     Model = Stokcs
+//   }
+//   try {
+//     const result = await Model.updateMany(
+//       { updatedAt: { $type: "string" } },
+//       [
+//         {
+//           $set: {
+//             updatedAt: { $dateFromString: { dateString: "$updatedAt" } }
+//           }
+//         }
+//       ],
+//       { timestamps: false }
+//     );
+
+//     console.log(`Updated ${result.modifiedCount} documents successfully`);
+//     res.status(200).json({
+//       success: true,
+//       message: `Updated ${result.modifiedCount} documents successfully`,
+//       modifiedCount: result.modifiedCount,
+//       processedAt: new Date().toISOString()
+//     });
+
+//   } catch (error) {
+//     console.error('Error updating documents:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'An error occurred while updating documents',
+//       error: error.message
+//     });
+//   }
+// });
+
+// router.post('/fix-id', async (req, res) => {
+//   try {
+//     var Modell;
+
+//     // Select the appropriate model based on request type
+//     if (req.body.type === 'tyre') {
+//       Modell = TyreModel;
+//     } else if (req.body.type === 'equipments') {
+//       Modell = Equipment;
+//     } else if (req.body.type === 'reports') {
+//       Modell = serviceReportModel;
+//     } else if (req.body.type === 'histories') {
+//       Modell = serviceHistoryModel;
+//     } else if (req.body.type === 'maintanance') {
+//       Modell = MaintananceModel;
+//     } else if (req.body.type === 'handover') {
+//       Modell = Handover;
+//     } else if (req.body.type === 'toolkit') {
+//       Modell = Toolkit;
+//     } else if (req.body.type === 'stocks') {
+//       Modell = Stokcs;
+//     } else if (req.body.type === 'battery') {
+//       Modell = BatteryModel;
+//     }  else if (req.body.type === 'mec') {
+//       Modell = Mechanic;
+//     }else {
+//       return res.status(400).json({ error: 'Invalid type specified' });
+//     }
+
+//     // Check initial state
+//     const stringIdCount = await Modell.find({ _id: { $type: "string" } }).countDocuments();
+//     const objectIdCount = await Modell.find({ _id: { $type: "objectId" } }).countDocuments();
+
+//     console.log(`Initial state - String IDs: ${stringIdCount}, ObjectIDs: ${objectIdCount}`);
+
+//     if (stringIdCount === 0) {
+//       return res.json({
+//         success: true,
+//         message: "No string IDs found. All documents already have proper ObjectIDs.",
+//         initialStringIds: stringIdCount,
+//         initialObjectIds: objectIdCount
+//       });
+//     }
+
+//     // Get the MongoDB collection directly
+//     const collection = Modell.collection;
+
+//     // Find all documents with string type _id using raw MongoDB query
+//     const docs = await collection.find({ _id: { $type: "string" } }).toArray();
+//     let processedCount = 0;
+//     let convertedCount = 0;
+
+//     console.log(`Found ${docs.length} documents with string IDs`);
+
+//     for (const doc of docs) {
+//       try {
+//         const oldStringId = doc._id;
+//         const newObjectId = new mongoose.Types.ObjectId(oldStringId);
+
+//         console.log(`Processing: ${oldStringId} -> ${newObjectId}`);
+//         console.log(`Document before conversion:`, JSON.stringify({ _id: doc._id, name: doc.name }));
+
+//         // Create new document with ObjectId
+//         const newDoc = { ...doc };
+//         newDoc._id = newObjectId;
+
+//         // Method 1: Try using bulkWrite for atomic operation
+//         try {
+//           const bulkOps = [
+//             {
+//               deleteOne: {
+//                 filter: { _id: oldStringId }
+//               }
+//             },
+//             {
+//               insertOne: {
+//                 document: newDoc
+//               }
+//             }
+//           ];
+
+//           const result = await collection.bulkWrite(bulkOps, { ordered: true });
+
+//           if (result.deletedCount === 1 && result.insertedCount === 1) {
+//             convertedCount++;
+//             console.log(`✅ BulkWrite success: ${oldStringId} -> ${newObjectId}`);
+//             console.log(`Result:`, result.deletedCount, 'deleted,', result.insertedCount, 'inserted');
+//           } else {
+//             console.log(`❌ BulkWrite partial success: deleted ${result.deletedCount}, inserted ${result.insertedCount}`);
+//           }
+
+//         } catch (bulkError) {
+//           console.log(`❌ BulkWrite failed for ${oldStringId}: ${bulkError.message}`);
+
+//           // Method 2: Manual delete and insert
+//           try {
+//             console.log(`Trying manual delete/insert for ${oldStringId}`);
+
+//             // First verify the document exists
+//             const existingDoc = await collection.findOne({ _id: oldStringId });
+//             if (!existingDoc) {
+//               console.log(`❌ Document ${oldStringId} not found`);
+//               continue;
+//             }
+
+//             // Delete the old document
+//             const deleteResult = await collection.deleteOne({ _id: oldStringId });
+//             console.log(`Delete result for ${oldStringId}:`, deleteResult.deletedCount);
+
+//             if (deleteResult.deletedCount === 1) {
+//               // Insert the new document
+//               const insertResult = await collection.insertOne(newDoc);
+//               console.log(`Insert result:`, insertResult.insertedId);
+
+//               if (insertResult.insertedId) {
+//                 convertedCount++;
+//                 console.log(`✅ Manual conversion success: ${oldStringId} -> ${newObjectId}`);
+//               } else {
+//                 console.log(`❌ Insert failed for ${oldStringId}`);
+//               }
+//             } else {
+//               console.log(`❌ Delete failed for ${oldStringId}`);
+//             }
+
+//           } catch (manualError) {
+//             console.log(`❌ Manual method failed for ${oldStringId}: ${manualError.message}`);
+//           }
+//         }
+
+//         processedCount++;
+
+//       } catch (error) {
+//         console.log(`❌ Error processing document ${doc._id}: ${error.message}`);
+//       }
+//     }
+
+//     // Wait a moment for operations to complete
+//     await new Promise(resolve => setTimeout(resolve, 1000));
+
+//     // Check final state
+//     const finalStringIdCount = await Modell.find({ _id: { $type: "string" } }).countDocuments();
+//     const finalObjectIdCount = await Modell.find({ _id: { $type: "objectId" } }).countDocuments();
+
+//     console.log(`Final state - String IDs: ${finalStringIdCount}, ObjectIDs: ${finalObjectIdCount}`);
+
+//     // Verify with raw collection query too
+//     const rawStringCount = await collection.countDocuments({ _id: { $type: "string" } });
+//     const rawObjectCount = await collection.countDocuments({ _id: { $type: "objectId" } });
+//     console.log(`Raw collection final state - String IDs: ${rawStringCount}, ObjectIDs: ${rawObjectCount}`);
+
+//     // Send success response with detailed information
+//     res.json({
+//       success: true,
+//       totalProcessed: processedCount,
+//       converted: convertedCount,
+//       beforeConversion: {
+//         stringIds: stringIdCount,
+//         objectIds: objectIdCount
+//       },
+//       afterConversion: {
+//         stringIds: finalStringIdCount,
+//         objectIds: finalObjectIdCount,
+//         rawStringIds: rawStringCount,
+//         rawObjectIds: rawObjectCount
+//       },
+//       message: `Successfully processed ${processedCount} documents. ${convertedCount} converted from string to ObjectId. Final result: ${finalObjectIdCount} documents with proper ObjectIDs, ${finalStringIdCount} remaining string IDs.`
+//     });
+
+//   } catch (error) {
+//     console.error('Fix-ID Route Error:', error);
+//     res.status(500).json({
+//       error: error.message,
+//       success: false
+//     });
+//   }
+// });
+
+// router.get('/fix-variant-ids', async (req, res) => {
+//   try {
+//     const Modell = Toolkit;
+
+//     // Get the MongoDB collection directly
+//     const collection = Modell.collection;
+
+//     // Find all documents that have variants with string IDs
+//     const docs = await collection.find({
+//       "variants._id": { $type: "string" }
+//     }).toArray();
+
+//     let processedDocuments = 0;
+//     let convertedVariantIds = 0;
+//     let convertedHistoryIds = 0;
+
+//     console.log(`Found ${docs.length} documents with string variant IDs`);
+
+//     if (docs.length === 0) {
+//       return res.json({ 
+//         success: true, 
+//         message: "No string variant IDs found. All variant IDs are already ObjectIds.",
+//         documentsProcessed: 0,
+//         variantIdsConverted: 0,
+//         historyIdsConverted: 0
+//       });
+//     }
+
+//     for (const doc of docs) {
+//       try {
+//         console.log(`Processing document: ${doc._id}`);
+//         let documentModified = false;
+
+//         // Process variants
+//         if (doc.variants && Array.isArray(doc.variants)) {
+//           doc.variants = doc.variants.map(variant => {
+//             const updatedVariant = { ...variant };
+
+//             // Convert variant._id if it's a string
+//             if (updatedVariant._id && typeof updatedVariant._id === 'string') {
+//               try {
+//                 const oldVariantId = updatedVariant._id;
+//                 updatedVariant._id = new mongoose.Types.ObjectId(oldVariantId);
+//                 convertedVariantIds++;
+//                 documentModified = true;
+//                 console.log(`  ✅ Converted variant ID: ${oldVariantId} -> ${updatedVariant._id}`);
+//               } catch (variantIdError) {
+//                 console.log(`  ❌ Failed to convert variant ID: ${updatedVariant._id} - ${variantIdError.message}`);
+//               }
+//             }
+
+//             // Convert stockHistory item IDs if they're strings
+//             if (updatedVariant.stockHistory && Array.isArray(updatedVariant.stockHistory)) {
+//               updatedVariant.stockHistory = updatedVariant.stockHistory.map(historyItem => {
+//                 const updatedHistoryItem = { ...historyItem };
+
+//                 if (updatedHistoryItem._id && typeof updatedHistoryItem._id === 'string') {
+//                   try {
+//                     const oldHistoryId = updatedHistoryItem._id;
+//                     updatedHistoryItem._id = new mongoose.Types.ObjectId(oldHistoryId);
+//                     convertedHistoryIds++;
+//                     documentModified = true;
+//                     console.log(`    ✅ Converted history ID: ${oldHistoryId} -> ${updatedHistoryItem._id}`);
+//                   } catch (historyIdError) {
+//                     console.log(`    ❌ Failed to convert history ID: ${updatedHistoryItem._id} - ${historyIdError.message}`);
+//                   }
+//                 }
+
+//                 return updatedHistoryItem;
+//               });
+//             }
+
+//             return updatedVariant;
+//           });
+//         }
+
+//         // Update the document if it was modified
+//         if (documentModified) {
+//           const updateResult = await collection.replaceOne(
+//             { _id: doc._id },
+//             doc
+//           );
+
+//           if (updateResult.modifiedCount === 1) {
+//             processedDocuments++;
+//             console.log(`✅ Successfully updated document: ${doc._id}`);
+//           } else {
+//             console.log(`❌ Failed to update document: ${doc._id}`);
+//           }
+//         }
+
+//       } catch (error) {
+//         console.log(`❌ Error processing document ${doc._id}: ${error.message}`);
+//       }
+//     }
+
+//     // Wait a moment for operations to complete
+//     await new Promise(resolve => setTimeout(resolve, 500));
+
+//     // Check final state
+//     const finalDocsWithStringVariantIds = await collection.countDocuments({
+//       "variants._id": { $type: "string" }
+//     });
+
+//     const finalDocsWithObjectIdVariantIds = await collection.countDocuments({
+//       "variants._id": { $type: "objectId" }
+//     });
+
+//     const finalDocsWithStringHistoryIds = await collection.countDocuments({
+//       "variants.stockHistory._id": { $type: "string" }
+//     });
+
+//     console.log(`Final state - Documents with string variant IDs: ${finalDocsWithStringVariantIds}`);
+//     console.log(`Final state - Documents with ObjectId variant IDs: ${finalDocsWithObjectIdVariantIds}`);
+//     console.log(`Final state - Documents with string history IDs: ${finalDocsWithStringHistoryIds}`);
+
+//     // Send success response with detailed information
+//     res.json({ 
+//       success: true, 
+//       documentsProcessed: processedDocuments,
+//       variantIdsConverted: convertedVariantIds,
+//       historyIdsConverted: convertedHistoryIds,
+//       finalState: {
+//         docsWithStringVariantIds: finalDocsWithStringVariantIds,
+//         docsWithObjectIdVariantIds: finalDocsWithObjectIdVariantIds,
+//         docsWithStringHistoryIds: finalDocsWithStringHistoryIds
+//       },
+//       message: `Successfully processed ${processedDocuments} documents. Converted ${convertedVariantIds} variant IDs and ${convertedHistoryIds} history IDs from string to ObjectId.`
+//     });
+
+//   } catch (error) {
+//     console.error('Fix-Variant-IDs Route Error:', error);
+//     res.status(500).json({ 
+//       error: error.message,
+//       success: false 
+//     });
+//   }
+// });
+
+
+
+router.get('/data-to-mongo', async (req, res) => {
+ Mechanic
+})
+
+
+
+
+const fs = require('fs').promises;
+const path = require('path');
+
+router.get('/get-data-and-store', async (req, res) => {
+  const baseUrl = process.env.ATTENDANCE_URL;
+  const username = process.env.ATTENDANCE_SYSTEM_UNAME;
+  const password = process.env.ATTENDANCE_SYSTEM_PASS;
+  
+  let cookieJar = new Map();
+  let allData = [];
+  
+  try {
+    console.log('🔐 Starting login process...');
+    
+    // Step 1: Get CSRF token
+    const loginPageResponse = await fetch(`${baseUrl}/login/`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Cache-Control': 'no-cache'
+      }
+    });
+
+    // Parse cookies from response
+    const setCookies = loginPageResponse.headers.get('set-cookie');
+    if (setCookies) {
+      const cookieStrings = setCookies.split(/,(?=\s*[a-zA-Z])/);
+      cookieStrings.forEach(cookieString => {
+        const parts = cookieString.split(';');
+        const [nameValue] = parts;
+        if (nameValue && nameValue.includes('=')) {
+          const [name, ...valueParts] = nameValue.split('=');
+          const value = valueParts.join('=');
+          if (name && value) {
+            cookieJar.set(name.trim(), value.trim());
+          }
+        }
+      });
+    }
+
+    // Extract CSRF token from HTML
+    const html = await loginPageResponse.text();
+    const patterns = [
+      /name=["|']csrfmiddlewaretoken["|']\s+value=["|']([^"']+)["|']/,
+      /value=["|']([^"']+)["|']\s+name=["|']csrfmiddlewaretoken["|']/,
+      /<input[^>]*name=["|']csrfmiddlewaretoken["|'][^>]*value=["|']([^"']+)["|']/
+    ];
+
+    let csrfToken = null;
+    for (const pattern of patterns) {
+      const match = html.match(pattern);
+      if (match) {
+        csrfToken = match[1];
+        break;
+      }
+    }
+
+    if (!csrfToken) {
+      throw new Error('Could not obtain CSRF token');
+    }
+
+    if (!cookieJar.has('csrftoken') && csrfToken) {
+      cookieJar.set('csrftoken', csrfToken);
+    }
+
+    console.log('✅ CSRF token obtained');
+
+    // Step 2: Login
+    const formData = new URLSearchParams();
+    formData.append('csrfmiddlewaretoken', csrfToken);
+    formData.append('username', username);
+    formData.append('password', password);
+    formData.append('captcha', '');
+    formData.append('template10', '');
+    formData.append('login_type', 'pwd');
+
+    const cookieString = Array.from(cookieJar.entries())
+      .map(([name, value]) => `${name}=${value}`)
+      .join('; ');
+
+    const loginResponse = await fetch(`${baseUrl}/login/`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRFToken': cookieJar.get('csrftoken'),
+        'Cookie': cookieString,
+        'Referer': `${baseUrl}/login/`,
+        'Origin': baseUrl,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+      },
+      body: formData,
+      redirect: 'manual'
+    });
+
+    // Update cookies after login
+    const newCookies = loginResponse.headers.get('set-cookie');
+    if (newCookies) {
+      const cookieStrings = newCookies.split(/,(?=\s*[a-zA-Z])/);
+      cookieStrings.forEach(cookieString => {
+        const parts = cookieString.split(';');
+        const [nameValue] = parts;
+        if (nameValue && nameValue.includes('=')) {
+          const [name, ...valueParts] = nameValue.split('=');
+          const value = valueParts.join('=');
+          if (name && value) {
+            cookieJar.set(name.trim(), value.trim());
+          }
+        }
+      });
+    }
+
+    if (!(loginResponse.status === 302 || loginResponse.status === 301 || loginResponse.ok)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Login failed',
+        message: 'Unable to authenticate with attendance system'
+      });
+    }
+
+    console.log('✅ Login successful');
+
+    // Step 3: Fetch all attendance data with pagination
+    const finalCookieString = Array.from(cookieJar.entries())
+      .map(([name, value]) => `${name}=${value}`)
+      .join('; ');
+
+    let currentPage = 1;
+    let hasNextPage = true;
+    let totalCount = 0;
+
+    console.log('📊 Starting data fetch process...');
+
+    while (hasNextPage) {
+      console.log(`📄 Fetching page ${currentPage}...`);
+      
+      const apiUrl = `http://127.0.0.1:8081/iclock/api/transactions/?page=${currentPage}`;
+      
+      const dataResponse = await fetch(apiUrl, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Cookie': finalCookieString,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'application/json, text/plain, */*',
+          'Referer': `${baseUrl}/login/`
+        }
+      });
+
+      if (!dataResponse.ok) {
+        return res.status(500).json({
+          success: false,
+          error: `HTTP ${dataResponse.status} on page ${currentPage}`,
+          partialData: allData.length > 0 ? { count: allData.length, data: allData } : null
+        });
+      }
+
+      const content = await dataResponse.text();
+      
+      // Check if we got redirected to login page
+      if (content.includes('SIGN IN TO YOUR ACCOUNT')) {
+        return res.status(401).json({
+          success: false,
+          error: 'Session expired during data fetch',
+          partialData: allData.length > 0 ? { count: allData.length, data: allData } : null
+        });
+      }
+
+      const pageData = JSON.parse(content);
+      
+      if (currentPage === 1) {
+        totalCount = pageData.count;
+        console.log(`📈 Total records to fetch: ${totalCount}`);
+      }
+
+      if (pageData.data && Array.isArray(pageData.data)) {
+        allData = allData.concat(pageData.data);
+        console.log(`✅ Page ${currentPage} fetched: ${pageData.data.length} records (Total: ${allData.length}/${totalCount})`);
+      }
+
+      // Check if there's a next page
+      hasNextPage = !!pageData.next;
+      currentPage++;
+
+      // Small delay to avoid overwhelming the server
+      if (hasNextPage) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+
+    console.log(`🎉 All data fetched successfully: ${allData.length} total records`);
+
+    // Step 4: Save to file
+    const outputData = {
+      totalRecords: allData.length,
+      fetchedAt: new Date().toISOString(),
+      data: allData
+    };
+
+    const filePath = path.join(process.cwd(), 'attendance-all-data.json');
+    await fs.writeFile(filePath, JSON.stringify(outputData, null, 2), 'utf8');
+    
+    console.log(`💾 Data saved to: ${filePath}`);
+    console.log(`📊 Summary: ${allData.length} attendance records saved`);
+
+    // Return success response with all data
+    res.json({
+      success: true,
+      message: 'All attendance data fetched and saved successfully',
+      totalRecords: allData.length,
+      filePath: 'attendance-all-data.json',
+      fetchedAt: new Date().toISOString(),
+      summary: {
+        totalPages: currentPage - 1,
+        recordsPerPage: Math.ceil(allData.length / (currentPage - 1)),
+        firstRecord: allData[0] || null,
+        lastRecord: allData[allData.length - 1] || null
+      },
+      data: allData
+    });
+
+  } catch (error) {
+    console.error('❌ Error:', error.message);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      message: 'Failed to fetch attendance data',
+      partialData: allData.length > 0 ? { count: allData.length, data: allData } : null
+    });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+router.get('/check-missing-dates', async (req, res) => {
+  try {
+    // Get total document count
+    const totalDocuments = await Fuels.countDocuments();
+
+    if (totalDocuments === 0) {
+      return res.json({ success: true, message: 'No data found' });
+    }
+
+    // Get ALL transaction dates
+    const allDates = await Fuels.find({}, { transactionDate: 1, _id: 0 }).lean();
+    
+    if (allDates.length === 0) {
+      throw new Error('No transaction dates found');
+    }
+
+    // Convert and validate dates
+    const validDates = [];
+    const invalidDates = [];
+    
+    allDates.forEach((doc, index) => {
+      try {
+        if (!doc.transactionDate) {
+          invalidDates.push({ index, reason: 'null/undefined', value: doc.transactionDate });
+          return;
+        }
+        
+        const dateObj = new Date(doc.transactionDate);
+        if (isNaN(dateObj.getTime())) {
+          invalidDates.push({ index, reason: 'invalid date', value: doc.transactionDate });
+          return;
+        }
+        
+        validDates.push({
+          original: doc.transactionDate,
+          date: dateObj,
+          year: dateObj.getFullYear(),
+          month: dateObj.getMonth() + 1,
+          day: dateObj.getDate()
+        });
+      } catch (error) {
+        invalidDates.push({ index, reason: error.message, value: doc.transactionDate });
+      }
+    });
+    
+    if (validDates.length === 0) {
+      throw new Error('No valid transaction dates found');
+    }
+
+    // Group by year-month and collect all days
+    const yearMonthGroups = {};
+    
+    validDates.forEach(dateInfo => {
+      const yearMonth = `${dateInfo.year}-${dateInfo.month.toString().padStart(2, '0')}`;
+      
+      if (!yearMonthGroups[yearMonth]) {
+        yearMonthGroups[yearMonth] = {
+          year: dateInfo.year,
+          month: dateInfo.month,
+          count: 0,
+          days: new Set()
+        };
+      }
+      
+      yearMonthGroups[yearMonth].count++;
+      yearMonthGroups[yearMonth].days.add(dateInfo.day);
+    });
+
+    // Function to get days in month
+    const getDaysInMonth = (year, month) => {
+      return new Date(year, month, 0).getDate();
+    };
+
+    // Function to get month name
+    const getMonthName = (month) => {
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                         'July', 'August', 'September', 'October', 'November', 'December'];
+      return monthNames[month - 1];
+    };
+
+    // Function to find missing date ranges
+    const findMissingRanges = (existingDays, totalDays) => {
+      const sortedDays = Array.from(existingDays).sort((a, b) => a - b);
+      const missingRanges = [];
+      let rangeStart = null;
+      
+      for (let day = 1; day <= totalDays; day++) {
+        if (!existingDays.has(day)) {
+          if (rangeStart === null) {
+            rangeStart = day;
+          }
+        } else {
+          if (rangeStart !== null) {
+            if (rangeStart === day - 1) {
+              missingRanges.push(`${rangeStart}`);
+            } else {
+              missingRanges.push(`${rangeStart}-${day - 1}`);
+            }
+            rangeStart = null;
+          }
+        }
+      }
+      
+      // Handle case where missing range extends to end of month
+      if (rangeStart !== null) {
+        if (rangeStart === totalDays) {
+          missingRanges.push(`${rangeStart}`);
+        } else {
+          missingRanges.push(`${rangeStart}-${totalDays}`);
+        }
+      }
+      
+      return missingRanges;
+    };
+
+    // Helper function for ordinal suffix
+    function getOrdinalSuffix(day) {
+      const num = parseInt(day);
+      if (num >= 11 && num <= 13) return 'th';
+      switch (num % 10) {
+        case 1: return 'st';
+        case 2: return 'nd';
+        case 3: return 'rd';
+        default: return 'th';
+      }
+    }
+
+    // Analyze each month for missing dates
+    const monthAnalysis = [];
+    
+    Object.values(yearMonthGroups).forEach(group => {
+      const daysInMonth = getDaysInMonth(group.year, group.month);
+      const existingDays = group.days;
+      const missingRanges = findMissingRanges(existingDays, daysInMonth);
+      const isComplete = missingRanges.length === 0;
+      
+      const monthData = {
+        year: group.year,
+        month: group.month,
+        monthName: getMonthName(group.month),
+        totalDaysInMonth: daysInMonth,
+        daysWithData: existingDays.size,
+        missingDaysCount: daysInMonth - existingDays.size,
+        transactionCount: group.count,
+        isComplete: isComplete,
+        missingDateRanges: missingRanges,
+        existingDays: Array.from(existingDays).sort((a, b) => a - b),
+        firstDay: Math.min(...existingDays),
+        lastDay: Math.max(...existingDays)
+      };
+      
+      monthAnalysis.push(monthData);
+    });
+
+    // Sort analysis by year and month
+    monthAnalysis.sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      return a.month - b.month;
+    });
+
+    // Separate complete and incomplete months
+    const completeMonths = monthAnalysis.filter(month => month.isComplete);
+    const incompleteMonths = monthAnalysis.filter(month => !month.isComplete);
+
+    // Find date range
+    const sortedDates = validDates.sort((a, b) => a.date - b.date);
+    const minDate = sortedDates[0].date;
+    const maxDate = sortedDates[sortedDates.length - 1].date;
+
+    // Generate summary for easy understanding
+    const summary = {
+      totalMonthsAnalyzed: monthAnalysis.length,
+      completeMonthsCount: completeMonths.length,
+      incompleteMonthsCount: incompleteMonths.length,
+      totalMissingDays: incompleteMonths.reduce((sum, month) => sum + month.missingDaysCount, 0)
+    };
+
+    // Create easy-to-read missing data report
+    const missingDataReport = incompleteMonths.map(month => {
+      const ranges = month.missingDateRanges.map(range => {
+        if (range.includes('-')) {
+          const [start, end] = range.split('-');
+          return `${start}${getOrdinalSuffix(start)} to ${end}${getOrdinalSuffix(end)}`;
+        } else {
+          return `${range}${getOrdinalSuffix(range)}`;
+        }
+      });
+      
+      return {
+        month: `${month.monthName} ${month.year}`,
+        missingDays: month.missingDaysCount,
+        missingDateRanges: ranges.join(', ')
+      };
+    });
+
+    const responseObj = {
+      success: true,
+      totalDocuments,
+      validDatesCount: validDates.length,
+      invalidDatesCount: invalidDates.length,
+      dateRange: {
+        minDate: minDate.toISOString().split('T')[0],
+        maxDate: maxDate.toISOString().split('T')[0],
+        daysDifference: Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24))
+      },
+      summary,
+      completeMonths: completeMonths.map(month => ({
+        month: `${month.monthName} ${month.year}`,
+        transactionCount: month.transactionCount
+      })),
+      incompleteMonths: missingDataReport,
+      detailedAnalysis: monthAnalysis,
+      quickSummary: {
+        message: `Found ${incompleteMonths.length} months with missing data out of ${monthAnalysis.length} total months.`,
+        totalMissingDays: summary.totalMissingDays,
+        completionRate: `${((completeMonths.length / monthAnalysis.length) * 100).toFixed(1)}%`
+      }
+    };
+
+    res.json(responseObj);
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      errorType: typeof error,
+      step: 'Error occurred during missing dates analysis'
+    });
+  }
+});
