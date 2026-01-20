@@ -247,6 +247,32 @@ const getYearlyServices = async (req, res) => {
     })
 }
 
+const getAllServicesByDateRange = async (req, res) => {
+  const { startDate, endDate } = req.params;
+  reportServices.fetchAllServicesByDateRange(startDate, endDate)
+    .then((fetchedServices) => {
+      if (fetchedServices) {
+        res.status(fetchedServices.status).json(fetchedServices)
+      }
+    })
+    .catch((err) => {
+      res.status(err.status || 500).json({ message: 'Cannot get services by date range', error: err.message })
+    })
+}
+
+const getAllServicesByLastMonths = async (req, res) => {
+  const { monthsCount } = req.params;
+  reportServices.fetchAllServicesByLastMonths(parseInt(monthsCount))
+    .then((fetchedServices) => {
+      if (fetchedServices) {
+        res.status(fetchedServices.status).json(fetchedServices)
+      }
+    })
+    .catch((err) => {
+      res.status(err.status || 500).json({ message: 'Cannot get services by last months', error: err.message })
+    })
+}
+
 module.exports = {
   addServiceReport,
   getServiceReport,
@@ -266,5 +292,7 @@ module.exports = {
   getYesterdayServices,
   getWeeklyServices,
   getMonthlyServices,
-  getYearlyServices
+  getYearlyServices,
+  getAllServicesByDateRange,
+  getAllServicesByLastMonths
 };

@@ -607,5 +607,175 @@ module.exports = {
         });
       }
     });
+  },
+
+  fetchAllServicesByDateRange: (startDate, endDate) => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Convert date format from DD-MM-YYYY to YYYY-MM-DD
+        const convertDate = (dateStr) => {
+          const parts = dateStr.split('-');
+          return `${parts[2]}-${parts[1]}-${parts[0]}`;
+        };
+
+        const formattedStartDate = convertDate(startDate);
+        const formattedEndDate = convertDate(endDate);
+
+        const getReport = await serviceReportModel.find({
+          date: {
+            $gte: formattedStartDate,
+            $lte: formattedEndDate
+          }
+        }).sort({ date: -1, regNo: 1 });
+
+        const groupedByType = {
+          oil: [],
+          maintenance: [],
+          tyre: [],
+          battery: [],
+          normal: [],
+          other: []
+        };
+
+        const groupedByRegNo = {};
+
+        getReport.forEach(report => {
+          const type = report.serviceType || 'other';
+          if (groupedByType[type]) {
+            groupedByType[type].push(report);
+          } else {
+            groupedByType.other.push(report);
+          }
+
+          if (!groupedByRegNo[report.regNo]) {
+            groupedByRegNo[report.regNo] = [];
+          }
+          groupedByRegNo[report.regNo].push(report);
+        });
+
+        const statistics = {
+          total: getReport.length,
+          totalEquipment: Object.keys(groupedByRegNo).length,
+          byType: {
+            oil: groupedByType.oil.length,
+            maintenance: groupedByType.maintenance.length,
+            tyre: groupedByType.tyre.length,
+            battery: groupedByType.battery.length,
+            normal: groupedByType.normal.length,
+            other: groupedByType.other.length
+          }
+        };
+
+        resolve({
+          status: 200,
+          ok: true,
+          period: 'custom',
+          dateRange: {
+            from: formattedStartDate,
+            to: formattedEndDate
+          },
+          statistics: statistics,
+          data: {
+            all: getReport,
+            groupedByType: groupedByType,
+            groupedByRegNo: groupedByRegNo
+          }
+        });
+      } catch (error) {
+        console.error('Error in fetchServicesByDateRange:', error);
+        reject({
+          status: 500,
+          ok: false,
+          message: error.message || 'Error fetching services by date range'
+        });
+      }
+    });
+  },
+
+  fetchAllServicesByLastMonths: (monthsCount) => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const currentDate = new Date();
+        const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - monthsCount, currentDate.getDate());
+
+        const formatDate = (date) => {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        };
+
+        const formattedStartDate = formatDate(startDate);
+        const formattedEndDate = formatDate(currentDate);
+
+        const getReport = await serviceReportModel.find({
+          date: {
+            $gte: formattedStartDate,
+            $lte: formattedEndDate
+          }
+        }).sort({ date: -1, regNo: 1 });
+
+        const groupedByType = {
+          oil: [],
+          maintenance: [],
+          tyre: [],
+          battery: [],
+          normal: [],
+          other: []
+        };
+
+        const groupedByRegNo = {};
+
+        getReport.forEach(report => {
+          const type = report.serviceType || 'other';
+          if (groupedByType[type]) {
+            groupedByType[type].push(report);
+          } else {
+            groupedByType.other.push(report);
+          }
+
+          if (!groupedByRegNo[report.regNo]) {
+            groupedByRegNo[report.regNo] = [];
+          }
+          groupedByRegNo[report.regNo].push(report);
+        });
+
+        const statistics = {
+          total: getReport.length,
+          totalEquipment: Object.keys(groupedByRegNo).length,
+          byType: {
+            oil: groupedByType.oil.length,
+            maintenance: groupedByType.maintenance.length,
+            tyre: groupedByType.tyre.length,
+            battery: groupedByType.battery.length,
+            normal: groupedByType.normal.length,
+            other: groupedByType.other.length
+          }
+        };
+
+        resolve({
+          status: 200,
+          ok: true,
+          period: `last-${monthsCount}-months`,
+          dateRange: {
+            from: formattedStartDate,
+            to: formattedEndDate
+          },
+          statistics: statistics,
+          data: {
+            all: getReport,
+            groupedByType: groupedByType,
+            groupedByRegNo: groupedByRegNo
+          }
+        });
+      } catch (error) {
+        console.error('Error in fetchServicesByLastMonths:', error);
+        reject({
+          status: 500,
+          ok: false,
+          message: error.message || 'Error fetching services by last months'
+        });
+      }
+    });
   }
 }
