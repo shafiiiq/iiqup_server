@@ -1,4 +1,3 @@
-const userServices = require('../services/service-report.js')
 const serviceHistoryServices = require('../services/service-history-services.js')
 
 const addServiceHistory = async (req, res) => {

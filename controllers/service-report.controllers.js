@@ -1,4 +1,4 @@
-const reportServices = require('../services/service-report.js')
+const reportServices = require('../services/service-report-services.js')
 
 const addServiceReport = async (req, res) => {
   reportServices.insertServiceReport(req.body)

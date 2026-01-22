@@ -1,7 +1,7 @@
 const serviceHistoryModel = require('../models/service-history.model.js');
 const serviceReportModel = require('../models/service-report.model.js');
-const { createNotification } = require('../utils/notification-jobs'); // Import notification service
-const PushNotificationService = require('../utils/push-notification-jobs');
+const { createNotification } = require('../utils/notification-jobs.js'); // Import notification service
+const PushNotificationService = require('../utils/push-notification-jobs.js');
 
 module.exports = {
 

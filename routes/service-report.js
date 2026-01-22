@@ -7,16 +7,15 @@ router.get('/getwith/:id', serviceReportController.getServiceReportWithId)
 router.put('/updatewith/:id', serviceReportController.updateServiceReportWithId)
 router.delete('/deletewith/:id', serviceReportController.removeServiceReportWithId)
 
-// PUT THESE BEFORE THE :regNo ROUTE
 router.get('/summary/daily', serviceReportController.getDailyServices)
 router.get('/summary/yesterday', serviceReportController.getYesterdayServices)
 router.get('/summary/weekly', serviceReportController.getWeeklyServices)
 router.get('/summary/monthly', serviceReportController.getMonthlyServices)
 router.get('/summary/yearly', serviceReportController.getYearlyServices)
-router.get('/summary/date-range/:startDate/:endDate', serviceReportController.getServicesByDateRange)
-router.get('/summary/last-months/:monthsCount', serviceReportController.getServicesByLastMonths)
 
-// NOW PUT THE DYNAMIC ROUTES AFTER
+router.get('/summary/date-range/:startDate/:endDate', serviceReportController.getAllServicesByDateRange)
+router.get('/summary/last-months/:monthsCount', serviceReportController.getAllServicesByLastMonths)
+
 router.get('/histories/:regNo', serviceReportController.getAllServiceHistories)
 router.get('/histories/:regNo/oil', serviceReportController.getAllOilServices)
 router.get('/histories/:regNo/maintenance', serviceReportController.getAllMaintenanceServices)
