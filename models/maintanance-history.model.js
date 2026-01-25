@@ -21,6 +21,9 @@ const MaintananceHistorySchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  reportId: {
+    type: String,
+  },
   createdAt: {
     type: Date,
     default: Date.now

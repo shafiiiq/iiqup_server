@@ -94,86 +94,6 @@ ToolkitSchema.pre('save', function (next) {
   next();
 });
 
-// Define the attendance schema (unchanged)
-const AttendanceSchema = new Schema({
-  id: {
-    type: Number,
-  },
-  emp: {
-    type: Number,
-  },
-  emp_code: {
-    type: String
-  },
-  first_name: {
-    type: String
-  },
-  last_name: {
-    type: String
-  },
-  department: {
-    type: String,
-  },
-  position: {
-    type: String,
-  },
-  punch_time: {
-    type: String,
-  },
-  punch_state: {
-    type: String,
-  },
-  verify_type: {
-    type: String,
-  },
-  verify_type_display: {
-    type: String,
-  },
-  work_code: {
-    type: String,
-  },
-  gps_location: {
-    type: String,
-  },
-  work_code: {
-    type: String,
-  },
-  area_alias: {
-    type: String,
-  },
-  terminal_sn: {
-    type: String,
-  },
-  temperature: {
-    type: String,
-  },
-  is_mask: {
-    type: String,
-  },
-  terminal_alias: {
-    type: String,
-  },
-  upload_time: {
-    type: String,
-  },
-});
-
-// Calculate total time when clocking out (unchanged)
-AttendanceSchema.pre('save', function (next) {
-  if (this.in && this.out) {
-    let totalMinutes = Math.floor((this.out - this.in) / (1000 * 60));
-
-    // Subtract break time if both breakOut and breakIn exist
-    if (this.breakOut && this.breakIn) {
-      const breakMinutes = Math.floor((this.breakIn - this.breakOut) / (1000 * 60));
-      totalMinutes -= breakMinutes;
-    }
-
-    this.totalTime = totalMinutes > 0 ? totalMinutes : 0;
-  }
-  next();
-});
-
 // Define the individual overtime entry schema
 const OvertimeEntrySchema = new Schema({
   date: {
@@ -324,7 +244,6 @@ const MechanicSchema = new Schema({
     default: 'mechanic'
   },
   toolkits: [ToolkitSchema],
-  attendance: [AttendanceSchema],
   // Only use the monthly overtime structure
   monthlyOvertime: [MonthlyOvertimeSchema],
   createdAt: {

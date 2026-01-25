@@ -3,24 +3,26 @@ const router = express.Router();
 const mechanicController = require('../controllers/mechanic.controller');
 const { authMiddleware } = require('../utils/jwt');
 
-/* Mechanic CRUD operations */
 router.post('/add-mechanic', mechanicController.addMechanic);
 router.get('/get-all-mechanic', authMiddleware, mechanicController.getMechanic);
 router.put('/update-mechanic/:id', mechanicController.updateMechanic);
 router.delete('/delete-mechanic/:id', mechanicController.deleteMechanic);
-
-/* Toolkit operations */
 router.post('/:mechanicId/assign-toolkit', mechanicController.addToolkit);
-
-/* Overtime operations */
 router.post('/:mechanicId/overtime', mechanicController.addOvertime);
 router.get('/:mechanicId/monthly-overtime', mechanicController.getMechanicMonthlyOvertime);
 router.get('/:mechanicId/monthly-overtime/:month/:year', mechanicController.getMechanicMonthlyOvertime);
-
-/* Migration operation (one-time use) */
+router.get('/attendance/:zktecoPin/daily/:date', mechanicController.getDailyAttendance);
+router.get('/attendance/:zktecoPin/weekly/:year/:week', mechanicController.getWeeklyAttendance);
+router.get('/attendance/:zktecoPin/monthly/:year/:month', mechanicController.getMonthlyAttendance);
+router.get('/attendance/:zktecoPin/yearly/:year', mechanicController.getYearlyAttendance);
+router.get('/attendance/:zktecoPin/date-range', mechanicController.getAttendanceByDateRange);
+router.get('/attendance/:zktecoPin/months', mechanicController.getAttendanceByMonths);
+router.get('/attendance/:zktecoPin/years', mechanicController.getAttendanceByYears);
+router.get('/attendance/:zktecoPin/weeks', mechanicController.getAttendanceByWeeks);
+router.get('/attendance/:zktecoPin/all-months', mechanicController.getAllMonthsAttendance);
+router.get('/attendance/:zktecoPin/all-years', mechanicController.getAllYearsAttendance);
+router.get('/attendance/:zktecoPin/all', mechanicController.getAllAttendance);
 router.post('/overtime/migrate', mechanicController.migrateOvertimeData);
-
-/* Cleanup operations */
 router.delete('/:mechanicId/overtime/cleanup', mechanicController.cleanupMechanicOvertimeData);
 router.delete('/overtime/cleanup-all', mechanicController.cleanupAllOvertimeData);
 

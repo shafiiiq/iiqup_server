@@ -60,6 +60,9 @@ const ServiceReportSchema = new Schema({
   serviceType: {
     type: String,
   },
+  historyId: {
+    type: String,
+  },
   checklistItems: [ChecklistItemSchema],
   createdAt: {
     type: Date,

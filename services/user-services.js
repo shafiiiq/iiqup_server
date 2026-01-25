@@ -2611,7 +2611,7 @@ const blockDevice = async (sessionId, userId) => {
       userId
     });
 
-    if (!session) {
+    if (!session) { 
       return {
         status: 404,
         success: false,
@@ -2621,11 +2621,11 @@ const blockDevice = async (sessionId, userId) => {
 
     // Delete session permanently (blocking)
     await Session.deleteOne({ _id: sessionId });
-
-    const userToBlock = await User.findById(userId);
+    
+    const userToBlock = await User.findById(userId);  
     if (userToBlock) {
       const websocket = await import('../utils/websocket.js');
-      websocket.default.forceLogoutUser(userToLogout.uniqueCode, userToLogout._id, session.sessionToken, 'Device blocked');
+      websocket.default.forceLogoutUser(userToBlock.uniqueCode, userToBlock._id, session.sessionToken, 'Device blocked');
     }
 
     // Optionally: Add device ID to blocked devices list in User model

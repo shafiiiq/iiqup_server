@@ -1,4 +1,7 @@
 const serviceHistoryModel = require('../models/service-history.model.js');
+const tyreHistoryModel = require('../models/tyre.model.js');
+const batteryHistoryModel = require('../models/batery.model.js');
+const maintanceHistoryModel = require('../models/maintanance-history.model.js');
 const serviceReportModel = require('../models/service-report.model.js');
 const { createNotification } = require('../utils/notification-jobs.js'); // Import notification service
 const PushNotificationService = require('../utils/push-notification-jobs.js');
@@ -6,42 +9,59 @@ const PushNotificationService = require('../utils/push-notification-jobs.js');
 module.exports = {
 
   insertServiceReport: (data) => {
-
     return new Promise(async (resolve, reject) => {
       try {
         if (!data || !data.regNo || !data.date) {
           throw new Error('Missing required data: regNo and date are required');
         }
 
-        if (data.checklistItems && data.serviceType !== 'normal') {
-          data.serviceType = 'oil';
-        } else if (data.serviceType === 'normal') {
-          data.serviceType = 'normal';
-
-          try {
-            const correspondingReport = await serviceHistoryModel.findOne({
-              regNo: data.regNo,
-              date: data.date
-            });
-
-            console.log("correspondingReport", correspondingReport);
-
-            if (correspondingReport) {
-              // Update the serviceType field directly
-              correspondingReport.serviceType = data.serviceType;
-
-              await correspondingReport.save();
-            }
-          } catch (error) {
-            console.error('Error updating service report:', error);
-          }
+        // Determine which history model to use based on serviceType
+        let HistoryModel;
+        if (data.serviceType === "oil" || data.serviceType === "normal") {
+          HistoryModel = serviceHistoryModel;
+        } else if (data.serviceType === "tyre") {
+          HistoryModel = tyreHistoryModel;
+        } else if (data.serviceType === "battery") {
+          HistoryModel = batteryHistoryModel;
+        } else if (data.serviceType === "maintenance") {
+          HistoryModel = maintanceHistoryModel;
+        } else {
+          HistoryModel = serviceHistoryModel; // default
         }
 
-        const result = await serviceReportModel.create(data);
+        let correspondingHistory;
+
+        // If historyId is provided, use it directly
+        if (data.historyId) {
+          correspondingHistory = await HistoryModel.findById(data.historyId);
+        } else {
+          // Fallback to finding by regNo and date
+          correspondingHistory = await HistoryModel.findOne({
+            regNo: data.regNo,
+            date: data.date
+          });
+        }
+
+        if (!correspondingHistory) {
+          throw new Error(`No history record found for ${data.historyId ? 'historyId: ' + data.historyId : 'regNo: ' + data.regNo + ' and date: ' + data.date}`);
+        }
+
+        // Create the service report with historyId
+        const reportData = {
+          ...data,
+          historyId: correspondingHistory._id.toString()
+        };
+
+        const result = await serviceReportModel.create(reportData);
 
         if (!result) {
           throw new Error(`Failed to create service report for regNo: ${data.regNo}`);
         }
+
+        // Update the history record with reportId and serviceType
+        correspondingHistory.reportId = result._id.toString();
+        correspondingHistory.serviceType = data.serviceType;
+        await correspondingHistory.save();
 
         await createNotification({
           title: `${data.machine} - ${data.regNo} serviced`,
@@ -55,7 +75,7 @@ module.exports = {
         await PushNotificationService.sendGeneralNotification(
           JSON.parse(process.env.OFFICE_MAIN),
           `${data.machine} - ${data.regNo} serviced`, //title
-          `At ${data.location}\nServiced Hours: ${data.serviceHrs}\nNext Service: ${data.nextServiceHrs}\n${data.remarks}\nMechanics: ${data.mechanics}`, //decription
+          `At ${data.location}\nServiced Hours: ${data.serviceHrs}\nNext Service: ${data.nextServiceHrs}\n${data.remarks}\nMechanics: ${data.mechanics}`, //description
           'high', //priority
           'normal' // type
         );
@@ -132,6 +152,7 @@ module.exports = {
   updateServiceReportWith: (id, updateData) => {
     return new Promise(async (resolve, reject) => {
       try {
+
         // Find and update the service report
         const updatedServiceReport = await serviceReportModel.findByIdAndUpdate(
           id,
@@ -184,28 +205,43 @@ module.exports = {
         // Prepare service history update data
         const serviceHistoryUpdate = {
           date: updatedServiceReport.date,
-          oil: oilFilterStatus, // Assuming oil status follows oilFilter
+          oil: oilFilterStatus,
           oilFilter: oilFilterStatus,
           fuelFilter: fuelFilterStatus,
-          waterSeparator: 'Check', // Default value, adjust as needed
+          waterSeparator: 'Check',
           airFilter: airFilterStatus,
           serviceHrs: parseInt(updatedServiceReport.serviceHrs) || 0,
           nextServiceHrs: parseInt(updatedServiceReport.nextServiceHrs) || 0,
         };
 
-        // Update service history - find by regNo and date
-        const updatedServiceHistory = await serviceHistoryModel.findOneAndUpdate(
-          {
-            regNo: parseInt(updatedServiceReport.regNo), // Convert to number as per schema
-            date: updatedServiceReport.date
-          },
+        let HistoryModel
+        if (updatedServiceReport.serviceType === "oil" || updatedServiceReport.serviceType === "normal") {
+          HistoryModel = serviceHistoryModel
+          console.log("1")
+        } else if (updatedServiceReport.serviceType === "tyre") {
+          console.log("2")
+          HistoryModel = tyreHistoryModel
+        } else if (updatedServiceReport.serviceType === "battery") {
+          console.log("3")
+          HistoryModel = batteryHistoryModel
+        } else if (updatedServiceReport.serviceType === "maintenance") {
+          console.log("4")
+          HistoryModel = maintanceHistoryModel
+        }
+
+        // Use historyId to find and update the exact history record
+        const updatedServiceHistory = await HistoryModel.findByIdAndUpdate(
+          updatedServiceReport.historyId,  // Use the stored historyId
           serviceHistoryUpdate,
           {
             new: true,
-            upsert: true, // Create if doesn't exist
             runValidators: true
           }
         );
+
+        if (!updatedServiceHistory) {
+          console.warn('Service history not found for historyId:', updatedServiceReport.historyId);
+        }
 
         // Prepare response
         const response = {
@@ -231,10 +267,9 @@ module.exports = {
       }
     });
   },
-
   deleteServiceReportWith: async (id) => {
     try {
-      // First, find the service report to get regNo and date before deletion
+      // First, find the service report to get historyId and serviceType before deletion
       const serviceReportToDelete = await serviceReportModel.findById(id);
 
       if (!serviceReportToDelete) {
@@ -245,8 +280,8 @@ module.exports = {
         };
       }
 
-      // Extract regNo and date for service history lookup
-      const { regNo, date } = serviceReportToDelete;
+      // Extract historyId and serviceType for history deletion
+      const { historyId, serviceType } = serviceReportToDelete;
 
       // Delete the service report
       const deletedServiceReport = await serviceReportModel.findByIdAndDelete(id);
@@ -259,11 +294,25 @@ module.exports = {
         };
       }
 
-      // Find and delete corresponding service history record
-      const deletedServiceHistory = await serviceHistoryModel.findOneAndDelete({
-        regNo: parseInt(regNo),
-        date: date
-      });
+      // Determine which history model to use based on serviceType
+      let HistoryModel;
+      if (serviceType === "oil" || serviceType === "normal") {
+        HistoryModel = serviceHistoryModel;
+      } else if (serviceType === "tyre") {
+        HistoryModel = tyreHistoryModel;
+      } else if (serviceType === "battery") {
+        HistoryModel = batteryHistoryModel;
+      } else if (serviceType === "maintenance") {
+        HistoryModel = maintanceHistoryModel;
+      } else {
+        HistoryModel = serviceHistoryModel; // default
+      }
+
+      // Find and delete corresponding history record using historyId
+      let deletedServiceHistory = null;
+      if (historyId) {
+        deletedServiceHistory = await HistoryModel.findByIdAndDelete(historyId);
+      }
 
       const response = {
         success: true,
@@ -273,12 +322,14 @@ module.exports = {
             id: deletedServiceReport._id,
             regNo: deletedServiceReport.regNo,
             date: deletedServiceReport.date,
-            machine: deletedServiceReport.machine
+            machine: deletedServiceReport.machine,
+            serviceType: deletedServiceReport.serviceType
           },
           deletedServiceHistory: deletedServiceHistory ? {
             id: deletedServiceHistory._id,
             regNo: deletedServiceHistory.regNo,
-            date: deletedServiceHistory.date
+            date: deletedServiceHistory.date,
+            serviceType: deletedServiceHistory.serviceType
           } : null
         }
       };

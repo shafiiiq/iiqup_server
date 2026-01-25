@@ -33,6 +33,9 @@ const TyreHistorySchema = new mongoose.Schema({
     type: String, // Can be changed to Number if only numeric values are expected
     required: true
   },
+  reportId: {
+    type: String,
+  },
   createdAt: {
     type: Date,
     default: Date.now

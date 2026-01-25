@@ -45,9 +45,12 @@ const ServiceHistorySchema = new mongoose.Schema({
   serviceType: {
     type: String,
   },
-  serviceReport:[],
+  reportId: {
+    type: String,
+  },
+  serviceReport: [],
   fullService: {
-    type:Boolean
+    type: Boolean
   }
 });
 

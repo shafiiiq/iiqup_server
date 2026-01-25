@@ -1,4 +1,5 @@
 const Mechanic = require('../models/mechanic.model');
+const Attendance = require('../models/attendance.model');
 
 /**
  * Service to handle all mechanic-related operations
@@ -556,6 +557,571 @@ class MechanicService {
             message: 'No migration needed - system is already using monthly structure',
             data: {}
         };
+    }
+
+    /**
+ * Fetch daily attendance for a mechanic
+ * @param {String} zktecoPin - ZKTeco PIN
+ * @param {String} date - Date in YYYY-MM-DD format
+ * @returns {Promise} - Promise with status and data
+ */
+    async fetchDailyAttendance(zktecoPin, date) {
+        try {
+            const mechanic = await Mechanic.findOne({ zktecoPin: parseInt(zktecoPin) });
+
+            if (!mechanic) {
+                throw {
+                    status: 404,
+                    message: 'Mechanic not found'
+                };
+            }
+
+            const attendance = await Attendance.find({
+                pin: zktecoPin,
+                dateOnly: date
+            }).sort({ punchDateTime: 1 });
+
+            return {
+                status: 200,
+                message: `Daily attendance for ${date} fetched successfully`,
+                data: {
+                    mechanic: {
+                        name: mechanic.name,
+                        zktecoPin: mechanic.zktecoPin
+                    },
+                    date: date,
+                    records: attendance,
+                    count: attendance.length
+                }
+            };
+        } catch (error) {
+            if (error.status) {
+                throw error;
+            }
+            throw {
+                status: 500,
+                message: error.message || 'Error fetching daily attendance'
+            };
+        }
+    }
+
+    /**
+     * Fetch weekly attendance for a mechanic
+     * @param {String} zktecoPin - ZKTeco PIN
+     * @param {String} year - Year
+     * @param {String} week - Week number
+     * @returns {Promise} - Promise with status and data
+     */
+    async fetchWeeklyAttendance(zktecoPin, year, week) {
+        try {
+            const mechanic = await Mechanic.findOne({ zktecoPin: parseInt(zktecoPin) });
+
+            if (!mechanic) {
+                throw {
+                    status: 404,
+                    message: 'Mechanic not found'
+                };
+            }
+
+            const attendance = await Attendance.find({
+                pin: zktecoPin,
+                year: parseInt(year),
+                weekNumber: parseInt(week)
+            }).sort({ punchDateTime: 1 });
+
+            return {
+                status: 200,
+                message: `Weekly attendance for week ${week}, ${year} fetched successfully`,
+                data: {
+                    mechanic: {
+                        name: mechanic.name,
+                        zktecoPin: mechanic.zktecoPin
+                    },
+                    year: year,
+                    week: week,
+                    records: attendance,
+                    count: attendance.length
+                }
+            };
+        } catch (error) {
+            if (error.status) {
+                throw error;
+            }
+            throw {
+                status: 500,
+                message: error.message || 'Error fetching weekly attendance'
+            };
+        }
+    }
+
+    /**
+     * Fetch monthly attendance for a mechanic
+     * @param {String} zktecoPin - ZKTeco PIN
+     * @param {String} year - Year
+     * @param {String} month - Month (01-12)
+     * @returns {Promise} - Promise with status and data
+     */
+    async fetchMonthlyAttendance(zktecoPin, year, month) {
+        try {
+            const mechanic = await Mechanic.findOne({ zktecoPin: parseInt(zktecoPin) });
+
+            if (!mechanic) {
+                throw {
+                    status: 404,
+                    message: 'Mechanic not found'
+                };
+            }
+
+            const monthYear = `${year}-${month.padStart(2, '0')}`;
+            const attendance = await Attendance.find({
+                pin: zktecoPin,
+                monthYear: monthYear
+            }).sort({ punchDateTime: 1 });
+
+            return {
+                status: 200,
+                message: `Monthly attendance for ${monthYear} fetched successfully`,
+                data: {
+                    mechanic: {
+                        name: mechanic.name,
+                        zktecoPin: mechanic.zktecoPin
+                    },
+                    year: year,
+                    month: month,
+                    records: attendance,
+                    count: attendance.length
+                }
+            };
+        } catch (error) {
+            if (error.status) {
+                throw error;
+            }
+            throw {
+                status: 500,
+                message: error.message || 'Error fetching monthly attendance'
+            };
+        }
+    }
+
+    /**
+     * Fetch yearly attendance for a mechanic
+     * @param {String} zktecoPin - ZKTeco PIN
+     * @param {String} year - Year
+     * @returns {Promise} - Promise with status and data
+     */
+    async fetchYearlyAttendance(zktecoPin, year) {
+        try {
+            const mechanic = await Mechanic.findOne({ zktecoPin: parseInt(zktecoPin) });
+
+            if (!mechanic) {
+                throw {
+                    status: 404,
+                    message: 'Mechanic not found'
+                };
+            }
+
+            const attendance = await Attendance.find({
+                pin: zktecoPin,
+                year: parseInt(year)
+            }).sort({ punchDateTime: 1 });
+
+            return {
+                status: 200,
+                message: `Yearly attendance for ${year} fetched successfully`,
+                data: {
+                    mechanic: {
+                        name: mechanic.name,
+                        zktecoPin: mechanic.zktecoPin
+                    },
+                    year: year,
+                    records: attendance,
+                    count: attendance.length
+                }
+            };
+        } catch (error) {
+            if (error.status) {
+                throw error;
+            }
+            throw {
+                status: 500,
+                message: error.message || 'Error fetching yearly attendance'
+            };
+        }
+    }
+
+    /**
+     * Fetch attendance by date range
+     * @param {String} zktecoPin - ZKTeco PIN
+     * @param {String} startDate - Start date in YYYY-MM-DD format
+     * @param {String} endDate - End date in YYYY-MM-DD format
+     * @returns {Promise} - Promise with status and data
+     */
+    async fetchAttendanceByDateRange(zktecoPin, startDate, endDate) {
+        try {
+            if (!startDate || !endDate) {
+                throw {
+                    status: 400,
+                    message: 'Both startDate and endDate are required'
+                };
+            }
+
+            const mechanic = await Mechanic.findOne({ zktecoPin: parseInt(zktecoPin) });
+
+            if (!mechanic) {
+                throw {
+                    status: 404,
+                    message: 'Mechanic not found'
+                };
+            }
+
+            const attendance = await Attendance.find({
+                pin: zktecoPin,
+                dateOnly: {
+                    $gte: startDate,
+                    $lte: endDate
+                }
+            }).sort({ punchDateTime: 1 });
+
+            return {
+                status: 200,
+                message: `Attendance from ${startDate} to ${endDate} fetched successfully`,
+                data: {
+                    mechanic: {
+                        name: mechanic.name,
+                        zktecoPin: mechanic.zktecoPin
+                    },
+                    startDate: startDate,
+                    endDate: endDate,
+                    records: attendance,
+                    count: attendance.length
+                }
+            };
+        } catch (error) {
+            if (error.status) {
+                throw error;
+            }
+            throw {
+                status: 500,
+                message: error.message || 'Error fetching attendance by date range'
+            };
+        }
+    }
+
+    /**
+     * Fetch attendance by specific months
+     * @param {String} zktecoPin - ZKTeco PIN
+     * @param {String} months - Comma-separated months in YYYY-MM format
+     * @returns {Promise} - Promise with status and data
+     */
+    async fetchAttendanceByMonths(zktecoPin, months) {
+        try {
+            if (!months) {
+                throw {
+                    status: 400,
+                    message: 'Months parameter is required (format: YYYY-MM,YYYY-MM)'
+                };
+            }
+
+            const mechanic = await Mechanic.findOne({ zktecoPin: parseInt(zktecoPin) });
+
+            if (!mechanic) {
+                throw {
+                    status: 404,
+                    message: 'Mechanic not found'
+                };
+            }
+
+            const monthsArray = months.split(',').map(m => m.trim());
+            const attendance = await Attendance.find({
+                pin: zktecoPin,
+                monthYear: { $in: monthsArray }
+            }).sort({ punchDateTime: 1 });
+
+            return {
+                status: 200,
+                message: `Attendance for specified months fetched successfully`,
+                data: {
+                    mechanic: {
+                        name: mechanic.name,
+                        zktecoPin: mechanic.zktecoPin
+                    },
+                    months: monthsArray,
+                    records: attendance,
+                    count: attendance.length
+                }
+            };
+        } catch (error) {
+            if (error.status) {
+                throw error;
+            }
+            throw {
+                status: 500,
+                message: error.message || 'Error fetching attendance by months'
+            };
+        }
+    }
+
+    /**
+     * Fetch attendance by specific years
+     * @param {String} zktecoPin - ZKTeco PIN
+     * @param {String} years - Comma-separated years
+     * @returns {Promise} - Promise with status and data
+     */
+    async fetchAttendanceByYears(zktecoPin, years) {
+        try {
+            if (!years) {
+                throw {
+                    status: 400,
+                    message: 'Years parameter is required (format: 2025,2024,2023)'
+                };
+            }
+
+            const mechanic = await Mechanic.findOne({ zktecoPin: parseInt(zktecoPin) });
+
+            if (!mechanic) {
+                throw {
+                    status: 404,
+                    message: 'Mechanic not found'
+                };
+            }
+
+            const yearsArray = years.split(',').map(y => parseInt(y.trim()));
+            const attendance = await Attendance.find({
+                pin: zktecoPin,
+                year: { $in: yearsArray }
+            }).sort({ punchDateTime: 1 });
+
+            return {
+                status: 200,
+                message: `Attendance for specified years fetched successfully`,
+                data: {
+                    mechanic: {
+                        name: mechanic.name,
+                        zktecoPin: mechanic.zktecoPin
+                    },
+                    years: yearsArray,
+                    records: attendance,
+                    count: attendance.length
+                }
+            };
+        } catch (error) {
+            if (error.status) {
+                throw error;
+            }
+            throw {
+                status: 500,
+                message: error.message || 'Error fetching attendance by years'
+            };
+        }
+    }
+
+    /**
+     * Fetch attendance by specific weeks
+     * @param {String} zktecoPin - ZKTeco PIN
+     * @param {String} weeks - Comma-separated weeks in YYYY-WW format
+     * @returns {Promise} - Promise with status and data
+     */
+    async fetchAttendanceByWeeks(zktecoPin, weeks) {
+        try {
+            if (!weeks) {
+                throw {
+                    status: 400,
+                    message: 'Weeks parameter is required (format: 2025-1,2025-2)'
+                };
+            }
+
+            const mechanic = await Mechanic.findOne({ zktecoPin: parseInt(zktecoPin) });
+
+            if (!mechanic) {
+                throw {
+                    status: 404,
+                    message: 'Mechanic not found'
+                };
+            }
+
+            const weeksArray = weeks.split(',').map(w => w.trim());
+            const queries = weeksArray.map(weekStr => {
+                const [year, week] = weekStr.split('-');
+                return {
+                    pin: zktecoPin,
+                    year: parseInt(year),
+                    weekNumber: parseInt(week)
+                };
+            });
+
+            const attendance = await Attendance.find({
+                $or: queries
+            }).sort({ punchDateTime: 1 });
+
+            return {
+                status: 200,
+                message: `Attendance for specified weeks fetched successfully`,
+                data: {
+                    mechanic: {
+                        name: mechanic.name,
+                        zktecoPin: mechanic.zktecoPin
+                    },
+                    weeks: weeksArray,
+                    records: attendance,
+                    count: attendance.length
+                }
+            };
+        } catch (error) {
+            if (error.status) {
+                throw error;
+            }
+            throw {
+                status: 500,
+                message: error.message || 'Error fetching attendance by weeks'
+            };
+        }
+    }
+
+    /**
+     * Fetch all months attendance grouped by month
+     * @param {String} zktecoPin - ZKTeco PIN
+     * @returns {Promise} - Promise with status and data
+     */
+    async fetchAllMonthsAttendance(zktecoPin) {
+        try {
+            const mechanic = await Mechanic.findOne({ zktecoPin: parseInt(zktecoPin) });
+
+            if (!mechanic) {
+                throw {
+                    status: 404,
+                    message: 'Mechanic not found'
+                };
+            }
+
+            const attendance = await Attendance.aggregate([
+                { $match: { pin: zktecoPin } },
+                { $sort: { punchDateTime: 1 } },
+                {
+                    $group: {
+                        _id: '$monthYear',
+                        records: { $push: '$$ROOT' },
+                        count: { $sum: 1 }
+                    }
+                },
+                { $sort: { _id: -1 } }
+            ]);
+
+            return {
+                status: 200,
+                message: 'All months attendance fetched successfully',
+                data: {
+                    mechanic: {
+                        name: mechanic.name,
+                        zktecoPin: mechanic.zktecoPin
+                    },
+                    months: attendance,
+                    totalMonths: attendance.length
+                }
+            };
+        } catch (error) {
+            if (error.status) {
+                throw error;
+            }
+            throw {
+                status: 500,
+                message: error.message || 'Error fetching all months attendance'
+            };
+        }
+    }
+
+    /**
+     * Fetch all years attendance grouped by year
+     * @param {String} zktecoPin - ZKTeco PIN
+     * @returns {Promise} - Promise with status and data
+     */
+    async fetchAllYearsAttendance(zktecoPin) {
+        try {
+            const mechanic = await Mechanic.findOne({ zktecoPin: parseInt(zktecoPin) });
+
+            if (!mechanic) {
+                throw {
+                    status: 404,
+                    message: 'Mechanic not found'
+                };
+            }
+
+            const attendance = await Attendance.aggregate([
+                { $match: { pin: zktecoPin } },
+                { $sort: { punchDateTime: 1 } },
+                {
+                    $group: {
+                        _id: '$year',
+                        records: { $push: '$$ROOT' },
+                        count: { $sum: 1 }
+                    }
+                },
+                { $sort: { _id: -1 } }
+            ]);
+
+            return {
+                status: 200,
+                message: 'All years attendance fetched successfully',
+                data: {
+                    mechanic: {
+                        name: mechanic.name,
+                        zktecoPin: mechanic.zktecoPin
+                    },
+                    years: attendance,
+                    totalYears: attendance.length
+                }
+            };
+        } catch (error) {
+            if (error.status) {
+                throw error;
+            }
+            throw {
+                status: 500,
+                message: error.message || 'Error fetching all years attendance'
+            };
+        }
+    }
+
+    /**
+     * Fetch all attendance records
+     * @param {String} zktecoPin - ZKTeco PIN
+     * @returns {Promise} - Promise with status and data
+     */
+    async fetchAllAttendance(zktecoPin) {
+        try {
+            const mechanic = await Mechanic.findOne({ zktecoPin: parseInt(zktecoPin) });
+
+            if (!mechanic) {
+                throw {
+                    status: 404,
+                    message: 'Mechanic not found'
+                };
+            }
+
+            const attendance = await Attendance.find({
+                pin: zktecoPin
+            }).sort({ punchDateTime: -1 });
+
+            return {
+                status: 200,
+                message: 'All attendance records fetched successfully',
+                data: {
+                    mechanic: {
+                        name: mechanic.name,
+                        zktecoPin: mechanic.zktecoPin
+                    },
+                    records: attendance,
+                    count: attendance.length
+                }
+            };
+        } catch (error) {
+            if (error.status) {
+                throw error;
+            }
+            throw {
+                status: 500,
+                message: error.message || 'Error fetching all attendance'
+            };
+        }
     }
 }
 

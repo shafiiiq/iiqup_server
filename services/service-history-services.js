@@ -424,40 +424,72 @@ module.exports = {
 
     deleteServiceHistory: async (id, type) => {
         try {
-
-            let deletedToolkit
-            if (type == 'oil') {
-                deletedToolkit = await serviceHistoryModel.findByIdAndDelete(id)
-            } else if (type == 'tyre') {
-                deletedToolkit = await tyreModel.findByIdAndDelete(id)
-            } else if (type == 'battery') {
-                deletedToolkit = await batteryModel.findByIdAndDelete(id)
+            // Determine which history model to use
+            let HistoryModel;
+            if (type === 'oil' || type === 'normal') {
+                HistoryModel = serviceHistoryModel;
+            } else if (type === 'tyre') {
+                HistoryModel = tyreHistoryModel;
+            } else if (type === 'battery') {
+                HistoryModel = batteryHistoryModel;
+            } else if (type === 'maintenance') {
+                HistoryModel = maintananceHistoryModel;
             } else {
-                deletedToolkit = await maintananceHistoryModel.findByIdAndDelete(id)
+                HistoryModel = serviceHistoryModel; // default
             }
 
-            if (!deletedToolkit) {
+            // First, find the history to get reportId before deletion
+            const historyToDelete = await HistoryModel.findById(id);
+
+            if (!historyToDelete) {
                 return {
                     status: 404,
                     success: false,
-                    message: `Service with ID ${id} not found`
+                    message: `Service history with ID ${id} not found`
                 };
+            }
+
+            // Extract reportId
+            const { reportId } = historyToDelete;
+
+            // Delete the history record
+            const deletedHistory = await HistoryModel.findByIdAndDelete(id);
+
+            if (!deletedHistory) {
+                return {
+                    status: 404,
+                    success: false,
+                    message: `Service history with ID ${id} not found`
+                };
+            }
+
+            // Delete the associated service report if reportId exists
+            let deletedReport = null;
+            if (reportId) {
+                deletedReport = await serviceReportModel.findByIdAndDelete(reportId);
             }
 
             return {
                 status: 200,
                 success: true,
-                message: 'Service deleted successfully',
-                data: deletedToolkit
+                message: 'Service history and associated report deleted successfully',
+                data: {
+                    deletedHistory: deletedHistory,
+                    deletedReport: deletedReport ? {
+                        id: deletedReport._id,
+                        regNo: deletedReport.regNo,
+                        date: deletedReport.date,
+                        machine: deletedReport.machine
+                    } : null
+                }
             };
         } catch (error) {
             return {
                 status: 400,
                 success: false,
-                message: 'Failed to delete Service',
+                message: 'Failed to delete Service history',
                 error: error.message
             };
         }
     }
-
 }
