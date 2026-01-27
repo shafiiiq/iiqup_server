@@ -146,7 +146,7 @@ const getBatteryHistory = async (req, res) => {
         res.status(404).json({ message: 'No service history found' })
       }
     })
-    .catch((err) => {
+    .catch((err) => { 
       res.status(err.status || 500).json({ message: 'Cannot get service history', error: err.message })
     })
 }

@@ -38,12 +38,12 @@ const generateTokens = (user) => {
     {
       id: user._id,
       email: user.email,
-      role: user.role,           // ADD THIS
-      uniqueCode: user.uniqueCode, // ADD THIS
+      role: user.role,
+      uniqueCode: user.uniqueCode,
       type: 'refresh'
     },
     JWT_SECRET,
-    { expiresIn: '7d' }
+    { expiresIn: '365d' } 
   );
 
   return { accessToken, refreshToken };
