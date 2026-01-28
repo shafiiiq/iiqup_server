@@ -12,9 +12,10 @@ const Toolkit = require('../models/toolkit.model.js');
 const Stokcs = require('../models/stocks.model.js');
 const mongoose = require('mongoose');
 const Mechanic = require('../models/mechanic.model.js');
+const DocumentModel = require('../models/document.model.js');
 const Fuels = require('../models/fuels.model.js');
 const User = require('../models/user.model.js');
-const equipModel = require('../models/equip.model.js');
+const EquipmentModel = require('../models/equip.model.js');
 const PushNotificationService = require('../utils/push-notification-jobs');
 const { createNotification } = require('../utils/notification-jobs');
 
@@ -288,7 +289,7 @@ router.post('/push-test', async (req, res) => {
     'normal',
   );
 
-  console.log(result); 
+  console.log(result);
 
   res.json({
     status: 200,
@@ -766,7 +767,7 @@ module.exports = router;
 
 
 router.get('/data-to-mongo', async (req, res) => {
- Mechanic
+  Mechanic
 })
 
 
@@ -779,13 +780,13 @@ router.get('/get-data-and-store', async (req, res) => {
   const baseUrl = process.env.ATTENDANCE_URL;
   const username = process.env.ATTENDANCE_SYSTEM_UNAME;
   const password = process.env.ATTENDANCE_SYSTEM_PASS;
-  
+
   let cookieJar = new Map();
   let allData = [];
-  
+
   try {
     console.log('🔐 Starting login process...');
-    
+
     // Step 1: Get CSRF token
     const loginPageResponse = await fetch(`${baseUrl}/login/`, {
       method: 'GET',
@@ -910,9 +911,9 @@ router.get('/get-data-and-store', async (req, res) => {
 
     while (hasNextPage) {
       console.log(`📄 Fetching page ${currentPage}...`);
-      
+
       const apiUrl = `http://127.0.0.1:8081/iclock/api/transactions/?page=${currentPage}`;
-      
+
       const dataResponse = await fetch(apiUrl, {
         method: 'GET',
         credentials: 'include',
@@ -933,7 +934,7 @@ router.get('/get-data-and-store', async (req, res) => {
       }
 
       const content = await dataResponse.text();
-      
+
       // Check if we got redirected to login page
       if (content.includes('SIGN IN TO YOUR ACCOUNT')) {
         return res.status(401).json({
@@ -944,7 +945,7 @@ router.get('/get-data-and-store', async (req, res) => {
       }
 
       const pageData = JSON.parse(content);
-      
+
       if (currentPage === 1) {
         totalCount = pageData.count;
         console.log(`📈 Total records to fetch: ${totalCount}`);
@@ -976,7 +977,7 @@ router.get('/get-data-and-store', async (req, res) => {
 
     const filePath = path.join(process.cwd(), 'attendance-all-data.json');
     await fs.writeFile(filePath, JSON.stringify(outputData, null, 2), 'utf8');
-    
+
     console.log(`💾 Data saved to: ${filePath}`);
     console.log(`📊 Summary: ${allData.length} attendance records saved`);
 
@@ -1015,7 +1016,64 @@ router.get('/get-data-and-store', async (req, res) => {
 
 
 
+router.get('/add-source-id', async (req, res) => {
+  try {
+    // Get all documents
+    const documents = await DocumentModel.find({});
 
+    let updated = 0;
+    let notFound = 0;
+    let errors = 0;
+
+    for (const doc of documents) {
+      try {
+        // Find equipment by regNo
+        const equipment = await EquipmentModel.findOne({ regNo: doc.regNo });
+
+        if (equipment) {
+          // Update document with SourceId
+          await DocumentModel.updateOne(
+            { _id: doc._id },
+            {
+              $set: {
+                SourceId: equipment._id.toString(),
+                documentSource: [{
+                  source: 'equipment',
+                  sourceId: equipment._id.toString(),
+                  sourceModel: 'Equipment Model'
+                }]
+              }
+            }
+          );
+          updated++;
+        } else {
+          console.log(`Equipment not found for regNo: ${doc.regNo}`);
+          notFound++;
+        }
+      } catch (err) {
+        console.error(`Error processing document ${doc._id}:`, err);
+        errors++;
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Migration completed',
+      updated,
+      notFound,
+      errors,
+      total: documents.length
+    });
+
+  } catch (error) {
+    console.error('Migration error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Migration failed',
+      error: error.message
+    });
+  }
+});
 
 
 
@@ -1031,7 +1089,7 @@ router.get('/check-missing-dates', async (req, res) => {
 
     // Get ALL transaction dates
     const allDates = await Fuels.find({}, { transactionDate: 1, _id: 0 }).lean();
-    
+
     if (allDates.length === 0) {
       throw new Error('No transaction dates found');
     }
@@ -1039,20 +1097,20 @@ router.get('/check-missing-dates', async (req, res) => {
     // Convert and validate dates
     const validDates = [];
     const invalidDates = [];
-    
+
     allDates.forEach((doc, index) => {
       try {
         if (!doc.transactionDate) {
           invalidDates.push({ index, reason: 'null/undefined', value: doc.transactionDate });
           return;
         }
-        
+
         const dateObj = new Date(doc.transactionDate);
         if (isNaN(dateObj.getTime())) {
           invalidDates.push({ index, reason: 'invalid date', value: doc.transactionDate });
           return;
         }
-        
+
         validDates.push({
           original: doc.transactionDate,
           date: dateObj,
@@ -1064,17 +1122,17 @@ router.get('/check-missing-dates', async (req, res) => {
         invalidDates.push({ index, reason: error.message, value: doc.transactionDate });
       }
     });
-    
+
     if (validDates.length === 0) {
       throw new Error('No valid transaction dates found');
     }
 
     // Group by year-month and collect all days
     const yearMonthGroups = {};
-    
+
     validDates.forEach(dateInfo => {
       const yearMonth = `${dateInfo.year}-${dateInfo.month.toString().padStart(2, '0')}`;
-      
+
       if (!yearMonthGroups[yearMonth]) {
         yearMonthGroups[yearMonth] = {
           year: dateInfo.year,
@@ -1083,7 +1141,7 @@ router.get('/check-missing-dates', async (req, res) => {
           days: new Set()
         };
       }
-      
+
       yearMonthGroups[yearMonth].count++;
       yearMonthGroups[yearMonth].days.add(dateInfo.day);
     });
@@ -1096,7 +1154,7 @@ router.get('/check-missing-dates', async (req, res) => {
     // Function to get month name
     const getMonthName = (month) => {
       const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-                         'July', 'August', 'September', 'October', 'November', 'December'];
+        'July', 'August', 'September', 'October', 'November', 'December'];
       return monthNames[month - 1];
     };
 
@@ -1105,7 +1163,7 @@ router.get('/check-missing-dates', async (req, res) => {
       const sortedDays = Array.from(existingDays).sort((a, b) => a - b);
       const missingRanges = [];
       let rangeStart = null;
-      
+
       for (let day = 1; day <= totalDays; day++) {
         if (!existingDays.has(day)) {
           if (rangeStart === null) {
@@ -1122,7 +1180,7 @@ router.get('/check-missing-dates', async (req, res) => {
           }
         }
       }
-      
+
       // Handle case where missing range extends to end of month
       if (rangeStart !== null) {
         if (rangeStart === totalDays) {
@@ -1131,7 +1189,7 @@ router.get('/check-missing-dates', async (req, res) => {
           missingRanges.push(`${rangeStart}-${totalDays}`);
         }
       }
-      
+
       return missingRanges;
     };
 
@@ -1149,13 +1207,13 @@ router.get('/check-missing-dates', async (req, res) => {
 
     // Analyze each month for missing dates
     const monthAnalysis = [];
-    
+
     Object.values(yearMonthGroups).forEach(group => {
       const daysInMonth = getDaysInMonth(group.year, group.month);
       const existingDays = group.days;
       const missingRanges = findMissingRanges(existingDays, daysInMonth);
       const isComplete = missingRanges.length === 0;
-      
+
       const monthData = {
         year: group.year,
         month: group.month,
@@ -1170,7 +1228,7 @@ router.get('/check-missing-dates', async (req, res) => {
         firstDay: Math.min(...existingDays),
         lastDay: Math.max(...existingDays)
       };
-      
+
       monthAnalysis.push(monthData);
     });
 
@@ -1207,7 +1265,7 @@ router.get('/check-missing-dates', async (req, res) => {
           return `${range}${getOrdinalSuffix(range)}`;
         }
       });
-      
+
       return {
         month: `${month.monthName} ${month.year}`,
         missingDays: month.missingDaysCount,

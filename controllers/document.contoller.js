@@ -1,15 +1,24 @@
 const documentServices = require('../services/document-services');
-const fs = require('fs');
-const path = require('path');
 
 const uploadDocument = async (req, res) => {
   try {
-    const { regNo, documentType, description, category, fileName, mimeType, date, expiry } = req.body;
+    const {
+      sourceId,
+      sourceType,
+      documentType,
+      description,
+      category,
+      fileName,
+      mimeType,
+      date,
+      expiry
+    } = req.body;
 
-    if (!regNo || !documentType) {
+    // Validate required fields
+    if (!sourceId || !sourceType || !documentType) {
       return res.status(400).json({
         status: 400,
-        message: 'Registration Number and Document Type are required'
+        message: 'Source ID, Source Type, and Document Type are required'
       });
     }
 
@@ -20,8 +29,26 @@ const uploadDocument = async (req, res) => {
       });
     }
 
+    // Validate sourceType
+    const validSourceTypes = ['equipment', 'operator', 'mechanic', 'office-staff'];
+    if (!validSourceTypes.includes(sourceType)) {
+      return res.status(400).json({
+        status: 400,
+        message: 'Invalid source type. Must be: equipment, operator, mechanic, or office-staff'
+      });
+    }
+
     // Save to database and get presigned URL
-    const result = await documentServices.saveDocument(regNo, documentType, { fileName, mimeType }, description, category, date, expiry);
+    const result = await documentServices.saveDocument(
+      sourceId,
+      sourceType,
+      documentType,
+      { fileName, mimeType },
+      description,
+      category,
+      date,
+      expiry
+    );
 
     res.status(200).json({
       status: 200,
@@ -46,18 +73,27 @@ const uploadDocument = async (req, res) => {
 
 const getDocuments = async (req, res) => {
   try {
-    const { regNo } = req.params;
+    const { type, id } = req.params;
 
-    // Validate registration number
-    if (!regNo) {
+    // Validate parameters
+    if (!type || !id) {
       return res.status(400).json({
         status: 400,
-        message: 'Registration Number is required'
+        message: 'Type and ID are required'
+      });
+    }
+
+    // Validate type
+    const validTypes = ['equipment', 'operator', 'mechanic', 'office-staff'];
+    if (!validTypes.includes(type)) {
+      return res.status(400).json({
+        status: 400,
+        message: 'Invalid type. Must be: equipment, operator, mechanic, or office-staff'
       });
     }
 
     // Get documents
-    const result = await documentServices.getDocuments(regNo);
+    const result = await documentServices.getDocuments(type, id);
 
     res.status(result.status).json(result);
   } catch (err) {
@@ -70,12 +106,9 @@ const getDocuments = async (req, res) => {
   }
 };
 
-
 const getAllDocuments = async (req, res) => {
   try {
-    // Get documents
     const result = await documentServices.getAllDocuments();
-
     res.status(result.status).json(result);
   } catch (err) {
     console.error('Get Documents Error:', err);
@@ -89,9 +122,7 @@ const getAllDocuments = async (req, res) => {
 
 const getAllDocumentsTypes = async (req, res) => {
   try {
-    // Get documents
     const result = await documentServices.getAllDocumentsTypes();
-
     res.status(result.status).json(result);
   } catch (err) {
     console.error('Get Documents Error:', err);
@@ -103,8 +134,6 @@ const getAllDocumentsTypes = async (req, res) => {
   }
 };
 
-
-// NEW: Download document endpoint
 const downloadDocument = async (req, res) => {
   try {
     const { documentId } = req.params;
@@ -116,7 +145,6 @@ const downloadDocument = async (req, res) => {
       });
     }
 
-    // Get document info from database
     const result = await documentServices.getDocumentById(documentId);
 
     if (result.status !== 200) {
@@ -135,7 +163,6 @@ const downloadDocument = async (req, res) => {
   }
 };
 
-// NEW: View document endpoint
 const viewDocument = async (req, res) => {
   try {
     const { documentId } = req.params;
@@ -147,7 +174,6 @@ const viewDocument = async (req, res) => {
       });
     }
 
-    // Get document info from database
     const result = await documentServices.getDocumentById(documentId);
 
     if (result.status !== 200) {
@@ -168,13 +194,13 @@ const viewDocument = async (req, res) => {
 
 const mergePDFs = async (req, res) => {
   try {
-    const { regNo, documentIds, category, documentType } = req.body;
+    const { sourceId, sourceType, documentIds, category, documentType } = req.body;
 
     // Validate inputs
-    if (!regNo || !documentIds || !Array.isArray(documentIds) || documentIds.length < 2) {
+    if (!sourceId || !sourceType || !documentIds || !Array.isArray(documentIds) || documentIds.length < 2) {
       return res.status(400).json({
         status: 400,
-        message: 'Registration Number and at least 2 document IDs are required'
+        message: 'Source ID, Source Type, and at least 2 document IDs are required'
       });
     }
 
@@ -185,8 +211,7 @@ const mergePDFs = async (req, res) => {
       });
     }
 
-    // Call service to merge PDFs
-    const result = await documentServices.mergePDFs(regNo, documentIds, category, documentType);
+    const result = await documentServices.mergePDFs(sourceId, sourceType, documentIds, category, documentType);
 
     res.status(result.status).json(result);
 
@@ -200,16 +225,15 @@ const mergePDFs = async (req, res) => {
   }
 };
 
-// Split PDF Controller
 const splitPDF = async (req, res) => {
   try {
-    const { regNo, documentId, splitOptions, category } = req.body;
+    const { sourceId, sourceType, documentId, splitOptions, category } = req.body;
 
     // Validate inputs
-    if (!regNo || !documentId) {
+    if (!sourceId || !sourceType || !documentId) {
       return res.status(400).json({
         status: 400,
-        message: 'Registration Number and Document ID are required'
+        message: 'Source ID, Source Type, and Document ID are required'
       });
     }
 
@@ -227,8 +251,7 @@ const splitPDF = async (req, res) => {
       });
     }
 
-    // Call service to split PDF
-    const result = await documentServices.splitPDF(regNo, documentId, splitOptions, category);
+    const result = await documentServices.splitPDF(sourceId, sourceType, documentId, splitOptions, category);
 
     res.status(result.status).json(result);
 
@@ -242,6 +265,67 @@ const splitPDF = async (req, res) => {
   }
 };
 
+const renameFile = async (req, res) => {
+  try {
+    const { documentId } = req.params;
+    const { newFileName } = req.body;
+
+    if (!documentId || !newFileName) {
+      return res.status(400).json({
+        status: 400,
+        message: 'Document ID and new file name are required'
+      });
+    }
+
+    // Validate filename (no special characters except - and _)
+    const validFilename = /^[a-zA-Z0-9-_ ]+$/.test(newFileName);
+    if (!validFilename) {
+      return res.status(400).json({
+        status: 400,
+        message: 'Invalid file name. Only letters, numbers, spaces, hyphens and underscores are allowed'
+      });
+    }
+
+    const result = await documentServices.renameFile(documentId, newFileName);
+
+    res.status(result.status).json(result);
+
+  } catch (err) {
+    console.error('Rename file error:', err);
+    res.status(500).json({
+      status: 500,
+      message: 'Failed to rename file',
+      error: err.message
+    });
+  }
+};
+
+const deleteDocument = async (req, res) => {
+  try {
+    const { documentId } = req.params;
+
+    if (!documentId) {
+      return res.status(400).json({
+        status: 400,
+        message: 'Document ID is required'
+      });
+    }
+
+    const result = await documentServices.deleteDocument(documentId);
+
+    res.status(result.status).json(result);
+
+  } catch (err) {
+    console.error('Delete document error:', err);
+    res.status(500).json({
+      status: 500,
+      message: 'Failed to delete document',
+      error: err.message
+    });
+  }
+};
+
+
 module.exports = {
   uploadDocument,
   getDocuments,
@@ -250,5 +334,7 @@ module.exports = {
   getAllDocuments,
   getAllDocumentsTypes,
   mergePDFs,
-  splitPDF
+  splitPDF,
+  renameFile,
+  deleteDocument
 };

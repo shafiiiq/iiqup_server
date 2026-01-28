@@ -1,9 +1,12 @@
 const documentModel = require('../models/document.model');
+const equipmentModel = require('../models/equip.model');
+const operatorModel = require('../models/operator.model');
+const mechanicModel = require('../models/mechanic.model');
+const userModel = require('../models/user.model');
 const path = require('path');
-const fs = require('fs');
-const { createNotification } = require('../utils/notification-jobs'); // Import notification service
+const { createNotification } = require('../utils/notification-jobs');
 const PushNotificationService = require('../utils/push-notification-jobs');
-const { putObject, getObjectUrl } = require('../s3bucket/s3.bucket')
+const { putObject, getObjectUrl, deleteObject } = require('../s3bucket/s3.bucket');
 const { PDFDocument } = require('pdf-lib');
 
 const formatDate = (date) => {
@@ -13,7 +16,7 @@ const formatDate = (date) => {
     const [year, month, day] = date.split('-');
     return `${day}-${month}-${year}`;
   }
-  const dateObj = date instanceof Date ? date : new Date(date + 'T00:00:00'); // Add time to avoid timezone issues
+  const dateObj = date instanceof Date ? date : new Date(date + 'T00:00:00');
 
   if (isNaN(dateObj.getTime())) {
     return null;
@@ -42,6 +45,56 @@ const formatDateTime = () => {
   return `${day}-${month}-${year}-${hours}${minutes}${ampm}`;
 };
 
+// Helper function to get source details and generate S3 key
+const getSourceDetailsAndKey = async (sourceId, sourceType, documentType, finalFilename) => {
+  let sourceData = null;
+  let s3Key = '';
+  let sourceModel = '';
+
+  switch (sourceType) {
+    case 'equipment':
+      sourceData = await equipmentModel.findById(sourceId);
+      if (!sourceData) {
+        throw new Error('Equipment not found');
+      }
+      s3Key = `equipment-documents/${sourceData.regNo}/${documentType}/${finalFilename}`;
+      sourceModel = 'Equipment Model';
+      break;
+
+    case 'operator':
+      sourceData = await operatorModel.findById(sourceId);
+      if (!sourceData) {
+        throw new Error('Operator not found');
+      }
+      s3Key = `operator-documents/${sourceData.qatarId}/${documentType}/${finalFilename}`;
+      sourceModel = 'Operator Model';
+      break;
+
+    case 'mechanic':
+      sourceData = await mechanicModel.findById(sourceId);
+      if (!sourceData) {
+        throw new Error('Mechanic not found');
+      }
+      s3Key = `mechanic-documents/${sourceData.email}/${sourceData._id}/${documentType}/${finalFilename}`;
+      sourceModel = 'Mechanic Model';
+      break;
+
+    case 'office-staff':
+      sourceData = await userModel.findById(sourceId);
+      if (!sourceData) {
+        throw new Error('Office staff not found');
+      }
+      s3Key = `office-documents/${sourceData.email}/${sourceData._id}/${documentType}/${finalFilename}`;
+      sourceModel = 'Office Model';
+      break;
+
+    default:
+      throw new Error('Invalid source type');
+  }
+
+  return { sourceData, s3Key, sourceModel };
+};
+
 // Helper function to download PDF from S3
 const downloadPDFFromS3 = async (s3Key) => {
   try {
@@ -49,7 +102,7 @@ const downloadPDFFromS3 = async (s3Key) => {
 
     const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(`Failed to fetch PDF: ${response.status}`);
+      throw new Error(`Failed to fetch PDF: ${response.status}`); 
     }
 
     const arrayBuffer = await response.arrayBuffer();
@@ -59,6 +112,7 @@ const downloadPDFFromS3 = async (s3Key) => {
     throw new Error(`Failed to download PDF: ${err.message}`);
   }
 };
+
 // Helper function to upload PDF to S3
 const uploadPDFToS3 = async (pdfBytes, s3Key, mimeType = 'application/pdf') => {
   try {
@@ -71,37 +125,53 @@ const uploadPDFToS3 = async (pdfBytes, s3Key, mimeType = 'application/pdf') => {
 };
 
 module.exports = {
-  saveDocument: async (regNo, documentType, file, description, category, date, expiry) => {
+  saveDocument: async (sourceId, sourceType, documentType, file, description, category, date, expiry) => {
     try {
-      // Generate S3 key (path)
+      // Generate filename
       const ext = path.extname(file.fileName);
-      const finalFilename = `${regNo}-${documentType}-${formatDateTime()}${ext}`;
-      const s3Key = `documents/${regNo}/${documentType}/${finalFilename}`;
+      const finalFilename = `${documentType}-${formatDateTime()}${ext}`;
+
+      // Get source details and S3 key
+      const { sourceData, s3Key, sourceModel } = await getSourceDetailsAndKey(
+        sourceId,
+        sourceType,
+        documentType,
+        finalFilename
+      );
 
       // Get presigned URL for upload
       const uploadUrl = await putObject(file.fileName, s3Key, file.mimeType);
 
-      let document = await documentModel.findOne({ regNo, documentType });
+      // Find or create document
+      let document = await documentModel.findOne({
+        SourceId: sourceId,
+        documentType
+      });
 
       if (!document) {
         document = new documentModel({
-          regNo,
+          SourceId: sourceId,
           documentType,
           description,
           category,
-          files: []
+          files: [],
+          documentSource: [{
+            source: sourceType,
+            sourceId: sourceId,
+            sourceModel: sourceModel
+          }]
         });
       }
 
-      // Validate and format dates - ensure they're not undefined
+      // Validate and format dates
       const formattedDate = date ? formatDate(date) : null;
       const formattedExpiry = expiry ? formatDate(expiry) : null;
 
-      // Check if required fields are present after formatting
       if (!formattedDate || !formattedExpiry) {
         throw new Error('Date and expiry are required and must be valid dates');
       }
 
+      // Add file
       document.files.push({
         date: formattedDate,
         expiry: formattedExpiry,
@@ -110,20 +180,37 @@ module.exports = {
         mimetype: file.mimeType || file.fileName.split('.').pop()
       });
 
+      // Create notification
+      let sourceIdentifier = '';
+      switch (sourceType) {
+        case 'equipment':
+          sourceIdentifier = sourceData.regNo;
+          break;
+        case 'operator':
+          sourceIdentifier = sourceData.name;
+          break;
+        case 'mechanic':
+          sourceIdentifier = sourceData.name;
+          break;
+        case 'office-staff':
+          sourceIdentifier = sourceData.name;
+          break;
+      }
+
       const notification = await createNotification({
         title: `New document added`,
-        description: `Document ${documentType} is uploaded for ${regNo}, Now you can access new one`,
+        description: `Document ${documentType} is uploaded for ${sourceIdentifier} (${sourceType}), Now you can access new one`,
         priority: "high",
         sourceId: 'from applications',
         time: new Date()
       });
 
       await PushNotificationService.sendGeneralNotification(
-        null, // broadcast to all users
-        `New document added`, //title
-        `Document ${documentType} is uploaded for ${regNo}, Now you can access new one`, //description
-        'high', //priority
-        'normal', // type 
+        null,
+        `New document added`,
+        `Document ${documentType} is uploaded for ${sourceIdentifier} (${sourceType}), Now you can access new one`,
+        'high',
+        'normal',
         notification.data._id.toString()
       );
 
@@ -147,9 +234,24 @@ module.exports = {
     }
   },
 
-  getDocuments: async (regNo) => {
+  getDocuments: async (sourceType, sourceId) => {
     try {
-      const documents = await documentModel.find({ regNo });
+      // Verify source exists
+      const { sourceData } = await getSourceDetailsAndKey(sourceId, sourceType, 'temp', 'temp.pdf');
+
+      if (!sourceData) {
+        return {
+          status: 404,
+          message: `${sourceType} not found`
+        };
+      }
+
+      // Get documents
+      const documents = await documentModel.find({
+        SourceId: sourceId,
+        'documentSource.source': sourceType
+      });
+
       return {
         status: 200,
         documents: documents
@@ -172,7 +274,7 @@ module.exports = {
         documents: documents
       };
     } catch (err) {
-      console.error('Error in getDocuments:', err);
+      console.error('Error in getAllDocuments:', err);
       return {
         status: 500,
         message: 'Failed to retrieve documents',
@@ -189,7 +291,7 @@ module.exports = {
         documents: documents
       };
     } catch (err) {
-      console.error('Error in getDocuments:', err);
+      console.error('Error in getAllDocumentsTypes:', err);
       return {
         status: 500,
         message: 'Failed to retrieve documents',
@@ -198,10 +300,8 @@ module.exports = {
     }
   },
 
-  // NEW: Get document by file ID
   getDocumentById: async (documentId) => {
     try {
-      // Find document that contains the file with this ID
       const document = await documentModel.findOne({
         'files._id': documentId
       });
@@ -213,7 +313,6 @@ module.exports = {
         };
       }
 
-      // Find the specific file within the document
       const file = document.files.find(f => f._id.toString() === documentId);
 
       if (!file) {
@@ -229,8 +328,9 @@ module.exports = {
           filePath: file.path,
           filename: file.filename,
           mimetype: file.mimetype,
-          regNo: document.regNo,
-          documentType: document.documentType
+          sourceId: document.SourceId,
+          documentType: document.documentType,
+          sourceType: document.documentSource[0]?.source
         }
       };
     } catch (err) {
@@ -243,12 +343,20 @@ module.exports = {
     }
   },
 
-  mergePDFs: async (regNo, documentIds, category, documentType) => {
+  mergePDFs: async (sourceId, sourceType, documentIds, category, documentType) => {
     try {
-      // 1. Create a new PDF document
+      // Verify source exists
+      const { sourceData, sourceModel } = await getSourceDetailsAndKey(
+        sourceId,
+        sourceType,
+        'temp',
+        'temp.pdf'
+      );
+
+      // Create merged PDF
       const mergedPdf = await PDFDocument.create();
 
-      // 2. Fetch all documents and their files
+      // Fetch all documents
       const documentPromises = documentIds.map(async (docId) => {
         const document = await documentModel.findOne({ 'files._id': docId });
 
@@ -262,7 +370,6 @@ module.exports = {
           throw new Error(`File ${docId} not found in document`);
         }
 
-        // Check if it's a PDF
         if (!file.mimetype.includes('pdf')) {
           throw new Error(`File ${file.filename} is not a PDF. Only PDFs can be merged.`);
         }
@@ -272,16 +379,11 @@ module.exports = {
 
       const documentsData = await Promise.all(documentPromises);
 
-      // 3. Download and merge all PDFs
+      // Merge PDFs
       for (const { file } of documentsData) {
         try {
-          // Download PDF from S3
           const pdfBuffer = await downloadPDFFromS3(file.path);
-
-          // Load the PDF
           const pdf = await PDFDocument.load(pdfBuffer);
-
-          // Copy all pages from this PDF to merged PDF
           const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
           copiedPages.forEach((page) => {
             mergedPdf.addPage(page);
@@ -292,33 +394,45 @@ module.exports = {
         }
       }
 
-      // 4. Save the merged PDF
+      // Save merged PDF
       const mergedPdfBytes = await mergedPdf.save();
 
-      // 5. Generate filename and S3 key
-      const mergedFilename = `${regNo}-${documentType}-merged-${formatDateTime()}.pdf`;
-      const s3Key = `documents/${regNo}/${documentType}/${mergedFilename}`;
+      // Generate filename and S3 key
+      const mergedFilename = `${documentType}-merged-${formatDateTime()}.pdf`;
+      const { s3Key } = await getSourceDetailsAndKey(
+        sourceId,
+        sourceType,
+        documentType,
+        mergedFilename
+      );
 
-      // 6. Upload merged PDF to S3
+      // Upload to S3
       const uploadUrl = await uploadPDFToS3(mergedPdfBytes, s3Key);
 
-      // 7. Save to database
-      let document = await documentModel.findOne({ regNo, documentType });
+      // Save to database
+      let document = await documentModel.findOne({
+        SourceId: sourceId,
+        documentType
+      });
 
       if (!document) {
         document = new documentModel({
-          regNo,
+          SourceId: sourceId,
           documentType,
           description: `Merged PDF created from ${documentIds.length} documents`,
           category,
-          files: []
+          files: [],
+          documentSource: [{
+            source: sourceType,
+            sourceId: sourceId,
+            sourceModel: sourceModel
+          }]
         });
       }
 
-      // Get earliest date and latest expiry from merged documents
+      // Get dates
       const dates = documentsData.map(d => d.file.date).filter(Boolean);
       const expiries = documentsData.map(d => d.file.expiry).filter(Boolean);
-
       const earliestDate = dates.length > 0 ? dates.sort()[0] : formatDate(new Date());
       const latestExpiry = expiries.length > 0 ? expiries.sort().reverse()[0] : formatDate(new Date());
 
@@ -330,23 +444,12 @@ module.exports = {
         mimetype: 'application/pdf'
       });
 
-      // Create notification
-      // const notification = await createNotification({
-      //   title: `PDFs Merged`,
-      //   description: `${documentIds.length} PDFs merged successfully for ${regNo}`,
-      //   priority: "normal",
-      //   sourceId: 'from applications',
-      //   target: JSON.parse(process.env.OFFICE_MAIN),
-      //   time: new Date()
-      // });
-
       await PushNotificationService.sendGeneralNotification(
         process.env.SUPER_ADMIN,
         `PDFs Merged`,
-        `${documentIds.length} PDFs merged successfully for ${regNo}`,
+        `${documentIds.length} PDFs merged successfully for ${sourceType}`,
         'normal',
-        'normal',
-        // notification.data._id.toString()
+        'normal'
       );
 
       await document.save();
@@ -373,10 +476,17 @@ module.exports = {
     }
   },
 
-  // Split PDF Service
-  splitPDF: async (regNo, documentId, splitOptions, category) => {
+  splitPDF: async (sourceId, sourceType, documentId, splitOptions, category) => {
     try {
-      // 1. Find the document
+      // Verify source exists
+      const { sourceData, sourceModel } = await getSourceDetailsAndKey(
+        sourceId,
+        sourceType,
+        'temp',
+        'temp.pdf'
+      );
+
+      // Find document
       const document = await documentModel.findOne({ 'files._id': documentId });
 
       if (!document) {
@@ -395,7 +505,6 @@ module.exports = {
         };
       }
 
-      // Check if it's a PDF
       if (!file.mimetype.includes('pdf')) {
         return {
           status: 400,
@@ -403,24 +512,18 @@ module.exports = {
         };
       }
 
-      // 2. Download PDF from S3
+      // Download and load PDF
       const pdfBuffer = await downloadPDFFromS3(file.path);
-
-      // 3. Load the PDF
       const pdf = await PDFDocument.load(pdfBuffer);
       const totalPages = pdf.getPageCount();
 
-      // 4. Validate page numbers
+      // Process split options
       const { pages, splitType } = splitOptions;
-
-      // splitType can be: 'specific' (specific pages), 'range' (page ranges), 'every' (split every N pages)
       let pagesToExtract = [];
 
       if (splitType === 'specific') {
-        // Specific pages: [1, 3, 5]
         pagesToExtract = pages.filter(p => p > 0 && p <= totalPages);
       } else if (splitType === 'range') {
-        // Range: [[1,3], [5,7]] - extract pages 1-3 and 5-7
         pages.forEach(range => {
           const [start, end] = range;
           for (let i = start; i <= end && i <= totalPages; i++) {
@@ -428,7 +531,6 @@ module.exports = {
           }
         });
       } else if (splitType === 'every') {
-        // Split every N pages: pages = 2 means [1-2], [3-4], [5-6]...
         const pageSize = pages[0] || 1;
         for (let i = 1; i <= totalPages; i += pageSize) {
           pagesToExtract.push(i);
@@ -447,11 +549,10 @@ module.exports = {
         };
       }
 
-      // 5. Create split PDFs
+      // Create split PDFs
       const splitDocuments = [];
 
       if (splitType === 'every') {
-        // Split into multiple PDFs
         const pageSize = pages[0] || 1;
         for (let i = 0; i < totalPages; i += pageSize) {
           const newPdf = await PDFDocument.create();
@@ -463,10 +564,15 @@ module.exports = {
           }
 
           const pdfBytes = await newPdf.save();
-          const splitFilename = `${regNo}-${document.documentType}-split-${i + 1}-to-${endPage}-${formatDateTime()}.pdf`;
-          const s3Key = `documents/${regNo}/${document.documentType}/${splitFilename}`;
+          const splitFilename = `${document.documentType}-split-${i + 1}-to-${endPage}-${formatDateTime()}.pdf`;
 
-          // Upload to S3
+          const { s3Key } = await getSourceDetailsAndKey(
+            sourceId,
+            sourceType,
+            document.documentType,
+            splitFilename
+          );
+
           await uploadPDFToS3(pdfBytes, s3Key);
 
           splitDocuments.push({
@@ -477,22 +583,23 @@ module.exports = {
           });
         }
       } else {
-        // Single PDF with selected pages
         const newPdf = await PDFDocument.create();
-
-        // Convert 1-based page numbers to 0-based indices
         const pageIndices = pagesToExtract.map(p => p - 1);
-
         const copiedPages = await newPdf.copyPages(pdf, pageIndices);
         copiedPages.forEach((page) => {
           newPdf.addPage(page);
         });
 
         const pdfBytes = await newPdf.save();
-        const splitFilename = `${regNo}-${document.documentType}-split-pages-${pagesToExtract.join('-')}-${formatDateTime()}.pdf`;
-        const s3Key = `documents/${regNo}/${document.documentType}/${splitFilename}`;
+        const splitFilename = `${document.documentType}-split-pages-${pagesToExtract.join('-')}-${formatDateTime()}.pdf`;
 
-        // Upload to S3
+        const { s3Key } = await getSourceDetailsAndKey(
+          sourceId,
+          sourceType,
+          document.documentType,
+          splitFilename
+        );
+
         await uploadPDFToS3(pdfBytes, s3Key);
 
         splitDocuments.push({
@@ -503,22 +610,27 @@ module.exports = {
         });
       }
 
-      // 6. Save all split documents to database
+      // Save split documents
       const savedDocuments = [];
 
       for (const splitDoc of splitDocuments) {
         let doc = await documentModel.findOne({
-          regNo,
+          SourceId: sourceId,
           documentType: `${document.documentType} (Split)`
         });
 
         if (!doc) {
           doc = new documentModel({
-            regNo,
+            SourceId: sourceId,
             documentType: `${document.documentType} (Split)`,
             description: `Split from ${file.filename}`,
             category: category || document.category,
-            files: []
+            files: [],
+            documentSource: [{
+              source: sourceType,
+              sourceId: sourceId,
+              sourceModel: sourceModel
+            }]
           });
         }
 
@@ -534,23 +646,12 @@ module.exports = {
         savedDocuments.push(doc);
       }
 
-      // Create notification
-      // const notification = await createNotification({
-      //   title: `PDF Split`,
-      //   description: `PDF split into ${splitDocuments.length} document(s) for ${regNo}`,
-      //   priority: "normal",
-      //   sourceId: 'from applications',
-      //   target: JSON.parse(process.env.OFFICE_MAIN),
-      //   time: new Date()
-      // });
-
       await PushNotificationService.sendGeneralNotification(
         process.env.SUPER_ADMIN,
         `PDF Split`,
-        `PDF split into ${splitDocuments.length} document(s) for ${regNo}`,
+        `PDF split into ${splitDocuments.length} document(s) for ${sourceType}`,
         'normal',
-        'normal',
-        // notification.data._id.toString()
+        'normal'
       );
 
       return {
@@ -565,6 +666,159 @@ module.exports = {
       return {
         status: 500,
         message: 'Failed to split PDF',
+        error: err.message
+      };
+    }
+  },
+  renameFile: async (documentId, newFileName) => {
+    try {
+      // Find document containing the file
+      const document = await documentModel.findOne({
+        'files._id': documentId
+      });
+
+      if (!document) {
+        return {
+          status: 404,
+          message: 'Document not found'
+        };
+      }
+
+      // Find the specific file
+      const file = document.files.find(f => f._id.toString() === documentId);
+
+      if (!file) {
+        return {
+          status: 404,
+          message: 'File not found'
+        };
+      }
+
+      // Update displayFileName
+      file.displayFileName = newFileName;
+
+      // Save document
+      await document.save();
+
+      return {
+        status: 200,
+        message: 'File renamed successfully',
+        file: {
+          _id: file._id,
+          displayFileName: file.displayFileName,
+          filename: file.filename
+        }
+      };
+
+    } catch (err) {
+      console.error('Error in renameFile:', err);
+      return {
+        status: 500,
+        message: 'Failed to rename file',
+        error: err.message
+      };
+    }
+  },
+  deleteDocument: async (documentId) => {
+    try {
+      // Find document containing the file
+      const document = await documentModel.findOne({
+        'files._id': documentId
+      });
+
+      if (!document) {
+        return {
+          status: 404,
+          message: 'Document not found'
+        };
+      }
+
+      // Find the specific file
+      const file = document.files.find(f => f._id.toString() === documentId);
+
+      if (!file) {
+        return {
+          status: 404,
+          message: 'File not found'
+        };
+      }
+
+      // Delete from S3
+      try {
+        await deleteObject(file.path);
+      } catch (s3Error) {
+        console.error('Error deleting from S3:', s3Error);
+        // Continue with DB deletion even if S3 deletion fails
+      }
+
+      // Remove file from document
+      document.files = document.files.filter(f => f._id.toString() !== documentId);
+
+      // If no files left, delete the entire document
+      if (document.files.length === 0) {
+        await documentModel.findByIdAndDelete(document._id);
+      } else {
+        await document.save();
+      }
+
+      // Get source identifier for notification
+      let sourceIdentifier = '';
+      const sourceType = document.documentSource[0]?.source;
+
+      try {
+        const { sourceData } = await getSourceDetailsAndKey(
+          document.SourceId,
+          sourceType,
+          'temp',
+          'temp.pdf'
+        );
+
+        switch (sourceType) {
+          case 'equipment':
+            sourceIdentifier = sourceData.regNo;
+            break;
+          case 'operator':
+          case 'mechanic':
+          case 'office-staff':
+            sourceIdentifier = sourceData.name;
+            break;
+        }
+      } catch (err) {
+        sourceIdentifier = document.SourceId;
+      }
+
+      // Create notification
+      const notification = await createNotification({
+        title: `Document deleted`,
+        description: `Document ${file.filename} was deleted for ${sourceIdentifier} (${sourceType})`,
+        priority: "normal",
+        sourceId: 'from applications',
+        time: new Date()
+      });
+
+      await PushNotificationService.sendGeneralNotification(
+        null,
+        `Document deleted`,
+        `Document ${file.filename} was deleted for ${sourceIdentifier} (${sourceType})`,
+        'normal',
+        'normal',
+        notification.data._id.toString()
+      );
+
+      return {
+        status: 200,
+        message: 'Document deleted successfully',
+        deletedFile: {
+          filename: file.filename,
+          path: file.path
+        }
+      };
+
+    } catch (err) {
+      console.error('Error in deleteDocument:', err);
+      return {
+        status: 500,
+        message: 'Failed to delete document',
         error: err.message
       };
     }

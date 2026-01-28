@@ -239,7 +239,16 @@ module.exports = {
           }
         );
 
-        if (!updatedServiceHistory) {
+        const oldUpdatedServiceHistory = await HistoryModel.findOneAndUpdate(
+          { date: updatedServiceReport.date, regNo: updatedServiceReport.regNo },  // Use the stored historyId
+          serviceHistoryUpdate,
+          {
+            new: true,
+            runValidators: true
+          }
+        );
+
+        if (!updatedServiceHistory || oldUpdatedServiceHistory) {
           console.warn('Service history not found for historyId:', updatedServiceReport.historyId);
         }
 

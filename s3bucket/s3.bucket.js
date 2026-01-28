@@ -1,4 +1,4 @@
-const { S3Client, GetObjectCommand, PutObjectCommand } = require("@aws-sdk/client-s3");
+const { S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 require('dotenv').config();
 
@@ -11,10 +11,9 @@ const s3Client = new S3Client({
 });
 
 const getObjectUrl = async (key, isLong, isAuthSign = false) => {
-    // Use GetObjectCommand instead of GetObjectAclCommand for getting object URLs
     const command = new GetObjectCommand({
         Bucket: process.env.BUCKET_NAME,
-        Key: key // Note: Capital 'K' in Key
+        Key: key
     });
 
     let expiresIn;
@@ -40,4 +39,14 @@ const putObject = async (fileName, key, contentType) => {
     return url
 }
 
-module.exports = { getObjectUrl, putObject };
+const deleteObject = async (key) => {
+    const command = new DeleteObjectCommand({
+        Bucket: process.env.BUCKET_NAME,
+        Key: key
+    });
+    
+    await s3Client.send(command);
+    return { success: true, message: `Object ${key} deleted successfully` };
+};
+
+module.exports = { getObjectUrl, putObject, deleteObject };
