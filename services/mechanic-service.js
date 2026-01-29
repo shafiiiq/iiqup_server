@@ -273,39 +273,31 @@ class MechanicService {
                 };
             }
 
-            // Convert the date to start of day for consistent comparison
             const dateToAdd = new Date(overtimeData.date);
             dateToAdd.setHours(0, 0, 0, 0);
             overtimeData.date = dateToAdd;
 
-            // Generate month string in "Month Year" format (e.g., "May 2025")
             const monthYear = this.getMonthYearString(dateToAdd);
-
-            // Generate formatted date string in "dd-mm-yyyy" format
             const formattedDate = this.getFormattedDateString(dateToAdd);
 
-            // Initialize the workDetails array if not provided
             if (!overtimeData.workDetails) {
                 overtimeData.workDetails = [];
             }
 
-            // Prepare the overtime entry
             const overtimeEntry = {
                 date: dateToAdd,
                 formattedDate,
                 regNo: overtimeData.regNo || [],
                 times: overtimeData.times || [],
                 workDetails: overtimeData.workDetails || [],
-                totalTime: 0,  // Will be calculated by pre-save hook
-                formattedTime: ''  // Will be calculated by pre-save hook
+                totalTime: 0,
+                formattedTime: ''
             };
 
-            // Check if we already have this month in the monthlyOvertime array
             let monthIndex = mechanic.monthlyOvertime ?
                 mechanic.monthlyOvertime.findIndex(mo => mo.month === monthYear) : -1;
 
             if (monthIndex === -1) {
-                // Month doesn't exist, create a new monthly overtime entry
                 if (!mechanic.monthlyOvertime) {
                     mechanic.monthlyOvertime = [];
                 }
@@ -313,13 +305,12 @@ class MechanicService {
                 mechanic.monthlyOvertime.push({
                     month: monthYear,
                     entries: [overtimeEntry],
-                    totalMonthTime: 0,  // Will be calculated by pre-save hook
-                    formattedMonthTime: '0h 0m'  // Will be calculated by pre-save hook
+                    totalMonthTime: 0,
+                    formattedMonthTime: '0h 0m'
                 });
 
                 monthIndex = mechanic.monthlyOvertime.length - 1;
             } else {
-                // Check if we already have an entry for this exact date
                 const entryIndex = mechanic.monthlyOvertime[monthIndex].entries.findIndex(entry => {
                     const entryDate = new Date(entry.date);
                     entryDate.setHours(0, 0, 0, 0);
@@ -327,10 +318,8 @@ class MechanicService {
                 });
 
                 if (entryIndex !== -1) {
-                    // Entry for this date exists, merge the data
                     const existingEntry = mechanic.monthlyOvertime[monthIndex].entries[entryIndex];
 
-                    // Merge regNo arrays (avoid duplicates)
                     if (overtimeData.regNo && overtimeData.regNo.length > 0) {
                         overtimeData.regNo.forEach(regNo => {
                             if (!existingEntry.regNo.includes(regNo)) {
@@ -339,31 +328,28 @@ class MechanicService {
                         });
                     }
 
-                    // Merge times arrays
                     if (overtimeData.times && overtimeData.times.length > 0) {
                         existingEntry.times.push(...overtimeData.times);
                     }
 
-                    // Merge workDetails arrays
                     if (overtimeData.workDetails && overtimeData.workDetails.length > 0) {
                         existingEntry.workDetails.push(...overtimeData.workDetails);
                     }
 
-                    // Mark modified arrays for proper saving
                     const monthlyOvertimeArrayPath = `monthlyOvertime.${monthIndex}.entries.${entryIndex}`;
                     mechanic.markModified(`${monthlyOvertimeArrayPath}.times`);
                     mechanic.markModified(`${monthlyOvertimeArrayPath}.regNo`);
                     mechanic.markModified(`${monthlyOvertimeArrayPath}.workDetails`);
                 } else {
-                    // Entry for this date doesn't exist, add it
                     mechanic.monthlyOvertime[monthIndex].entries.push(overtimeEntry);
                 }
             }
 
-            // Save the updated mechanic
             const updatedMechanic = await mechanic.save();
 
-            // Get the added/updated overtime entry
+            console.log("updatedMechanic ....", updatedMechanic);
+
+
             const addedMonthlyOvertime = updatedMechanic.monthlyOvertime[monthIndex];
             const addedEntry = addedMonthlyOvertime.entries.find(entry => {
                 const entryDate = new Date(entry.date);
@@ -371,15 +357,14 @@ class MechanicService {
                 return entryDate.getTime() === dateToAdd.getTime();
             });
 
-            // Clean up old overtime data (older than 2 months)
             this.cleanupOldOvertimeData(mechanicId);
+
             return {
                 status: 201,
                 message: 'Overtime record added successfully',
                 data: addedMonthlyOvertime
             };
         } catch (error) {
-            // Handle validation errors
             if (error.name === 'ValidationError') {
                 const messages = Object.values(error.errors).map(val => val.message);
                 throw {
@@ -388,12 +373,10 @@ class MechanicService {
                 };
             }
 
-            // Pass through custom errors
             if (error.status) {
                 throw error;
             }
 
-            // Handle other errors
             throw {
                 status: 500,
                 message: error.message || 'Error adding overtime'

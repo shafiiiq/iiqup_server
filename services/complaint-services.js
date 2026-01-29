@@ -8,12 +8,10 @@ const { createNotification } = require('../utils/notification-jobs');
 const PushNotificationService = require('../utils/push-notification-jobs');
 
 class ComplaintService {
-  // Step 1: Register complaint and notify MAINTENANCE_HEAD
   static async createComplaint(complaint) {
     try {
       const equipment = await Equipment.findOne({ regNo: complaint.regNo });
 
-      // Generate unique complaint ID
       const complaintId = await this.generateComplaintId();
 
       const complaintData = new Complaint({
@@ -25,8 +23,6 @@ class ComplaintService {
 
       await complaintData.save();
 
-
-      // Notify MAINTENANCE_HEAD only
       const notification = await createNotification({
         title: `New Complaint Registered - ${complaint.regNo}`,
         description: `${complaint.name} registered complaint for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Please assign a mechanic.`,
@@ -1150,10 +1146,9 @@ class ComplaintService {
     }
   }
 
-  // Step 9: Mechanic completes work (updated version)
-  static async addSolutionToComplaint(complaintId, filesData, regNo, mechanic) {
+  static async addSolutionToComplaint(complaintId, filesData, regNo, mechanic, remarks = '') { // Added remarks parameter with default value
     try {
-      const solutionFiles = await Promise.all(filesData.map(async (file) => {
+      const solutionFiles = filesData.map((file) => {
         const fileData = {
           fileName: file.fileName,
           originalName: file.originalName,
@@ -1169,26 +1164,33 @@ class ComplaintService {
         }
 
         return fileData;
-      }));
+      });
+
+      const updateData = {
+        $push: {
+          solutions: { $each: solutionFiles },
+          approvalTrail: {
+            approvedBy: mechanic,
+            role: 'MECHANIC',
+            action: 'approved',
+            comments: remarks || 'Work completed successfully' // Use remarks if provided
+          }
+        },
+        $set: {
+          status: 'resolved',
+          workflowStatus: 'completed',
+          updatedAt: new Date()
+        }
+      };
+
+      // Add rectificationRemarks if provided
+      if (remarks) {
+        updateData.$set.rectificationRemarks = remarks;
+      }
 
       const complaint = await Complaint.findByIdAndUpdate(
         complaintId,
-        {
-          $push: {
-            solutions: { $each: solutionFiles },
-            approvalTrail: {
-              approvedBy: mechanic,
-              role: 'MECHANIC',
-              action: 'approved',
-              comments: 'Work completed successfully'
-            }
-          },
-          $set: {
-            status: 'resolved',
-            workflowStatus: 'completed',
-            updatedAt: new Date()
-          }
-        },
+        updateData,
         { new: true }
       );
 
@@ -1235,7 +1237,6 @@ class ComplaintService {
     }
   }
 
-  // Existing methods (unchanged)
   static async getComplaintsByUser(uniqueCode) {
     try {
       return await Complaint.find({ uniqueCode }).sort({ createdAt: -1 });

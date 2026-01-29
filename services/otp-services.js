@@ -83,8 +83,6 @@ const generateAndSendOTP = async (email, demo_opr = false, name) => {
 
     // Generate a cryptographically secure OTP
     const otp = generateSecureOTP();  
-    
-    console.log("OTP", otp)
 
     // Hash the OTP before storing
     const hashedOTP = await hashOTP(otp);

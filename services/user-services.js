@@ -9,6 +9,7 @@ const { renameFilesWithRequestId } = require('../multer/overtime-upload'); // Ch
 const admin = require('firebase-admin');
 const { createNotification } = require('../utils/notification-jobs');
 const UAParser = require('ua-parser-js');
+const mechanicServices = require('../services/mechanic-service.js')
 const Session = require('../models/sessions.model');
 
 // Initialize Firebase Admin
@@ -1251,12 +1252,10 @@ const addComplaints = async (regNo, userUniqueCode, data, uploadedFiles = null) 
 
 const grantAccept = async (uniqueCode, dataId, purpose) => {
   try {
-
     if (uniqueCode === process.env.WORKSHOP_MANAGER) {
-      uniqueCode = process.env.MAINTENANCE_HEAD
+      uniqueCode = process.env.MAINTENANCE_HEAD;
     }
 
-    // Find the user by uniqueCode
     const user = await User.findOne({ uniqueCode });
 
     if (!user) {
@@ -1266,7 +1265,6 @@ const grantAccept = async (uniqueCode, dataId, purpose) => {
       };
     }
 
-    // Find the specific grant access entry by dataId and purpose
     const grantIndex = user.grantAccess.findIndex(grant =>
       grant._id.toString() === dataId && grant.purpose === purpose
     );
@@ -1278,38 +1276,23 @@ const grantAccept = async (uniqueCode, dataId, purpose) => {
       };
     }
 
-    // Get the grant access data
     const grantData = user.grantAccess[grantIndex];
-
-    // Extract mechanicId and data from the grant
     const mechanicId = grantData.data.mechanicId;
     const dataToSend = grantData.data;
 
-    // Mark as granted
     user.grantAccess[grantIndex].granted = true;
     await user.save();
 
     try {
-      // Call the API to store the data permanently
-      const response = await fetch(`${process.env.SERVER_ADDRESS}/${mechanicId}/overtime`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(dataToSend)
-      });
+      const response = await mechanicServices.addOvertime(mechanicId, dataToSend);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to store data permanently');
+      if (!response || response.status !== 201) {
+        throw new Error(response.message || 'Failed to store data permanently');
       }
 
-      // Schedule removal of the grant access data after approving
       try {
-        // Find the user again to get the latest data
         const updatedUser = await User.findOne({ uniqueCode });
         if (updatedUser) {
-          // Remove the grant access data
           updatedUser.grantAccess.splice(grantIndex, 1);
           await updatedUser.save();
         }
@@ -1319,15 +1302,12 @@ const grantAccept = async (uniqueCode, dataId, purpose) => {
 
       try {
         const PushNotificationService = require('../utils/push-notification-jobs');
+        const mechanic = await Mechanic.findById(mechanicId);
 
-        const mechanic = await Mechanic.findById(mechanicId)
-
-        // Just add this check before using the times
         let notificationMessage;
+        const formattedDate = formatDate(dataToSend.date);
 
-        const formattedDate = formatDate(dataToSend.date); // "August 10, 2025"
-
-        if (dataToSend.times && dataToSend.times[0].in && dataToSend.times[0].out) {
+        if (dataToSend.times && dataToSend.times[0] && dataToSend.times[0].in && dataToSend.times[0].out) {
           const inTime = convertToAMPM(dataToSend.times[0].in);
           const outTime = convertToAMPM(dataToSend.times[0].out);
           notificationMessage = `Hamsa is accepted overtime of ${mechanic.name} from ${inTime} to ${outTime} for ${formattedDate}`;
@@ -1343,26 +1323,23 @@ const grantAccept = async (uniqueCode, dataId, purpose) => {
         });
 
         await PushNotificationService.sendGeneralNotification(
-          null, // broadcast to all users
-          "Mechanic overtime accepted", // title
-          notificationMessage, // description
-          'high', // priority
-          'normal', // type
+          null,
+          "Mechanic overtime accepted",
+          notificationMessage,
+          'high',
+          'normal',
           notification.data._id.toString()
         );
       } catch (notificationError) {
         console.error('Error sending push notification:', notificationError);
-        // Don't fail the entire operation if notification fails
       }
-
 
       return {
         status: 200,
         message: 'Grant access request approved successfully',
-        data: await response.json()
+        data: response.data
       };
     } catch (error) {
-      // If the API call fails, still keep the data as granted but log the error
       console.error('Error calling the API:', error);
       return {
         status: 500,
@@ -2611,7 +2588,7 @@ const blockDevice = async (sessionId, userId) => {
       userId
     });
 
-    if (!session) { 
+    if (!session) {
       return {
         status: 404,
         success: false,
@@ -2621,8 +2598,8 @@ const blockDevice = async (sessionId, userId) => {
 
     // Delete session permanently (blocking)
     await Session.deleteOne({ _id: sessionId });
-    
-    const userToBlock = await User.findById(userId);  
+
+    const userToBlock = await User.findById(userId);
     if (userToBlock) {
       const websocket = await import('../utils/websocket.js');
       websocket.default.forceLogoutUser(userToBlock.uniqueCode, userToBlock._id, session.sessionToken, 'Device blocked');

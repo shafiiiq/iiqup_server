@@ -13,5 +13,7 @@ router.post('/add-equipment-image', equipmentController.addEquipmentImage);
 router.get('/equipment-images/:regNo', equipmentController.getEquipmentRegNo);
 router.post('/bulk-equipment-images', equipmentController.getBulkEquipmentImages);
 router.get('/equipment-count', equipmentController.getEquipmentCount);
+router.get('/equipment-stats', equipmentController.getEquipmentStats);
+router.get('/get-equipments-by-status', equipmentController.getEquipmentsByStatus);
 
 module.exports = router;

@@ -4,13 +4,13 @@ const { uploadSolutionFiles } = require('../multer/solution-upload');
 const multer = require('multer');
 const path = require('path');
 const { putObject } = require('../s3bucket/s3.bucket');
+const { uploadToS3 } = require('../services/s3Config-services');
 const Mechanic = require('../models/mechanic.model');
 
 class ComplaintController {
-  // Step 1: Register complaint (unchanged but now only notifies MAINTENANCE_HEAD)
   static async registerComplaint(req, res) {
     try {
-      const { regNo, name, uniqueCode, files } = req.body;
+      const { regNo, name, uniqueCode, files, remarks } = req.body; // ADD remarks
 
       if (!files || files.length === 0) {
         return res.status(400).json({
@@ -36,39 +36,30 @@ class ComplaintController {
         return false;
       };
 
-      // Generate upload URLs for each file
-      const uploadData = await Promise.all(
-        files.map(async (file) => {
-          const ext = path.extname(file.fileName);
-          const finalFilename = `${regNo || 'no-reg'}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}${ext}`;
-          const s3Key = `complaints/${regNo || 'no-reg'}/${uniqueCode}/complaint-${uniqueCode}-${finalFilename}`;
+      // Process files metadata
+      const uploadData = files.map((file) => {
+        const ext = path.extname(file.fileName);
+        const finalFilename = `${regNo || 'no-reg'}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}${ext}`;
+        const s3Key = `complaints/${regNo || 'no-reg'}/${uniqueCode}/complaint-${uniqueCode}-${finalFilename}`;
+        const isVideo = isVideoFile(file.mimeType, file.fileName);
 
-          // Get presigned upload URL
-          const uploadUrl = await putObject(
-            file.fileName,
-            s3Key,
-            file.mimeType
-          );
+        return {
+          fileName: finalFilename,
+          originalName: file.fileName,
+          filePath: s3Key,
+          mimeType: file.mimeType,
+          type: isVideo ? 'video' : 'photo',
+          fileBuffer: file.fileBuffer,
+          uploadDate: new Date()
+        };
+      });
 
-          const isVideo = isVideoFile(file.mimeType, file.fileName);
-
-          return {
-            fileName: finalFilename,
-            originalName: file.fileName,
-            filePath: s3Key,
-            mimeType: file.mimeType,
-            type: isVideo ? 'video' : 'photo',
-            uploadUrl: uploadUrl, // This is what the frontend expects
-            uploadDate: new Date()
-          };
-        })
-      );
-
-      // Create complaint record
+      // Create complaint record first
       const complaintData = {
         uniqueCode,
         regNo: regNo || 'no-reg',
         name: name || 'no-name',
+        remarks: remarks || '', // ADD THIS LINE
         mediaFiles: uploadData.map(item => ({
           fileName: item.fileName,
           originalName: item.originalName,
@@ -81,15 +72,26 @@ class ComplaintController {
 
       const result = await ComplaintService.createComplaint(complaintData);
 
-      // Return response in the format expected by frontend
+      // Upload files to S3 in background (after response sent)
       res.status(202).json({
         status: 202,
-        message: 'Complaint registered successfully. MAINTENANCE_HEAD has been notified.',
+        message: 'Complaint registered successfully. Files are being uploaded.',
         data: {
-          complaint: result,
-          uploadData: uploadData // Array of objects with uploadUrl property
+          complaint: result
         }
       });
+
+      // Upload files asynchronously after response
+      uploadData.forEach(async (file) => {
+        try {
+          const buffer = Buffer.from(file.fileBuffer, 'base64');
+          await uploadToS3(buffer, file.filePath, file.mimeType);
+          console.log(`Successfully uploaded: ${file.fileName}`);
+        } catch (error) {
+          console.error(`Failed to upload ${file.fileName}:`, error);
+        }
+      });
+
     } catch (error) {
       console.error('Error registering complaint:', error);
       res.status(500).json({
@@ -167,17 +169,12 @@ class ComplaintController {
         const finalFilename = `audio-${complaintId}-${Date.now()}${ext}`;
         const s3Key = `complaint-audio/${complaintId}/${finalFilename}`;
 
-        const uploadUrl = await putObject(
-          audioFile.fileName,
-          s3Key,
-          audioFile.mimeType
-        );
-
         audioFileData = {
           fileName: finalFilename,
           filePath: s3Key,
           duration: audioFile.duration || 0,
-          uploadUrl: uploadUrl
+          fileBuffer: audioFile.fileBuffer, // Add base64 data
+          mimeType: audioFile.mimeType
         };
       }
 
@@ -187,10 +184,24 @@ class ComplaintController {
         mechanicId
       );
 
+      // Upload happens in background after response
       res.status(200).json({
-        ...result,
-        uploadData: audioFileData ? [audioFileData] : []
+        status: 200,
+        message: 'Item request submitted successfully',
+        data: result.data
       });
+
+      // Upload audio in background if exists
+      if (audioFileData && audioFileData.fileBuffer) {
+        try {
+          const buffer = Buffer.from(audioFileData.fileBuffer, 'base64');
+          await uploadToS3(buffer, audioFileData.filePath, audioFileData.mimeType);
+          console.log(`Successfully uploaded audio: ${audioFileData.fileName}`);
+        } catch (error) {
+          console.error(`Failed to upload audio ${audioFileData.fileName}:`, error);
+        }
+      }
+
     } catch (error) {
       console.error('Error in mechanic request:', error);
       res.status(error.status || 500).json({
@@ -399,7 +410,7 @@ class ComplaintController {
 
       // Generate pre-signed URL for S3 upload
       const uploadUrl = await putObject(
-        finalFilename, 
+        finalFilename,
         s3Key,
         'application/pdf',
       );
@@ -680,11 +691,10 @@ class ComplaintController {
     }
   }
 
-  // Step 9: Mechanic completes work (updated)
   static async addSolution(req, res, next) {
     try {
       const { complaintId } = req.params;
-      const { regNo, mechanic, files } = req.body;
+      const { regNo, mechanic, files, remarks } = req.body; // Added remarks
 
       if (!files || files.length === 0) {
         return res.status(400).json({
@@ -693,43 +703,55 @@ class ComplaintController {
         });
       }
 
-      const filesWithUploadData = await Promise.all(
-        files.map(async (file) => {
-          const ext = path.extname(file.fileName);
-          const finalFilename = `${complaintId}-${Date.now()}${ext}`;
-          const s3Key = `complaint-solutions/${complaintId}/${finalFilename}`;
+      // Process files metadata
+      const filesData = files.map((file) => {
+        const ext = path.extname(file.fileName);
+        const finalFilename = `${complaintId}-${Date.now()}${ext}`;
+        const s3Key = `complaint-solutions/${complaintId}/${finalFilename}`;
 
-          const uploadUrl = await putObject(
-            file.fileName,
-            s3Key,
-            file.mimeType
-          );
+        return {
+          fileName: finalFilename,
+          originalName: file.fileName,
+          filePath: s3Key,
+          mimeType: file.mimeType,
+          type: file.mimeType.startsWith('video/') ? 'video' : 'photo',
+          fileBuffer: file.fileBuffer,
+          uploadDate: new Date()
+        };
+      });
 
-          return {
-            fileName: finalFilename,
-            originalName: file.fileName,
-            filePath: s3Key,
-            mimeType: file.mimeType,
-            type: file.mimeType.startsWith('video/') ? 'video' : 'photo',
-            uploadUrl: uploadUrl,
-            uploadDate: new Date()
-          };
-        })
-      );
-
+      // Save to database first
       const result = await ComplaintService.addSolutionToComplaint(
         complaintId,
-        filesWithUploadData,
+        filesData.map(f => ({
+          fileName: f.fileName,
+          originalName: f.originalName,
+          filePath: f.filePath,
+          mimeType: f.mimeType,
+          type: f.type,
+          uploadDate: f.uploadDate
+        })),
         regNo,
-        mechanic
+        mechanic,
+        remarks // Pass remarks to service
       );
 
       res.status(200).json({
         status: 200,
-        message: 'Work completed successfully. All stakeholders have been notified.',
+        message: 'Work completed successfully. Files are being uploaded.',
         data: {
-          complaint: result.data,
-          uploadData: filesWithUploadData
+          complaint: result.data
+        }
+      });
+
+      // Upload files asynchronously after response
+      filesData.forEach(async (file) => {
+        try {
+          const buffer = Buffer.from(file.fileBuffer, 'base64');
+          await uploadToS3(buffer, file.filePath, file.mimeType);
+          console.log(`Successfully uploaded solution: ${file.fileName}`);
+        } catch (error) {
+          console.error(`Failed to upload solution ${file.fileName}:`, error);
         }
       });
 
@@ -771,7 +793,7 @@ class ComplaintController {
   static async getAllComplaints(req, res, next) {
     try {
       const complaint = await ComplaintService.getFullComplaints();
-      
+
       if (!complaint) {
         return res.status(404).json({ error: 'Complaints not found' });
       }

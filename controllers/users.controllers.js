@@ -928,6 +928,22 @@ const revokeBiometricToken = async (req, res) => {
   }
 };
 
+const verifyToken = async (req, res) => {
+  try {
+    res.status(200).json({
+      success: true,
+      valid: true,
+      message: 'Token is valid'
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: 'Token is invalid',
+      error: err.message
+    });
+  }
+};
+
 module.exports = {
   addUsers,
   getUsers,
@@ -945,8 +961,6 @@ module.exports = {
   cleanupFiles,
   getFileType,
   requestService,
-
-  // Push notification functions
   addPushToken,
   removePushToken,
   getUserPushTokens,
@@ -970,5 +984,6 @@ module.exports = {
   logoutAllSessions,
   revokeBiometricToken,
   biometricLogin,
-  generateBiometricToken
+  generateBiometricToken,
+  verifyToken
 };

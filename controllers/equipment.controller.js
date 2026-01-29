@@ -249,14 +249,14 @@ const getEquipmentRegNo = async (req, res) => {
 const getBulkEquipmentImages = async (req, res) => {
   try {
     const { regNos } = req.body;
-    
+
     if (!regNos || !Array.isArray(regNos) || regNos.length === 0) {
       return res.status(400).json({
         success: false,
         message: 'Array of equipment regNos is required'
       });
     }
-    
+
     // Limit to prevent overload (20 matches your pagination limit)
     if (regNos.length > 50) {
       return res.status(400).json({
@@ -264,7 +264,7 @@ const getBulkEquipmentImages = async (req, res) => {
         message: 'Maximum 50 equipment regNos allowed per request'
       });
     }
-    
+
     const result = await equipmentServices.getBulkEquipmentImages(regNos);
     console.log("HIiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiIIIIIIIII")
     res.status(result.status).json(result);
@@ -322,6 +322,58 @@ const getEquipmentCount = async (req, res) => {
   }
 };
 
+const getEquipmentStats = async (req, res) => {
+  try {
+    const result = await equipmentServices.fetchEquipmentStats();
+
+    res.status(200).json({
+      status: 200,
+      ok: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error getting equipment stats:', error);
+    res.status(500).json({
+      status: 500,
+      ok: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+const getEquipmentsByStatus = async (req, res) => {
+  try {
+    const { status, page = 1, limit = 20 } = req.query;
+
+    const result = await equipmentServices.fetchEquipmentsByStatus(
+      status,
+      parseInt(page),
+      parseInt(limit)
+    );
+
+    res.status(200).json({
+      status: 200,
+      ok: true,
+      data: result.equipments,
+      pagination: {
+        currentPage: result.currentPage,
+        totalPages: result.totalPages,
+        totalCount: result.totalCount,
+        hasMore: result.hasNextPage
+      }
+    });
+  } catch (error) {
+    console.error('Error getting equipments by status:', error);
+    res.status(500).json({
+      status: 500,
+      ok: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   addEquipments,
   getEquipments,
@@ -333,5 +385,7 @@ module.exports = {
   addEquipmentImage,
   getEquipmentRegNo,
   getBulkEquipmentImages,
-  getEquipmentCount
+  getEquipmentCount,
+  getEquipmentStats,
+  getEquipmentsByStatus
 };

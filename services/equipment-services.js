@@ -775,4 +775,145 @@ module.exports = {
       }
     });
   },
+
+  fetchEquipmentStats: function () {
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Base query - exclude outside equipment
+        const query = { outside: false };
+
+        // Get total count
+        const totalCount = await equipmentModel.countDocuments(query);
+
+        // Get counts for each status using aggregation for better performance
+        const statusCounts = await equipmentModel.aggregate([
+          { $match: query },
+          {
+            $group: {
+              _id: { $toLower: "$status" },
+              count: { $sum: 1 }
+            }
+          }
+        ]);
+
+        // Convert aggregation result to object
+        const stats = {
+          total: totalCount,
+          idle: 0,
+          active: 0,
+          maintenance: 0,
+          loading: 0,
+          going: 0,
+          unknown: 0
+        };
+
+        // Map aggregation results to stats object
+        statusCounts.forEach(item => {
+          const status = item._id;
+          if (stats.hasOwnProperty(status)) {
+            stats[status] = item.count;
+          } else {
+            stats.unknown += item.count;
+          }
+        });
+
+        // Get additional stats
+        const companyStats = await equipmentModel.aggregate([
+          { $match: query },
+          {
+            $group: {
+              _id: "$company",
+              count: { $sum: 1 }
+            }
+          }
+        ]);
+
+        // Get site distribution (most recent site per equipment)
+        const siteStats = await equipmentModel.aggregate([
+          { $match: query },
+          { $unwind: "$site" },
+          {
+            $group: {
+              _id: null,
+              sites: { $last: "$site" }
+            }
+          },
+          {
+            $group: {
+              _id: "$sites",
+              count: { $sum: 1 }
+            }
+          },
+          { $sort: { count: -1 } }
+        ]);
+
+        resolve({
+          status: 200,
+          ok: true,
+          stats: {
+            statusBreakdown: stats,
+            companyBreakdown: companyStats.reduce((acc, item) => {
+              acc[item._id] = item.count;
+              return acc;
+            }, {}),
+            siteBreakdown: siteStats.reduce((acc, item) => {
+              acc[item._id] = item.count;
+              return acc;
+            }, {}),
+            totalEquipment: totalCount
+          }
+        });
+      } catch (error) {
+        console.error('Error fetching equipment stats:', error);
+        reject({
+          status: 500,
+          ok: false,
+          message: error.message || 'Error fetching equipment statistics'
+        });
+      }
+    });
+  },
+  fetchEquipmentsByStatus: function (status, page = 1, limit = 20) {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const skip = (page - 1) * limit;
+
+        // Build query
+        let query = { outside: false };
+
+        // Add status filter if not 'all'
+        if (status && status !== 'all') {
+          query.status = { $regex: new RegExp(`^${status}$`, 'i') }; // Case insensitive exact match
+        }
+
+        // Get total count
+        const totalCount = await equipmentModel.countDocuments(query);
+
+        // Fetch paginated data
+        const equipments = await equipmentModel.find(query)
+          .sort({ year: -1, createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .lean();
+
+        const totalPages = Math.ceil(totalCount / limit);
+
+        resolve({
+          status: 200,
+          ok: true,
+          equipments,
+          currentPage: page,
+          totalPages,
+          totalCount,
+          hasNextPage: page < totalPages
+        });
+      } catch (error) {
+        reject({
+          status: 500,
+          ok: false,
+          message: error.message || 'Error fetching equipments by status'
+        });
+      }
+    });
+  },
 }

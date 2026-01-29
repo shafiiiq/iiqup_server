@@ -14,16 +14,19 @@ const ToolkitSchema = new Schema({
   toolkitId: {
     type: String,
     required: [true, 'toolkitId is required'],
-    trim: true
+    trim: true,
+    default: 'No One'
   },
   toolkitName: {
     type: String,
     required: [true, 'toolkitName is required'],
-    trim: true
+    trim: true,
+    default: 'No One',
   },
   variantId: {
     type: String,
     required: [true, 'variantId is required'],
+    default: 'No One',
     trim: true
   },
   size: {
@@ -38,13 +41,15 @@ const ToolkitSchema = new Schema({
   },
   assignedDate: {
     type: String,
+    default: new Date(),
     required: [true, 'assignedDate is required'],
     trim: true
   },
   reason: {
     type: String,
     required: [true, 'reason is required'],
-    trim: true
+    trim: true,
+    default: 'No Reason'
   },
   quantity: {
     type: Number,

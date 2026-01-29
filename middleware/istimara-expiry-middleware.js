@@ -153,7 +153,7 @@ const checkIstimaraExpiry = async () => {
         };
 
         // Send notification
-        const result = await createNotification(notificationData);
+        // const result = await createNotification(notificationData);
 
         await PushNotificationService.sendGeneralNotification(
           JSON.parse(process.env.OFFICE_ONLY), 

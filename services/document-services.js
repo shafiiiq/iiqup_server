@@ -53,6 +53,8 @@ const getSourceDetailsAndKey = async (sourceId, sourceType, documentType, finalF
 
   switch (sourceType) {
     case 'equipment':
+      console.log("sourceId", sourceId);
+      
       sourceData = await equipmentModel.findById(sourceId);
       if (!sourceData) {
         throw new Error('Equipment not found');
@@ -102,7 +104,7 @@ const downloadPDFFromS3 = async (s3Key) => {
 
     const response = await fetch(url);
     if (!response.ok) {
-      throw new Error(`Failed to fetch PDF: ${response.status}`); 
+      throw new Error(`Failed to fetch PDF: ${response.status}`);
     }
 
     const arrayBuffer = await response.arrayBuffer();
@@ -116,7 +118,23 @@ const downloadPDFFromS3 = async (s3Key) => {
 // Helper function to upload PDF to S3
 const uploadPDFToS3 = async (pdfBytes, s3Key, mimeType = 'application/pdf') => {
   try {
+    // Step 1: Get presigned URL
     const uploadUrl = await putObject('merged.pdf', s3Key, mimeType);
+
+    // Step 2: Actually upload the PDF bytes to S3 using the presigned URL
+    const uploadResponse = await fetch(uploadUrl, {
+      method: 'PUT',
+      body: pdfBytes,
+      headers: {
+        'Content-Type': mimeType
+      }
+    });
+
+    if (!uploadResponse.ok) {
+      throw new Error(`S3 upload failed with status: ${uploadResponse.status}`);
+    }
+
+    console.log('Successfully uploaded PDF to S3:', s3Key);
     return uploadUrl;
   } catch (err) {
     console.error('Error uploading PDF to S3:', err);

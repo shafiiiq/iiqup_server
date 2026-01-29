@@ -1011,7 +1011,44 @@ router.get('/get-data-and-store', async (req, res) => {
 
 
 
-
+router.get('/convert-to-objectid', async (req, res) => {
+  try {
+    // Use lean() to get plain objects and check the raw _id type
+    const equipments = await EquipmentModel.find({}).lean();
+    
+    let convertedCount = 0;
+    
+    for (const equipment of equipments) {
+      // Check if _id is not an ObjectId instance
+      if (!(equipment._id instanceof mongoose.Types.ObjectId)) {
+        const stringId = equipment._id.toString();
+        
+        // Delete the old document using the collection directly
+        await EquipmentModel.collection.deleteOne({ _id: stringId });
+        
+        // Create new document with proper ObjectId
+        delete equipment._id;
+        await EquipmentModel.collection.insertOne({
+          _id: new mongoose.Types.ObjectId(stringId),
+          ...equipment
+        });
+        
+        convertedCount++;
+      }
+    }
+    
+    res.json({
+      success: true,
+      message: `Converted ${convertedCount} equipment records to ObjectId`,
+      convertedCount
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 
 
 

@@ -1,7 +1,6 @@
 var express = require('express');
 var router = express.Router();
 const userController = require('../controllers/users.controllers');
-const overtimeUpload = require('../multer/overtime-upload'); // Import the multer config
 const { authMiddleware } = require('../utils/jwt');
 
 router.post('/addusers', userController.addUsers);
@@ -18,7 +17,7 @@ router.delete('/delete-special-notification/:id', authMiddleware, userController
 router.post('/verify-user', userController.verifyUser);
 router.post('/change-password', userController.changePassword);
 router.post('/reset-password', userController.resetPassword);
-router.post('/update-auth-mail', userController.updateAuthMail);  // Optional endpoint to update phone number
+router.post('/update-auth-mail', userController.updateAuthMail); 
 router.post('/get-special-notification', userController.getSpecialNotification);
 router.post('/register-push-token', userController.addPushToken);
 router.post('/remove-push-token', userController.removePushToken);
@@ -34,13 +33,6 @@ router.post('/doc-0auth-authorized-sign-key', authMiddleware, userController.get
 router.post('/doc-0auth-seal-sign-key', authMiddleware, userController.getSealKey)
 router.post('/activate-signature', authMiddleware, userController.activateSignature);
 router.post('/verify-device-trust', authMiddleware, userController.verifyDeviceTrust);
-router.get('/verify-token', authMiddleware, (req, res) => {
-    res.status(200).json({
-        success: true,
-        valid: true,
-        message: 'Token is valid'
-    });
-});
 router.post('/generate-biometric-token', userController.generateBiometricToken);
 router.post('/biometric-login', userController.biometricLogin);
 router.post('/revoke-biometric-token', userController.revokeBiometricToken);
@@ -48,4 +40,6 @@ router.get('/sessions', authMiddleware, userController.getUserSessions);
 router.delete('/sessions/:sessionId', authMiddleware, userController.logoutSession);
 router.post('/sessions/:sessionId/block', authMiddleware, userController.blockDevice);
 router.delete('/sessions/logout-all', authMiddleware, userController.logoutAllSessions);
+router.get('/verify-token', authMiddleware, userController.verifyToken);
+
 module.exports = router;

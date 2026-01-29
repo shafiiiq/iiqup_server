@@ -244,6 +244,8 @@ const complaintSchema = new mongoose.Schema({
   brand: { type: String },
   machine: { type: String },
   name: { type: String },
+  remarks: { type: String, default: '' },
+  rectificationRemarks: { type: String, default: '' },
   mediaFiles: [mediaFileSchema],
 
   // Assignment tracking
