@@ -26,7 +26,7 @@ const addMaintananceHistory = async (req, res) => {
 
 const getMaintananceHistory = async (req, res) => {
   const regNo = req.params.regNo;
-  serviceHistoryServices.fetchMaintananceHistory (regNo)
+  serviceHistoryServices.fetchMaintananceHistory(regNo)
     .then((fetchedHistory) => {
       if (fetchedHistory) {
         res.status(fetchedHistory.status).json(fetchedHistory)
@@ -50,6 +50,25 @@ const getServiceHistory = async (req, res) => {
       }
     })
     .catch((err) => {
+      res.status(err.status || 500).json({ message: 'Cannot get service history', error: err.message })
+    })
+}
+
+const getServiceHistoryById = async (req, res) => {
+  const { id, serviceType } = req.params;
+  console.log('Fetching service history - ID:', id, 'Type:', serviceType);
+
+  serviceHistoryServices.fetchServiceHistoryById(id, serviceType)
+    .then((fetchedHistory) => {
+      console.log('Fetched history:', fetchedHistory);
+      if (fetchedHistory) {
+        res.status(fetchedHistory.status).json(fetchedHistory)
+      } else {
+        res.status(404).json({ message: 'No service history found' })
+      }
+    })
+    .catch((err) => {
+      console.error('Error fetching service history:', err);
       res.status(err.status || 500).json({ message: 'Cannot get service history', error: err.message })
     })
 }
@@ -124,7 +143,7 @@ const getTyreHistory = async (req, res) => {
 }
 
 
-const addBatteryHistory = async (req, res) => { 
+const addBatteryHistory = async (req, res) => {
   serviceHistoryServices.insertBatteryHistory(req.body)
     .then((addHistory) => {
       if (addHistory) {
@@ -146,7 +165,7 @@ const getBatteryHistory = async (req, res) => {
         res.status(404).json({ message: 'No service history found' })
       }
     })
-    .catch((err) => { 
+    .catch((err) => {
       res.status(err.status || 500).json({ message: 'Cannot get service history', error: err.message })
     })
 }
@@ -155,7 +174,7 @@ const deleteServiceHistory = async (req, res) => {
   const { id, type } = req.params;
 
   serviceHistoryServices.deleteServiceHistory(id, type)
-    .then((result) => {      
+    .then((result) => {
       if (result) {
         res.status(result.status).json(result);
       }
@@ -177,5 +196,6 @@ module.exports = {
   getMaintananceHistory,
   getBatteryHistory,
   addBatteryHistory,
-  deleteServiceHistory
+  deleteServiceHistory,
+  getServiceHistoryById
 };

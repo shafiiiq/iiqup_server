@@ -1,6 +1,6 @@
 var express = require('express');
 var router = express.Router();
-const equipmentController = require('../controllers/equipment.controller');
+const equipmentController = require('../controllers/equipment.controller'); 
 
 router.post('/add-equipment', equipmentController.addEquipments);
 router.get('/get-equipments', equipmentController.getEquipments);

@@ -3,11 +3,12 @@ const serviceHistoryModel = require('../models/service-history.model.js');
 const NotificationModel = require('../models/notification-model.js');
 const serviceReportModel = require('../models/service-report.model.js');
 const maintananceHistoryModel = require('../models/maintanance-history.model.js');
-const tyreModel = require('../models/tyre.model.js');
-const batteryModel = require('../models/batery.model.js');
+const tyreHistoryModel = require('../models/tyre.model.js');
+const batteryHistoryModel = require('../models/batery.model.js');
+const EquipmentModel = require('../models/equip.model');
 const { createNotification } = require('../utils/notification-jobs'); // Import notification service
 const PushNotificationService = require('../utils/push-notification-jobs');
-const Equipment = require('../models/equip.model');
+const { default: mongoose } = require('mongoose');
 
 module.exports = {
 
@@ -139,13 +140,11 @@ module.exports = {
         });
     },
 
-    fetchServiceHistory: (data) => {
+    fetchServiceHistory: (regNo) => {
         return new Promise(async (resolve, reject) => {
             try {
-                // First, fetch the service history records
-                let serviceRecords = await serviceHistoryModel.find({ regNo: data });
+                let serviceRecords = await serviceHistoryModel.find({ regNo: regNo });
 
-                // Convert Mongoose documents to plain JavaScript objects
                 serviceRecords = serviceRecords.map(record => record.toObject());
 
                 for (let i = 0; i < serviceRecords.length; i++) {
@@ -156,17 +155,11 @@ module.exports = {
                             date: serviceRecords[i].date
                         });
 
-
-
                         if (serviceReports && serviceReports.length > 0) {
-                            // Use serviceReports[0] instead of serviceReport[i]
                             serviceRecords[i].remarks = serviceReports[0].remarks;
                         }
                     }
                 }
-
-                console.log(serviceRecords[2]);
-
 
                 resolve({
                     status: 200,
@@ -183,10 +176,62 @@ module.exports = {
         });
     },
 
+    fetchServiceHistoryById: (id, serviceType) => {
+        return new Promise(async (resolve, reject) => {
+            try {
+                if (!mongoose.Types.ObjectId.isValid(id)) {
+                    return reject({
+                        status: 400,
+                        ok: false,
+                        message: 'Invalid service history ID'
+                    });
+                }
+
+                let HistoryModel;
+                if (serviceType === 'oil' || serviceType === 'normal') {
+                    HistoryModel = serviceHistoryModel;
+                } else if (serviceType === 'tyre') {
+                    HistoryModel = tyreHistoryModel;
+                } else if (serviceType === 'battery') {
+                    HistoryModel = batteryHistoryModel;
+                } else if (serviceType === 'maintenance') {
+                    HistoryModel = maintananceHistoryModel;
+                } else {
+                    return reject({
+                        status: 400,
+                        ok: false,
+                        message: 'Invalid service type'
+                    });
+                }
+
+                let serviceRecord = await HistoryModel.findById(id);
+
+                if (!serviceRecord) {
+                    return reject({
+                        status: 404,
+                        ok: false,
+                        message: 'Service history not found'
+                    });
+                }
+
+                resolve({
+                    status: 200,
+                    ok: true,
+                    data: serviceRecord
+                });
+            } catch (error) {
+                reject({
+                    status: 500,
+                    ok: false,
+                    message: error.message || 'Error fetching service history'
+                });
+            }
+        });
+    },
+
     insertFullService: (data) => {
         return new Promise(async (resolve, reject) => {
             try {
-                // Check if data is provided
                 if (!data || !data.regNo) {
                     return reject({
                         status: 400,
@@ -195,7 +240,7 @@ module.exports = {
                     });
                 }
 
-                const equipment = await Equipment.findOne({ regNo: data.regNo });
+                const equipment = await EquipmentModel.findOne({ regNo: data.regNo });
 
                 const notification = await createNotification({
                     title: `Time to full service - ${equipment.brand} ${equipment.machine} ${data.regNo}`,
@@ -235,7 +280,6 @@ module.exports = {
     fetchLatestFullService: (data) => {
         return new Promise(async (resolve, reject) => {
             try {
-                // Find all documents matching regNo and fullService:true, sort by date in descending order, limit to 1
                 const getLatestFullService = await serviceHistoryModel.find(
                     { regNo: data, fullService: true }
                 ).sort({ date: -1 }).limit(1);
@@ -243,7 +287,7 @@ module.exports = {
                 resolve({
                     status: 200,
                     ok: true,
-                    data: getLatestFullService[0] || false // Return the first item or null if no results
+                    data: getLatestFullService[0] || false 
                 });
             } catch (error) {
                 reject({
@@ -323,9 +367,9 @@ module.exports = {
         return new Promise(async (resolve, reject) => {
             try {
 
-                const serviceHistory = await tyreModel.create({
+                const serviceHistory = await tyreHistoryModel.create({
                     date: data.date,
-                    tyreModel: data.tyreModel,
+                    tyreHistoryModel: data.tyreHistoryModel,
                     tyreNumber: data.tyreNumber,
                     equipment: data.equipment,
                     equipmentNo: data.equipmentNo,
@@ -356,7 +400,7 @@ module.exports = {
     fetchTyreHistory: (data) => {
         return new Promise(async (resolve, reject) => {
             try {
-                const getusers = await tyreModel.find({ equipmentNo: data });
+                const getusers = await tyreHistoryModel.find({ equipmentNo: data });
                 resolve({
                     status: 200,
                     ok: true,
@@ -375,9 +419,9 @@ module.exports = {
     insertBatteryHistory: (data) => {
         return new Promise(async (resolve, reject) => {
             try {
-                const serviceHistory = await batteryModel.create({
+                const serviceHistory = await batteryHistoryModel.create({
                     date: data.date,
-                    batteryModel: data.batteryModel,
+                    batteryHistoryModel: data.batteryHistoryModel,
                     equipment: data.equipment,
                     equipmentNo: data.equipmentNo,
                     location: data.location,
@@ -406,7 +450,7 @@ module.exports = {
     fetchBatteryHistory: (data) => {
         return new Promise(async (resolve, reject) => {
             try {
-                const getusers = await batteryModel.find({ equipmentNo: data });
+                const getusers = await batteryHistoryModel.find({ equipmentNo: data });
                 resolve({
                     status: 200,
                     ok: true,
@@ -435,10 +479,9 @@ module.exports = {
             } else if (type === 'maintenance') {
                 HistoryModel = maintananceHistoryModel;
             } else {
-                HistoryModel = serviceHistoryModel; // default
+                HistoryModel = serviceHistoryModel;
             }
 
-            // First, find the history to get reportId before deletion
             const historyToDelete = await HistoryModel.findById(id);
 
             if (!historyToDelete) {
@@ -449,10 +492,8 @@ module.exports = {
                 };
             }
 
-            // Extract reportId
             const { reportId } = historyToDelete;
 
-            // Delete the history record
             const deletedHistory = await HistoryModel.findByIdAndDelete(id);
 
             if (!deletedHistory) {

@@ -66,10 +66,10 @@ router.post('/iclock/cdata', async (req, res) => {
     // Process attendance data and call controller
     if (attendanceData) {
       // console.log('PROCESSED ATTENDANCE DATA:', attendanceData);
-      
+       
       // Convert ZKTeco format to your format and call controller
-      for (const record of attendanceData) {
-        // Get current time instead of parsing potentially old timestamp
+      for (const record of attendanceData) {  
+        // Get current time instead of parsing potentially old timestamp 
         const now = new Date();
         const currentTime = now.toTimeString().split(' ')[0]; // Gets HH:MM:SS format
         
