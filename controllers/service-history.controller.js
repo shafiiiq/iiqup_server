@@ -2,7 +2,7 @@ const serviceHistoryServices = require('../services/service-history-services.js'
 
 const addServiceHistory = async (req, res) => {
   serviceHistoryServices.insertServiceHisory(req.body)
-    .then((addHistory) => {
+    .then((addHistory) => { 
       if (addHistory) {
         res.status(addHistory.status).json(addHistory)
       }

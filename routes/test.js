@@ -5,7 +5,7 @@ const BatteryModel = require('../models/batery.model.js');
 const serviceReportModel = require('../models/service-report.model.js');
 const TyreModel = require('../models/tyre.model.js');
 const serviceHistoryModel = require('../models/service-history.model.js');
-const MaintananceModel = require('../models/maintanance-history.model.js');
+const MaintananceModel = require('../models/maintenance-history.model.js');
 const Equipment = require('../models/equip.model.js');
 const Handover = require('../models/equip-hand-over-stock.model.js');
 const Toolkit = require('../models/toolkit.model.js');
@@ -408,7 +408,7 @@ module.exports = router;
 //     Model = serviceReportModel
 //   } else if (req.body.type === 'histories') {
 //     Model = serviceHistoryModel
-//   } else if (req.body.type === 'maintanance') {
+//   } else if (req.body.type === 'maintenance') {
 //     Model = MaintananceModel
 //   }else if (req.body.type === 'handover') {
 //     Model = Handover
@@ -461,7 +461,7 @@ module.exports = router;
 //       Modell = serviceReportModel;
 //     } else if (req.body.type === 'histories') {
 //       Modell = serviceHistoryModel;
-//     } else if (req.body.type === 'maintanance') {
+//     } else if (req.body.type === 'maintenance') {
 //       Modell = MaintananceModel;
 //     } else if (req.body.type === 'handover') {
 //       Modell = Handover;

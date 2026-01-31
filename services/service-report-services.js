@@ -1,7 +1,7 @@
 const serviceHistoryModel = require('../models/service-history.model.js');
 const tyreHistoryModel = require('../models/tyre.model.js');
 const batteryHistoryModel = require('../models/batery.model.js');
-const maintanceHistoryModel = require('../models/maintanance-history.model.js');
+const maintanceHistoryModel = require('../models/maintenance-history.model.js');
 const serviceReportModel = require('../models/service-report.model.js');
 const { createNotification } = require('../utils/notification-jobs.js'); // Import notification service
 const PushNotificationService = require('../utils/push-notification-jobs.js');
@@ -84,7 +84,9 @@ module.exports = {
           status: 200,
           ok: true,
           message: 'Service report created successfully',
-          data: result
+          data: {
+            serviceReport: result
+          }
         });
 
       } catch (err) {
@@ -128,11 +130,19 @@ module.exports = {
   },
 
   fetchServiceReportWith: (id) => {
+    console.log("id ...................", id);
+    
     return new Promise(async (resolve, reject) => {
       try {
-        const getReport = await serviceReportModel.find({
-          _id: id,
-        });
+        const getReport = await serviceReportModel.findById(id);
+
+        if (!getReport) {
+          return reject({
+            status: 404,
+            ok: false,
+            message: 'Service report not found'
+          });
+        }
 
         resolve({
           status: 200,
@@ -606,64 +616,6 @@ module.exports = {
           status: 500,
           ok: false,
           message: error.message || 'Error fetching services by last months'
-        });
-      }
-    });
-  },
-
-  updateServiceReport: (id, updateData) => {
-    return new Promise(async (resolve, reject) => {
-      try {
-        const validUser = await serviceReportModel.findById(id);
-        if (validUser) {
-          const updatedUser = await serviceReportModel.findByIdAndUpdate(id, updateData, { new: true });
-          return resolve({
-            status: 200,
-            ok: true,
-            message: 'Service report updated successfully',
-            data: updatedUser
-          });
-        } else {
-          reject({
-            status: 404,
-            ok: false,
-            message: 'Service report not found'
-          });
-        }
-      } catch (error) {
-        reject({
-          status: 500,
-          ok: false,
-          message: 'Unable to update service report'
-        });
-      }
-    });
-  },
-
-  deleteServiceReport: (id) => {
-    return new Promise(async (resolve, reject) => {
-      try {
-        const validUser = await serviceReportModel.findById(id);
-        if (validUser) {
-          const deleteUser = await serviceReportModel.findByIdAndDelete(id);
-          return resolve({
-            status: 200,
-            ok: true,
-            message: 'Service report deleted successfully',
-            data: deleteUser
-          });
-        } else {
-          reject({
-            status: 404,
-            ok: false,
-            message: 'Service report not found'
-          });
-        }
-      } catch (error) {
-        reject({
-          status: 500,
-          ok: false,
-          message: 'Unable to delete service report'
         });
       }
     });

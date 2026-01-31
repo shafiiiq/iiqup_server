@@ -52,7 +52,7 @@ const ServiceReportSchema = new Schema({
   operatorName: {
     type: String,
     required: true
-  },
+  }, 
   remarks: {
     type: String,
     default: ''

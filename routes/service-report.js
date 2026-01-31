@@ -1,9 +1,10 @@
-var express = require('express'); 
+var express = require('express');
 var router = express.Router();
 const serviceReportController = require('../controllers/service-report.controllers.js')
 
 router.post('/add-service-report', serviceReportController.addServiceReport)
-router.get('/getwith/:id', serviceReportController.getServiceReportWithId)
+router.get('/get-report/with-id/:id', serviceReportController.getServiceReportWithId)
+router.get('/:regNo/:date', serviceReportController.getServiceReport)
 router.put('/updatewith/:id', serviceReportController.updateServiceReportWithId)
 router.delete('/deletewith/:id', serviceReportController.removeServiceReportWithId)
 
@@ -12,7 +13,6 @@ router.get('/summary/yesterday', serviceReportController.getYesterdayServices)
 router.get('/summary/weekly', serviceReportController.getWeeklyServices)
 router.get('/summary/monthly', serviceReportController.getMonthlyServices)
 router.get('/summary/yearly', serviceReportController.getYearlyServices)
-
 router.get('/summary/date-range/:startDate/:endDate', serviceReportController.getAllServicesByDateRange)
 router.get('/summary/last-months/:monthsCount', serviceReportController.getAllServicesByLastMonths)
 
@@ -24,8 +24,6 @@ router.get('/histories/:regNo/battery', serviceReportController.getAllBatterySer
 router.get('/histories/:regNo/date-range/:startDate/:endDate', serviceReportController.getServicesByDateRange)
 router.get('/histories/:regNo/last-months/:monthsCount', serviceReportController.getServicesByLastMonths)
 
-router.get('/:regNo/:date', serviceReportController.getServiceReport)
-router.put('/updateuser/:id', serviceReportController.updateServiceReport)
-router.delete('/deleteuser/:id', serviceReportController.deleteServiceReport)
+
 
 module.exports = router;

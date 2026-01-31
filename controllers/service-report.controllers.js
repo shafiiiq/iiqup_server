@@ -27,8 +27,8 @@ const getServiceReport = async (req, res) => {
 }
 
 const getServiceReportWithId = async (req, res) => {
-
   const id = req.params.id;
+  console.log("id ...................", id);
   reportServices.fetchServiceReportWith(id)
     .then((fetchedUsers) => {
       if (fetchedUsers) {
@@ -157,35 +157,6 @@ const getServicesByLastMonths = async (req, res) => {
     })
 }
 
-const updateServiceReport = async (req, res) => {
-  const { id } = req.params;
-  const updateData = req.body;
-
-  reportServices.updateServiceReport(id, updateData)
-    .then((updatedUser) => {
-      if (updatedUser) {
-        res.status(updatedUser.status).json(updatedUser)
-      }
-    })
-    .catch((err) => {
-      res.status(err.status).json({ error: err.message })
-    })
-}
-
-const deleteServiceReport = async (req, res) => {
-  const { id } = req.params;
-
-  reportServices.deleteServiceReport(id)
-    .then((response) => {
-      if (response) {
-        res.status(response.status).json(response)
-      }
-    })
-    .catch((err) => {
-      res.status(err.status).json({ error: err.message })
-    })
-}
-
 const getDailyServices = async (req, res) => {
   reportServices.fetchServicesByPeriod('daily')
     .then((fetchedServices) => {
@@ -276,8 +247,6 @@ const getAllServicesByLastMonths = async (req, res) => {
 module.exports = {
   addServiceReport,
   getServiceReport,
-  updateServiceReport,
-  deleteServiceReport,
   getAllServiceHistories,
   getAllOilServices,
   getAllMaintenanceServices,

@@ -1,6 +1,6 @@
 const serviceHistoryModel = require('../models/service-history.model.js');
 const serviceReportModel = require('../models/service-report.model.js');
-const maintananceHistoryModel = require('../models/maintanance-history.model.js');
+const maintananceHistoryModel = require('../models/maintenance-history.model.js');
 const tyreModel = require('../models/tyre.model.js');
 const batteryModel = require('../models/batery.model.js');
 const stocksModel = require('../models/stocks.model.js');
@@ -35,7 +35,7 @@ const cache = {
 const models = [
   { model: serviceHistoryModel, source: 'serviceHistoryModel', content: 'service-history' },
   { model: serviceReportModel, source: 'serviceReportModel', content: 'service-report' },
-  { model: maintananceHistoryModel, source: 'maintananceHistoryModel', content: 'maintanance-history' },
+  { model: maintananceHistoryModel, source: 'maintananceHistoryModel', content: 'maintenance-history' },
   { model: tyreModel, source: 'tyreModel', content: 'tyre-history' },
   { model: batteryModel, source: 'batteryModel', content: 'battery-history' },
   { model: equipmnentModel, source: 'equipmnentModel', content: 'equipment' },
@@ -251,7 +251,7 @@ module.exports = {
           data: {
             serviceHistory: updatesByCollection['service-history'] || [],
             serviceReports: updatesByCollection['service-report'] || [],
-            maintenanceHistory: updatesByCollection['maintanance-history'] || [],
+            maintenanceHistory: updatesByCollection['maintenance-history'] || [],
             tyreHistory: updatesByCollection['tyre-history'] || [],
             batteryHistory: updatesByCollection['battery-history'] || [],
             equipment: updatesByCollection['equipment'] || [],
@@ -294,7 +294,7 @@ module.exports = {
           data: {
             serviceHistory: updatesByCollection['service-history'] || [],
             serviceReports: updatesByCollection['service-report'] || [],
-            maintenanceHistory: updatesByCollection['maintanance-history'] || [],
+            maintenanceHistory: updatesByCollection['maintenance-history'] || [],
             tyreHistory: updatesByCollection['tyre-history'] || [],
             batteryHistory: updatesByCollection['battery-history'] || [],
             equipment: updatesByCollection['equipment'] || [],
@@ -337,7 +337,7 @@ module.exports = {
           data: {
             serviceHistory: updatesByCollection['service-history'] || [],
             serviceReports: updatesByCollection['service-report'] || [],
-            maintenanceHistory: updatesByCollection['maintanance-history'] || [],
+            maintenanceHistory: updatesByCollection['maintenance-history'] || [],
             tyreHistory: updatesByCollection['tyre-history'] || [],
             batteryHistory: updatesByCollection['battery-history'] || [],
             equipment: updatesByCollection['equipment'] || [],
@@ -380,7 +380,7 @@ module.exports = {
           data: {
             serviceHistory: updatesByCollection['service-history'] || [],
             serviceReports: updatesByCollection['service-report'] || [],
-            maintenanceHistory: updatesByCollection['maintanance-history'] || [],
+            maintenanceHistory: updatesByCollection['maintenance-history'] || [],
             tyreHistory: updatesByCollection['tyre-history'] || [],
             batteryHistory: updatesByCollection['battery-history'] || [],
             equipment: updatesByCollection['equipment'] || [],

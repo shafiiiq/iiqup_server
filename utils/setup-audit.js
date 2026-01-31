@@ -7,7 +7,7 @@ function setupAuditTracking() {
     const modelConfigs = [
       { path: '../models/service-history.model', collection: 'service-history' },
       { path: '../models/service-report.model', collection: 'service-report' },
-      { path: '../models/maintanance-history.model', collection: 'maintanance-history' },
+      { path: '../models/maintenance-history.model', collection: 'maintenance-history' },
       { path: '../models/tyre.model', collection: 'tyre' },
       { path: '../models/batery.model', collection: 'battery' },
       { path: '../models/equip-hand-over-stock.model', collection: 'equip-hand-over-stock' },

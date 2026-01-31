@@ -2,7 +2,7 @@ const { promises } = require('fs');
 const serviceHistoryModel = require('../models/service-history.model.js');
 const NotificationModel = require('../models/notification-model.js');
 const serviceReportModel = require('../models/service-report.model.js');
-const maintananceHistoryModel = require('../models/maintanance-history.model.js');
+const maintananceHistoryModel = require('../models/maintenance-history.model.js');
 const tyreHistoryModel = require('../models/tyre.model.js');
 const batteryHistoryModel = require('../models/batery.model.js');
 const EquipmentModel = require('../models/equip.model');
@@ -287,7 +287,7 @@ module.exports = {
                 resolve({
                     status: 200,
                     ok: true,
-                    data: getLatestFullService[0] || false 
+                    data: getLatestFullService[0] || false
                 });
             } catch (error) {
                 reject({
@@ -369,7 +369,7 @@ module.exports = {
 
                 const serviceHistory = await tyreHistoryModel.create({
                     date: data.date,
-                    tyreHistoryModel: data.tyreHistoryModel,
+                    tyreModel: data.tyreModel,
                     tyreNumber: data.tyreNumber,
                     equipment: data.equipment,
                     equipmentNo: data.equipmentNo,
@@ -421,7 +421,7 @@ module.exports = {
             try {
                 const serviceHistory = await batteryHistoryModel.create({
                     date: data.date,
-                    batteryHistoryModel: data.batteryHistoryModel,
+                    batteryModel: data.batteryModel,
                     equipment: data.equipment,
                     equipmentNo: data.equipmentNo,
                     location: data.location,
@@ -467,6 +467,10 @@ module.exports = {
     },
 
     deleteServiceHistory: async (id, type) => {
+        console.log("type", type);
+
+        console.log("id", id);
+
         try {
             // Determine which history model to use
             let HistoryModel;
@@ -477,12 +481,18 @@ module.exports = {
             } else if (type === 'battery') {
                 HistoryModel = batteryHistoryModel;
             } else if (type === 'maintenance') {
+                console.log(" hiiiiiiiiiii")
                 HistoryModel = maintananceHistoryModel;
             } else {
                 HistoryModel = serviceHistoryModel;
             }
 
+            console.log("HistoryModel", HistoryModel)
+
             const historyToDelete = await HistoryModel.findById(id);
+
+            console.log("maintananceHistoryModel", historyToDelete);
+
 
             if (!historyToDelete) {
                 return {
