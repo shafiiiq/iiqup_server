@@ -259,6 +259,22 @@ const MechanicSchema = new Schema({
     type: Date,
     default: Date.now
   },
+  attendance: [{
+    id: Number,
+    punch_time: String,
+    punch_state: String,
+    emp_name: String,
+    verify_type: String,
+    work_code: String,
+    gps_location: String,
+    terminal_alias: String,
+    capture: String,
+    upload_time: String,
+    icon: String,
+    location: String,
+    photo: String,
+    pin: Number
+  }],
   zktecoPin: {
     type: Number
   },

@@ -48,42 +48,21 @@ const storeToProcess = async (req, res) => {
 };
 
 const sendToServer = async (attendanceData) => {
-  console.log("this is the attendance data", attendanceData);
-
   try {
-    // Handle both direct data and request object formats
     const data = attendanceData.body || attendanceData;
     const { pin, punch_time, state, work_code, location, id } = data;
-
-    // Parse the pin to integer
     const parsedPin = parseInt(pin);
 
-    // Find mechanic by zktecoPin
     const mechanic = await Mechanic.findOne({ zktecoPin: parsedPin });
 
-    // If no mechanic found and it's not a special admin pin (1 or 15), return early
     if (!mechanic && parsedPin !== 15 && parsedPin !== 1) {
       console.log(`No mechanic found for pin: ${parsedPin}`);
       return;
     }
 
-    // Convert punch_time to Qatar timezone
     const qatarTime = convertToQatarTime(punch_time);
-    console.log(`Hardware time: ${punch_time}, Qatar local time: ${qatarTime}`);
 
-    // Check for duplicate with Qatar time (only if mechanic exists)
-    if (mechanic) {
-      const existingRecord = mechanic.attendance.find(att =>
-        att.punch_time === qatarTime && att.punch_state === state
-      );
-
-      if (existingRecord) {
-        console.log(`Duplicate attendance record skipped for ${mechanic.name}`);
-        return;
-      }
-    }
-
-    // Determine employee name based on pin
+    // Determine employee name
     let empName;
     if (parsedPin === 1) {
       empName = process.env.SUPER_ADMIN_NAME;
@@ -95,7 +74,6 @@ const sendToServer = async (attendanceData) => {
       empName = `Unknown User (PIN: ${parsedPin})`;
     }
 
-    // Create new attendance record with Qatar time
     const newAttendance = {
       id: id,
       punch_time: qatarTime,
@@ -113,16 +91,12 @@ const sendToServer = async (attendanceData) => {
       pin: parsedPin
     };
 
-    // Save attendance to the service
     const savedAttendance = await attendanceService.addAttendance(newAttendance);
 
-    // Only add to mechanic's attendance array if it's a regular mechanic
-    if (mechanic) {
-      mechanic.attendance.push(newAttendance);
-      await mechanic.save();
-      console.log(`✅ Attendance saved for ${mechanic.name} at ${qatarTime} Qatar time`);
+    if (savedAttendance) {
+      console.log(`✅ Attendance saved for ${empName} at ${qatarTime}`);
     } else {
-      console.log(`✅ Attendance saved for ${empName} at ${qatarTime} Qatar time`);
+      console.log(`⏭️ Duplicate skipped for ${empName}`);
     }
 
   } catch (error) {

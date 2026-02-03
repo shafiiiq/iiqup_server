@@ -68,7 +68,7 @@ const generateAndSendOTP = async (email, demo_opr = false, name) => {
     let user;
 
     // Check if user exists with this email
-    user = await User.findOne({ authMail: email });
+    user = await User.findOne({ authMail: email }); 
 
     if (!user) {
       user = await Mechanic.findOne({ authMail: email });
@@ -82,10 +82,7 @@ const generateAndSendOTP = async (email, demo_opr = false, name) => {
     }
 
     // Generate a cryptographically secure OTP
-    const otp = generateSecureOTP();  
-
-    console.log("otp::::::", otp);
-    
+    const otp = generateSecureOTP();      
 
     // Hash the OTP before storing
     const hashedOTP = await hashOTP(otp);
