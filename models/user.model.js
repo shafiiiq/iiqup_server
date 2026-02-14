@@ -222,7 +222,24 @@ const userSchema = new Schema({
       type: Date,
       default: Date.now
     }
-  }]
+  }],
+  exploredFeatures: [{
+    releaseId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Explorer'
+    },
+    featureId: {
+      type: mongoose.Schema.Types.ObjectId
+    },
+    exploredAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  lastExploredVersion: {
+    type: String,
+    default: null
+  }
 });
 
 // Method to check if user has specific permission

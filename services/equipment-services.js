@@ -1,8 +1,21 @@
 const { promises } = require('fs');
 const equipmentModel = require('../models/equip.model');
+const mobilizationModel = require('../models/mobilizations.model');
+const replacementsModel = require('../models/replacements.model');
+const OperatorModel = require('../models/operator.model');
 const { createNotification } = require('../utils/notification-jobs'); // Import notification service
 const PushNotificationService = require('../utils/push-notification-jobs');
 const EquipmentImageModel = require('../models/equip-hand-over-stock.model');
+const OperatorService = require('./operator-services')
+
+const getCurrentDateTime = () => {
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const year = now.getFullYear();
+  const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+  return { month, year, time };
+};
 
 module.exports = {
 
@@ -168,13 +181,18 @@ module.exports = {
     });
   },
 
-  fetchEquipments: function (page = 1, limit = 20) {
+  fetchEquipments: function (page = 1, limit = 20, hiredFilter = null) {
     return new Promise(async (resolve, reject) => {
       try {
         const skip = (page - 1) * limit;
 
-        // Query for non-outside equipment
-        const query = { outside: false };
+        // Build query based on hiredFilter
+        let query = {};
+        if (hiredFilter === 'hired') {
+          query.hired = true;
+        } else if (hiredFilter === 'own') {
+          query.hired = false;
+        }
 
         // Get total count
         const totalCount = await equipmentModel.countDocuments(query);
@@ -207,39 +225,51 @@ module.exports = {
     });
   },
 
-  searchEquipments: function (searchTerm, page = 1, limit = 20, searchField = 'all') {
+  searchEquipments: function (searchTerm, page = 1, limit = 20, searchField = 'all', hiredFilter = null) {
     return new Promise(async (resolve, reject) => {
       try {
         const skip = (page - 1) * limit;
 
-        // Base query - exclude outside equipment
-        let query = { outside: false };
+        // Build base query based on hiredFilter
+        let baseQuery = {};
+        if (hiredFilter === 'hired') {
+          baseQuery.hired = true;
+        } else if (hiredFilter === 'own') {
+          baseQuery.hired = false;
+        }
 
         // Build search query based on searchField
+        let searchQuery = {};
+
         if (searchField === 'all') {
           // Search across multiple fields
-          query.$or = [
+          searchQuery.$or = [
             { machine: { $regex: searchTerm, $options: 'i' } },
             { regNo: { $regex: searchTerm, $options: 'i' } },
             { brand: { $regex: searchTerm, $options: 'i' } },
             { company: { $regex: searchTerm, $options: 'i' } },
             { status: { $regex: searchTerm, $options: 'i' } },
             { site: { $regex: searchTerm, $options: 'i' } },
-            { certificationBody: { $regex: searchTerm, $options: 'i' } },
-            { coc: { $regex: searchTerm, $options: 'i' } }
+            { coc: { $regex: searchTerm, $options: 'i' } },
+            // Fix for certificationBody (array of objects)
+            { 'certificationBody.operatorName': { $regex: searchTerm, $options: 'i' } },
+            { 'certificationBody.operatorId': { $regex: searchTerm, $options: 'i' } }
           ];
 
           // Check if searchTerm is a number for year search
           if (!isNaN(searchTerm)) {
-            query.$or.push({ year: parseInt(searchTerm) });
+            searchQuery.$or.push({ year: parseInt(searchTerm) });
           }
         } else if (searchField === 'site') {
           // Site-specific search
-          query.site = { $regex: searchTerm, $options: 'i' };
+          searchQuery.site = { $regex: searchTerm, $options: 'i' };
         } else {
           // Specific field search
-          query[searchField] = { $regex: searchTerm, $options: 'i' };
+          searchQuery[searchField] = { $regex: searchTerm, $options: 'i' };
         }
+
+        // Combine baseQuery and searchQuery
+        const query = { ...baseQuery, ...searchQuery };
 
         // Get total count for search results
         const totalCount = await equipmentModel.countDocuments(query);
@@ -275,7 +305,7 @@ module.exports = {
   fetchEquipmentByReg: (regNo) => {
     return new Promise(async (resolve, reject) => {
       try {
-        const data = await equipmentModel.find({ outside: false, regNo: regNo });
+        const data = await equipmentModel.find({ regNo: regNo });
         resolve({
           status: 200,
           ok: true,
@@ -291,20 +321,86 @@ module.exports = {
     });
   },
 
+  changeEquipmentStatus: async function (data) {
+    try {
+      const {
+        equipmentId,
+        regNo,
+        machine,
+        previousStatus,
+        newStatus,
+        month,
+        year,
+        time,
+        remarks
+      } = data;
+
+      // Create mobilization record for status change
+      const statusChange = new mobilizationModel({
+        equipmentId,
+        regNo,
+        machine,
+        action: 'status_changed',
+        previousStatus,
+        newStatus,
+        withOperator: false,
+        month,
+        year,
+        date: new Date(),
+        time,
+        remarks: remarks || '',
+        status: newStatus
+      });
+
+      await statusChange.save();
+
+      // Update equipment status
+      const updatedEquipment = await equipmentModel.findOneAndUpdate(
+        { _id: equipmentId },
+        {
+          $set: {
+            status: newStatus,
+            updatedAt: new Date()
+          }
+        },
+        { new: true }
+      );
+
+      if (!updatedEquipment) {
+        return {
+          status: 404,
+          ok: false,
+          message: 'Equipment not found'
+        };
+      }
+
+      return {
+        status: 200,
+        ok: true,
+        message: 'Equipment status changed successfully',
+        data: {
+          statusChange,
+          updatedEquipment
+        }
+      };
+    } catch (error) {
+      console.error('Error in changeEquipmentStatus service:', error);
+      throw error;
+    }
+  },
+
   updateEquipments: (regNo, updatedData, equipmentNumber = null, operatorName = null) => {
     return new Promise(async (resolve, reject) => {
       try {
-        //  Check for equipmentNumber and operatorName (not updateData === null)
         if (equipmentNumber && operatorName) {
           const equipment = await equipmentModel.findOne({ regNo: equipmentNumber });
           if (!equipment) {
             return reject({ status: 404, ok: false, message: 'Equipment not found' });
           }
 
-          // Fixed: Properly update operator field
           const result = await equipmentModel.findOneAndUpdate(
             { regNo: equipmentNumber },
-            { operator: operatorName }, // Fixed: Pass as object with operator field
+            { operator: operatorName },
             { new: true, runValidators: true }
           );
 
@@ -317,15 +413,15 @@ module.exports = {
           });
 
           await PushNotificationService.sendGeneralNotification(
-            null, // broadcast to all users
-            'Operator Updated', //title
-            `${equipment.machine} - ${equipment.regNo}'s new operator is ${operatorName}`, //description
-            'medium', //priority
-            'normal', // type
+            null,
+            'Operator Updated',
+            `${equipment.machine} - ${equipment.regNo}'s new operator is ${operatorName}`,
+            'medium',
+            'normal',
             notification.data._id.toString()
           );
 
-          return resolve({ // Added return
+          return resolve({
             status: 200,
             ok: true,
             message: 'Equipment updated successfully',
@@ -338,18 +434,62 @@ module.exports = {
           return reject({ status: 404, ok: false, message: 'Equipment not found' });
         }
 
+        // ✅ MIGRATION: Convert old string format to new object format
+        if (equipment.certificationBody && equipment.certificationBody.length > 0) {
+          const needsMigration = equipment.certificationBody.some(item => typeof item === 'string');
+
+          if (needsMigration) {
+            console.log(`Migrating certificationBody for equipment ${regNo}`);
+
+            const migratedCertificationBody = equipment.certificationBody.map(item => {
+              if (typeof item === 'string') {
+                return {
+                  operatorName: item,
+                  operatorId: '',
+                  assignedAt: new Date()
+                };
+              }
+              return item;
+            });
+
+            await equipmentModel.findOneAndUpdate(
+              { regNo: regNo },
+              { $set: { certificationBody: migratedCertificationBody } },
+              { new: true }
+            );
+
+            equipment.certificationBody = migratedCertificationBody;
+          }
+        }
+
         // Store original data for notification comparison
         const originalEquipment = { ...equipment.toObject() };
 
-        // Remove immutable fields that shouldn't be updated
-        const { _id, __v, createdAt, ...cleanUpdatedData } = updatedData;
+        // ✅ FIX: Remove certificationBody from updatedData to prevent overwriting
+        const { _id, __v, createdAt, certificationBody, ...cleanUpdatedData } = updatedData;
 
         // Handle operator addition to certificationBody
         const updateData = { ...cleanUpdatedData };
 
-        if (cleanUpdatedData.operator) {
-          // Use $push to add to certificationBody array
-          updateData.$push = { certificationBody: cleanUpdatedData.operator };
+        if (cleanUpdatedData.operator && cleanUpdatedData.operatorId) {
+          updateData.$push = {
+            certificationBody: {
+              operatorName: cleanUpdatedData.operator,
+              operatorId: cleanUpdatedData.operatorId,
+              assignedAt: new Date()
+            }
+          };
+          delete updateData.operator;
+          delete updateData.operatorId;
+        } else if (cleanUpdatedData.operator && !cleanUpdatedData.operatorId) {
+          console.warn('Operator provided without operatorId - this is deprecated');
+          updateData.$push = {
+            certificationBody: {
+              operatorName: cleanUpdatedData.operator,
+              operatorId: '',
+              assignedAt: new Date()
+            }
+          };
           delete updateData.operator;
         }
 
@@ -359,11 +499,36 @@ module.exports = {
           { new: true, runValidators: true }
         );
 
-        // Send notification for equipment update
+        // ✅ SEND NOTIFICATION FOR STATUS CHANGE
         try {
           const changes = [];
 
-          // Check if site changed with proper type checking
+          // Check for status change
+          if (updatedData.status && originalEquipment.status !== updatedData.status) {
+            changes.push(`status changed from ${originalEquipment.status} to ${updatedData.status}`);
+
+            // Create mobilization record for status change
+            const { month, year, time } = getCurrentDateTime();
+
+            const statusChange = new mobilizationModel({
+              equipmentId: equipment._id,
+              regNo: equipment.regNo,
+              machine: equipment.machine,
+              action: 'status_changed',
+              previousStatus: originalEquipment.status,
+              newStatus: updatedData.status,
+              withOperator: false,
+              month,
+              year,
+              date: new Date(),
+              time,
+              remarks: `Status updated via edit modal`,
+              status: updatedData.status
+            });
+
+            await statusChange.save();
+          }
+
           if (updatedData.site && JSON.stringify(originalEquipment.site) !== JSON.stringify(updatedData.site)) {
             let siteText;
             if (Array.isArray(updatedData.site)) {
@@ -374,12 +539,12 @@ module.exports = {
             changes.push(`site is: ${siteText}`);
           }
 
-          // Fixed: Check against result's certificationBody, not updatedData
           if (result.certificationBody &&
             JSON.stringify(originalEquipment.certificationBody) !== JSON.stringify(result.certificationBody)) {
             if (Array.isArray(result.certificationBody) && result.certificationBody.length > 0) {
               const lastOperator = result.certificationBody[result.certificationBody.length - 1];
-              changes.push(`operator is: ${lastOperator}`);
+              const operatorName = lastOperator.operatorName || lastOperator;
+              changes.push(`operator is: ${operatorName}`);
             }
           }
 
@@ -395,18 +560,17 @@ module.exports = {
             });
 
             await PushNotificationService.sendGeneralNotification(
-              null, // broadcast to all users
-              'Equipment Updated', //title
-              `${equipment.machine} - ${equipment.regNo}'s new ${changesText}`, //description
-              'medium', //priority
-              'normal', // type
+              null,
+              'Equipment Updated',
+              `${equipment.machine} - ${equipment.regNo}'s new ${changesText}`,
+              'medium',
+              'normal',
               notification.data._id.toString()
             );
           }
 
         } catch (notificationError) {
           console.error('Failed to send notification for equipment update:', notificationError);
-          // Don't reject the main operation if notification fails
         }
 
         resolve({
@@ -475,7 +639,7 @@ module.exports = {
     return new Promise(async (resolve, reject) => {
       try {
         // Find the equipment by registration number
-        const equipment = await equipmentModel.findOne({ regNo: regNo });
+        const equipment = await equipmentModel.findById(id);
 
         if (!equipment) {
           return reject({
@@ -776,11 +940,16 @@ module.exports = {
     });
   },
 
-  fetchEquipmentStats: function () {
+  fetchEquipmentStats: function (hiredFilter = null) {
     return new Promise(async (resolve, reject) => {
       try {
-        // Base query - exclude outside equipment
-        const query = { outside: false };
+        // Build query based on hiredFilter
+        let query = {};
+        if (hiredFilter === 'hired') {
+          query.hired = true;
+        } else if (hiredFilter === 'own') {
+          query.hired = false;
+        }
 
         // Get total count
         const totalCount = await equipmentModel.countDocuments(query);
@@ -873,13 +1042,18 @@ module.exports = {
       }
     });
   },
-  fetchEquipmentsByStatus: function (status, page = 1, limit = 20) {
+  fetchEquipmentsByStatus: function (status, page = 1, limit = 20, hiredFilter = null) {
     return new Promise(async (resolve, reject) => {
       try {
         const skip = (page - 1) * limit;
 
-        // Build query
-        let query = { outside: false };
+        // Build query based on hiredFilter
+        let query = {};
+        if (hiredFilter === 'hired') {
+          query.hired = true;
+        } else if (hiredFilter === 'own') {
+          query.hired = false;
+        }
 
         // Add status filter if not 'all'
         if (status && status !== 'all') {
@@ -916,4 +1090,1084 @@ module.exports = {
       }
     });
   },
+  mobilizeEquipment: async function (data) {
+    try {
+      const {
+        equipmentId,  // This is now _id (ObjectId) from frontend
+        regNo,
+        machine,
+        site,
+        operator,
+        operatorId,
+        withOperator,
+        month,
+        year,
+        time,
+        remarks
+      } = data;
+
+      const mobilization = new mobilizationModel({
+        equipmentId,  // Now ObjectId
+        regNo,
+        machine,
+        action: 'mobilized',
+        site,
+        operator: withOperator ? operator : undefined,
+        withOperator,
+        month,
+        year,
+        date: new Date(),
+        time,
+        remarks,
+        status: 'active'
+      });
+
+      await mobilization.save();
+
+      const updateData = {
+        status: 'active',
+        site: [site],
+        updatedAt: new Date()
+      };
+
+      const updateOperation = { $set: updateData };
+
+      if (withOperator && operator && operatorId) {
+        updateOperation.$push = {
+          certificationBody: {
+            operatorName: operator,
+            operatorId: operatorId,
+            assignedAt: new Date()
+          }
+        };
+      }
+
+      // ✅ Change from { id: equipmentId } to { _id: equipmentId }
+      const updatedEquipment = await equipmentModel.findOneAndUpdate(
+        { _id: equipmentId },  // Use _id instead of id
+        updateOperation,
+        { new: true }
+      );
+
+      if (!updatedEquipment) {
+        return {
+          status: 404,
+          ok: false,
+          message: 'Equipment not found'
+        };
+      }
+
+      return {
+        status: 201,
+        ok: true,
+        message: 'Equipment mobilized successfully',
+        data: {
+          mobilization,
+          updatedEquipment
+        }
+      };
+    } catch (error) {
+      console.error('Error in mobilizeEquipment service:', error);
+      throw error;
+    }
+  },
+
+  demobilizeEquipment: async function (data) {
+    try {
+      const {
+        equipmentId,  // Now ObjectId
+        regNo,
+        machine,
+        month,
+        year,
+        time,
+        remarks
+      } = data;
+
+      const demobilization = new mobilizationModel({
+        equipmentId,
+        regNo,
+        machine,
+        action: 'demobilized',
+        withOperator: false,
+        month,
+        year,
+        date: new Date(),
+        time,
+        remarks,
+        status: 'idle'
+      });
+
+      await demobilization.save();
+
+      // ✅ Change from { id: equipmentId } to { _id: equipmentId }
+      const updatedEquipment = await equipmentModel.findOneAndUpdate(
+        { _id: equipmentId },  // Use _id instead of id
+        {
+          $set: {
+            status: 'idle',
+            updatedAt: new Date()
+          }
+        },
+        { new: true }
+      );
+
+      if (!updatedEquipment) {
+        return {
+          status: 404,
+          ok: false,
+          message: 'Equipment not found'
+        };
+      }
+
+      return {
+        status: 201,
+        ok: true,
+        message: 'Equipment demobilized successfully',
+        data: {
+          demobilization,
+          updatedEquipment
+        }
+      };
+    } catch (error) {
+      console.error('Error in demobilizeEquipment service:', error);
+      throw error;
+    }
+  },
+
+  getMobilizationHistory: async function (equipmentId, page, limit) {
+    try {
+      const skip = (page - 1) * limit;
+
+      const history = await mobilizationModel.find({ equipmentId })
+        .sort({ date: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
+      const totalCount = await mobilizationModel.countDocuments({ equipmentId });
+      const totalPages = Math.ceil(totalCount / limit);
+
+      return {
+        history,
+        currentPage: page,
+        totalPages,
+        totalCount,
+        hasNextPage: page < totalPages
+      };
+    } catch (error) {
+      console.error('Error in getMobilizationHistory service:', error);
+      throw error;
+    }
+  },
+
+  replaceOperator: async function (data) {
+    try {
+      const {
+        equipmentId,  // Now ObjectId
+        regNo,
+        machine,
+        currentOperator,
+        currentOperatorId,
+        replacedOperator,
+        replacedOperatorId,
+        month,
+        year,
+        time,
+        remarks
+      } = data;
+
+      const replacement = new replacementsModel({
+        equipmentId,
+        regNo,
+        machine,
+        date: new Date(),
+        month,
+        year,
+        time,
+        status: 'active',
+        type: 'operator',
+        currentOperator,
+        currentOperatorId,
+        replacedOperator,
+        replacedOperatorId,
+        remarks
+      });
+
+      await replacement.save();
+
+      // ✅ Change from { id: equipmentId } to { _id: equipmentId }
+      const updatedEquipment = await equipmentModel.findOneAndUpdate(
+        { _id: equipmentId },  // Use _id instead of id
+        {
+          $push: {
+            certificationBody: {
+              operatorName: replacedOperator,
+              operatorId: replacedOperatorId,
+              assignedAt: new Date()
+            }
+          },
+          $set: { updatedAt: new Date() }
+        },
+        { new: true }
+      );
+
+      if (!updatedEquipment) {
+        return {
+          status: 404,
+          ok: false,
+          message: 'Equipment not found'
+        };
+      }
+
+      return {
+        status: 201,
+        ok: true,
+        message: 'Operator replaced successfully',
+        data: {
+          replacement,
+          updatedEquipment
+        }
+      };
+    } catch (error) {
+      console.error('Error in replaceOperator service:', error);
+      throw error;
+    }
+  },
+
+  replaceEquipment: async function (data) {
+    try {
+      const {
+        equipmentId,  // Now ObjectId
+        regNo,
+        machine,
+        replacedEquipmentId,  // Now ObjectId
+        replacedEquipmentRegNo,
+        replacedEquipmentMachine,
+        newSiteForReplaced,
+        month,
+        year,
+        time,
+        remarks
+      } = data;
+
+      // ✅ Change from { id: equipmentId } to { _id: equipmentId }
+      const currentEquipment = await equipmentModel.findOne({ _id: equipmentId });
+
+      if (!currentEquipment) {
+        return {
+          status: 404,
+          ok: false,
+          message: 'Current equipment not found'
+        };
+      }
+
+      const currentSite = currentEquipment.site && currentEquipment.site.length > 0
+        ? currentEquipment.site[0]
+        : null;
+
+      if (!currentSite) {
+        return {
+          status: 400,
+          ok: false,
+          message: 'Current equipment has no site assigned'
+        };
+      }
+
+      const replacement = new replacementsModel({
+        equipmentId,
+        regNo,
+        machine,
+        date: new Date(),
+        month,
+        year,
+        time,
+        status: 'active',
+        type: 'equipment',
+        replacedEquipmentId,
+        remarks
+      });
+
+      await replacement.save();
+
+      // ✅ Change from { id: replacedEquipmentId } to { _id: replacedEquipmentId }
+      const updatedReplacedEquipment = await equipmentModel.findOneAndUpdate(
+        { _id: replacedEquipmentId },  // Use _id instead of id
+        {
+          $set: {
+            site: [currentSite],
+            status: 'active',
+            updatedAt: new Date()
+          }
+        },
+        { new: true }
+      );
+
+      if (!updatedReplacedEquipment) {
+        return {
+          status: 404,
+          ok: false,
+          message: 'Replacement equipment not found'
+        };
+      }
+
+      let currentEquipmentUpdate;
+      if (newSiteForReplaced) {
+        currentEquipmentUpdate = {
+          site: [newSiteForReplaced],
+          status: 'active',
+          updatedAt: new Date()
+        };
+      } else {
+        currentEquipmentUpdate = {
+          site: [],
+          status: 'idle',
+          updatedAt: new Date()
+        };
+      }
+
+      // ✅ Change from { id: equipmentId } to { _id: equipmentId }
+      const updatedCurrentEquipment = await equipmentModel.findOneAndUpdate(
+        { _id: equipmentId },  // Use _id instead of id
+        { $set: currentEquipmentUpdate },
+        { new: true }
+      );
+
+      return {
+        status: 201,
+        ok: true,
+        message: 'Equipment replaced successfully',
+        data: {
+          replacement,
+          currentEquipment: updatedCurrentEquipment,
+          replacedEquipment: updatedReplacedEquipment
+        }
+      };
+    } catch (error) {
+      console.error('Error in replaceEquipment service:', error);
+      throw error;
+    }
+  },
+
+  getReplacementHistory: async function (equipmentId, page, limit, type) {
+    try {
+      const skip = (page - 1) * limit;
+
+      // Build query
+      const query = { equipmentId };
+      if (type) {
+        query.type = type;
+      }
+
+      const history = await replacementsModel.find(query)
+        .sort({ date: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
+      const totalCount = await replacementsModel.countDocuments(query);
+      const totalPages = Math.ceil(totalCount / limit);
+
+      return {
+        history,
+        currentPage: page,
+        totalPages,
+        totalCount,
+        hasNextPage: page < totalPages
+      };
+    } catch (error) {
+      console.error('Error in getReplacementHistory service:', error);
+      throw error;
+    }
+  },
+  fetchUniqueSites: async function () {
+    try {
+      const sites = await equipmentModel.distinct('site');
+
+      // Flatten nested arrays and remove duplicates
+      const uniqueSites = [...new Set(sites.flat())].filter(site => site && site.trim() !== '');
+
+      // Sort alphabetically
+      uniqueSites.sort();
+
+      return uniqueSites;
+    } catch (error) {
+      console.error('Error fetching unique sites:', error);
+      throw error;
+    }
+  },
+  fetchUniqueSites: async function () {
+    try {
+      const sites = await equipmentModel.distinct('site');
+
+      // Flatten nested arrays and remove duplicates
+      const uniqueSites = [...new Set(sites.flat())].filter(site => site && site.trim() !== '');
+
+      // Sort alphabetically
+      uniqueSites.sort();
+
+      return uniqueSites;
+    } catch (error) {
+      console.error('Error fetching unique sites:', error);
+      throw error;
+    }
+  },
+
+  fetchAllMobilizations: async function () {
+    try {
+      const mobilizations = await mobilizationModel.find({})
+        .sort({ date: -1, createdAt: -1 })
+        .limit(100)
+        .lean();
+
+      // Get unique equipment regNos
+      const regNos = [...new Set(mobilizations.map(m => m.regNo))];
+
+      // Fetch equipment details in bulk
+      const equipments = await equipmentModel.find({
+        regNo: { $in: regNos }
+      }).lean();
+
+      // Fetch equipment images in bulk
+      const equipmentImages = await EquipmentImageModel.find({
+        equipmentNo: { $in: regNos }
+      }).lean();
+
+      // Fetch operator details if needed
+      const operatorNames = [...new Set(
+        mobilizations
+          .filter(m => m.operator)
+          .map(m => m.operator)
+      )];
+
+      let operators = [];
+      if (operatorNames.length > 0) {
+        operators = await OperatorService.getOperatorsByNames(operatorNames);
+      }
+
+      // Create maps for quick lookup
+      const equipmentMap = {};
+      equipments.forEach(eq => {
+        equipmentMap[eq.regNo] = eq;
+      });
+
+      const imageMap = {};
+      equipmentImages.forEach(img => {
+        imageMap[img.equipmentNo] = img.images?.map(image => {
+          let imagePath = image.path;
+          if (imagePath.startsWith('public/')) imagePath = imagePath.substring(7);
+          else if (imagePath.startsWith('/public/')) imagePath = imagePath.substring(8);
+          imagePath = imagePath.replace(/\\/g, '/');
+
+          return {
+            ...image,
+            url: `/${imagePath}`
+          };
+        }) || [];
+      });
+
+      const operatorMap = {};
+      operators.forEach(op => {
+        operatorMap[op.name] = op;
+      });
+
+      // Enrich mobilizations with equipment and operator details
+      const enrichedMobilizations = mobilizations.map(mob => {
+        const equipment = equipmentMap[mob.regNo] || {};
+        const images = imageMap[mob.regNo] || [];
+        const operator = mob.operator ? operatorMap[mob.operator] : null;
+
+        return {
+          ...mob,
+          equipmentDetails: {
+            id: equipment.id,
+            machine: equipment.machine || mob.machine,
+            regNo: equipment.regNo || mob.regNo,
+            brand: equipment.brand,
+            year: equipment.year,
+            company: equipment.company,
+            status: equipment.status
+          },
+          equipmentImages: images,
+          operatorDetails: operator ? {
+            name: operator.name,
+            qatarId: operator.qatarId,
+            contactNo: operator.contactNo,
+            profilePic: operator.profilePic
+          } : null
+        };
+      });
+
+      return enrichedMobilizations;
+    } catch (error) {
+      console.error('Error fetching all mobilizations:', error);
+      throw error;
+    }
+  },
+
+  fetchAllReplacements: async function () {
+    try {
+      const replacements = await replacementsModel.find({})
+        .sort({ date: -1, createdAt: -1 })
+        .limit(100)
+        .lean();
+
+      // ✅ Get unique equipment ObjectIds (both current and replaced)
+      const equipmentIds = [...new Set([
+        ...replacements.map(r => r.equipmentId.toString()),
+        ...replacements
+          .filter(r => r.type === 'equipment' && r.replacedEquipmentId)
+          .map(r => r.replacedEquipmentId.toString())
+      ])];
+
+      // ✅ Fetch all equipment by _id instead of id
+      const equipments = await equipmentModel.find({
+        _id: { $in: equipmentIds }
+      }).lean();
+
+      // Get all regNos for fetching images
+      const allRegNos = [...new Set(equipments.map(eq => eq.regNo))];
+
+      // Fetch equipment images for all regNos
+      const equipmentImages = await EquipmentImageModel.find({
+        equipmentNo: { $in: allRegNos }
+      }).lean();
+
+      // ✅ Fetch operator details BY ID instead of by name
+      const operatorIds = [...new Set([
+        ...replacements.filter(r => r.currentOperatorId).map(r => r.currentOperatorId),
+        ...replacements.filter(r => r.replacedOperatorId).map(r => r.replacedOperatorId)
+      ])];
+
+      let operators = [];
+      if (operatorIds.length > 0) {
+        operators = await OperatorService.getOperatorsByIds(operatorIds);
+      }
+
+      // ✅ Create maps using _id as string keys
+      const equipmentMapById = {};
+      const equipmentMapByRegNo = {};
+      equipments.forEach(eq => {
+        equipmentMapById[eq._id.toString()] = eq;  // Convert ObjectId to string
+        equipmentMapByRegNo[eq.regNo] = eq;
+      });
+
+      const imageMap = {};
+      equipmentImages.forEach(img => {
+        imageMap[img.equipmentNo] = img.images?.map(image => {
+          let imagePath = image.path;
+          if (imagePath.startsWith('public/')) imagePath = imagePath.substring(7);
+          else if (imagePath.startsWith('/public/')) imagePath = imagePath.substring(8);
+          else if (imagePath.startsWith('public\\')) imagePath = imagePath.substring(7);
+          else if (imagePath.startsWith('\\public\\')) imagePath = imagePath.substring(8);
+          imagePath = imagePath.replace(/\\/g, '/');
+
+          return {
+            ...image,
+            url: `/${imagePath}`
+          };
+        }) || [];
+      });
+
+      // ✅ Create operator map by ID instead of by name
+      const operatorMap = {};
+      operators.forEach(op => {
+        operatorMap[op._id.toString()] = op; // Convert ObjectId to string for consistent lookup
+      });
+
+      // ✅ Enrich replacements with equipment and operator details
+      const enrichedReplacements = replacements.map(rep => {
+        const currentEquipment = equipmentMapById[rep.equipmentId.toString()] || {};
+        const currentImages = imageMap[currentEquipment.regNo] || [];
+
+        let replacedEquipmentDetails = null;
+        let replacedEquipmentImages = [];
+
+        // For equipment replacements, get replaced equipment details
+        if (rep.type === 'equipment' && rep.replacedEquipmentId) {
+          const replacedEquipment = equipmentMapById[rep.replacedEquipmentId.toString()] || {};
+          replacedEquipmentImages = imageMap[replacedEquipment.regNo] || [];
+
+          replacedEquipmentDetails = {
+            id: replacedEquipment._id,
+            machine: replacedEquipment.machine,
+            regNo: replacedEquipment.regNo,
+            brand: replacedEquipment.brand,
+            year: replacedEquipment.year,
+            company: replacedEquipment.company,
+            status: replacedEquipment.status,
+            site: replacedEquipment.site?.[0] || replacedEquipment.site,
+            images: replacedEquipmentImages
+          };
+        }
+
+        // ✅ Get operator details by ID
+        const currentOperatorDetails = rep.currentOperatorId ? operatorMap[rep.currentOperatorId] : null;
+        const replacedOperatorDetails = rep.replacedOperatorId ? operatorMap[rep.replacedOperatorId] : null;
+
+        return {
+          ...rep,
+          currentEquipmentDetails: {
+            id: currentEquipment._id,
+            machine: currentEquipment.machine || rep.machine,
+            regNo: currentEquipment.regNo || rep.regNo,
+            brand: currentEquipment.brand,
+            year: currentEquipment.year,
+            company: currentEquipment.company,
+            status: currentEquipment.status,
+            site: currentEquipment.site?.[0] || currentEquipment.site,
+            images: currentImages
+          },
+          replacedEquipmentDetails,
+          currentOperatorDetails: currentOperatorDetails ? {
+            id: currentOperatorDetails._id || currentOperatorDetails.id,
+            name: currentOperatorDetails.name,
+            qatarId: currentOperatorDetails.qatarId,
+            contactNo: currentOperatorDetails.contactNo,
+            profilePic: currentOperatorDetails.profilePic
+          } : null,
+          replacedOperatorDetails: replacedOperatorDetails ? {
+            id: replacedOperatorDetails._id || replacedOperatorDetails.id,
+            name: replacedOperatorDetails.name,
+            qatarId: replacedOperatorDetails.qatarId,
+            contactNo: replacedOperatorDetails.contactNo,
+            profilePic: replacedOperatorDetails.profilePic
+          } : null
+        };
+      });
+
+      return enrichedReplacements;
+    } catch (error) {
+      console.error('Error fetching all replacements:', error);
+      throw error;
+    }
+  },
+  fetchFilteredMobilizations: async function (filterType, startDate = null, endDate = null, months = null, specificTime = null, startTime = null, endTime = null) {
+    try {
+      let query = {};
+      let startDateTime, endDateTime;
+
+      switch (filterType) {
+        case 'daily':
+          // Today's mobilizations
+          startDateTime = new Date();
+          startDateTime.setHours(0, 0, 0, 0);
+          endDateTime = new Date();
+          endDateTime.setHours(23, 59, 59, 999);
+          query.date = { $gte: startDateTime, $lte: endDateTime };
+          break;
+
+        case 'yesterday':
+          // Yesterday's mobilizations
+          startDateTime = new Date();
+          startDateTime.setDate(startDateTime.getDate() - 1);
+          startDateTime.setHours(0, 0, 0, 0);
+          endDateTime = new Date();
+          endDateTime.setDate(endDateTime.getDate() - 1);
+          endDateTime.setHours(23, 59, 59, 999);
+          query.date = { $gte: startDateTime, $lte: endDateTime };
+          break;
+
+        case 'weekly':
+          // Last 7 days
+          startDateTime = new Date();
+          startDateTime.setDate(startDateTime.getDate() - 7);
+          startDateTime.setHours(0, 0, 0, 0);
+          endDateTime = new Date();
+          endDateTime.setHours(23, 59, 59, 999);
+          query.date = { $gte: startDateTime, $lte: endDateTime };
+          break;
+
+        case 'monthly':
+          // Last 30 days
+          startDateTime = new Date();
+          startDateTime.setDate(startDateTime.getDate() - 30);
+          startDateTime.setHours(0, 0, 0, 0);
+          endDateTime = new Date();
+          endDateTime.setHours(23, 59, 59, 999);
+          query.date = { $gte: startDateTime, $lte: endDateTime };
+          break;
+
+        case 'yearly':
+          // Last 365 days
+          startDateTime = new Date();
+          startDateTime.setDate(startDateTime.getDate() - 365);
+          startDateTime.setHours(0, 0, 0, 0);
+          endDateTime = new Date();
+          endDateTime.setHours(23, 59, 59, 999);
+          query.date = { $gte: startDateTime, $lte: endDateTime };
+          break;
+
+        case 'months':
+          // Last X months
+          if (!months) months = 1;
+          startDateTime = new Date();
+          startDateTime.setMonth(startDateTime.getMonth() - parseInt(months));
+          startDateTime.setHours(0, 0, 0, 0);
+          endDateTime = new Date();
+          endDateTime.setHours(23, 59, 59, 999);
+          query.date = { $gte: startDateTime, $lte: endDateTime };
+          break;
+
+        // 🆕 NEW: Single date filter
+        case 'single':
+          // Single date (DD-MM-YYYY format from frontend)
+          if (!startDate) {
+            throw new Error('Date is required for single date filter');
+          }
+          const [singleDay, singleMonth, singleYear] = startDate.split('-');
+          startDateTime = new Date(singleYear, singleMonth - 1, singleDay, 0, 0, 0, 0);
+          endDateTime = new Date(singleYear, singleMonth - 1, singleDay, 23, 59, 59, 999);
+          query.date = { $gte: startDateTime, $lte: endDateTime };
+          break;
+
+        case 'custom':
+          // Date range (DD-MM-YYYY format from frontend)
+          if (!startDate || !endDate) {
+            throw new Error('Start date and end date are required for custom range');
+          }
+
+          // Parse DD-MM-YYYY to Date
+          const [startDay, startMonth, startYear] = startDate.split('-');
+          const [endDay, endMonth, endYear] = endDate.split('-');
+
+          startDateTime = new Date(startYear, startMonth - 1, startDay, 0, 0, 0, 0);
+          endDateTime = new Date(endYear, endMonth - 1, endDay, 23, 59, 59, 999);
+
+          query.date = { $gte: startDateTime, $lte: endDateTime };
+          break;
+
+        default:
+          // Default to last 30 days
+          startDateTime = new Date();
+          startDateTime.setDate(startDateTime.getDate() - 30);
+          startDateTime.setHours(0, 0, 0, 0);
+          endDateTime = new Date();
+          endDateTime.setHours(23, 59, 59, 999);
+          query.date = { $gte: startDateTime, $lte: endDateTime };
+      }
+
+      if (specificTime) {
+        query.time = specificTime;
+      } else if (startTime && endTime) {
+        query.time = { $gte: startTime, $lte: endTime };
+      }
+
+      const mobilizations = await mobilizationModel.find(query)
+        .sort({ date: -1, createdAt: -1 })
+        .limit(500)
+        .lean();
+
+      // Get unique equipment regNos
+      const regNos = [...new Set(mobilizations.map(m => m.regNo))];
+
+      // Fetch equipment details in bulk
+      const equipments = await equipmentModel.find({
+        regNo: { $in: regNos }
+      }).lean();
+
+      // Fetch equipment images in bulk
+      const equipmentImages = await EquipmentImageModel.find({
+        equipmentNo: { $in: regNos }
+      }).lean();
+
+      // Fetch operator details if needed
+      const operatorNames = [...new Set(
+        mobilizations
+          .filter(m => m.operator)
+          .map(m => m.operator)
+      )];
+
+      let operators = [];
+      if (operatorNames.length > 0) {
+        operators = await OperatorService.getOperatorsByNames(operatorNames);
+      }
+
+      // Create maps for quick lookup
+      const equipmentMap = {};
+      equipments.forEach(eq => {
+        equipmentMap[eq.regNo] = eq;
+      });
+
+      const imageMap = {};
+      equipmentImages.forEach(img => {
+        imageMap[img.equipmentNo] = img.images?.map(image => {
+          let imagePath = image.path;
+          if (imagePath.startsWith('public/')) imagePath = imagePath.substring(7);
+          else if (imagePath.startsWith('/public/')) imagePath = imagePath.substring(8);
+          imagePath = imagePath.replace(/\\/g, '/');
+
+          return {
+            ...image,
+            url: `/${imagePath}`
+          };
+        }) || [];
+      });
+
+      const operatorMap = {};
+      operators.forEach(op => {
+        operatorMap[op.name] = op;
+      });
+
+      // Enrich mobilizations with equipment and operator details
+      const enrichedMobilizations = mobilizations.map(mob => {
+        const equipment = equipmentMap[mob.regNo] || {};
+        const images = imageMap[mob.regNo] || [];
+        const operator = mob.operator ? operatorMap[mob.operator] : null;
+
+        return {
+          ...mob,
+          equipmentDetails: {
+            id: equipment.id,
+            machine: equipment.machine || mob.machine,
+            regNo: equipment.regNo || mob.regNo,
+            brand: equipment.brand,
+            year: equipment.year,
+            company: equipment.company,
+            status: equipment.status,
+            site: equipment.site?.[0] || equipment.site
+          },
+          equipmentImages: images,
+          operatorDetails: operator ? {
+            name: operator.name,
+            qatarId: operator.qatarId,
+            contactNo: operator.contactNo,
+            profilePic: operator.profilePic
+          } : null
+        };
+      });
+
+      return enrichedMobilizations;
+    } catch (error) {
+      console.error('Error fetching filtered mobilizations:', error);
+      throw error;
+    }
+  },
+
+  fetchFilteredReplacements: async function (filterType, startDate = null, endDate = null, months = null) {
+    try {
+      let query = {};
+      let startDateTime, endDateTime;
+
+      switch (filterType) {
+        case 'daily':
+          startDateTime = new Date();
+          startDateTime.setHours(0, 0, 0, 0);
+          endDateTime = new Date();
+          endDateTime.setHours(23, 59, 59, 999);
+          query.date = { $gte: startDateTime, $lte: endDateTime };
+          break;
+
+        case 'yesterday':
+          startDateTime = new Date();
+          startDateTime.setDate(startDateTime.getDate() - 1);
+          startDateTime.setHours(0, 0, 0, 0);
+          endDateTime = new Date();
+          endDateTime.setDate(endDateTime.getDate() - 1);
+          endDateTime.setHours(23, 59, 59, 999);
+          query.date = { $gte: startDateTime, $lte: endDateTime };
+          break;
+
+        case 'weekly':
+          startDateTime = new Date();
+          startDateTime.setDate(startDateTime.getDate() - 7);
+          startDateTime.setHours(0, 0, 0, 0);
+          endDateTime = new Date();
+          endDateTime.setHours(23, 59, 59, 999);
+          query.date = { $gte: startDateTime, $lte: endDateTime };
+          break;
+
+        case 'monthly':
+          startDateTime = new Date();
+          startDateTime.setDate(startDateTime.getDate() - 30);
+          startDateTime.setHours(0, 0, 0, 0);
+          endDateTime = new Date();
+          endDateTime.setHours(23, 59, 59, 999);
+          query.date = { $gte: startDateTime, $lte: endDateTime };
+          break;
+
+        case 'yearly':
+          startDateTime = new Date();
+          startDateTime.setDate(startDateTime.getDate() - 365);
+          startDateTime.setHours(0, 0, 0, 0);
+          endDateTime = new Date();
+          endDateTime.setHours(23, 59, 59, 999);
+          query.date = { $gte: startDateTime, $lte: endDateTime };
+          break;
+
+        case 'months':
+          if (!months) months = 1;
+          startDateTime = new Date();
+          startDateTime.setMonth(startDateTime.getMonth() - parseInt(months));
+          startDateTime.setHours(0, 0, 0, 0);
+          endDateTime = new Date();
+          endDateTime.setHours(23, 59, 59, 999);
+          query.date = { $gte: startDateTime, $lte: endDateTime };
+          break;
+
+        case 'custom':
+          if (!startDate || !endDate) {
+            throw new Error('Start date and end date are required for custom range');
+          }
+
+          const [startDay, startMonth, startYear] = startDate.split('-');
+          const [endDay, endMonth, endYear] = endDate.split('-');
+
+          startDateTime = new Date(startYear, startMonth - 1, startDay, 0, 0, 0, 0);
+          endDateTime = new Date(endYear, endMonth - 1, endDay, 23, 59, 59, 999);
+
+          query.date = { $gte: startDateTime, $lte: endDateTime };
+          break;
+
+        default:
+          startDateTime = new Date();
+          startDateTime.setDate(startDateTime.getDate() - 30);
+          startDateTime.setHours(0, 0, 0, 0);
+          endDateTime = new Date();
+          endDateTime.setHours(23, 59, 59, 999);
+          query.date = { $gte: startDateTime, $lte: endDateTime };
+      }
+
+      const replacements = await replacementsModel.find(query)
+        .sort({ date: -1, createdAt: -1 })
+        .limit(500)
+        .lean();
+
+      // ✅ Get unique equipment ObjectIds (both current and replaced)
+      const equipmentIds = [...new Set([
+        ...replacements.map(r => r.equipmentId.toString()),
+        ...replacements
+          .filter(r => r.type === 'equipment' && r.replacedEquipmentId)
+          .map(r => r.replacedEquipmentId.toString())
+      ])];
+
+      // ✅ Fetch all equipment by _id
+      const equipments = await equipmentModel.find({
+        _id: { $in: equipmentIds }
+      }).lean();
+
+      // Fetch equipment images for all regNos
+      const allRegNos = [...new Set(equipments.map(eq => eq.regNo))];
+
+      const equipmentImages = await EquipmentImageModel.find({
+        equipmentNo: { $in: allRegNos }
+      }).lean();
+
+      // ✅ Fetch operator details BY ID instead of by name
+      const operatorIds = [...new Set([
+        ...replacements.filter(r => r.currentOperatorId).map(r => r.currentOperatorId),
+        ...replacements.filter(r => r.replacedOperatorId).map(r => r.replacedOperatorId)
+      ])];
+
+      let operators = [];
+      if (operatorIds.length > 0) {
+        operators = await this.getOperatorsByIds(operatorIds);
+      }
+
+      // ✅ Create maps using _id as string keys
+      const equipmentMapById = {};
+      const equipmentMapByRegNo = {};
+      equipments.forEach(eq => {
+        equipmentMapById[eq._id.toString()] = eq;
+        equipmentMapByRegNo[eq.regNo] = eq;
+      });
+
+      const imageMap = {};
+      equipmentImages.forEach(img => {
+        imageMap[img.equipmentNo] = img.images?.map(image => {
+          let imagePath = image.path;
+          if (imagePath.startsWith('public/')) imagePath = imagePath.substring(7);
+          else if (imagePath.startsWith('/public/')) imagePath = imagePath.substring(8);
+          imagePath = imagePath.replace(/\\/g, '/');
+
+          return {
+            ...image,
+            url: `/${imagePath}`
+          };
+        }) || [];
+      });
+
+      // ✅ Create operator map by ID
+      const operatorMap = {};
+      operators.forEach(op => {
+        operatorMap[op._id.toString()] = op;
+      });
+
+      // ✅ Enrich replacements
+      const enrichedReplacements = replacements.map(rep => {
+        const currentEquipment = equipmentMapById[rep.equipmentId.toString()] || {};
+        const currentImages = imageMap[currentEquipment.regNo] || [];
+
+        let replacedEquipmentDetails = null;
+        let replacedEquipmentImages = [];
+
+        // For equipment replacements, get replaced equipment details
+        if (rep.type === 'equipment' && rep.replacedEquipmentId) {
+          const replacedEquipment = equipmentMapById[rep.replacedEquipmentId.toString()] || {};
+          replacedEquipmentImages = imageMap[replacedEquipment.regNo] || [];
+
+          replacedEquipmentDetails = {
+            id: replacedEquipment._id,
+            machine: replacedEquipment.machine,
+            regNo: replacedEquipment.regNo,
+            brand: replacedEquipment.brand,
+            year: replacedEquipment.year,
+            company: replacedEquipment.company,
+            status: replacedEquipment.status,
+            site: replacedEquipment.site?.[0] || replacedEquipment.site,
+            images: replacedEquipmentImages
+          };
+        }
+
+        // ✅ Get operator details by ID
+        const currentOperatorDetails = rep.currentOperatorId ? operatorMap[rep.currentOperatorId] : null;
+        const replacedOperatorDetails = rep.replacedOperatorId ? operatorMap[rep.replacedOperatorId] : null;
+
+        return {
+          ...rep,
+          currentEquipmentDetails: {
+            id: currentEquipment._id,
+            machine: currentEquipment.machine || rep.machine,
+            regNo: currentEquipment.regNo || rep.regNo,
+            brand: currentEquipment.brand,
+            year: currentEquipment.year,
+            company: currentEquipment.company,
+            status: currentEquipment.status,
+            site: currentEquipment.site?.[0] || currentEquipment.site,
+            images: currentImages
+          },
+          replacedEquipmentDetails,
+          currentOperatorDetails: currentOperatorDetails ? {
+            id: currentOperatorDetails._id || currentOperatorDetails.id,
+            name: currentOperatorDetails.name,
+            qatarId: currentOperatorDetails.qatarId,
+            contactNo: currentOperatorDetails.contactNo,
+            profilePic: currentOperatorDetails.profilePic
+          } : null,
+          replacedOperatorDetails: replacedOperatorDetails ? {
+            id: replacedOperatorDetails._id || replacedOperatorDetails.id,
+            name: replacedOperatorDetails.name,
+            qatarId: replacedOperatorDetails.qatarId,
+            contactNo: replacedOperatorDetails.contactNo,
+            profilePic: replacedOperatorDetails.profilePic
+          } : null
+        };
+      });
+
+      return enrichedReplacements;
+    } catch (error) {
+      console.error('Error fetching filtered replacements:', error);
+      throw error;
+    }
+  },
+  getOperatorsByIds: async function (operatorIds) {
+    try {
+      const operators = await OperatorModel.find({
+        _id: { $in: operatorIds }
+      }).lean();
+
+      return operators;
+    } catch (error) {
+      console.error('Error fetching operators by IDs:', error);
+      throw error;
+    }
+  }
 }

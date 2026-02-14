@@ -236,6 +236,16 @@ class OperatorService {
 
     return operator;
   }
+
+  static async getOperatorsByNames(names) {
+    if (!names || !Array.isArray(names) || names.length === 0) {
+      return [];
+    }
+
+    return await Operator.find({
+      name: { $in: names }
+    }).lean();
+  }
 }
 
 module.exports = OperatorService;

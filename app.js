@@ -1,27 +1,22 @@
 var express = require('express');
 var path = require('path');
+require('dotenv').config();
 var cookieParser = require('cookie-parser');
 var logger = require('morgan');
 var cors = require('cors');
 var http = require('http');
 var socketIo = require('socket.io');
-require('dotenv').config();
 
 // auth middle ware to secure 
 const { authMiddleware } = require('./utils/jwt');
-
-// Import the cron jobs and middleware
 const setupCronJobs = require('./utils/cron-jobs');
 const { overtimeCleanupMiddleware } = require('./middleware/cleanup-middleware');
 const { istimaraExpiryMiddleware } = require('./middleware/istimara-expiry-middleware');
-
-// Import WebSocket handler
+const { connectDevDB } = require('./config/dev.connection');
 const websocket = require('./utils/websocket');
 const setupWebSocket = websocket.default.setupWebSocket;
 const { autoBackup } = require('./utils/backup-data');
-const { connectDevDB } = require('./config/dev.connection');
 
-// Import routes
 var equipementRouter = require('./routes/equipments');
 var serviceReport = require('./routes/service-report');
 var userRouter = require('./routes/users');
@@ -47,6 +42,7 @@ const backchargeRouter = require('./routes/backcharge');
 const testRoutes = require('./routes/test');
 const chatRouter = require('./routes/chat');
 const devInfinity = require('./routes/dev');
+const explorerRouter = require('./routes/explorer');
 
 var app = express();
 
@@ -59,10 +55,8 @@ connectDevDB()
     process.exit(1);
   });
  
-// Create HTTP server 
 var server = http.createServer(app);
 
-// CORS configuration for Express
 const corsOptions = {
   origin: [
     'https://iiqup.vercel.app',
@@ -84,38 +78,32 @@ const corsOptions = {
   optionsSuccessStatus: 200,
 };
 
-// Socket.IO CORS (same logic)
 const io = socketIo(server, {
   cors: {
-    origin: '*', // or add your local IP
+    origin: '*',
     methods: ['GET', 'POST'],
     credentials: true,
   },
-  transports: ['websocket', 'polling'], // Add polling fallback
+  transports: ['websocket', 'polling'],
   allowEIO3: true
 });
 
-// Setup WebSocket handlers
 setupWebSocket(io);
 
-// Make io available globally for sending notifications
 global.io = io;
 
 require('./utils/db');
 
-// Middleware setup
 app.use(logger('dev'));
 
-// Apply CORS middleware
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions)); // handle preflight requests
+app.options('*', cors(corsOptions));
 
-// Body parsing middleware
 app.use(express.json({ limit: '50gb' }));
 app.use(express.urlencoded({ extended: true, limit: '50gb' }));
 app.use(cookieParser());
 
-// Static file serving
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/', (req, res) => {
@@ -136,7 +124,7 @@ app.use('/toolkits', authMiddleware, toolkitsRouter);
 app.use('/mechanics', mechanicsRouter);
 app.use('/notification', authMiddleware, notificationRouter);
 app.use('/lpo', authMiddleware, lpoRouter);
-app.use('/operators', operatorRouter);
+app.use('/operators', operatorRouter); 
 app.use('/complaints', complaintsRouter);
 app.use('/applications', authMiddleware, applicationRouter);
 app.use('/hunter-eye', securityRouter);
@@ -146,6 +134,7 @@ app.use('/fuels', FuelsRouter);
 app.use('/attendance', attendanceRoutes);
 app.use('/backcharge', backchargeRouter);
 app.use('/chat', authMiddleware, chatRouter);
+app.use('/explorer', authMiddleware, explorerRouter);
 app.use('/test', testRoutes);
 
 // infinty deV special router

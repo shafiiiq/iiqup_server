@@ -1015,28 +1015,28 @@ router.get('/convert-to-objectid', async (req, res) => {
   try {
     // Use lean() to get plain objects and check the raw _id type
     const equipments = await EquipmentModel.find({}).lean();
-    
+
     let convertedCount = 0;
-    
+
     for (const equipment of equipments) {
       // Check if _id is not an ObjectId instance
       if (!(equipment._id instanceof mongoose.Types.ObjectId)) {
         const stringId = equipment._id.toString();
-        
+
         // Delete the old document using the collection directly
         await EquipmentModel.collection.deleteOne({ _id: stringId });
-        
+
         // Create new document with proper ObjectId
         delete equipment._id;
         await EquipmentModel.collection.insertOne({
           _id: new mongoose.Types.ObjectId(stringId),
           ...equipment
         });
-        
+
         convertedCount++;
       }
     }
-    
+
     res.json({
       success: true,
       message: `Converted ${convertedCount} equipment records to ObjectId`,
@@ -1113,7 +1113,54 @@ router.get('/add-source-id', async (req, res) => {
 });
 
 
+router.get('/remove-outside-add-hired', async (req, res) => {
+  try {
+    const result = await Equipment.updateMany(
+      {},
+      {
+        $unset: { outside: 1 },
+        $set: { hired: false }
+      }
+    );
 
+    res.json({
+      success: true,
+      message: 'Successfully removed outside field and set hired to false',
+      modifiedCount: result.modifiedCount,
+      matchedCount: result.matchedCount
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Migration failed',
+      error: error.message
+    });
+  }
+});
+
+router.get('/add-hired-field', async (req, res) => {
+  try {
+    const result = await Equipment.updateMany(
+      {},
+      {
+        $set: { hired: false }
+      }
+    );
+
+    res.json({
+      success: true,
+      message: 'Successfully set hired to false for all equipment',
+      modifiedCount: result.modifiedCount,
+      matchedCount: result.matchedCount
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Migration failed',
+      error: error.message
+    });
+  }
+});
 
 router.get('/check-missing-dates', async (req, res) => {
   try {

@@ -14,11 +14,12 @@ const addEquipments = async (req, res) => {
 
 const getEquipments = async (req, res) => {
   try {
-    const { page = 1, limit = 20 } = req.query;
+    const { page = 1, limit = 20, hired } = req.query;
 
     const result = await equipmentServices.fetchEquipments(
       parseInt(page),
-      parseInt(limit)
+      parseInt(limit),
+      hired // Pass hired filter: 'hired', 'own', or null/undefined for all
     );
 
     res.status(200).json({
@@ -45,7 +46,9 @@ const getEquipments = async (req, res) => {
 
 const searchEquipments = async (req, res) => {
   try {
-    const { searchTerm, page = 1, limit = 20, searchField = 'all' } = req.body;
+    const { searchTerm, page = 1, limit = 20, searchField = 'all', hired } = req.body;
+
+    console.log("logggggggggggg", req.body)
 
     if (!searchTerm || searchTerm.trim() === '') {
       return res.status(400).json({
@@ -59,7 +62,8 @@ const searchEquipments = async (req, res) => {
       searchTerm.trim(),
       parseInt(page),
       parseInt(limit),
-      searchField
+      searchField,
+      hired
     );
 
     res.status(200).json({
@@ -102,7 +106,7 @@ const updateEquipments = async (req, res) => {
   const { regNo } = req.params;
   const updateData = req.body;
 
-  console.log("updateData", updateData);
+  console.log("updateData", updateData.certificationBody);
 
   equipmentServices.updateEquipments(regNo, updateData)
     .then((updatedUser) => {
@@ -114,7 +118,6 @@ const updateEquipments = async (req, res) => {
       res.status(err.status).json({ error: err.message })
     })
 }
-
 
 const deleteEquipments = async (req, res) => {
   const { regNo } = req.params;
@@ -132,10 +135,10 @@ const deleteEquipments = async (req, res) => {
 
 
 const updateStatus = async (req, res) => {
-  const { regNo } = req.params;
+  const { id } = req.params;
   const updateData = req.body;
 
-  equipmentServices.changeStatus(regNo, updateData)
+  equipmentServices.changeStatus(id, updateData)
     .then((updatedUser) => {
       if (updatedUser) {
         res.status(updatedUser.status).json(updatedUser)
@@ -145,6 +148,61 @@ const updateStatus = async (req, res) => {
       res.status(err.status).json({ error: err.message })
     })
 }
+
+const changeEquipmentStatus = async (req, res) => {
+  try {
+    const {
+      equipmentId,
+      regNo,
+      machine,
+      previousStatus,
+      newStatus,
+      month,
+      year,
+      time,
+      remarks
+    } = req.body;
+
+    // Validation
+    if (!equipmentId || !regNo || !machine || !previousStatus || !newStatus || !month || !year || !time) {
+      return res.status(400).json({
+        status: 400,
+        ok: false,
+        message: 'Missing required fields: equipmentId, regNo, machine, previousStatus, newStatus, month, year, time'
+      });
+    }
+
+    if (previousStatus === newStatus) {
+      return res.status(400).json({
+        status: 400,
+        ok: false,
+        message: 'Previous status and new status cannot be the same'
+      });
+    }
+
+    const result = await equipmentServices.changeEquipmentStatus({
+      equipmentId,
+      regNo,
+      machine,
+      previousStatus,
+      newStatus,
+      month,
+      year,
+      time,
+      remarks: remarks || ''
+    });
+
+    res.status(result.status).json(result);
+  } catch (error) {
+    console.error('Error changing equipment status:', error);
+    res.status(500).json({
+      status: 500,
+      ok: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
 
 
 const addEquipmentImage = async (req, res) => {
@@ -278,9 +336,14 @@ const getBulkEquipmentImages = async (req, res) => {
 
 const getEquipmentCount = async (req, res) => {
   try {
-    const { searchTerm, searchField = 'all' } = req.query;
+    const { searchTerm, searchField = 'all', hired } = req.query;
 
-    let query = { outside: false };
+    let query = {};
+    if (hired === 'hired') {
+      query.hired = true;
+    } else if (hired === 'own') {
+      query.hired = false;
+    }
 
     if (searchTerm && searchTerm.trim() !== '') {
       if (searchField === 'all') {
@@ -324,7 +387,8 @@ const getEquipmentCount = async (req, res) => {
 
 const getEquipmentStats = async (req, res) => {
   try {
-    const result = await equipmentServices.fetchEquipmentStats();
+    const { hired } = req.query;
+    const result = await equipmentServices.fetchEquipmentStats(hired);
 
     res.status(200).json({
       status: 200,
@@ -344,12 +408,13 @@ const getEquipmentStats = async (req, res) => {
 
 const getEquipmentsByStatus = async (req, res) => {
   try {
-    const { status, page = 1, limit = 20 } = req.query;
+    const { status, page = 1, limit = 20, hired } = req.query;
 
     const result = await equipmentServices.fetchEquipmentsByStatus(
       status,
       parseInt(page),
-      parseInt(limit)
+      parseInt(limit),
+      hired
     );
 
     res.status(200).json({
@@ -374,6 +439,485 @@ const getEquipmentsByStatus = async (req, res) => {
   }
 };
 
+const mobilizeEquipment = async (req, res) => {
+  try {
+    const {
+      equipmentId,
+      regNo,
+      machine,
+      site,
+      operator,
+      withOperator,
+      month,
+      year,
+      time,
+      remarks
+    } = req.body;
+
+    // Validation
+    if (!equipmentId || !regNo || !machine || !site || !month || !year || !time) {
+      return res.status(400).json({
+        status: 400,
+        ok: false,
+        message: 'Missing required fields: equipmentId, regNo, machine, site, month, year, time'
+      });
+    }
+
+    if (withOperator && !operator) {
+      return res.status(400).json({
+        status: 400,
+        ok: false,
+        message: 'Operator is required when withOperator is true'
+      });
+    }
+
+    const result = await equipmentServices.mobilizeEquipment({
+      equipmentId,
+      regNo,
+      machine,
+      site,
+      operator,
+      withOperator: withOperator || false,
+      month,
+      year,
+      time,
+      remarks: remarks || ''
+    });
+
+    res.status(result.status).json(result);
+  } catch (error) {
+    console.error('Error mobilizing equipment:', error);
+    res.status(500).json({
+      status: 500,
+      ok: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+const demobilizeEquipment = async (req, res) => {
+  try {
+    const {
+      equipmentId,
+      regNo,
+      machine,
+      month,
+      year,
+      time,
+      remarks
+    } = req.body;
+
+    // Validation
+    if (!equipmentId || !regNo || !machine || !month || !year || !time) {
+      return res.status(400).json({
+        status: 400,
+        ok: false,
+        message: 'Missing required fields: equipmentId, regNo, machine, month, year, time'
+      });
+    }
+
+    const result = await equipmentServices.demobilizeEquipment({
+      equipmentId,
+      regNo,
+      machine,
+      month,
+      year,
+      time,
+      remarks: remarks || ''
+    });
+
+    res.status(result.status).json(result);
+  } catch (error) {
+    console.error('Error demobilizing equipment:', error);
+    res.status(500).json({
+      status: 500,
+      ok: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+const getMobilizationHistory = async (req, res) => {
+  try {
+    const { equipmentId } = req.params;
+    const { page = 1, limit = 20 } = req.query;
+
+    if (!equipmentId) {
+      return res.status(400).json({
+        status: 400,
+        ok: false,
+        message: 'Equipment ID is required'
+      });
+    }
+
+    const result = await equipmentServices.getMobilizationHistory(
+      parseInt(equipmentId),
+      parseInt(page),
+      parseInt(limit)
+    );
+
+    res.status(200).json({
+      status: 200,
+      ok: true,
+      data: result.history,
+      pagination: {
+        currentPage: result.currentPage,
+        totalPages: result.totalPages,
+        totalCount: result.totalCount,
+        hasMore: result.hasNextPage
+      }
+    });
+  } catch (error) {
+    console.error('Error getting mobilization history:', error);
+    res.status(500).json({
+      status: 500,
+      ok: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+const replaceOperator = async (req, res) => {
+  try {
+    const {
+      equipmentId,
+      regNo,
+      machine,
+      currentOperator,
+      currentOperatorId,
+      replacedOperator,
+      replacedOperatorId,
+      month,
+      year,
+      time,
+      remarks
+    } = req.body;
+
+    console.log("data", req.body)
+    // Validation
+    if (!equipmentId || !regNo || !machine || !currentOperator || !currentOperatorId || !replacedOperator || !replacedOperatorId || !month || !year || !time) {
+      return res.status(400).json({
+        status: 400,
+        ok: false,
+        message: 'Missing required fields: equipmentId, regNo, machine, currentOperator, currentOperatorId, replacedOperator, replacedOperatorId, month, year, time'
+      });
+    }
+
+    const result = await equipmentServices.replaceOperator({
+      equipmentId,
+      regNo,
+      machine,
+      currentOperator,
+      currentOperatorId,
+      replacedOperator,
+      replacedOperatorId,
+      month,
+      year,
+      time,
+      remarks: remarks || ''
+    });
+
+    res.status(result.status).json(result);
+  } catch (error) {
+    console.error('Error replacing operator:', error);
+    res.status(500).json({
+      status: 500,
+      ok: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+const replaceEquipment = async (req, res) => {
+  try {
+    const {
+      equipmentId,
+      regNo,
+      machine,
+      replacedEquipmentId,
+      replacedEquipmentRegNo,
+      replacedEquipmentMachine,
+      newSiteForReplaced, // Optional: new site for the replaced equipment (equipmentId)
+      month,
+      year,
+      time,
+      remarks
+    } = req.body;
+
+    console.log("data", req.body)
+
+    // Validation
+    if (!equipmentId || !regNo || !machine || !replacedEquipmentId || !replacedEquipmentRegNo || !replacedEquipmentMachine || !month || !year || !time) {
+      return res.status(400).json({
+        status: 400,
+        ok: false,
+        message: 'Missing required fields: equipmentId, regNo, machine, replacedEquipmentId, replacedEquipmentRegNo, replacedEquipmentMachine, month, year, time'
+      });
+    }
+
+    const result = await equipmentServices.replaceEquipment({
+      equipmentId,
+      regNo,
+      machine,
+      replacedEquipmentId,
+      replacedEquipmentRegNo,
+      replacedEquipmentMachine,
+      newSiteForReplaced: newSiteForReplaced || null,
+      month,
+      year,
+      time,
+      remarks: remarks || ''
+    });
+
+    res.status(result.status).json(result);
+  } catch (error) {
+    console.error('Error replacing equipment:', error);
+    res.status(500).json({
+      status: 500,
+      ok: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+const getReplacementHistory = async (req, res) => {
+  try {
+    const { equipmentId } = req.params;
+    const { page = 1, limit = 20, type } = req.query;
+
+    if (!equipmentId) {
+      return res.status(400).json({
+        status: 400,
+        ok: false,
+        message: 'Equipment ID is required'
+      });
+    }
+
+    const result = await equipmentServices.getReplacementHistory(
+      parseInt(equipmentId),
+      parseInt(page),
+      parseInt(limit),
+      type // Optional filter: 'operator', 'site', 'equipment'
+    );
+
+    res.status(200).json({
+      status: 200,
+      ok: true,
+      data: result.history,
+      pagination: {
+        currentPage: result.currentPage,
+        totalPages: result.totalPages,
+        totalCount: result.totalCount,
+        hasMore: result.hasNextPage
+      }
+    });
+  } catch (error) {
+    console.error('Error getting replacement history:', error);
+    res.status(500).json({
+      status: 500,
+      ok: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+const getSites = async (req, res) => {
+  try {
+    const result = await equipmentServices.fetchUniqueSites();
+    res.status(200).json({
+      status: 200,
+      ok: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error getting sites:', error);
+    res.status(500).json({
+      status: 500,
+      ok: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+const getAllMobilizations = async (req, res) => {
+  try {
+    const result = await equipmentServices.fetchAllMobilizations();
+
+    res.status(200).json({
+      status: 200,
+      ok: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error getting all mobilizations:', error);
+    res.status(500).json({
+      status: 500,
+      ok: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+const getAllReplacements = async (req, res) => {
+  try {
+    const result = await equipmentServices.fetchAllReplacements();
+
+    res.status(200).json({
+      status: 200,
+      ok: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error getting all replacements:', error);
+    res.status(500).json({
+      status: 500,
+      ok: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+const getFilteredMobilizations = async (req, res) => {
+  try {
+    const {
+      filterType,
+      startDate,
+      endDate,
+      months,
+      specificTime,
+      startTime,
+      endTime
+    } = req.query;
+
+    if (!filterType) {
+      return res.status(400).json({
+        status: 400,
+        ok: false,
+        message: 'Filter type is required (daily, yesterday, weekly, monthly, yearly, months, custom, single)'
+      });
+    }
+
+    if (filterType === 'custom' && (!startDate || !endDate)) {
+      return res.status(400).json({
+        status: 400,
+        ok: false,
+        message: 'Start date and end date are required for custom range'
+      });
+    }
+
+    if (filterType === 'single' && !startDate) {
+      return res.status(400).json({
+        status: 400,
+        ok: false,
+        message: 'Date is required for single date filter'
+      });
+    }
+
+    if (filterType === 'months' && !months) {
+      return res.status(400).json({
+        status: 400,
+        ok: false,
+        message: 'Months parameter is required for months filter type'
+      });
+    }
+
+    if (startTime && endTime && startTime > endTime) {
+      return res.status(400).json({
+        status: 400,
+        ok: false,
+        message: 'Start time must be before end time'
+      });
+    }
+
+    const result = await equipmentServices.fetchFilteredMobilizations(
+      filterType,
+      startDate,
+      endDate,
+      months,
+      specificTime,
+      startTime,
+      endTime
+    );
+
+    res.status(200).json({
+      status: 200,
+      ok: true,
+      data: result,
+      count: result.length
+    });
+  } catch (error) {
+    console.error('Error getting filtered mobilizations:', error);
+    res.status(500).json({
+      status: 500,
+      ok: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+const getFilteredReplacements = async (req, res) => {
+  try {
+    const { filterType, startDate, endDate, months } = req.query;
+
+    if (!filterType) {
+      return res.status(400).json({
+        status: 400,
+        ok: false,
+        message: 'Filter type is required (daily, yesterday, weekly, monthly, yearly, months, custom)'
+      });
+    }
+
+    if (filterType === 'custom' && (!startDate || !endDate)) {
+      return res.status(400).json({
+        status: 400,
+        ok: false,
+        message: 'Start date and end date are required for custom range'
+      });
+    }
+
+    if (filterType === 'months' && !months) {
+      return res.status(400).json({
+        status: 400,
+        ok: false,
+        message: 'Months parameter is required for months filter type'
+      });
+    }
+
+    const result = await equipmentServices.fetchFilteredReplacements(
+      filterType,
+      startDate,
+      endDate,
+      months
+    );
+
+    res.status(200).json({
+      status: 200,
+      ok: true,
+      data: result,
+      count: result.length
+    });
+  } catch (error) {
+    console.error('Error getting filtered replacements:', error);
+    res.status(500).json({
+      status: 500,
+      ok: false,
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+};
+
+
 module.exports = {
   addEquipments,
   getEquipments,
@@ -387,5 +931,17 @@ module.exports = {
   getBulkEquipmentImages,
   getEquipmentCount,
   getEquipmentStats,
-  getEquipmentsByStatus
+  getEquipmentsByStatus,
+  mobilizeEquipment,
+  demobilizeEquipment,
+  getMobilizationHistory,
+  replaceOperator,
+  replaceEquipment,
+  getReplacementHistory,
+  getSites,
+  getAllReplacements,
+  getAllMobilizations,
+  getFilteredMobilizations,
+  getFilteredReplacements,
+  changeEquipmentStatus
 };
