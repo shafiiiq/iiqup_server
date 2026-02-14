@@ -543,8 +543,11 @@ module.exports = {
             JSON.stringify(originalEquipment.certificationBody) !== JSON.stringify(result.certificationBody)) {
             if (Array.isArray(result.certificationBody) && result.certificationBody.length > 0) {
               const lastOperator = result.certificationBody[result.certificationBody.length - 1];
-              const operatorName = lastOperator.operatorName || lastOperator;
-              changes.push(`operator is: ${operatorName}`);
+              const operatorName = lastOperator?.operatorName || String(lastOperator);
+
+              if (operatorName && typeof operatorName === 'string') {
+                changes.push(`operator is: ${operatorName}`);
+              }
             }
           }
 
