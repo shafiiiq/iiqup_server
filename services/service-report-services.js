@@ -131,7 +131,7 @@ module.exports = {
 
   fetchServiceReportWith: (id) => {
     console.log("id ...................", id);
-    
+
     return new Promise(async (resolve, reject) => {
       try {
         const getReport = await serviceReportModel.findById(id);
@@ -789,5 +789,93 @@ module.exports = {
         });
       }
     });
-  }
+  },
+  fetchServicesByTypeAndDateRange: (regNo, serviceType, startDate, endDate) => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const convertDate = (dateStr) => {
+          const parts = dateStr.split('-');
+          return `${parts[2]}-${parts[1]}-${parts[0]}`;
+        };
+
+        const formattedStartDate = convertDate(startDate);
+        const formattedEndDate = convertDate(endDate);
+
+        const query = {
+          regNo: regNo,
+          date: {
+            $gte: formattedStartDate,
+            $lte: formattedEndDate
+          }
+        };
+
+        // Add serviceType filter if provided (null means all types)
+        if (serviceType) {
+          query.serviceType = serviceType;
+        }
+
+        const getReport = await serviceReportModel.find(query).sort({ date: -1 });
+
+        resolve({
+          status: 200,
+          ok: true,
+          data: getReport
+        });
+      } catch (error) {
+        console.error('Error in fetchServicesByTypeAndDateRange:', error);
+        reject({
+          status: 500,
+          ok: false,
+          message: error.message || 'Error fetching services by type and date range'
+        });
+      }
+    });
+  },
+
+  fetchServicesByTypeAndLastMonths: (regNo, serviceType, monthsCount) => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const currentDate = new Date();
+        const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - monthsCount, 1);
+
+        const formatDate = (date) => {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        };
+
+        const formattedStartDate = formatDate(startDate);
+        const formattedCurrentDate = formatDate(currentDate);
+
+        const query = {
+          regNo: regNo,
+          date: {
+            $gte: formattedStartDate,
+            $lte: formattedCurrentDate
+          }
+        };
+
+        // Add serviceType filter if provided (null means all types)
+        if (serviceType) {
+          query.serviceType = serviceType;
+        }
+
+        const getReport = await serviceReportModel.find(query).sort({ date: -1 });
+
+        resolve({
+          status: 200,
+          ok: true,
+          data: getReport
+        });
+      } catch (error) {
+        console.error('Error in fetchServicesByTypeAndLastMonths:', error);
+        reject({
+          status: 500,
+          ok: false,
+          message: error.message || 'Error fetching services by type and last months'
+        });
+      }
+    });
+  } 
 }

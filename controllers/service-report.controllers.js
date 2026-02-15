@@ -25,7 +25,7 @@ const getServiceReport = async (req, res) => {
       res.status(err.status || 500).json({ message: 'Cannot get service report', error: err.message })
     })
 }
- 
+
 const getServiceReportWithId = async (req, res) => {
   const id = req.params.id;
   console.log("id ...................", id);
@@ -244,6 +244,63 @@ const getAllServicesByLastMonths = async (req, res) => {
     })
 }
 
+const getServicesByTypeAndDateRange = async (req, res) => {
+  const { regNo, serviceType, startDate, endDate } = req.params;
+
+  // Map service type segment to actual service type
+  const serviceTypeMap = {
+    'all-histories': null,
+    'oil-service': 'oil',
+    'maintenance-service': 'maintenance',
+    'tyre-service': 'tyre',
+    'battery-service': 'battery'
+  };
+
+  const actualServiceType = serviceTypeMap[serviceType];
+
+  reportServices.fetchServicesByTypeAndDateRange(regNo, actualServiceType, startDate, endDate)
+    .then((fetchedServices) => {
+      if (fetchedServices) {
+        res.status(fetchedServices.status).json(fetchedServices)
+      }
+    })
+    .catch((err) => {
+      res.status(err.status || 500).json({
+        message: 'Cannot get services by type and date range',
+        error: err.message
+      })
+    })
+}
+
+const getServicesByTypeAndLastMonths = async (req, res) => {
+  const { regNo, serviceType, monthsCount } = req.params;
+
+  // Map service type segment to actual service type
+  const serviceTypeMap = {
+    'all-histories': null,
+    'oil-service': 'oil',
+    'maintenance-service': 'maintenance',
+    'tyre-service': 'tyre',
+    'battery-service': 'battery'
+  };
+
+  const actualServiceType = serviceTypeMap[serviceType];
+
+  reportServices.fetchServicesByTypeAndLastMonths(regNo, actualServiceType, parseInt(monthsCount))
+    .then((fetchedServices) => {
+      if (fetchedServices) {
+        res.status(fetchedServices.status).json(fetchedServices)
+      }
+    })
+    .catch((err) => {
+      res.status(err.status || 500).json({
+        message: 'Cannot get services by type and last months',
+        error: err.message
+      })
+    })
+}
+
+
 module.exports = {
   addServiceReport,
   getServiceReport,
@@ -263,5 +320,7 @@ module.exports = {
   getMonthlyServices,
   getYearlyServices,
   getAllServicesByDateRange,
-  getAllServicesByLastMonths
+  getAllServicesByLastMonths,
+  getServicesByTypeAndDateRange,
+  getServicesByTypeAndLastMonths
 };

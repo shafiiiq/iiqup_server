@@ -16,6 +16,7 @@ router.get('/summary/yearly', serviceReportController.getYearlyServices)
 router.get('/summary/date-range/:startDate/:endDate', serviceReportController.getAllServicesByDateRange)
 router.get('/summary/last-months/:monthsCount', serviceReportController.getAllServicesByLastMonths)
 
+// Original routes (keep for backward compatibility)
 router.get('/histories/:regNo', serviceReportController.getAllServiceHistories)
 router.get('/histories/:regNo/oil', serviceReportController.getAllOilServices)
 router.get('/histories/:regNo/maintenance', serviceReportController.getAllMaintenanceServices)
@@ -24,6 +25,8 @@ router.get('/histories/:regNo/battery', serviceReportController.getAllBatterySer
 router.get('/histories/:regNo/date-range/:startDate/:endDate', serviceReportController.getServicesByDateRange)
 router.get('/histories/:regNo/last-months/:monthsCount', serviceReportController.getServicesByLastMonths)
 
-
+// ✅ NEW ROUTES - Add these to support service-type-filtered date ranges
+router.get('/histories/:regNo/:serviceType/date-range/:startDate/:endDate', serviceReportController.getServicesByTypeAndDateRange)
+router.get('/histories/:regNo/:serviceType/last-months/:monthsCount', serviceReportController.getServicesByTypeAndLastMonths)
 
 module.exports = router;
