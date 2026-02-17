@@ -3,9 +3,11 @@ const connectedUsers = new Map(); // uniqueCode -> array of sessions
 import { checkSessionStatus } from '../services/user-services.js';
 import messageService from '../services/message-services.js';
 import chatService from '../services/chat-services.js';
+const typingNotificationSent = new Map();
 
 const setupWebSocket = (io) => {
   console.log('🔌 WebSocket server initialized');
+  const typingNotificationSent = new Map();
 
   io.on('connection', (socket) => {
     console.log('✅ New client connected:', socket.id);
@@ -132,12 +134,14 @@ const setupWebSocket = (io) => {
     });
 
     // Typing indicator
-    socket.on('typing', (data) => {
+    const typingNotificationSent = new Map();
+
+    socket.on('typing', async (data) => {
       try {
         console.log('⌨️ User typing:', data);
         const { chatId, userId, userName, participants, senderUniqueCode } = data;
+        const PushNotificationService = await import('../utils/push-notification-jobs.js');
 
-        // Emit to all chat participants except sender
         participants.forEach(participant => {
           if (participant.uniqueCode !== senderUniqueCode) {
             global.io.to(`user_${participant.uniqueCode}`).emit('user_typing', {
@@ -146,6 +150,21 @@ const setupWebSocket = (io) => {
               userName,
               isTyping: true
             });
+
+            const notificationKey = `${chatId}_${userId}_${participant.uniqueCode}`;
+
+            if (!typingNotificationSent.has(notificationKey)) {
+              PushNotificationService.default.sendGeneralNotification(
+                participant.uniqueCode,
+                `${userName}`,
+                'is typing...',
+                'low',
+                'typing',
+                `typing_${chatId}_${userId}`
+              );
+
+              typingNotificationSent.set(notificationKey, true);
+            }
           }
         });
       } catch (error) {
@@ -153,19 +172,28 @@ const setupWebSocket = (io) => {
       }
     });
 
-    socket.on('stop_typing', (data) => {
+    socket.on('stop_typing', async (data) => {
       try {
         console.log('⌨️ User stopped typing:', data);
-        const { chatId, userId, participants, senderUniqueCode } = data;
+        const { chatId, userId, userName, participants, senderUniqueCode } = data;
 
-        // Emit to all chat participants
-        participants.forEach(participant => {
+        participants.forEach(async (participant) => {
           if (participant.uniqueCode !== senderUniqueCode) {
             global.io.to(`user_${participant.uniqueCode}`).emit('user_typing', {
               chatId,
               userId,
+              userName,
               isTyping: false
             });
+
+            const notificationKey = `${chatId}_${userId}_${participant.uniqueCode}`;
+            typingNotificationSent.delete(notificationKey);
+
+            const PushNotificationService = await import('../utils/push-notification-jobs.js');
+            await PushNotificationService.default.dismissNotification(
+              participant.uniqueCode,
+              `typing_${chatId}_${userId}`
+            );
           }
         });
       } catch (error) {
@@ -238,15 +266,13 @@ const setupWebSocket = (io) => {
         // 1. Send via WebSocket
         global.io.to(`user_${receiverUniqueCode}`).emit('incoming_call', callData);
 
-        // 2. Send FCM push
+        // 2. Send FCM push with VOIP priority for iOS
         const PushNotificationService = await import('../utils/push-notification-jobs.js');
-        await PushNotificationService.default.sendGeneralNotification(
+        await PushNotificationService.default.sendVoIPCallNotification(
           receiverUniqueCode,
-          `Incoming call from ${callerName}`,
-          'Tap to answer',
-          'high',
-          'call',
-          `call_${callerId}_${Date.now()}`
+          callerName,
+          callerId,
+          chatId
         );
 
         console.log(`📤 Call notification sent to: ${receiverUniqueCode}`);

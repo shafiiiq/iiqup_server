@@ -41,11 +41,13 @@ const equipmentSchema = new mongoose.Schema({
   certificationBody: [{
     operatorName: {
       type: String,
-      required: true
+      required: false,  
+      default: 'Not Assigned'
     },
     operatorId: {
       type: String,
-      required: true
+      required: false, 
+      default: 'Not Assigned'
     },
     assignedAt: {
       type: Date,
@@ -67,14 +69,18 @@ const equipmentSchema = new mongoose.Schema({
     required: true,
     default: false
   },
+  hiredFrom: {
+    type: String,
+    default: ""  
+  },
   status: {
     type: String,
     required: true
   },
-  site: [{
-    type: String,
-    required: true
-  }],
+  site: {  
+    type: [String],
+    default: []
+  },
   createdAt: {
     type: Date,
     default: Date.now
@@ -95,10 +101,8 @@ equipmentSchema.index({ status: 1 });
 equipmentSchema.index({ site: 1 });
 equipmentSchema.index({ hired: 1 });
 
-// Compound index for common queries
 equipmentSchema.index({ hired: 1, year: -1, createdAt: -1 });
 
-// Text index for full-text search
 equipmentSchema.index({
   machine: 'text',
   regNo: 'text',
@@ -106,9 +110,7 @@ equipmentSchema.index({
   company: 'text'
 });
 
-// Add index for operator searches
 equipmentSchema.index({ 'certificationBody.operatorId': 1 });
 equipmentSchema.index({ 'certificationBody.operatorName': 1 });
 
-// Create the model
 module.exports = mongoose.model('Equipments', equipmentSchema);

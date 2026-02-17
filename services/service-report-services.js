@@ -365,12 +365,19 @@ module.exports = {
     }
   },
 
-  fetchAllServiceHistories: (regNo) => {
+  fetchAllServiceHistories: (regNo, serviceTypes = []) => {
     return new Promise(async (resolve, reject) => {
       try {
-        const getReport = await serviceReportModel.find({
-          regNo: regNo,
-        }).sort({ date: -1 }); // Sort by date descending (newest first)
+        // Build the query
+        const query = { regNo: regNo };
+
+        // Add serviceType filter if serviceTypes array is provided and not empty
+        if (serviceTypes && serviceTypes.length > 0) {
+          query.serviceType = { $in: serviceTypes };
+        }
+
+        const getReport = await serviceReportModel.find(query)
+          .sort({ date: -1 }); // Sort by date descending (newest first)
 
         resolve({
           status: 200,
@@ -582,9 +589,10 @@ module.exports = {
   fetchServicesByLastMonths: (regNo, monthsCount) => {
     return new Promise(async (resolve, reject) => {
       try {
-        // Calculate the start date (X months ago)
+        // Calculate the start date (first day of the month X months ago)
         const currentDate = new Date();
-        const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - monthsCount, 1);
+        // FIXED: Add +1 to get the correct starting month
+        const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - monthsCount + 1, 1);
 
         // Format dates to YYYY-MM-DD
         const formatDate = (date) => {
@@ -597,6 +605,10 @@ module.exports = {
         const formattedStartDate = formatDate(startDate);
         const formattedCurrentDate = formatDate(currentDate);
 
+        console.log('Fetching services for last', monthsCount, 'months');
+        console.log('Start Date:', formattedStartDate);
+        console.log('Current Date:', formattedCurrentDate);
+
         const getReport = await serviceReportModel.find({
           regNo: regNo,
           date: {
@@ -604,6 +616,8 @@ module.exports = {
             $lte: formattedCurrentDate
           }
         }).sort({ date: -1 });
+
+        console.log('Found reports:', getReport.length);
 
         resolve({
           status: 200,
@@ -708,7 +722,8 @@ module.exports = {
     return new Promise(async (resolve, reject) => {
       try {
         const currentDate = new Date();
-        const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - monthsCount, currentDate.getDate());
+        // FIXED: Add +1 to get correct starting month
+        const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - monthsCount + 1, 1);
 
         const formatDate = (date) => {
           const year = date.getFullYear();
@@ -719,6 +734,10 @@ module.exports = {
 
         const formattedStartDate = formatDate(startDate);
         const formattedEndDate = formatDate(currentDate);
+
+        console.log('Fetching all services for last', monthsCount, 'months');
+        console.log('Start Date:', formattedStartDate);
+        console.log('End Date:', formattedEndDate);
 
         const getReport = await serviceReportModel.find({
           date: {
@@ -790,7 +809,7 @@ module.exports = {
       }
     });
   },
-  fetchServicesByTypeAndDateRange: (regNo, serviceType, startDate, endDate) => {
+  fetchServicesByTypeAndDateRange: (regNo, serviceType, startDate, endDate, serviceTypes = []) => {
     return new Promise(async (resolve, reject) => {
       try {
         const convertDate = (dateStr) => {
@@ -809,8 +828,12 @@ module.exports = {
           }
         };
 
-        // Add serviceType filter if provided (null means all types)
-        if (serviceType) {
+        // Priority 1: Use serviceTypes array if provided
+        if (serviceTypes && serviceTypes.length > 0) {
+          query.serviceType = { $in: serviceTypes };
+        }
+        // Priority 2: Use single serviceType if provided (and no serviceTypes array)
+        else if (serviceType) {
           query.serviceType = serviceType;
         }
 
@@ -832,11 +855,11 @@ module.exports = {
     });
   },
 
-  fetchServicesByTypeAndLastMonths: (regNo, serviceType, monthsCount) => {
+  fetchServicesByTypeAndLastMonths: (regNo, serviceType, monthsCount, serviceTypes = []) => {
     return new Promise(async (resolve, reject) => {
       try {
         const currentDate = new Date();
-        const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - monthsCount, 1);
+        const startDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - monthsCount + 1, 1);
 
         const formatDate = (date) => {
           const year = date.getFullYear();
@@ -848,6 +871,10 @@ module.exports = {
         const formattedStartDate = formatDate(startDate);
         const formattedCurrentDate = formatDate(currentDate);
 
+        console.log('Fetching services for last', monthsCount, 'months');
+        console.log('Start Date:', formattedStartDate);
+        console.log('Current Date:', formattedCurrentDate);
+
         const query = {
           regNo: regNo,
           date: {
@@ -856,12 +883,16 @@ module.exports = {
           }
         };
 
-        // Add serviceType filter if provided (null means all types)
-        if (serviceType) {
+        if (serviceTypes && serviceTypes.length > 0) {
+          query.serviceType = { $in: serviceTypes };
+        }
+        else if (serviceType) {
           query.serviceType = serviceType;
         }
 
         const getReport = await serviceReportModel.find(query).sort({ date: -1 });
+
+        console.log('Found reports:', getReport.length);
 
         resolve({
           status: 200,
@@ -877,5 +908,5 @@ module.exports = {
         });
       }
     });
-  } 
+  }
 }

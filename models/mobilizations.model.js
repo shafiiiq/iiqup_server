@@ -17,7 +17,7 @@ const mobilizationSchema = new mongoose.Schema({
   action: {
     type: String,
     required: true,
-    enum: ['mobilized', 'demobilized', 'status_changed']  // ✅ ADD status_changed
+    enum: ['mobilized', 'demobilized', 'status_changed']  
   },
   previousStatus: {
     type: String,

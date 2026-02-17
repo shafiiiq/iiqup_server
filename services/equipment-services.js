@@ -17,6 +17,30 @@ const getCurrentDateTime = () => {
   return { month, year, time };
 };
 
+const safeUpdateOperator = async (operatorId, updateData) => {
+  if (!operatorId || operatorId === 'Not Assigned' || operatorId === '' || operatorId === 'undefined') {
+    console.log('Skipping operator update - invalid operatorId:', operatorId);
+    return null;
+  }
+
+  try {
+    const mongoose = require('mongoose');
+    if (!mongoose.Types.ObjectId.isValid(operatorId)) {
+      console.log('Skipping operator update - not a valid ObjectId:', operatorId);
+      return null;
+    }
+
+    return await OperatorModel.findByIdAndUpdate(
+      operatorId,
+      { ...updateData, updatedAt: new Date() },
+      { new: true }
+    );
+  } catch (err) {
+    console.error('safeUpdateOperator failed:', err.message);
+    return null;
+  }
+};
+
 module.exports = {
 
   insertEquipments: (data) => {
@@ -32,10 +56,62 @@ module.exports = {
           });
         }
 
+        // ✅ Validate hiredFrom when company is HIRED
+        if (data.company === 'HIRED' && !data.hiredFrom) {
+          return reject({
+            status: 400,
+            ok: false,
+            message: 'hiredFrom is required when company is HIRED',
+          });
+        }
+
         const equipments = await equipmentModel.find({});
         data.id = equipments.length + 1;
 
         console.log('Next ID:', data.id);
+
+        // ✅ Handle certificationBody - convert string to proper array format
+        if (data.certificationBody) {
+          if (typeof data.certificationBody === 'string') {
+            // If it's a string like "No Operator", create empty array
+            if (data.certificationBody === 'No Operator' || data.certificationBody.trim() === '') {
+              data.certificationBody = [];
+            } else {
+              // If it's an operator name, create proper object
+              data.certificationBody = [{
+                operatorName: data.certificationBody,
+                operatorId: 'Not Assigned',
+                assignedAt: new Date()
+              }];
+            }
+          } else if (Array.isArray(data.certificationBody)) {
+            // If it's already an array, ensure each item is an object
+            data.certificationBody = data.certificationBody.map(item => {
+              if (typeof item === 'string') {
+                return {
+                  operatorName: item,
+                  operatorId: 'Not Assigned',
+                  assignedAt: new Date()
+                };
+              }
+              return item;
+            });
+          }
+        } else {
+          // ✅ If no certificationBody provided, set to empty array
+          data.certificationBody = [];
+        }
+
+        // ✅ Handle site - ensure it's an array
+        if (data.site) {
+          if (typeof data.site === 'string') {
+            data.site = data.site.trim() === '' ? [] : [data.site];
+          } else if (!Array.isArray(data.site)) {
+            data.site = [];
+          }
+        } else {
+          data.site = [];
+        }
 
         const equipment = await equipmentModel.create(data);
 
@@ -52,15 +128,14 @@ module.exports = {
 
           await PushNotificationService.sendGeneralNotification(
             JSON.parse(process.env.OFFICE_MAIN),
-            "New Asset Launched", //title
-            `Alhamdulillah , We are happy to inform to you! We have bought a brand new ${equipment.machine} (${equipment.brand}) today`, //description
-            'high', //priority
-            'normal', // type
+            "New Asset Launched",
+            `Alhamdulillah , We are happy to inform to you! We have bought a brand new ${equipment.machine} (${equipment.brand}) today`,
+            'high',
+            'normal',
             notification.data._id.toString()
           );
         } catch (notificationError) {
           console.error('Failed to send notification for new equipment:', notificationError);
-          // Don't reject the main operation if notification fails
         }
 
         resolve({
@@ -73,9 +148,7 @@ module.exports = {
       } catch (err) {
         console.log(err);
 
-        // Handle duplicate key error specifically
         if (err.code === 11000) {
-          // Find next available ID by incrementing until we find one that works
           let attempts = 0;
           const maxAttempts = 10;
 
@@ -86,7 +159,6 @@ module.exports = {
 
               const equipment = await equipmentModel.create(data);
 
-              // Send notification for new equipment (retry case)
               try {
                 const notification = await createNotification({
                   title: "New Asset Launched",
@@ -97,11 +169,11 @@ module.exports = {
                 });
 
                 await PushNotificationService.sendGeneralNotification(
-                  null, // broadcast to all users
-                  "New Asset Launched", //title
-                  `Alhamdulillah , We are happy to inform to you! We have bought a brand new ${equipment.machine} (${equipment.brand}) today`, //description
-                  'high', //priority
-                  'normal', // type
+                  null,
+                  "New Asset Launched",
+                  `Alhamdulillah , We are happy to inform to you! We have bought a brand new ${equipment.machine} (${equipment.brand}) today`,
+                  'high',
+                  'normal',
                   notification.data._id.toString()
                 );
               } catch (notificationError) {
@@ -117,9 +189,8 @@ module.exports = {
             } catch (retryErr) {
               if (retryErr.code === 11000) {
                 attempts++;
-                continue; // Try next ID
+                continue;
               } else {
-                // Different error, reject
                 return reject({
                   status: 500,
                   ok: false,
@@ -130,7 +201,6 @@ module.exports = {
             }
           }
 
-          // If we've exhausted all attempts
           reject({
             status: 500,
             ok: false,
@@ -462,6 +532,15 @@ module.exports = {
           }
         }
 
+        // ✅ Validate hiredFrom when company is being changed to HIRED
+        if (updatedData.company === 'HIRED' && !updatedData.hiredFrom && !equipment.hiredFrom) {
+          return reject({
+            status: 400,
+            ok: false,
+            message: 'hiredFrom is required when company is HIRED'
+          });
+        }
+
         // Store original data for notification comparison
         const originalEquipment = { ...equipment.toObject() };
 
@@ -470,6 +549,7 @@ module.exports = {
 
         // Handle operator addition to certificationBody
         const updateData = { ...cleanUpdatedData };
+        let newOperatorId = null; // ✅ Track new operator ID
 
         if (cleanUpdatedData.operator && cleanUpdatedData.operatorId) {
           updateData.$push = {
@@ -479,6 +559,7 @@ module.exports = {
               assignedAt: new Date()
             }
           };
+          newOperatorId = cleanUpdatedData.operatorId; // ✅ Store operator ID
           delete updateData.operator;
           delete updateData.operatorId;
         } else if (cleanUpdatedData.operator && !cleanUpdatedData.operatorId) {
@@ -497,9 +578,25 @@ module.exports = {
           { regNo: regNo },
           updateData,
           { new: true, runValidators: true }
-        );
+        ); 
 
-        // ✅ SEND NOTIFICATION FOR STATUS CHANGE
+        if (newOperatorId) {
+          try {
+            const previousOperatorId = originalEquipment.certificationBody?.length > 0
+              ? originalEquipment.certificationBody[originalEquipment.certificationBody.length - 1]?.operatorId
+              : null;
+
+            if (previousOperatorId && previousOperatorId !== newOperatorId) {
+              await safeUpdateOperator(previousOperatorId, { equipmentNumber: '' });
+            }
+
+            await safeUpdateOperator(newOperatorId, { equipmentNumber: regNo });
+
+          } catch (operatorUpdateError) {
+            console.error('Failed to update operator equipment number:', operatorUpdateError);
+          }
+        }
+
         try {
           const changes = [];
 
@@ -537,6 +634,11 @@ module.exports = {
               siteText = String(updatedData.site);
             }
             changes.push(`site is: ${siteText}`);
+          }
+
+          // ✅ Add notification for hiredFrom changes
+          if (updatedData.hiredFrom && originalEquipment.hiredFrom !== updatedData.hiredFrom) {
+            changes.push(`hired from: ${updatedData.hiredFrom}`);
           }
 
           if (result.certificationBody &&
@@ -1096,7 +1198,7 @@ module.exports = {
   mobilizeEquipment: async function (data) {
     try {
       const {
-        equipmentId,  // This is now _id (ObjectId) from frontend
+        equipmentId,
         regNo,
         machine,
         site,
@@ -1110,7 +1212,7 @@ module.exports = {
       } = data;
 
       const mobilization = new mobilizationModel({
-        equipmentId,  // Now ObjectId
+        equipmentId,
         regNo,
         machine,
         action: 'mobilized',
@@ -1145,9 +1247,8 @@ module.exports = {
         };
       }
 
-      // ✅ Change from { id: equipmentId } to { _id: equipmentId }
       const updatedEquipment = await equipmentModel.findOneAndUpdate(
-        { _id: equipmentId },  // Use _id instead of id
+        { _id: equipmentId },
         updateOperation,
         { new: true }
       );
@@ -1158,6 +1259,10 @@ module.exports = {
           ok: false,
           message: 'Equipment not found'
         };
+      }
+
+      if (withOperator && operatorId) {
+        await safeUpdateOperator(operatorId, { equipmentNumber: regNo });
       }
 
       return {
@@ -1178,7 +1283,7 @@ module.exports = {
   demobilizeEquipment: async function (data) {
     try {
       const {
-        equipmentId,  // Now ObjectId
+        equipmentId,
         regNo,
         machine,
         month,
@@ -1186,6 +1291,15 @@ module.exports = {
         time,
         remarks
       } = data;
+
+      // ✅ Get current equipment to find assigned operator
+      const currentEquipment = await equipmentModel.findById(equipmentId);
+
+      let currentOperatorId = null;
+      if (currentEquipment && currentEquipment.certificationBody && currentEquipment.certificationBody.length > 0) {
+        const lastOperator = currentEquipment.certificationBody[currentEquipment.certificationBody.length - 1];
+        currentOperatorId = lastOperator?.operatorId;
+      }
 
       const demobilization = new mobilizationModel({
         equipmentId,
@@ -1203,9 +1317,8 @@ module.exports = {
 
       await demobilization.save();
 
-      // ✅ Change from { id: equipmentId } to { _id: equipmentId }
       const updatedEquipment = await equipmentModel.findOneAndUpdate(
-        { _id: equipmentId },  // Use _id instead of id
+        { _id: equipmentId },
         {
           $set: {
             status: 'idle',
@@ -1222,6 +1335,8 @@ module.exports = {
           message: 'Equipment not found'
         };
       }
+
+      await safeUpdateOperator(currentOperatorId, { equipmentNumber: '' });
 
       return {
         status: 201,
@@ -1266,7 +1381,7 @@ module.exports = {
   replaceOperator: async function (data) {
     try {
       const {
-        equipmentId,  // Now ObjectId
+        equipmentId,
         regNo,
         machine,
         currentOperator,
@@ -1298,9 +1413,8 @@ module.exports = {
 
       await replacement.save();
 
-      // ✅ Change from { id: equipmentId } to { _id: equipmentId }
       const updatedEquipment = await equipmentModel.findOneAndUpdate(
-        { _id: equipmentId },  // Use _id instead of id
+        { _id: equipmentId },
         {
           $push: {
             certificationBody: {
@@ -1321,6 +1435,9 @@ module.exports = {
           message: 'Equipment not found'
         };
       }
+
+      await safeUpdateOperator(currentOperatorId, { equipmentNumber: '' });
+      await safeUpdateOperator(replacedOperatorId, { equipmentNumber: regNo });
 
       return {
         status: 201,

@@ -190,6 +190,15 @@ const operatorSchema = new mongoose.Schema({
     type: profilePicSchema,
     default: {}
   },
+  hired: {
+    type: Boolean,
+    required: true,
+    default: false
+  },
+  hiredFrom: {
+    type: String,
+    default: ""
+  },
   toolkits: [ToolkitSchema],
   pushTokens: [{
     token: {

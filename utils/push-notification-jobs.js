@@ -1,12 +1,134 @@
-// services/pushNotificationService.js
+const admin = require('firebase-admin');
 const userService = require('../services/user-services');
 const { sendNotificationToUser: sendWebSocketNotification, broadcastNotification: broadcastWebSocketNotification } = require('../utils/websocket').default;
 const User = require('../models/user.model');
+const Operator = require('../models/operator.model');
+const Mechanic = require('../models/mechanic.model');
 
 /**
  * Enhanced Push Notification Service that handles both WebSocket and Push Notifications
  */
 class PushNotificationService {
+
+    static async dismissNotification(uniqueCode, notificationId) {
+        try {
+            let user = await User.findOne({ uniqueCode }).select('uniqueCode pushTokens');
+            if (!user) user = await Operator.findOne({ uniqueCode }).select('uniqueCode pushTokens');
+            if (!user) user = await Mechanic.findOne({ uniqueCode }).select('uniqueCode pushTokens');
+
+            if (!user || !user.pushTokens || user.pushTokens.length === 0) {
+                return { success: false };
+            }
+
+            const activeTokens = user.pushTokens
+                .filter(t => t.isActive && t.token)
+                .map(t => t.token);
+
+            if (activeTokens.length === 0) {
+                return { success: false };
+            }
+
+            const message = {
+                data: {
+                    action: 'dismiss',
+                    notificationId: String(notificationId)
+                },
+                android: {
+                    priority: 'high',
+                    data: {
+                        action: 'dismiss',
+                        notificationId: String(notificationId)
+                    }
+                },
+                apns: {
+                    payload: {
+                        aps: {
+                            'content-available': 1
+                        }
+                    }
+                }
+            };
+
+            await Promise.allSettled(
+                activeTokens.map(token => admin.messaging().send({ ...message, token }))
+            );
+
+            return { success: true };
+        } catch (error) {
+            console.error('❌ Dismiss error:', error);
+            return { success: false };
+        }
+    }
+
+    static async sendVoIPCallNotification(uniqueCode, callerName, callerId, chatId) {
+        try {
+            let user = await User.findOne({ uniqueCode }).select('uniqueCode pushTokens');
+            if (!user) user = await Operator.findOne({ uniqueCode }).select('uniqueCode pushTokens');
+            if (!user) user = await Mechanic.findOne({ uniqueCode }).select('uniqueCode pushTokens');
+
+            if (!user || !user.pushTokens || user.pushTokens.length === 0) {
+                return { success: false };
+            }
+
+            const activeTokens = user.pushTokens
+                .filter(t => t.isActive && t.token)
+                .map(t => t.token);
+
+            if (activeTokens.length === 0) {
+                return { success: false };
+            }
+
+            const message = {
+                data: {
+                    type: 'call',
+                    callAction: 'incoming',
+                    callerId: String(callerId),
+                    callerName: String(callerName),
+                    chatId: String(chatId),
+                    notificationId: `call_${callerId}_${Date.now()}`
+                },
+                notification: {
+                    title: `Incoming call from ${callerName}`,
+                    body: 'Tap to answer'
+                },
+                android: {
+                    priority: 'max',
+                    notification: {
+                        channelId: 'call_channel',
+                        sound: 'call_ringtone',
+                        priority: 'max',
+                        visibility: 'public'
+                    }
+                },
+                apns: {
+                    headers: {
+                        'apns-priority': '10',
+                        'apns-push-type': 'alert'
+                    },
+                    payload: {
+                        aps: {
+                            alert: {
+                                title: `Incoming call from ${callerName}`,
+                                body: 'Tap to answer'
+                            },
+                            sound: 'default',
+                            'content-available': 1,
+                            category: 'CALL_INVITATION'
+                        }
+                    }
+                }
+            };
+
+            await Promise.allSettled(
+                activeTokens.map(token => admin.messaging().send({ ...message, token }))
+            );
+
+            return { success: true };
+        } catch (error) {
+            console.error('❌ VoIP push error:', error);
+            return { success: false };
+        }
+    }
 
     /**
      * Send notification to user via both WebSocket and Push Notification

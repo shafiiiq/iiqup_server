@@ -1,4 +1,5 @@
 const Operator = require('../models/operator.model');
+const Equipment = require('../models/equip.model');
 const User = require('../models/user.model');
 const { generateUniqueCode } = require('../utils/code-generator');
 const otpServices = require('../services/otp-services');
@@ -13,50 +14,40 @@ class OperatorService {
     // Check if operator already exists
     const existingOperator = await Operator.findOne({
       $or: [
-        { qatarId: operatorData.qatarId },
-        { id: operatorData.id }
+        { qatarId: operatorData.qatarId }
       ]
     });
 
     if (existingOperator) {
-      const error = new Error('Operator with this Qatar ID or ID already exists');
+      const error = new Error('Operator with this Qatar ID already exists');
       error.statusCode = 409;
       throw error;
     }
 
-    // Validate required fields
-    const requiredFields = ['name', 'qatarId', 'id', 'slNo'];
-    for (const field of requiredFields) {
-      if (!operatorData[field]) {
-        const error = new Error(`${field} is required`);
-        error.statusCode = 400;
-        throw error;
-      }
-    }
+    // ✅ Auto-generate slNo and id (find max + 1)
+    const lastOperator = await Operator.findOne().sort({ slNo: -1 }).lean();
+    const nextSlNo = lastOperator ? (lastOperator.slNo || 0) + 1 : 1;
+    const nextId = lastOperator ? (lastOperator.id || 0) + 1 : 1;
 
-    // Generate unique code if not provided
-    if (!operatorData.uniqueCode) {
-      operatorData.uniqueCode = generateUniqueCode(operatorData.name, operatorData.qatarId);
-    }
+    // ✅ Zero-pad to minimum 3 digits
+    const paddedSlNo = String(nextSlNo).padStart(3, '0');
+
+    // ✅ Auto-generate uniqueCode based on hired status
+    const isHired = operatorData.hired === true || operatorData.sponsorship === 'HIRED';
+    const uniqueCode = isHired
+      ? `AL-HIRED-${paddedSlNo}`
+      : `ATE-OP-${paddedSlNo}`;
+
+    operatorData.slNo = nextSlNo;
+    operatorData.id = nextId;
+    operatorData.uniqueCode = uniqueCode;
 
     const operator = new Operator(operatorData);
 
-    // Find auth user
     const authUser = await User.findOne({ email: process.env.AUTH_USER });
     if (!authUser) {
       const error = new Error('Authorization user not found');
       error.statusCode = 404;
-      throw error;
-    }
-
-    // Send OTP
-    try {
-      await otpServices.generateAndSendOTP(authUser.authMail);
-    } catch (otpError) {
-      console.error('OTP Send Error:', otpError);
-      const error = new Error('Failed to send OTP');
-      error.statusCode = 500;
-      error.details = otpError.message;
       throw error;
     }
 
@@ -211,15 +202,30 @@ class OperatorService {
     return operator;
   }
 
-  static async updateOperator(qatarId, updateData) {
-    if (!qatarId) {
-      const error = new Error('Qatar ID is required');
+  static async updateOperator(id, updateData) {
+    if (!id) {
+      const error = new Error('ID is required');
       error.statusCode = 400;
       throw error;
     }
 
-    const operator = await Operator.findOneAndUpdate(
-      { qatarId },
+    // ✅ Pass id directly, not as object
+    const existingOperator = await Operator.findById(id);
+    if (!existingOperator) {
+      const error = new Error('Operator not found');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const isEquipmentNumberChanged = updateData.equipmentNumber !== undefined &&
+      updateData.equipmentNumber !== existingOperator.equipmentNumber;
+
+    const oldEquipmentNumber = existingOperator.equipmentNumber;
+    const newEquipmentNumber = updateData.equipmentNumber;
+
+    // ✅ findByIdAndUpdate, NOT findByIdAndDelete
+    const operator = await Operator.findByIdAndUpdate(
+      id,
       { ...updateData, updatedAt: Date.now() },
       { new: true, runValidators: true }
     );
@@ -230,8 +236,65 @@ class OperatorService {
       throw error;
     }
 
-    if (updateData.equipmentNumber) {
-      updateEquipments(null, null, updateData.equipmentNumber, operator.name)
+    // Equipment sync logic (unchanged)
+    if (isEquipmentNumberChanged) {
+      try {
+        if (oldEquipmentNumber && oldEquipmentNumber.trim() !== '') {
+          const oldEquipment = await Equipment.findOne({ regNo: oldEquipmentNumber });
+          if (oldEquipment) {
+            const updatedCertificationBody = oldEquipment.certificationBody.filter(
+              cert => cert.operatorId !== operator._id.toString()
+            );
+            await Equipment.findOneAndUpdate(
+              { regNo: oldEquipmentNumber },
+              { $set: { certificationBody: updatedCertificationBody, updatedAt: new Date() } }
+            );
+          }
+        }
+
+        if (newEquipmentNumber && newEquipmentNumber.trim() !== '') {
+          const newEquipment = await Equipment.findOne({ regNo: newEquipmentNumber });
+          if (newEquipment) {
+            const operatorExists = newEquipment.certificationBody.some(
+              cert => cert.operatorId === operator._id.toString()
+            );
+            if (!operatorExists) {
+              await Equipment.findOneAndUpdate(
+                { regNo: newEquipmentNumber },
+                {
+                  $push: {
+                    certificationBody: {
+                      operatorName: operator.name,
+                      operatorId: operator._id.toString(),
+                      assignedAt: new Date()
+                    }
+                  },
+                  $set: { updatedAt: new Date() }
+                }
+              );
+            }
+          }
+        }
+      } catch (equipmentUpdateError) {
+        console.error('Failed to sync equipment when updating operator:', equipmentUpdateError);
+      }
+    }
+
+    return operator;
+  }
+
+  static async deleteOperator(qatarId) {
+    if (!qatarId) {
+      const error = new Error('Qatar ID is required');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const operator = await Operator.findOneAndDelete({ qatarId });
+    if (!operator) {
+      const error = new Error('Operator not found');
+      error.statusCode = 404;
+      throw error;
     }
 
     return operator;

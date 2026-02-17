@@ -68,7 +68,15 @@ const removeServiceReportWithId = async (req, res) => {
 
 const getAllServiceHistories = async (req, res) => {
   const regNo = req.params.regNo;
-  reportServices.fetchAllServiceHistories(regNo)
+  const serviceTypesParam = req.query.serviceTypes; // Get query parameter
+
+  // Parse serviceTypes - it comes as comma-separated string
+  let serviceTypes = [];
+  if (serviceTypesParam) {
+    serviceTypes = serviceTypesParam.split(',').map(type => type.trim());
+  }
+
+  reportServices.fetchAllServiceHistories(regNo, serviceTypes)
     .then((fetchedServices) => {
       if (fetchedServices) {
         res.status(fetchedServices.status).json(fetchedServices)
@@ -246,6 +254,7 @@ const getAllServicesByLastMonths = async (req, res) => {
 
 const getServicesByTypeAndDateRange = async (req, res) => {
   const { regNo, serviceType, startDate, endDate } = req.params;
+  const serviceTypesParam = req.query.serviceTypes; // Add this
 
   // Map service type segment to actual service type
   const serviceTypeMap = {
@@ -258,7 +267,13 @@ const getServicesByTypeAndDateRange = async (req, res) => {
 
   const actualServiceType = serviceTypeMap[serviceType];
 
-  reportServices.fetchServicesByTypeAndDateRange(regNo, actualServiceType, startDate, endDate)
+  // Parse serviceTypes from query parameter
+  let serviceTypes = [];
+  if (serviceTypesParam) {
+    serviceTypes = serviceTypesParam.split(',').map(type => type.trim());
+  }
+
+  reportServices.fetchServicesByTypeAndDateRange(regNo, actualServiceType, startDate, endDate, serviceTypes)
     .then((fetchedServices) => {
       if (fetchedServices) {
         res.status(fetchedServices.status).json(fetchedServices)
@@ -274,6 +289,7 @@ const getServicesByTypeAndDateRange = async (req, res) => {
 
 const getServicesByTypeAndLastMonths = async (req, res) => {
   const { regNo, serviceType, monthsCount } = req.params;
+  const serviceTypesParam = req.query.serviceTypes; // Add this
 
   // Map service type segment to actual service type
   const serviceTypeMap = {
@@ -286,7 +302,13 @@ const getServicesByTypeAndLastMonths = async (req, res) => {
 
   const actualServiceType = serviceTypeMap[serviceType];
 
-  reportServices.fetchServicesByTypeAndLastMonths(regNo, actualServiceType, parseInt(monthsCount))
+  // Parse serviceTypes from query parameter
+  let serviceTypes = [];
+  if (serviceTypesParam) {
+    serviceTypes = serviceTypesParam.split(',').map(type => type.trim());
+  }
+
+  reportServices.fetchServicesByTypeAndLastMonths(regNo, actualServiceType, parseInt(monthsCount), serviceTypes)
     .then((fetchedServices) => {
       if (fetchedServices) {
         res.status(fetchedServices.status).json(fetchedServices)
@@ -299,6 +321,73 @@ const getServicesByTypeAndLastMonths = async (req, res) => {
       })
     })
 }
+
+const handleSummary = async (req, res) => {
+  const { type, param1, param2 } = req.params;
+
+  switch (type) {
+    case 'daily':
+      return getDailyServices(req, res);
+    case 'yesterday':
+      return getYesterdayServices(req, res);
+    case 'weekly':
+      return getWeeklyServices(req, res);
+    case 'monthly':
+      return getMonthlyServices(req, res);
+    case 'yearly':
+      return getYearlyServices(req, res);
+    case 'date-range':
+      req.params.startDate = param1;
+      req.params.endDate = param2;
+      return getAllServicesByDateRange(req, res);
+    case 'last-months':
+      req.params.monthsCount = param1;
+      return getAllServicesByLastMonths(req, res);
+    default:
+      return res.status(400).json({ message: 'Invalid summary type' });
+  }
+};
+
+const handleHistory = async (req, res) => {
+  const { regNo, type, param1, param2, param3 } = req.params;
+
+  switch (type) {
+    case 'all':
+      return getAllServiceHistories(req, res);
+    case 'oil':
+      return getAllOilServices(req, res);
+    case 'maintenance':
+      return getAllMaintenanceServices(req, res);
+    case 'tyre':
+      return getAllTyreServices(req, res);
+    case 'battery':
+      return getAllBatteryServices(req, res);
+    case 'date-range':
+      req.params.startDate = param1;
+      req.params.endDate = param2;
+      return getServicesByDateRange(req, res);
+    case 'last-months':
+      req.params.monthsCount = param1;
+      return getServicesByLastMonths(req, res);
+    case 'oil-service':
+    case 'maintenance-service':
+    case 'tyre-service':
+    case 'battery-service':
+    case 'all-histories':
+      req.params.serviceType = type;
+      req.params.startDate = param2;
+      req.params.endDate = param3;
+      if (param1 === 'date-range') {
+        return getServicesByTypeAndDateRange(req, res);
+      } else if (param1 === 'last-months') {
+        req.params.monthsCount = param2;
+        return getServicesByTypeAndLastMonths(req, res);
+      }
+      return res.status(400).json({ message: 'Invalid history parameters' });
+    default:
+      return res.status(400).json({ message: 'Invalid history type' });
+  }
+};
 
 
 module.exports = {
@@ -322,5 +411,7 @@ module.exports = {
   getAllServicesByDateRange,
   getAllServicesByLastMonths,
   getServicesByTypeAndDateRange,
-  getServicesByTypeAndLastMonths
+  getServicesByTypeAndLastMonths,
+  handleSummary,
+  handleHistory
 };

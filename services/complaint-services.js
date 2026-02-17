@@ -1,5 +1,6 @@
 const Complaint = require('../models/complaint.model');
 const Equipment = require('../models/equip.model');
+const MobilzationModel = require('../models/mobilizations.model');
 const lpoModel = require('../models/lpo.model');
 const LPO = require('../models/lpo.model');
 const Mechanic = require('../models/mechanic.model');
@@ -12,20 +13,90 @@ class ComplaintService {
     try {
       const equipment = await Equipment.findOne({ regNo: complaint.regNo });
 
+      // If equipment not found, throw error
+      if (!equipment) {
+        throw {
+          status: 404,
+          message: `Equipment with regNo ${complaint.regNo} not found`
+        };
+      }
+
+      // Store the previous status before changing to maintenance
+      const previousStatus = equipment.status;
+
       const complaintId = await this.generateComplaintId();
 
       const complaintData = new Complaint({
         ...complaint,
         complaintId: complaintId,
         workflowStatus: 'registered',
-        status: 'pending'
+        status: 'pending',
+        previousEquipmentStatus: previousStatus // Store previous status in complaint
       });
 
       await complaintData.save();
 
+      // Update equipment status to 'maintenance'
+      await Equipment.findOneAndUpdate(
+        { regNo: complaint.regNo },
+        {
+          status: 'maintenance',
+          lastMaintenanceDate: new Date()
+        },
+        { new: true }
+      );
+
+      // Get current date/time info for mobilization record
+      const now = new Date();
+      const month = now.getMonth() + 1; // 1-12
+      const year = now.getFullYear();
+      const time = now.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+
+      // Get operator info - handle both string and object format
+      let operatorName = null;
+      let operatorId = null;
+
+      if (equipment.certificationBody && equipment.certificationBody.length > 0) {
+        const lastOperator = equipment.certificationBody[equipment.certificationBody.length - 1];
+        if (typeof lastOperator === 'object') {
+          operatorName = lastOperator.operatorName;
+          operatorId = lastOperator.operatorId;
+        } else {
+          operatorName = lastOperator;
+        }
+      }
+
+      // Create mobilization record for status change to maintenance
+      const mobilizationData = {
+        equipmentId: equipment._id,
+        regNo: equipment.regNo,
+        machine: equipment.machine,
+        action: 'status_changed',
+        previousStatus: previousStatus,
+        newStatus: 'maintenance',
+        site: equipment.site && equipment.site.length > 0
+          ? equipment.site[equipment.site.length - 1]
+          : 'Workshop',
+        operator: operatorName,
+        withOperator: operatorName ? true : false,
+        month: month,
+        year: year,
+        date: now,
+        time: time,
+        remarks: `Equipment moved to maintenance due to complaint registration. Complaint ID: ${complaintData.complaintId}. Remarks: ${complaint.remarks || 'No remarks provided'}`,
+        status: 'maintenance'
+      };
+
+      await MobilzationModel.create(mobilizationData);
+
+      // Create notification with status change info
       const notification = await createNotification({
         title: `New Complaint Registered - ${complaint.regNo}`,
-        description: `${complaint.name} registered complaint for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Please assign a mechanic.`,
+        description: `${complaint.name} registered complaint for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Equipment status changed from ${previousStatus} to Maintenance. Please assign a mechanic.`,
         priority: "high",
         sourceId: complaintData._id,
         recipient: JSON.parse(process.env.OFFICE_HERO),
@@ -39,7 +110,7 @@ class ComplaintService {
       await PushNotificationService.sendGeneralNotification(
         JSON.parse(process.env.OFFICE_HERO),
         `New Complaint - ${complaint.regNo}`,
-        `New complaint needs mechanic assignment for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'}`,
+        `New complaint needs mechanic assignment. Equipment ${complaint.regNo} is now in Maintenance.`,
         'high',
         'normal',
         notification.data._id.toString()
@@ -1146,7 +1217,7 @@ class ComplaintService {
     }
   }
 
-  static async addSolutionToComplaint(complaintId, filesData, regNo, mechanic, remarks = '') { // Added remarks parameter with default value
+  static async addSolutionToComplaint(complaintId, filesData, regNo, mechanic, remarks = '') {
     try {
       const solutionFiles = filesData.map((file) => {
         const fileData = {
@@ -1166,6 +1237,13 @@ class ComplaintService {
         return fileData;
       });
 
+      // Get complaint to retrieve previous status
+      const existingComplaint = await Complaint.findById(complaintId);
+
+      if (!existingComplaint) {
+        throw { status: 404, message: 'Complaint not found' };
+      }
+
       const updateData = {
         $push: {
           solutions: { $each: solutionFiles },
@@ -1173,7 +1251,7 @@ class ComplaintService {
             approvedBy: mechanic,
             role: 'MECHANIC',
             action: 'approved',
-            comments: remarks || 'Work completed successfully' // Use remarks if provided
+            comments: remarks || 'Work completed successfully'
           }
         },
         $set: {
@@ -1183,7 +1261,6 @@ class ComplaintService {
         }
       };
 
-      // Add rectificationRemarks if provided
       if (remarks) {
         updateData.$set.rectificationRemarks = remarks;
       }
@@ -1194,12 +1271,71 @@ class ComplaintService {
         { new: true }
       );
 
-      if (!complaint) {
-        throw { status: 404, message: 'Complaint not found' };
-      }
-
       const equipment = await Equipment.findOne({ regNo: complaint.regNo });
 
+      // Set equipment status to 'active' after maintenance completion
+      // Or restore to previous status if it wasn't already maintenance
+      const restoredStatus = existingComplaint.previousEquipmentStatus === 'maintenance'
+        ? 'active'
+        : (existingComplaint.previousEquipmentStatus || 'active');
+
+      await Equipment.findOneAndUpdate(
+        { regNo: complaint.regNo },
+        {
+          status: restoredStatus,
+          lastCompletedMaintenanceDate: new Date()
+        },
+        { new: true }
+      );
+
+      // Get current date/time info for mobilization record
+      const now = new Date();
+      const month = now.getMonth() + 1;
+      const year = now.getFullYear();
+      const time = now.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+
+      // Get operator info - handle both string and object format
+      let operatorName = null;
+      let operatorId = null;
+
+      if (equipment.certificationBody && equipment.certificationBody.length > 0) {
+        const lastOperator = equipment.certificationBody[equipment.certificationBody.length - 1];
+        if (typeof lastOperator === 'object') {
+          operatorName = lastOperator.operatorName;
+          operatorId = lastOperator.operatorId;
+        } else {
+          operatorName = lastOperator;
+        }
+      }
+
+      // Create mobilization record for status change from maintenance to active
+      const mobilizationData = {
+        equipmentId: equipment._id,
+        regNo: equipment.regNo,
+        machine: equipment.machine,
+        action: 'status_changed',
+        previousStatus: 'maintenance',
+        newStatus: restoredStatus,
+        site: equipment.site && equipment.site.length > 0
+          ? equipment.site[equipment.site.length - 1]
+          : 'Workshop',
+        operator: operatorName,
+        withOperator: operatorName ? true : false,
+        month: month,
+        year: year,
+        date: now,
+        time: time,
+        remarks: `Maintenance completed by ${mechanic}. Equipment status changed to ${restoredStatus}. Complaint ID: ${existingComplaint.complaintId}. ${remarks || 'Equipment ready for operation.'}`,
+        status: restoredStatus
+      };
+
+      await MobilzationModel.create(mobilizationData);
+
+      // Update mechanics status
       if (complaint.assignedMechanic && complaint.assignedMechanic.length > 0) {
         const mechanicIds = complaint.assignedMechanic.map(m => m.mechanicId);
 
@@ -1211,7 +1347,7 @@ class ComplaintService {
 
       await createNotification({
         title: `Work Completed - ${complaint.regNo}`,
-        description: `${mechanic} completed work on ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Equipment ready to work.`,
+        description: `${mechanic} completed work on ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Equipment is now ${restoredStatus} and ready for operation.`,
         priority: "medium",
         sourceId: 'work_completed',
         recipient: JSON.parse(process.env.OFFICE_HERO),
@@ -1221,7 +1357,7 @@ class ComplaintService {
       await PushNotificationService.sendGeneralNotification(
         JSON.parse(process.env.OFFICE_HERO),
         `Work Completed - ${complaint.regNo}`,
-        `${mechanic} completed work on ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Equipment ready to work.`,
+        `${mechanic} completed work on ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Equipment is now ${restoredStatus}.`,
         'medium',
         'normal'
       );
