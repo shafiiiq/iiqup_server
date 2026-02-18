@@ -10,7 +10,8 @@ const Mechanic = require('../models/mechanic.model');
 class ComplaintController {
   static async registerComplaint(req, res) {
     try {
-      const { regNo, name, uniqueCode, files, remarks } = req.body; // ADD remarks
+      const { regNo, name, uniqueCode, remarks } = req.body;
+      const files = req.files;
 
       if (!files || files.length === 0) {
         return res.status(400).json({
@@ -26,40 +27,58 @@ class ComplaintController {
             return true;
           }
         }
-
         if (fileName) {
           const ext = path.extname(fileName).toLowerCase();
           const videoExtensions = ['.mp4', '.webm', '.ogg', '.avi', '.mov', '.wmv', '.flv', '.m4v', '.3gp', '.mkv'];
           return videoExtensions.includes(ext);
         }
-
         return false;
       };
 
-      // Process files metadata
+      // Prepare file metadata
       const uploadData = files.map((file) => {
-        const ext = path.extname(file.fileName);
+        const ext = path.extname(file.originalname);
         const finalFilename = `${regNo || 'no-reg'}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}${ext}`;
         const s3Key = `complaints/${regNo || 'no-reg'}/${uniqueCode}/complaint-${uniqueCode}-${finalFilename}`;
-        const isVideo = isVideoFile(file.mimeType, file.fileName);
+        const isVideo = isVideoFile(file.mimetype, file.originalname);
 
         return {
           fileName: finalFilename,
-          originalName: file.fileName,
+          originalName: file.originalname,
           filePath: s3Key,
-          mimeType: file.mimeType,
+          mimeType: file.mimetype,
           type: isVideo ? 'video' : 'photo',
-          fileBuffer: file.fileBuffer,
+          buffer: file.buffer, // raw buffer from multer memoryStorage
           uploadDate: new Date()
         };
       });
 
-      // Create complaint record first
+      // Upload ALL files to S3 FIRST — with retry
+      const MAX_RETRIES = 3;
+
+      const uploadWithRetry = async (file, attempt = 1) => {
+        try {
+          await uploadToS3(file.buffer, file.filePath, file.mimeType);
+          console.log(`✅ Uploaded: ${file.fileName}`);
+        } catch (error) {
+          if (attempt < MAX_RETRIES) {
+            console.warn(`⚠️ Retry ${attempt}/${MAX_RETRIES} for ${file.fileName}`);
+            await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+            return uploadWithRetry(file, attempt + 1);
+          }
+          console.error(`❌ Failed after ${MAX_RETRIES} attempts: ${file.fileName}`);
+          throw new Error(`Failed to upload file: ${file.fileName}`);
+        }
+      };
+
+      await Promise.all(uploadData.map(file => uploadWithRetry(file)));
+
+      // Save to DB after all files uploaded successfully
       const complaintData = {
         uniqueCode,
         regNo: regNo || 'no-reg',
         name: name || 'no-name',
-        remarks: remarks || '', // ADD THIS LINE
+        remarks: remarks || '',
         mediaFiles: uploadData.map(item => ({
           fileName: item.fileName,
           originalName: item.originalName,
@@ -72,23 +91,11 @@ class ComplaintController {
 
       const result = await ComplaintService.createComplaint(complaintData);
 
-      // Upload files to S3 in background (after response sent)
-      res.status(202).json({
-        status: 202,
-        message: 'Complaint registered successfully. Files are being uploaded.',
+      return res.status(201).json({
+        status: 201,
+        message: 'Complaint registered successfully.',
         data: {
           complaint: result
-        }
-      });
-
-      // Upload files asynchronously after response
-      uploadData.forEach(async (file) => {
-        try {
-          const buffer = Buffer.from(file.fileBuffer, 'base64');
-          await uploadToS3(buffer, file.filePath, file.mimeType);
-          console.log(`Successfully uploaded: ${file.fileName}`);
-        } catch (error) {
-          console.error(`Failed to upload ${file.fileName}:`, error);
         }
       });
 
@@ -96,7 +103,7 @@ class ComplaintController {
       console.error('Error registering complaint:', error);
       res.status(500).json({
         status: 500,
-        message: 'Failed to register complaint',
+        message: error.message || 'Failed to register complaint',
         error: error.message
       });
     }

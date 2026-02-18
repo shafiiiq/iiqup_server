@@ -43,6 +43,7 @@ const testRoutes = require('./routes/test');
 const chatRouter = require('./routes/chat');
 const devInfinity = require('./routes/dev');
 const explorerRouter = require('./routes/explorer');
+const networkRouter = require('./routes/network');
 
 var app = express();
 
@@ -135,6 +136,7 @@ app.use('/attendance', attendanceRoutes);
 app.use('/backcharge', backchargeRouter);
 app.use('/chat', authMiddleware, chatRouter);
 app.use('/explorer', authMiddleware, explorerRouter);
+app.use('/network', authMiddleware, networkRouter);
 app.use('/test', testRoutes);
 
 // infinty deV special router

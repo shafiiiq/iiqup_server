@@ -46,6 +46,7 @@
   "license": "ISC",
   "description": "",
   "devDependencies": {
+    "@types/multer": "^2.0.0",
     "nodemon": "^3.1.5"
   }
 }

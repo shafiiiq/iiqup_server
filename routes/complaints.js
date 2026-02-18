@@ -1,13 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const ComplaintController = require('../controllers/complaint.controller');
+const multer = require('multer');
 
-// Step 1: Register a new complaint (unchanged but now notifies only MAINTENANCE_HEAD)
-router.post('/register', ComplaintController.registerComplaint);
+const storage = multer.memoryStorage();
+const upload = multer({
+    storage: storage,
+    limits: {
+        fileSize: 1024 * 1024 * 1024, // 1GB per file
+        files: 10
+    }
+});
+
+router.post('/register', upload.array('files', 10), ComplaintController.registerComplaint);
 
 // Step 2: MAINTENANCE_HEAD assigns mechanic  
 router.post('/assign-mechanic/:complaintId', ComplaintController.assignMechanic);
- 
+
 // Step 3: Mechanic requests items/tools
 router.post('/mechanic-request/:complaintId', ComplaintController.mechanicRequestItems);
 
