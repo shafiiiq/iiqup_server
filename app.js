@@ -1,153 +1,127 @@
-var express = require('express');
-var path = require('path');
+const express       = require('express');
+const path          = require('path');
+const cookieParser  = require('cookie-parser');
+const logger        = require('morgan');
+const cors          = require('cors');
+const http          = require('http');
+const socketIo      = require('socket.io');
 require('dotenv').config();
-var cookieParser = require('cookie-parser');
-var logger = require('morgan');
-var cors = require('cors');
-var http = require('http');
-var socketIo = require('socket.io');
 
-// auth middle ware to secure 
-const { authMiddleware } = require('./utils/jwt');
-const setupCronJobs = require('./utils/cron-jobs');
-const { overtimeCleanupMiddleware } = require('./middleware/cleanup-middleware');
-const { istimaraExpiryMiddleware } = require('./middleware/istimara-expiry-middleware');
-const { connectDevDB } = require('./config/dev.connection');
-const websocket = require('./utils/websocket');
+// ── Middleware ─────────────────────────────────────────────────────────────────
+const { authMiddleware }            = require('./utils/jwt.utils');
+
+// ── WebSocket ──────────────────────────────────────────────────────────────────
+const websocket      = require('./sockets/websocket');
 const setupWebSocket = websocket.default.setupWebSocket;
-const { autoBackup } = require('./utils/backup-data');
 
-var equipementRouter = require('./routes/equipments');
-var serviceReport = require('./routes/service-report');
-var userRouter = require('./routes/users');
-var serviceHistory = require('./routes/service-history');
-var stocksRouter = require('./routes/stocks');
-var documentsRouter = require('./routes/documents');
-var dashboardRouter = require('./routes/dashboard');
-var toolkitsRouter = require('./routes/toolkits');
-var mechanicsRouter = require('./routes/mechanic');
-var otpRouter = require('./routes/otp');
-var notificationRouter = require('./routes/notification');
-var lpoRouter = require('./routes/lpo');
-var operatorRouter = require('./routes/operator');
-var complaintsRouter = require('./routes/complaints');
-var applicationRouter = require('./routes/applications');
-var securityRouter = require('./routes/security');
-var _0authRouter = require('./routes/0auth');
-var s3Config = require('./routes/s3Config');
-var FuelsRouter = require('./routes/fuels');
-var ztech = require('./routes/ztech');
-const attendanceRoutes = require('./routes/attendance');
-const backchargeRouter = require('./routes/backcharge');
-const testRoutes = require('./routes/test');
-const chatRouter = require('./routes/chat');
-const devInfinity = require('./routes/dev');
-const explorerRouter = require('./routes/explorer');
-const networkRouter = require('./routes/network');
+// ── Routes ─────────────────────────────────────────────────────────────────────
+const equipmentRouter      = require('./routes/equipment.router');
+const serviceReportRouter  = require('./routes/report.router');
+const userRouter           = require('./routes/user.router');
+const serviceHistoryRouter = require('./routes/history.router.');
+const stocksRouter         = require('./routes/stock.router');
+const documentsRouter      = require('./routes/document.router');
+const dashboardRouter      = require('./routes/dashboard.router');
+const toolkitsRouter       = require('./routes/toolkit.router');
+const mechanicsRouter      = require('./routes/mechanic.router');
+const otpRouter            = require('./routes/otp.router');
+const notificationRouter   = require('./routes/notification.router');
+const lpoRouter            = require('./routes/lpo.router.');
+const operatorRouter       = require('./routes/operator.router');
+const complaintsRouter     = require('./routes/complaint.router');
+const oauthRouter          = require('./routes/oauth.router');
+const s3Router             = require('./routes/s3.router');
+const fuelsRouter          = require('./routes/fuel.router');
+const ztechRouter          = require('./routes/ztech.router');
+const attendanceRouter     = require('./routes/attendance.router');
+const backchargeRouter     = require('./routes/backcharge.router');
+const chatRouter           = require('./routes/chat.router');
+const explorerRouter       = require('./routes/explorer.router');
 
-var app = express();
+// ─────────────────────────────────────────────────────────────────────────────
+// App Initialisation
+// ─────────────────────────────────────────────────────────────────────────────
 
-connectDevDB()
-  .then(() => {
-    console.log('✅ Dev Portfolio Database connected');
-  })
-  .catch((err) => {
-    console.error('❌ Dev Portfolio Database connection failed:', err);
-    process.exit(1);
-  });
- 
-var server = http.createServer(app);
+const app    = express();
+const server = http.createServer(app);
+
+// ── Database connection ────────────────────────────────────────────────────────
+
+require('./db/ansarigroup.db');
+
+// ── CORS configuration ─────────────────────────────────────────────────────────
 
 const corsOptions = {
   origin: [
     'https://iiqup.vercel.app',
     'https://ansarigroup.online',
     'https://www.ansarigroup.online',
-    "http://192.168.100.53:3000",
-    "http://localhost:3000"
+    'http://192.168.100.53:3000',
+    'http://localhost:3000',
   ],
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: [
-    'Origin',
-    'X-Requested-With',
-    'Content-Type',
-    'Accept',
-    'Authorization',
-    'Cache-Control',
-  ],
-  credentials: true,
+  methods:          ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders:   ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization', 'Cache-Control'],
+  credentials:      true,
   optionsSuccessStatus: 200,
 };
 
+// ── Socket.IO setup ────────────────────────────────────────────────────────────
+
 const io = socketIo(server, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST'],
-    credentials: true,
-  },
+  cors:       { origin: '*', methods: ['GET', 'POST'], credentials: true },
   transports: ['websocket', 'polling'],
-  allowEIO3: true
+  allowEIO3:  true,
 });
 
 setupWebSocket(io);
-
 global.io = io;
 
-require('./utils/db');
+// ── Express middleware stack ───────────────────────────────────────────────────
 
 app.use(logger('dev'));
-
 app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
-
 app.use(express.json({ limit: '50gb' }));
 app.use(express.urlencoded({ extended: true, limit: '50gb' }));
 app.use(cookieParser());
+app.use(express.static(path.join(__dirname, 'public'))); 
 
+// ── Health check ───────────────────────────────────────────────────────────────
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.get('/', (req, res) => res.send('Server is running!'));
 
-app.get('/', (req, res) => {
-  res.send('Server is running!');
-});
+// ─────────────────────────────────────────────────────────────────────────────
+// Route Mounting
+// ─────────────────────────────────────────────────────────────────────────────
 
-// Routes
-app.use('/', ztech);
-app.use('/users', userRouter);
-app.use('/otp', otpRouter);
-app.use('/equipments', equipementRouter);
-app.use('/service-report', serviceReport);
-app.use('/service-history', authMiddleware, serviceHistory);
-app.use('/stocks', stocksRouter);
-app.use('/documents', documentsRouter);
-app.use('/dashboard', authMiddleware, dashboardRouter);
-app.use('/toolkits', authMiddleware, toolkitsRouter);
-app.use('/mechanics', mechanicsRouter);
-app.use('/notification', authMiddleware, notificationRouter);
-app.use('/lpo', authMiddleware, lpoRouter);
-app.use('/operators', operatorRouter); 
-app.use('/complaints', complaintsRouter);
-app.use('/applications', authMiddleware, applicationRouter);
-app.use('/hunter-eye', securityRouter);
-app.use('/0auth', _0authRouter);
-app.use('/s3Config', authMiddleware, s3Config);
-app.use('/fuels', FuelsRouter);
-app.use('/attendance', attendanceRoutes);
-app.use('/backcharge', backchargeRouter);
-app.use('/chat', authMiddleware, chatRouter);
-app.use('/explorer', authMiddleware, explorerRouter);
-app.use('/network', authMiddleware, networkRouter);
-app.use('/test', testRoutes);
+// ── Public routes (no auth required) ──────────────────────────────────────────
+app.use('/ztech',               ztechRouter);
+app.use('/users',          userRouter);
+app.use('/otp',            otpRouter);
+app.use('/equipments',     equipmentRouter);
+app.use('/service-report', serviceReportRouter);
+app.use('/stocks',         stocksRouter);
+app.use('/documents',      documentsRouter);
+app.use('/mechanics',      mechanicsRouter);
+app.use('/operators',      operatorRouter);
+app.use('/complaints',     complaintsRouter);
+app.use('/oauth',          oauthRouter);
+app.use('/fuels',          fuelsRouter);
+app.use('/attendance',     attendanceRouter);
+app.use('/backcharge',     backchargeRouter);
 
-// infinty deV special router
-app.use('/api/v1/portfolio/dev', devInfinity);
+// ── Protected routes (auth required) ──────────────────────────────────────────
+app.use('/service-history', authMiddleware, serviceHistoryRouter);
+app.use('/dashboard',       authMiddleware, dashboardRouter);
+app.use('/toolkits',        authMiddleware, toolkitsRouter);
+app.use('/notification',    authMiddleware, notificationRouter);
+app.use('/lpo',             authMiddleware, lpoRouter);
+app.use('/s3',              authMiddleware, s3Router);
+app.use('/chat',            authMiddleware, chatRouter);
+app.use('/explorer',        authMiddleware, explorerRouter);
 
-// Overtime auto deleter after 2 months
-app.use(overtimeCleanupMiddleware);
+// ─────────────────────────────────────────────────────────────────────────────
+// Exports
+// ─────────────────────────────────────────────────────────────────────────────
 
-// Start the cron jobs
-const cronJobs = setupCronJobs();
-cronJobs.start();
-
-// Export both app and server
 module.exports = { app, server };

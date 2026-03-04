@@ -1,77 +1,57 @@
-const dashboardServices = require('../services/dashboard-services');
+const dashboardServices = require('../services/dashboard.service');
 
-// EXISTING CONTROLLERS (keep as is)
-const getDailyUpdates = async (req, res) => {
-  dashboardServices.fetchDailyUpdates()
-    .then((result) => res.status(result.status).json(result))
-    .catch((err) => res.status(err.status || 500).json({ error: err.message }));
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Wraps a dashboard service call in a standard async handler.
+ *
+ * @param {Function} serviceFn - The dashboard service function to call.
+ * @returns {Function} Express route handler.
+ */
+const handle = (serviceFn) => async (req, res) => {
+  try {
+    const result = await serviceFn();
+    res.status(result.status).json(result);
+  } catch (err) {
+    res.status(err.status || 500).json({ success: false, message: err.message });
+  }
 };
 
-const getWeeklyUpdates = async (req, res) => {
-  dashboardServices.fetchWeeklyUpdates()
-    .then((result) => res.status(result.status).json(result))
-    .catch((err) => res.status(err.status || 500).json({ error: err.message }));
-};
+// ─────────────────────────────────────────────────────────────────────────────
+// Controllers
+// ─────────────────────────────────────────────────────────────────────────────
 
-const getMonthlyUpdates = async (req, res) => {
-  dashboardServices.fetchMonthlyUpdates()
-    .then((result) => res.status(result.status).json(result))
-    .catch((err) => res.status(err.status || 500).json({ error: err.message }));
-};
+// ── Full updates ──────────────────────────────────────────────────────────────
+const getDailyUpdates          = handle(dashboardServices.fetchDailyUpdates);
+const getWeeklyUpdates         = handle(dashboardServices.fetchWeeklyUpdates);
+const getMonthlyUpdates        = handle(dashboardServices.fetchMonthlyUpdates);
+const getYearlyUpdates         = handle(dashboardServices.fetchYearlyUpdates);
+const getLast5DaysComparison   = handle(dashboardServices.fetchLast5DaysComparison);
+const getLast5MonthsComparison = handle(dashboardServices.fetchLast5MonthsComparison);
+const getLast5YearsComparison  = handle(dashboardServices.fetchLast5YearsComparison);
 
-const getYearlyUpdates = async (req, res) => {
-  dashboardServices.fetchYearlyUpdates()
-    .then((result) => res.status(result.status).json(result))
-    .catch((err) => res.status(err.status || 500).json({ error: err.message }));
-};
+// ── Counts only ───────────────────────────────────────────────────────────────
+const getDailyCounts           = handle(dashboardServices.fetchDailyCounts);
+const getWeeklyCounts          = handle(dashboardServices.fetchWeeklyCounts);
+const getMonthlyCounts         = handle(dashboardServices.fetchMonthlyCounts);
+const getYearlyCounts          = handle(dashboardServices.fetchYearlyCounts);
 
-const getLast5DaysComparison = async (req, res) => {
-  dashboardServices.fetchLast5DaysComparison()
-    .then((result) => res.status(result.status).json(result))
-    .catch((err) => res.status(err.status || 500).json({ error: err.message }));
-};
+// ── Cache ─────────────────────────────────────────────────────────────────────
 
-const getLast5MonthsComparison = async (req, res) => {
-  dashboardServices.fetchLast5MonthsComparison()
-    .then((result) => res.status(result.status).json(result))
-    .catch((err) => res.status(err.status || 500).json({ error: err.message }));
-};
-
-const getLast5YearsComparison = async (req, res) => {
-  dashboardServices.fetchLast5YearsComparison()
-    .then((result) => res.status(result.status).json(result))
-    .catch((err) => res.status(err.status || 500).json({ error: err.message }));
-};
-
-// NEW CONTROLLERS FOR COUNTS ONLY
-const getDailyCounts = async (req, res) => {
-  dashboardServices.fetchDailyCounts()
-    .then((result) => res.status(result.status).json(result))
-    .catch((err) => res.status(err.status || 500).json({ error: err.message }));
-};
-
-const getWeeklyCounts = async (req, res) => {
-  dashboardServices.fetchWeeklyCounts()
-    .then((result) => res.status(result.status).json(result))
-    .catch((err) => res.status(err.status || 500).json({ error: err.message }));
-};
-
-const getMonthlyCounts = async (req, res) => {
-  dashboardServices.fetchMonthlyCounts()
-    .then((result) => res.status(result.status).json(result))
-    .catch((err) => res.status(err.status || 500).json({ error: err.message }));
-};
-
-const getYearlyCounts = async (req, res) => {
-  dashboardServices.fetchYearlyCounts()
-    .then((result) => res.status(result.status).json(result))
-    .catch((err) => res.status(err.status || 500).json({ error: err.message }));
-};
-
-const clearCache = async (req, res) => {
+/**
+ * POST /clear-cache
+ * Clears the dashboard service cache.
+ */
+const clearCache = (req, res) => {
   const result = dashboardServices.clearCache();
   res.status(result.status).json(result);
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Exports
+// ─────────────────────────────────────────────────────────────────────────────
 
 module.exports = {
   getDailyUpdates,
@@ -81,10 +61,9 @@ module.exports = {
   getLast5DaysComparison,
   getLast5MonthsComparison,
   getLast5YearsComparison,
-  // NEW EXPORTS
   getDailyCounts,
   getWeeklyCounts,
   getMonthlyCounts,
   getYearlyCounts,
-  clearCache
+  clearCache,
 };

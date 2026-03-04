@@ -1,61 +1,164 @@
-const equipmentServices = require('../services/equipment-services')
+// controllers/equipment.controller.js
+const path               = require('path');
+const { putObject }      = require('../aws/s3.aws');
+const equipmentServices  = require('../services/equipment.service');
+const equipmentModel     = require('../models/equipment.model');
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+const paginationShape = (result) => ({
+  currentPage: result.currentPage,
+  totalPages:  result.totalPages,
+  totalCount:  result.totalCount,
+  hasMore:     result.hasNextPage,
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CRUD Controllers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * POST /add-equipment
+ * Creates a new equipment record.
+ */
 const addEquipments = async (req, res) => {
-  equipmentServices.insertEquipments(req.body)
-    .then((addedUser) => {
-      if (addedUser) {
-        res.status(addedUser.status).json(addedUser)
-      }
-    })
-    .catch((err) => {
-      res.status(err.status || 500).json({ error: err.message })
-    })
-}
-
-const getEquipments = async (req, res) => {
   try {
-    const { page = 1, limit = 20, hired } = req.query;
+    const result = await equipmentServices.insertEquipments(req.body);
 
-    const result = await equipmentServices.fetchEquipments(
-      parseInt(page),
-      parseInt(limit),
-      hired // Pass hired filter: 'hired', 'own', or null/undefined for all
-    );
-
-    res.status(200).json({
-      status: 200,
-      ok: true,
-      data: result.equipments,
-      pagination: {
-        currentPage: result.currentPage,
-        totalPages: result.totalPages,
-        totalCount: result.totalCount,
-        hasMore: result.hasNextPage
-      }
-    });
+    res.status(result.status).json(result);
   } catch (error) {
-    console.error('Error getting equipments:', error);
-    res.status(500).json({
-      status: 500,
-      ok: false,
-      message: 'Internal server error',
-      error: error.message
-    });
+    console.error('[Equipment] addEquipments:', error);
+    res.status(error.status || 500).json({ success: false, message: error.message });
   }
 };
 
+/**
+ * GET /get-equipments
+ * Returns a paginated list of equipment with an optional hired filter.
+ */
+const getEquipments = async (req, res) => {
+  try {
+    const { page = 1, limit = 20, hired, status } = req.query;
+    
+    const result = await equipmentServices.fetchEquipments(parseInt(page), parseInt(limit), hired, status);
+
+    res.status(200).json({
+      status:     200,
+      ok:         true,
+      data:       result.equipments,
+      pagination: paginationShape(result),
+    });
+  } catch (error) {
+    console.error('[Equipment] getEquipments:', error);
+    res.status(500).json({ status: 500, ok: false, message: error.message });
+  }
+};
+
+/**
+ * GET /get-equipment/:regNo
+ * Returns a single equipment record by registration number.
+ */
+const getEquipmentsByReg = async (req, res) => {
+  try {
+    const { regNo } = req.params;
+    const result    = await equipmentServices.fetchEquipmentByReg(regNo);
+
+    res.status(result.status).json(result);
+  } catch (error) {
+    console.error('[Equipment] getEquipmentsByReg:', error);
+    res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * GET /equipment-images/:regNo
+ * Returns a lightweight equipment record by registration number.
+ */
+const getEquipmentRegNo = async (req, res) => {
+  try {
+    const { regNo } = req.params;
+
+    if (!regNo) {
+      return res.status(400).json({ success: false, message: 'Equipment regNo is required' });
+    }
+
+    const result = await equipmentServices.getEquipmentRegNo(regNo);
+
+    res.status(result.status).json(result);
+  } catch (error) {
+    console.error('[Equipment] getEquipmentRegNo:', error);
+    res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * PUT /update-equipment/:regNo
+ * Updates an equipment record by registration number.
+ */
+const updateEquipments = async (req, res) => {
+  try {
+    const { regNo }  = req.params;
+    const updateData = req.body;
+
+    const result = await equipmentServices.updateEquipments(regNo, updateData);
+
+    res.status(result.status).json(result);
+  } catch (error) {
+    console.error('[Equipment] updateEquipments:', error);
+    res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * DELETE /delete-equipment/:regNo
+ * Deletes an equipment record by registration number.
+ */
+const deleteEquipments = async (req, res) => {
+  try {
+    const { regNo } = req.params;
+    const result    = await equipmentServices.deleteEquipments(regNo);
+
+    res.status(result.status).json(result);
+  } catch (error) {
+    console.error('[Equipment] deleteEquipments:', error);
+    res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * PUT /status-update/:id
+ * Updates the status field of an equipment record by ID.
+ */
+const updateStatus = async (req, res) => {
+  try {
+    const { id }     = req.params;
+    const updateData = req.body;
+
+    const result = await equipmentServices.changeStatus(id, updateData);
+
+    res.status(result.status).json(result);
+  } catch (error) {
+    console.error('[Equipment] updateStatus:', error);
+    res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Search & Filter Controllers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * POST /search-equipments
+ * Full-text search across equipment fields with pagination.
+ */
 const searchEquipments = async (req, res) => {
   try {
     const { searchTerm, page = 1, limit = 20, searchField = 'all', hired } = req.body;
 
-    console.log("logggggggggggg", req.body)
-
     if (!searchTerm || searchTerm.trim() === '') {
-      return res.status(400).json({
-        status: 400,
-        ok: false,
-        message: 'Search term is required'
-      });
+      return res.status(400).json({ status: 400, ok: false, message: 'Search term is required' });
     }
 
     const result = await equipmentServices.searchEquipments(
@@ -63,303 +166,93 @@ const searchEquipments = async (req, res) => {
       parseInt(page),
       parseInt(limit),
       searchField,
-      hired
+      hired,
     );
 
     res.status(200).json({
-      status: 200,
-      ok: true,
-      data: result.equipments,
-      pagination: {
-        currentPage: result.currentPage,
-        totalPages: result.totalPages,
-        totalCount: result.totalCount,
-        hasMore: result.hasNextPage
-      },
-      searchTerm: searchTerm
+      status:     200,
+      ok:         true,
+      data:       result.equipments,
+      pagination: paginationShape(result),
+      searchTerm,
     });
   } catch (error) {
-    console.error('Error searching equipments:', error);
-    res.status(500).json({
-      status: 500,
-      ok: false,
-      message: 'Internal server error',
-      error: error.message
-    });
+    console.error('[Equipment] searchEquipments:', error);
+    res.status(500).json({ status: 500, ok: false, message: error.message });
   }
 };
 
-const getEquipmentsByReg = async (req, res) => {
-  const { regNo } = req.params
-  equipmentServices.fetchEquipmentByReg(regNo)
-    .then((fetchedUsers) => {
-      if (fetchedUsers) {
-        res.status(fetchedUsers.status).json(fetchedUsers)
-      }
-    })
-    .catch((err) => {
-      res.status(err.status || 500).json({ message: 'Cannot get all users', error: err.message })
-    })
-}
-
-const updateEquipments = async (req, res) => {
-  const { regNo } = req.params;
-  const updateData = req.body;
-
-  console.log("updateData", updateData.certificationBody);
-
-  equipmentServices.updateEquipments(regNo, updateData)
-    .then((updatedUser) => {
-      if (updatedUser) {
-        res.status(updatedUser.status).json(updatedUser)
-      }
-    })
-    .catch((err) => {
-      res.status(err.status).json({ error: err.message })
-    })
-}
-
-const deleteEquipments = async (req, res) => {
-  const { regNo } = req.params;
-
-  equipmentServices.deleteEquipments(regNo)
-    .then((response) => {
-      if (response) {
-        res.status(response.status).json(response)
-      }
-    })
-    .catch((err) => {
-      res.status(err.status).json({ error: err.message })
-    })
-}
-
-
-const updateStatus = async (req, res) => {
-  const { id } = req.params;
-  const updateData = req.body;
-
-  equipmentServices.changeStatus(id, updateData)
-    .then((updatedUser) => {
-      if (updatedUser) {
-        res.status(updatedUser.status).json(updatedUser)
-      }
-    })
-    .catch((err) => {
-      res.status(err.status).json({ error: err.message })
-    })
-}
-
-const changeEquipmentStatus = async (req, res) => {
+/**
+ * GET /get-equipments-by-status
+ * Returns paginated equipment filtered by status and optional hired flag.
+ */
+const getEquipmentsByStatus = async (req, res) => {
   try {
-    const {
-      equipmentId,
-      regNo,
-      machine,
-      previousStatus,
-      newStatus,
-      month,
-      year,
-      time,
-      remarks
-    } = req.body;
+    const { status, page = 1, limit = 20, hired } = req.query;
 
-    // Validation
-    if (!equipmentId || !regNo || !machine || !previousStatus || !newStatus || !month || !year || !time) {
-      return res.status(400).json({
-        status: 400,
-        ok: false,
-        message: 'Missing required fields: equipmentId, regNo, machine, previousStatus, newStatus, month, year, time'
-      });
-    }
-
-    if (previousStatus === newStatus) {
-      return res.status(400).json({
-        status: 400,
-        ok: false,
-        message: 'Previous status and new status cannot be the same'
-      });
-    }
-
-    const result = await equipmentServices.changeEquipmentStatus({
-      equipmentId,
-      regNo,
-      machine,
-      previousStatus,
-      newStatus,
-      month,
-      year,
-      time,
-      remarks: remarks || ''
-    });
-
-    res.status(result.status).json(result);
-  } catch (error) {
-    console.error('Error changing equipment status:', error);
-    res.status(500).json({
-      status: 500,
-      ok: false,
-      message: 'Internal server error',
-      error: error.message
-    });
-  }
-};
-
-
-const addEquipmentImage = async (req, res) => {
-  try {
-    const { equipmentNo, files } = req.body;
-
-    if (!equipmentNo) {
-      return res.status(400).json({
-        status: 400,
-        success: false,
-        message: 'Equipment ID is required'
-      });
-    }
-
-    if (!files || !files.length) {
-      return res.status(400).json({
-        status: 400,
-        success: false,
-        message: 'At least one file is required'
-      });
-    }
-
-    // Generate presigned URLs for each file
-    const filesWithUploadData = await Promise.all(
-      files.map(async (file, index) => {
-        const imageLabel = file.label || 'Unlabeled';
-
-        const ext = path.extname(file.fileName);
-        const finalFilename = `${equipmentNo}-${Date.now()}-${index}${ext}`;
-        const s3Key = `equipment-images/${equipmentNo}/${finalFilename}`;
-
-        const uploadUrl = await putObject(
-          file.fileName,
-          s3Key,
-          file.mimeType
-        );
-
-        const saveResult = await equipmentServices.addEquipmentImage(
-          equipmentNo,
-          s3Key,
-          imageLabel,
-          finalFilename,
-          file.mimeType
-        );
-
-        if (!saveResult.success) {
-          throw new Error(`Failed to save image metadata: ${saveResult.message}`);
-        }
-
-        return {
-          fileName: finalFilename,
-          originalName: file.fileName,
-          filePath: s3Key,
-          mimeType: file.mimeType,
-          type: file.mimeType.startsWith('video/') ? 'video' : 'photo',
-          uploadUrl: uploadUrl,
-          uploadDate: new Date(),
-          label: imageLabel,
-          dbSaveResult: saveResult
-        };
-      })
+    const result = await equipmentServices.fetchEquipmentsByStatus(
+      status,
+      parseInt(page),
+      parseInt(limit),
+      hired,
     );
 
     res.status(200).json({
+      status:     200,
+      ok:         true,
+      data:       result.equipments,
+      pagination: paginationShape(result),
+    });
+  } catch (error) {
+    console.error('[Equipment] getEquipmentsByStatus:', error);
+    res.status(500).json({ status: 500, ok: false, message: error.message });
+  }
+};
+
+/**
+ * GET /equipment-stats
+ * Returns aggregate counts and statistics for equipment.
+ */
+const getEquipmentStats = async (req, res) => {
+  try {
+    const { hired } = req.query;
+    const result    = await equipmentServices.fetchEquipmentStats(hired);
+
+    res.status(200).json({
       status: 200,
-      message: 'Pre-signed URLs generated and metadata saved',
-      data: {
-        uploadData: filesWithUploadData
-      }
+      ok:     true,
+      data:   result,
     });
-
-  } catch (err) {
-    res.status(err.status || 500).json({
-      status: err.status || 500,
-      success: false,
-      message: err.message || 'Internal server error'
-    });
+  } catch (error) {
+    console.error('[Equipment] getEquipmentStats:', error);
+    res.status(500).json({ status: 500, ok: false, message: error.message });
   }
 };
 
-const getEquipmentRegNo = async (req, res) => {
-  try {
-    const regNo = req.params.regNo;
-
-    if (!regNo) {
-      return res.status(400).json({
-        success: false,
-        message: 'Equipment regNo is required'
-      });
-    }
-
-    const result = await equipmentServices.getEquipmentRegNo(regNo);
-    res.status(result.status).json(result);
-  } catch (err) {
-    res.status(err.status || 500).json({
-      success: false,
-      message: err.message
-    });
-  }
-};
-
-const getBulkEquipmentImages = async (req, res) => {
-  try {
-    const { regNos } = req.body;
-
-    if (!regNos || !Array.isArray(regNos) || regNos.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Array of equipment regNos is required'
-      });
-    }
-
-    // Limit to prevent overload (20 matches your pagination limit)
-    if (regNos.length > 50) {
-      return res.status(400).json({
-        success: false,
-        message: 'Maximum 50 equipment regNos allowed per request'
-      });
-    }
-
-    const result = await equipmentServices.getBulkEquipmentImages(regNos);
-    console.log("HIiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiIIIIIIIII")
-    res.status(result.status).json(result);
-  } catch (err) {
-    res.status(err.status || 500).json({
-      success: false,
-      message: err.message
-    });
-  }
-};
-
+/**
+ * GET /equipment-count
+ * Returns the total count of equipment matching optional search/filter params.
+ */
 const getEquipmentCount = async (req, res) => {
   try {
     const { searchTerm, searchField = 'all', hired } = req.query;
 
     let query = {};
-    if (hired === 'hired') {
-      query.hired = true;
-    } else if (hired === 'own') {
-      query.hired = false;
-    }
+    if (hired === 'hired')    query.hired = true;
+    else if (hired === 'own') query.hired = false;
 
-    if (searchTerm && searchTerm.trim() !== '') {
+    if (searchTerm?.trim()) {
       if (searchField === 'all') {
         query.$or = [
-          { machine: { $regex: searchTerm, $options: 'i' } },
-          { regNo: { $regex: searchTerm, $options: 'i' } },
-          { brand: { $regex: searchTerm, $options: 'i' } },
-          { company: { $regex: searchTerm, $options: 'i' } },
-          { status: { $regex: searchTerm, $options: 'i' } },
-          { site: { $regex: searchTerm, $options: 'i' } },
-          { certificationBody: { $regex: searchTerm, $options: 'i' } }
+          { machine:           { $regex: searchTerm, $options: 'i' } },
+          { regNo:             { $regex: searchTerm, $options: 'i' } },
+          { brand:             { $regex: searchTerm, $options: 'i' } },
+          { company:           { $regex: searchTerm, $options: 'i' } },
+          { status:            { $regex: searchTerm, $options: 'i' } },
+          { site:              { $regex: searchTerm, $options: 'i' } },
+          { certificationBody: { $regex: searchTerm, $options: 'i' } },
         ];
-
-        if (!isNaN(searchTerm)) {
-          query.$or.push({ year: parseInt(searchTerm) });
-        }
+        if (!isNaN(searchTerm)) query.$or.push({ year: parseInt(searchTerm) });
       } else if (searchField === 'site') {
         query.site = { $regex: searchTerm, $options: 'i' };
       } else {
@@ -369,579 +262,534 @@ const getEquipmentCount = async (req, res) => {
 
     const count = await equipmentModel.countDocuments(query);
 
-    res.status(200).json({
-      status: 200,
-      ok: true,
-      count
-    });
+    res.status(200).json({ status: 200, ok: true, count });
   } catch (error) {
-    console.error('Error getting equipment count:', error);
-    res.status(500).json({
-      status: 500,
-      ok: false,
-      message: 'Internal server error',
-      error: error.message
-    });
+    console.error('[Equipment] getEquipmentCount:', error);
+    res.status(500).json({ status: 500, ok: false, message: error.message });
   }
 };
 
-const getEquipmentStats = async (req, res) => {
+/**
+ * GET /get-sites
+ * Returns a list of all unique site names across equipment records.
+ */
+const getSites = async (req, res) => {
   try {
-    const { hired } = req.query;
-    const result = await equipmentServices.fetchEquipmentStats(hired);
+    const result = await equipmentServices.fetchUniqueSites();
 
-    res.status(200).json({
-      status: 200,
-      ok: true,
-      data: result
-    });
+    res.status(200).json({ status: 200, ok: true, data: result });
   } catch (error) {
-    console.error('Error getting equipment stats:', error);
-    res.status(500).json({
-      status: 500,
-      ok: false,
-      message: 'Internal server error',
-      error: error.message
-    });
+    console.error('[Equipment] getSites:', error);
+    res.status(500).json({ status: 500, ok: false, message: error.message });
   }
 };
 
-const getEquipmentsByStatus = async (req, res) => {
-  try {
-    const { status, page = 1, limit = 20, hired } = req.query;
+// ─────────────────────────────────────────────────────────────────────────────
+// Image Controllers
+// ─────────────────────────────────────────────────────────────────────────────
 
-    const result = await equipmentServices.fetchEquipmentsByStatus(
-      status,
-      parseInt(page),
-      parseInt(limit),
-      hired
+/**
+ * POST /add-equipment-image
+ * Generates pre-signed S3 upload URLs and saves image metadata for an equipment record.
+ */
+const addEquipmentImage = async (req, res) => {
+  try {
+    const { equipmentNo, files } = req.body;
+
+    if (!equipmentNo) {
+      return res.status(400).json({ success: false, message: 'Equipment number is required' });
+    }
+
+    if (!files?.length) {
+      return res.status(400).json({ success: false, message: 'At least one file is required' });
+    }
+
+    const filesWithUploadData = await Promise.all(
+      files.map(async (file, index) => {
+        const imageLabel    = file.label || 'Unlabeled';
+        const ext           = path.extname(file.fileName);
+        const finalFilename = `${equipmentNo}-${Date.now()}-${index}${ext}`;
+        const s3Key         = `equipment-images/${equipmentNo}/${finalFilename}`;
+        const uploadUrl     = await putObject(file.fileName, s3Key, file.mimeType);
+
+        const saveResult = await equipmentServices.addEquipmentImage(
+          equipmentNo, s3Key, imageLabel, finalFilename, file.mimeType,
+        );
+
+        if (!saveResult.success) {
+          throw new Error(`Failed to save image metadata: ${saveResult.message}`);
+        }
+
+        return {
+          fileName:     finalFilename,
+          originalName: file.fileName,
+          filePath:     s3Key,
+          mimeType:     file.mimeType,
+          type:         file.mimeType.startsWith('video/') ? 'video' : 'photo',
+          uploadUrl,
+          uploadDate:   new Date(),
+          label:        imageLabel,
+          dbSaveResult: saveResult,
+        };
+      }),
     );
 
     res.status(200).json({
-      status: 200,
-      ok: true,
-      data: result.equipments,
-      pagination: {
-        currentPage: result.currentPage,
-        totalPages: result.totalPages,
-        totalCount: result.totalCount,
-        hasMore: result.hasNextPage
-      }
+      status:  200,
+      message: 'Pre-signed URLs generated and metadata saved',
+      data:    { uploadData: filesWithUploadData },
     });
   } catch (error) {
-    console.error('Error getting equipments by status:', error);
-    res.status(500).json({
-      status: 500,
-      ok: false,
-      message: 'Internal server error',
-      error: error.message
-    });
+    console.error('[Equipment] addEquipmentImage:', error);
+    res.status(error.status || 500).json({ success: false, message: error.message });
   }
 };
 
-const mobilizeEquipment = async (req, res) => {
+/**
+ * POST /bulk-equipment-images
+ * Returns images for multiple equipment records in a single request (max 50).
+ */
+const getBulkEquipmentImages = async (req, res) => {
+  try {
+    const { regNos } = req.body;
+
+    if (!regNos || !Array.isArray(regNos) || regNos.length === 0) {
+      return res.status(400).json({ success: false, message: 'Array of equipment regNos is required' });
+    }
+
+    if (regNos.length > 50) {
+      return res.status(400).json({ success: false, message: 'Maximum 50 equipment regNos allowed per request' });
+    }
+
+    const result = await equipmentServices.getBulkEquipmentImages(regNos);
+
+    res.status(result.status).json(result);
+  } catch (error) {
+    console.error('[Equipment] getBulkEquipmentImages:', error);
+    res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Status Change Controllers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * POST /change-equipment-status
+ * Records a status transition (e.g. active → maintenance) with audit metadata.
+ */
+const changeEquipmentStatus = async (req, res) => {
   try {
     const {
-      equipmentId,
-      regNo,
-      machine,
-      site,
-      operator,
-      withOperator,
-      month,
-      year,
-      time,
-      remarks
+      equipmentId, regNo, machine,
+      previousStatus, newStatus,
+      month, year, time, remarks,
     } = req.body;
 
-    // Validation
-    if (!equipmentId || !regNo || !machine || !site || !month || !year || !time) {
+    if (!equipmentId || !regNo || !machine || !previousStatus || !newStatus || !month || !year || !time) {
       return res.status(400).json({
-        status: 400,
-        ok: false,
-        message: 'Missing required fields: equipmentId, regNo, machine, site, month, year, time'
+        status:  400,
+        ok:      false,
+        message: 'Missing required fields: equipmentId, regNo, machine, previousStatus, newStatus, month, year, time',
       });
     }
 
-    if (withOperator && !operator) {
-      return res.status(400).json({
-        status: 400,
-        ok: false,
-        message: 'Operator is required when withOperator is true'
-      });
+    if (previousStatus === newStatus) {
+      return res.status(400).json({ status: 400, ok: false, message: 'Previous status and new status cannot be the same' });
     }
 
-    const result = await equipmentServices.mobilizeEquipment({
-      equipmentId,
-      regNo,
-      machine,
-      site,
-      operator,
-      withOperator: withOperator || false,
-      month,
-      year,
-      time,
-      remarks: remarks || ''
+    const result = await equipmentServices.changeEquipmentStatus({
+      equipmentId, regNo, machine,
+      previousStatus, newStatus,
+      month, year, time,
+      remarks: remarks || '',
     });
 
     res.status(result.status).json(result);
   } catch (error) {
-    console.error('Error mobilizing equipment:', error);
-    res.status(500).json({
-      status: 500,
-      ok: false,
-      message: 'Internal server error',
-      error: error.message
-    });
+    console.error('[Equipment] changeEquipmentStatus:', error);
+    res.status(500).json({ status: 500, ok: false, message: error.message });
   }
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Mobilization Controllers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * POST /mobilize-equipment
+ * Mobilizes an equipment unit to a site or client company with optional operator assignment.
+ */
+const mobilizeEquipment = async (req, res) => {
+  try {
+    const {
+      equipmentId, regNo, machine, site, operator, operatorId,
+      withOperator, deployType, clientCompany, selectedDate,
+      month, year, time, remarks,
+    } = req.body;
+
+    if (!equipmentId || !regNo || !machine || !month || !year || !time) {
+      return res.status(400).json({
+        status:  400,
+        ok:      false,
+        message: 'Missing required fields: equipmentId, regNo, machine, month, year, time',
+      });
+    }
+
+    if (deployType === 'company' && !clientCompany) {
+      return res.status(400).json({ status: 400, ok: false, message: 'clientCompany is required when deployType is company' });
+    }
+
+    if (deployType !== 'company' && !site) {
+      return res.status(400).json({ status: 400, ok: false, message: 'site is required when deployType is site' });
+    }
+
+    if (withOperator && !operator) {
+      return res.status(400).json({ status: 400, ok: false, message: 'Operator is required when withOperator is true' });
+    }
+
+    const result = await equipmentServices.mobilizeEquipment({
+      equipmentId, regNo, machine, site, operator, operatorId,
+      withOperator:  withOperator  || false,
+      deployType:    deployType    || 'site',
+      clientCompany: clientCompany || '',
+      selectedDate:  selectedDate  || null,
+      month, year, time,
+      remarks: remarks || '',
+    });
+
+    res.status(result.status).json(result);
+  } catch (error) {
+    console.error('[Equipment] mobilizeEquipment:', error);
+    res.status(500).json({ status: 500, ok: false, message: error.message });
+  }
+};
+
+/**
+ * POST /demobilize-equipment
+ * Demobilizes an equipment unit and records the event.
+ */
 const demobilizeEquipment = async (req, res) => {
   try {
     const {
-      equipmentId,
-      regNo,
-      machine,
-      month,
-      year,
-      time,
-      remarks
+      equipmentId, regNo, machine,
+      selectedDate, month, year, time, remarks,
     } = req.body;
 
-    // Validation
     if (!equipmentId || !regNo || !machine || !month || !year || !time) {
       return res.status(400).json({
-        status: 400,
-        ok: false,
-        message: 'Missing required fields: equipmentId, regNo, machine, month, year, time'
+        status:  400,
+        ok:      false,
+        message: 'Missing required fields: equipmentId, regNo, machine, month, year, time',
       });
     }
 
     const result = await equipmentServices.demobilizeEquipment({
-      equipmentId,
-      regNo,
-      machine,
-      month,
-      year,
-      time,
-      remarks: remarks || ''
+      equipmentId, regNo, machine,
+      selectedDate: selectedDate || null,
+      month, year, time,
+      remarks: remarks || '',
     });
 
     res.status(result.status).json(result);
   } catch (error) {
-    console.error('Error demobilizing equipment:', error);
-    res.status(500).json({
-      status: 500,
-      ok: false,
-      message: 'Internal server error',
-      error: error.message
-    });
+    console.error('[Equipment] demobilizeEquipment:', error);
+    res.status(500).json({ status: 500, ok: false, message: error.message });
   }
 };
 
+/**
+ * GET /mobilization-history/:equipmentId
+ * Returns paginated mobilization history for a specific equipment unit.
+ */
 const getMobilizationHistory = async (req, res) => {
   try {
-    const { equipmentId } = req.params;
+    const { equipmentId }          = req.params;
     const { page = 1, limit = 20 } = req.query;
 
     if (!equipmentId) {
-      return res.status(400).json({
-        status: 400,
-        ok: false,
-        message: 'Equipment ID is required'
-      });
+      return res.status(400).json({ status: 400, ok: false, message: 'Equipment ID is required' });
     }
 
     const result = await equipmentServices.getMobilizationHistory(
       parseInt(equipmentId),
       parseInt(page),
-      parseInt(limit)
+      parseInt(limit),
     );
 
     res.status(200).json({
-      status: 200,
-      ok: true,
-      data: result.history,
-      pagination: {
-        currentPage: result.currentPage,
-        totalPages: result.totalPages,
-        totalCount: result.totalCount,
-        hasMore: result.hasNextPage
-      }
+      status:     200,
+      ok:         true,
+      data:       result.history,
+      pagination: paginationShape(result),
     });
   } catch (error) {
-    console.error('Error getting mobilization history:', error);
-    res.status(500).json({
-      status: 500,
-      ok: false,
-      message: 'Internal server error',
-      error: error.message
-    });
+    console.error('[Equipment] getMobilizationHistory:', error);
+    res.status(500).json({ status: 500, ok: false, message: error.message });
   }
 };
 
+/**
+ * GET /all-mobilizations
+ * Returns all mobilization records across all equipment.
+ */
+const getAllMobilizations = async (req, res) => {
+  try {
+    const result = await equipmentServices.fetchAllMobilizations();
+
+    res.status(200).json({ status: 200, ok: true, data: result });
+  } catch (error) {
+    console.error('[Equipment] getAllMobilizations:', error);
+    res.status(500).json({ status: 500, ok: false, message: error.message });
+  }
+};
+
+/**
+ * GET /filtered-mobilizations
+ * Returns mobilization records filtered by date range, time window, or preset period.
+ */
+const getFilteredMobilizations = async (req, res) => {
+  try {
+    const {
+      filterType, startDate, endDate, months,
+      specificTime, startTime, endTime,
+    } = req.query;
+
+    if (!filterType) {
+      return res.status(400).json({
+        status:  400,
+        ok:      false,
+        message: 'filterType is required (daily, yesterday, weekly, monthly, yearly, months, custom, single)',
+      });
+    }
+
+    if (filterType === 'custom' && (!startDate || !endDate)) {
+      return res.status(400).json({ status: 400, ok: false, message: 'startDate and endDate are required for custom range' });
+    }
+
+    if (filterType === 'single' && !startDate) {
+      return res.status(400).json({ status: 400, ok: false, message: 'Date is required for single date filter' });
+    }
+
+    if (filterType === 'months' && !months) {
+      return res.status(400).json({ status: 400, ok: false, message: 'months is required for months filter type' });
+    }
+
+    if (startTime && endTime && startTime > endTime) {
+      return res.status(400).json({ status: 400, ok: false, message: 'startTime must be before endTime' });
+    }
+
+    const result = await equipmentServices.fetchFilteredMobilizations(
+      filterType, startDate, endDate, months, specificTime, startTime, endTime,
+    );
+
+    res.status(200).json({ status: 200, ok: true, data: result, count: result.length });
+  } catch (error) {
+    console.error('[Equipment] getFilteredMobilizations:', error);
+    res.status(500).json({ status: 500, ok: false, message: error.message });
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Replacement Controllers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * POST /replace-operator
+ * Replaces the assigned operator on a deployed equipment unit.
+ */
 const replaceOperator = async (req, res) => {
   try {
     const {
-      equipmentId,
-      regNo,
-      machine,
-      currentOperator,
-      currentOperatorId,
-      replacedOperator,
-      replacedOperatorId,
-      month,
-      year,
-      time,
-      remarks
+      equipmentId, regNo, machine,
+      currentOperator, currentOperatorId,
+      replacedOperator, replacedOperatorId,
+      selectedDate, month, year, time, remarks,
     } = req.body;
 
-    console.log("data", req.body)
-    // Validation
-    if (!equipmentId || !regNo || !machine || !currentOperator || !currentOperatorId || !replacedOperator || !replacedOperatorId || !month || !year || !time) {
+    if (
+      !equipmentId || !regNo || !machine ||
+      !currentOperator || !currentOperatorId ||
+      !replacedOperator || !replacedOperatorId ||
+      !month || !year || !time
+    ) {
       return res.status(400).json({
-        status: 400,
-        ok: false,
-        message: 'Missing required fields: equipmentId, regNo, machine, currentOperator, currentOperatorId, replacedOperator, replacedOperatorId, month, year, time'
+        status:  400,
+        ok:      false,
+        message: 'Missing required fields: equipmentId, regNo, machine, currentOperator, currentOperatorId, replacedOperator, replacedOperatorId, month, year, time',
       });
     }
 
     const result = await equipmentServices.replaceOperator({
-      equipmentId,
-      regNo,
-      machine,
-      currentOperator,
-      currentOperatorId,
-      replacedOperator,
-      replacedOperatorId,
-      month,
-      year,
-      time,
-      remarks: remarks || ''
+      equipmentId, regNo, machine,
+      currentOperator, currentOperatorId,
+      replacedOperator, replacedOperatorId,
+      selectedDate: selectedDate || null,
+      month, year, time,
+      remarks: remarks || '',
     });
 
     res.status(result.status).json(result);
   } catch (error) {
-    console.error('Error replacing operator:', error);
-    res.status(500).json({
-      status: 500,
-      ok: false,
-      message: 'Internal server error',
-      error: error.message
-    });
+    console.error('[Equipment] replaceOperator:', error);
+    res.status(500).json({ status: 500, ok: false, message: error.message });
   }
 };
 
+/**
+ * POST /replace-equipment
+ * Swaps one deployed equipment unit with another.
+ */
 const replaceEquipment = async (req, res) => {
   try {
     const {
-      equipmentId,
-      regNo,
-      machine,
-      replacedEquipmentId,
-      replacedEquipmentRegNo,
-      replacedEquipmentMachine,
-      newSiteForReplaced, // Optional: new site for the replaced equipment (equipmentId)
-      month,
-      year,
-      time,
-      remarks
+      equipmentId, regNo, machine,
+      replacedEquipmentId, replacedEquipmentRegNo, replacedEquipmentMachine,
+      newSiteForReplaced, selectedDate, month, year, time, remarks,
     } = req.body;
 
-    console.log("data", req.body)
-
-    // Validation
-    if (!equipmentId || !regNo || !machine || !replacedEquipmentId || !replacedEquipmentRegNo || !replacedEquipmentMachine || !month || !year || !time) {
+    if (
+      !equipmentId || !regNo || !machine ||
+      !replacedEquipmentId || !replacedEquipmentRegNo || !replacedEquipmentMachine ||
+      !month || !year || !time
+    ) {
       return res.status(400).json({
-        status: 400,
-        ok: false,
-        message: 'Missing required fields: equipmentId, regNo, machine, replacedEquipmentId, replacedEquipmentRegNo, replacedEquipmentMachine, month, year, time'
+        status:  400,
+        ok:      false,
+        message: 'Missing required fields: equipmentId, regNo, machine, replacedEquipmentId, replacedEquipmentRegNo, replacedEquipmentMachine, month, year, time',
       });
     }
 
     const result = await equipmentServices.replaceEquipment({
-      equipmentId,
-      regNo,
-      machine,
-      replacedEquipmentId,
-      replacedEquipmentRegNo,
-      replacedEquipmentMachine,
+      equipmentId, regNo, machine,
+      replacedEquipmentId, replacedEquipmentRegNo, replacedEquipmentMachine,
       newSiteForReplaced: newSiteForReplaced || null,
-      month,
-      year,
-      time,
-      remarks: remarks || ''
+      selectedDate:       selectedDate       || null,
+      month, year, time,
+      remarks: remarks || '',
     });
 
     res.status(result.status).json(result);
   } catch (error) {
-    console.error('Error replacing equipment:', error);
-    res.status(500).json({
-      status: 500,
-      ok: false,
-      message: 'Internal server error',
-      error: error.message
-    });
+    console.error('[Equipment] replaceEquipment:', error);
+    res.status(500).json({ status: 500, ok: false, message: error.message });
   }
 };
 
+/**
+ * GET /replacement-history/:equipmentId
+ * Returns paginated replacement history for a specific equipment unit.
+ */
 const getReplacementHistory = async (req, res) => {
   try {
-    const { equipmentId } = req.params;
+    const { equipmentId }                = req.params;
     const { page = 1, limit = 20, type } = req.query;
 
     if (!equipmentId) {
-      return res.status(400).json({
-        status: 400,
-        ok: false,
-        message: 'Equipment ID is required'
-      });
+      return res.status(400).json({ status: 400, ok: false, message: 'Equipment ID is required' });
     }
 
     const result = await equipmentServices.getReplacementHistory(
       parseInt(equipmentId),
       parseInt(page),
       parseInt(limit),
-      type // Optional filter: 'operator', 'site', 'equipment'
+      type,
     );
 
     res.status(200).json({
-      status: 200,
-      ok: true,
-      data: result.history,
-      pagination: {
-        currentPage: result.currentPage,
-        totalPages: result.totalPages,
-        totalCount: result.totalCount,
-        hasMore: result.hasNextPage
-      }
+      status:     200,
+      ok:         true,
+      data:       result.history,
+      pagination: paginationShape(result),
     });
   } catch (error) {
-    console.error('Error getting replacement history:', error);
-    res.status(500).json({
-      status: 500,
-      ok: false,
-      message: 'Internal server error',
-      error: error.message
-    });
+    console.error('[Equipment] getReplacementHistory:', error);
+    res.status(500).json({ status: 500, ok: false, message: error.message });
   }
 };
 
-const getSites = async (req, res) => {
-  try {
-    const result = await equipmentServices.fetchUniqueSites();
-    res.status(200).json({
-      status: 200,
-      ok: true,
-      data: result
-    });
-  } catch (error) {
-    console.error('Error getting sites:', error);
-    res.status(500).json({
-      status: 500,
-      ok: false,
-      message: 'Internal server error',
-      error: error.message
-    });
-  }
-};
-
-const getAllMobilizations = async (req, res) => {
-  try {
-    const result = await equipmentServices.fetchAllMobilizations();
-
-    res.status(200).json({
-      status: 200,
-      ok: true,
-      data: result
-    });
-  } catch (error) {
-    console.error('Error getting all mobilizations:', error);
-    res.status(500).json({
-      status: 500,
-      ok: false,
-      message: 'Internal server error',
-      error: error.message
-    });
-  }
-};
-
+/**
+ * GET /all-replacements
+ * Returns all replacement records across all equipment.
+ */
 const getAllReplacements = async (req, res) => {
   try {
     const result = await equipmentServices.fetchAllReplacements();
 
-    res.status(200).json({
-      status: 200,
-      ok: true,
-      data: result
-    });
+    res.status(200).json({ status: 200, ok: true, data: result });
   } catch (error) {
-    console.error('Error getting all replacements:', error);
-    res.status(500).json({
-      status: 500,
-      ok: false,
-      message: 'Internal server error',
-      error: error.message
-    });
+    console.error('[Equipment] getAllReplacements:', error);
+    res.status(500).json({ status: 500, ok: false, message: error.message });
   }
 };
 
-const getFilteredMobilizations = async (req, res) => {
-  try {
-    const {
-      filterType,
-      startDate,
-      endDate,
-      months,
-      specificTime,
-      startTime,
-      endTime
-    } = req.query;
-
-    if (!filterType) {
-      return res.status(400).json({
-        status: 400,
-        ok: false,
-        message: 'Filter type is required (daily, yesterday, weekly, monthly, yearly, months, custom, single)'
-      });
-    }
-
-    if (filterType === 'custom' && (!startDate || !endDate)) {
-      return res.status(400).json({
-        status: 400,
-        ok: false,
-        message: 'Start date and end date are required for custom range'
-      });
-    }
-
-    if (filterType === 'single' && !startDate) {
-      return res.status(400).json({
-        status: 400,
-        ok: false,
-        message: 'Date is required for single date filter'
-      });
-    }
-
-    if (filterType === 'months' && !months) {
-      return res.status(400).json({
-        status: 400,
-        ok: false,
-        message: 'Months parameter is required for months filter type'
-      });
-    }
-
-    if (startTime && endTime && startTime > endTime) {
-      return res.status(400).json({
-        status: 400,
-        ok: false,
-        message: 'Start time must be before end time'
-      });
-    }
-
-    const result = await equipmentServices.fetchFilteredMobilizations(
-      filterType,
-      startDate,
-      endDate,
-      months,
-      specificTime,
-      startTime,
-      endTime
-    );
-
-    res.status(200).json({
-      status: 200,
-      ok: true,
-      data: result,
-      count: result.length
-    });
-  } catch (error) {
-    console.error('Error getting filtered mobilizations:', error);
-    res.status(500).json({
-      status: 500,
-      ok: false,
-      message: 'Internal server error',
-      error: error.message
-    });
-  }
-};
-
+/**
+ * GET /filtered-replacements
+ * Returns replacement records filtered by date range or preset period.
+ */
 const getFilteredReplacements = async (req, res) => {
   try {
     const { filterType, startDate, endDate, months } = req.query;
 
     if (!filterType) {
       return res.status(400).json({
-        status: 400,
-        ok: false,
-        message: 'Filter type is required (daily, yesterday, weekly, monthly, yearly, months, custom)'
+        status:  400,
+        ok:      false,
+        message: 'filterType is required (daily, yesterday, weekly, monthly, yearly, months, custom)',
       });
     }
 
     if (filterType === 'custom' && (!startDate || !endDate)) {
-      return res.status(400).json({
-        status: 400,
-        ok: false,
-        message: 'Start date and end date are required for custom range'
-      });
+      return res.status(400).json({ status: 400, ok: false, message: 'startDate and endDate are required for custom range' });
     }
 
     if (filterType === 'months' && !months) {
-      return res.status(400).json({
-        status: 400,
-        ok: false,
-        message: 'Months parameter is required for months filter type'
-      });
+      return res.status(400).json({ status: 400, ok: false, message: 'months is required for months filter type' });
     }
 
-    const result = await equipmentServices.fetchFilteredReplacements(
-      filterType,
-      startDate,
-      endDate,
-      months
-    );
+    const result = await equipmentServices.fetchFilteredReplacements(filterType, startDate, endDate, months);
 
-    res.status(200).json({
-      status: 200,
-      ok: true,
-      data: result,
-      count: result.length
-    });
+    res.status(200).json({ status: 200, ok: true, data: result, count: result.length });
   } catch (error) {
-    console.error('Error getting filtered replacements:', error);
-    res.status(500).json({
-      status: 500,
-      ok: false,
-      message: 'Internal server error',
-      error: error.message
-    });
+    console.error('[Equipment] getFilteredReplacements:', error);
+    res.status(500).json({ status: 500, ok: false, message: error.message });
   }
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Exports
+// ─────────────────────────────────────────────────────────────────────────────
 
 module.exports = {
+  // CRUD
   addEquipments,
   getEquipments,
+  getEquipmentsByReg,
+  getEquipmentRegNo,
   updateEquipments,
   deleteEquipments,
   updateStatus,
-  getEquipmentsByReg,
+  // Search & Filter
   searchEquipments,
-  addEquipmentImage,
-  getEquipmentRegNo,
-  getBulkEquipmentImages,
-  getEquipmentCount,
-  getEquipmentStats,
   getEquipmentsByStatus,
+  getEquipmentStats,
+  getEquipmentCount,
+  getSites,
+  // Images
+  addEquipmentImage,
+  getBulkEquipmentImages,
+  // Status Change
+  changeEquipmentStatus,
+  // Mobilization
   mobilizeEquipment,
   demobilizeEquipment,
   getMobilizationHistory,
+  getAllMobilizations,
+  getFilteredMobilizations,
+  // Replacements
   replaceOperator,
   replaceEquipment,
   getReplacementHistory,
-  getSites,
   getAllReplacements,
-  getAllMobilizations,
-  getFilteredMobilizations,
   getFilteredReplacements,
-  changeEquipmentStatus
 };

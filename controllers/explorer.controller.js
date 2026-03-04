@@ -1,455 +1,424 @@
-const User = require('../models/user.model.js');
-const explorerServices = require('../services/explorer-services.js');
-const Explorer = require('../models/explorer.model.js');
-const { uploadToS3 } = require('../services/s3Config-services');
-const path = require('path');
+// controllers/explorer.controller.js
+const path               = require('path');
+const User               = require('../models/user.model.js');
+const explorerServices   = require('../services/explorer.service.js');
+const Explorer           = require('../models/explorer.model.js');
+const { uploadToS3 }     = require('../services/s3.service.js');
 
-class ExplorerController {
-    // Get all releases
-    static async getAllReleases(req, res) {
-        try {
-            const releases = await explorerServices.getAllReleases();
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
-            res.status(200).json({
-                status: 200,
-                message: 'Releases retrieved successfully',
-                data: releases
-            });
-        } catch (error) {
-            console.error('Error getting releases:', error);
-            res.status(500).json({
-                status: 500,
-                message: 'Failed to retrieve releases',
-                error: error.message
-            });
-        }
+const generateS3Key = (fileName) => {
+  const ext       = path.extname(fileName);
+  const uniqueId  = Math.random().toString(36).substr(2, 9);
+  const filename  = `feature-${Date.now()}-${uniqueId}${ext}`;
+  return { finalFilename: filename, s3Key: `explorer/features/${filename}` };
+};
+
+const parseHighlights = (highlights) =>
+  Array.isArray(highlights) ? highlights : JSON.parse(highlights);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Release Controllers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /explorer/releases
+ * Returns all releases.
+ */
+const getAllReleases = async (req, res) => {
+  try {
+    const releases = await explorerServices.getAllReleases();
+
+    res.status(200).json({
+      success: true,
+      message: 'Releases retrieved successfully',
+      data:    releases,
+    });
+  } catch (error) {
+    console.error('[Explorer] getAllReleases:', error);
+    res.status(500).json({ success: false, message: 'Failed to retrieve releases', error: error.message });
+  }
+};
+
+/**
+ * GET /explorer/releases/latest
+ * Returns the most recent release.
+ */
+const getLatestRelease = async (req, res) => {
+  try {
+    const release = await explorerServices.getLatestRelease();
+
+    res.status(200).json({
+      success: true,
+      message: 'Latest release retrieved successfully',
+      data:    release,
+    });
+  } catch (error) {
+    console.error('[Explorer] getLatestRelease:', error);
+    res.status(500).json({ success: false, message: 'Failed to retrieve latest release', error: error.message });
+  }
+};
+
+/**
+ * GET /explorer/releases/latest/me
+ * Returns the latest release enriched with the authenticated user's explored-feature status.
+ */
+const getLatestReleaseForUser = async (req, res) => {
+  try {
+    const userId  = req.user.id;
+    const release = await explorerServices.getLatestRelease();
+
+    if (!release) {
+      return res.status(404).json({ success: false, message: 'No releases available', data: null });
     }
 
-    // Get latest release (for frontend display)
-    static async getLatestRelease(req, res) {
-        try {
-            const release = await explorerServices.getLatestRelease();
+    const user = await User.findById(userId).select('exploredFeatures lastExploredVersion');
 
-            res.status(200).json({
-                status: 200,
-                message: 'Latest release retrieved successfully',
-                data: release
-            });
-        } catch (error) {
-            console.error('Error getting latest release:', error);
-            res.status(500).json({
-                status: 500,
-                message: 'Failed to retrieve latest release',
-                error: error.message
-            });
-        }
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found', data: null });
     }
 
-    static async getLatestReleaseForUser(req, res) {
-        try {
+    const exploredFeatures       = user.exploredFeatures || [];
+    const lastExploredVersion    = user.lastExploredVersion || null;
+    const hasExploredThisVersion = lastExploredVersion === release.releaseVersion;
 
-            const userId = req.user.id;
-            const release = await explorerServices.getLatestRelease();
+    const featuresWithExploredStatus = release.features.map(feature => ({
+      ...feature.toObject(),
+      isExplored: exploredFeatures.some(
+        ef =>
+          ef.releaseId.toString() === release._id.toString() &&
+          ef.featureId.toString() === feature._id.toString(),
+      ),
+    }));
 
-            console.log("release", release);
-            
+    res.status(200).json({
+      success: true,
+      message: 'Latest release retrieved successfully',
+      data:    {
+        ...release.toObject(),
+        features: featuresWithExploredStatus,
+        hasExploredThisVersion,
+      },
+    });
+  } catch (error) {
+    console.error('[Explorer] getLatestReleaseForUser:', error);
+    res.status(500).json({ success: false, message: 'Failed to retrieve latest release', error: error.message });
+  }
+};
 
-            if (!release) {
-                return res.status(404).json({ 
-                    status: 404,
-                    message: 'No releases available',
-                    data: null
-                });
-            }
+/**
+ * POST /explorer/releases
+ * Creates a new release with one or more features; videos are uploaded to S3 asynchronously.
+ */
+const createRelease = async (req, res) => {
+  try {
+    const { releaseVersion, releaseDate, features } = req.body;
 
-            const user = await User.findById(userId).select('exploredFeatures lastExploredVersion');
-
-            if (!user) {
-                return res.status(404).json({
-                    status: 404,
-                    message: 'User not found',
-                    data: null
-                });
-            }
-
-            const exploredFeatures = user.exploredFeatures || [];
-            const lastExploredVersion = user.lastExploredVersion || null;
-            const hasExploredThisVersion = lastExploredVersion === release.releaseVersion;
-
-            const featuresWithExploredStatus = release.features.map(feature => ({
-                ...feature.toObject(),
-                isExplored: exploredFeatures.some(
-                    ef => ef.releaseId.toString() === release._id.toString() &&
-                        ef.featureId.toString() === feature._id.toString()
-                )
-            }));
-
-            res.status(200).json({
-                status: 200,
-                message: 'Latest release retrieved successfully',
-                data: {
-                    ...release.toObject(),
-                    features: featuresWithExploredStatus,
-                    hasExploredThisVersion
-                }
-            });
-        } catch (error) {
-            console.error('Error getting latest release:', error);
-            res.status(500).json({
-                status: 500,
-                message: 'Failed to retrieve latest release',
-                error: error.message
-            });
-        }
+    if (!releaseVersion) {
+      return res.status(400).json({ success: false, message: 'Release version is required' });
     }
 
-    static async markFeatureAsExplored(req, res) {
-        try {
-            const userId = req.user.id;
-            const { releaseId, featureId } = req.body;
-
-            const user = await User.findById(userId);
-
-            const alreadyExplored = user.exploredFeatures.some(
-                ef => ef.releaseId.toString() === releaseId &&
-                    ef.featureId.toString() === featureId
-            );
-
-            if (!alreadyExplored) {
-                user.exploredFeatures.push({
-                    releaseId,
-                    featureId,
-                    exploredAt: new Date()
-                });
-            }
-
-            const release = await Explorer.findById(releaseId);
-            const allFeaturesExplored = release.features.every(feature =>
-                user.exploredFeatures.some(
-                    ef => ef.releaseId.toString() === releaseId &&
-                        ef.featureId.toString() === feature._id.toString()
-                )
-            );
-
-            if (allFeaturesExplored) {
-                user.lastExploredVersion = release.releaseVersion;
-            }
-
-            await user.save();
-
-            res.status(200).json({
-                status: 200,
-                message: 'Feature marked as explored',
-                data: {
-                    allFeaturesExplored
-                }
-            });
-        } catch (error) {
-            console.error('Error marking feature as explored:', error);
-            res.status(500).json({
-                status: 500,
-                message: 'Failed to mark feature as explored',
-                error: error.message
-            });
-        }
+    if (!features || !Array.isArray(features) || features.length === 0) {
+      return res.status(400).json({ success: false, message: 'At least one feature is required' });
     }
 
-    // Create new release with multiple features
-    static async createRelease(req, res) {
-        try {
-            const { releaseVersion, releaseDate, features } = req.body;
+    const processedFeatures = [];
 
-            if (!releaseVersion) {
-                return res.status(400).json({
-                    status: 400,
-                    message: 'Release version is required'
-                });
-            }
+    for (let i = 0; i < features.length; i++) {
+      const feature = features[i];
 
-            if (!features || !Array.isArray(features) || features.length === 0) {
-                return res.status(400).json({
-                    status: 400,
-                    message: 'At least one feature is required'
-                });
-            }
+      if (!feature.videoFile?.fileBuffer) {
+        return res.status(400).json({ success: false, message: `Video file is required for feature ${i + 1}` });
+      }
 
-            // Process features
-            const processedFeatures = [];
+      const { finalFilename, s3Key } = generateS3Key(feature.videoFile.fileName);
 
-            for (let i = 0; i < features.length; i++) {
-                const feature = features[i];
+      processedFeatures.push({
+        headline:       feature.headline,
+        description:    feature.description,
+        highlights:     parseHighlights(feature.highlights),
+        videoUrl:       s3Key,
+        videoFileName:  finalFilename,
+        videoMimeType:  feature.videoFile.mimeType,
+        uploadStatus:   'uploading',
+        order:          i + 1,
+      });
 
-                if (!feature.videoFile || !feature.videoFile.fileBuffer) {
-                    return res.status(400).json({
-                        status: 400,
-                        message: `Video file is required for feature ${i + 1}`
-                    });
-                }
-
-                // Generate unique filename
-                const ext = path.extname(feature.videoFile.fileName);
-                const timestamp = Date.now();
-                const uniqueId = Math.random().toString(36).substr(2, 9);
-                const finalFilename = `feature-${timestamp}-${uniqueId}${ext}`;
-                const s3Key = `explorer/features/${finalFilename}`;
-
-                processedFeatures.push({
-                    headline: feature.headline,
-                    description: feature.description,
-                    highlights: Array.isArray(feature.highlights) ? feature.highlights : JSON.parse(feature.highlights),
-                    videoUrl: s3Key,
-                    videoFileName: finalFilename,
-                    videoMimeType: feature.videoFile.mimeType,
-                    uploadStatus: 'uploading',
-                    order: i + 1
-                });
-
-                // Store video buffer for later upload
-                feature._videoBuffer = Buffer.from(feature.videoFile.fileBuffer, 'base64');
-                feature._s3Key = s3Key;
-            }
-
-            // Create release
-            const releaseData = {
-                releaseVersion,
-                releaseDate: releaseDate || new Date(),
-                features: processedFeatures
-            };
-
-            const result = await explorerServices.createRelease(releaseData);
-
-            // Send response first
-            res.status(202).json({
-                status: 202,
-                message: 'Release created successfully. Videos are being uploaded.',
-                data: result
-            });
-
-            // Upload videos in background
-            for (let i = 0; i < features.length; i++) {
-                const feature = features[i];
-                const featureId = result.features[i]._id;
-
-                try {
-                    await uploadToS3(feature._videoBuffer, feature._s3Key, feature.videoFile.mimeType);
-                    console.log(`Successfully uploaded video: ${feature._s3Key}`);
-
-                    await explorerServices.updateFeatureStatus(result._id, featureId, 'active');
-                } catch (error) {
-                    console.error(`Failed to upload video ${feature._s3Key}:`, error);
-                    await explorerServices.updateFeatureStatus(result._id, featureId, 'failed');
-                }
-            }
-
-        } catch (error) {
-            console.error('Error creating release:', error);
-            res.status(500).json({
-                status: 500,
-                message: 'Failed to create release',
-                error: error.message
-            });
-        }
+      feature._videoBuffer = Buffer.from(feature.videoFile.fileBuffer, 'base64');
+      feature._s3Key       = s3Key;
     }
 
-    // Add feature to existing release
-    static async addFeature(req, res) {
-        try {
-            const { releaseId } = req.params;
-            const { headline, description, highlights, videoFile } = req.body;
+    const result = await explorerServices.createRelease({
+      releaseVersion,
+      releaseDate: releaseDate || new Date(),
+      features:    processedFeatures,
+    });
 
-            if (!videoFile || !videoFile.fileBuffer) {
-                return res.status(400).json({
-                    status: 400,
-                    message: 'Video file is required'
-                });
-            }
+    res.status(202).json({
+      success: true,
+      message: 'Release created successfully. Videos are being uploaded.',
+      data:    result,
+    });
 
-            // Generate unique filename
-            const ext = path.extname(videoFile.fileName);
-            const timestamp = Date.now();
-            const uniqueId = Math.random().toString(36).substr(2, 9);
-            const finalFilename = `feature-${timestamp}-${uniqueId}${ext}`;
-            const s3Key = `explorer/features/${finalFilename}`;
+    for (let i = 0; i < features.length; i++) {
+      const feature   = features[i];
+      const featureId = result.features[i]._id;
+      try {
+        await uploadToS3(feature._videoBuffer, feature._s3Key, feature.videoFile.mimeType);
+        await explorerServices.updateFeatureStatus(result._id, featureId, 'active');
+      } catch (error) {
+        console.error(`[Explorer] createRelease — upload failed for ${feature._s3Key}:`, error);
+        await explorerServices.updateFeatureStatus(result._id, featureId, 'failed');
+      }
+    }
+  } catch (error) {
+    console.error('[Explorer] createRelease:', error);
+    res.status(500).json({ success: false, message: 'Failed to create release', error: error.message });
+  }
+};
 
-            const featureData = {
-                headline,
-                description,
-                highlights: Array.isArray(highlights) ? highlights : JSON.parse(highlights),
-                videoUrl: s3Key,
-                videoFileName: finalFilename,
-                videoMimeType: videoFile.mimeType
-            };
+/**
+ * DELETE /explorer/releases/:id
+ * Deletes an entire release by ID.
+ */
+const deleteRelease = async (req, res) => {
+  try {
+    const { id } = req.params;
 
-            const result = await explorerServices.addFeatureToRelease(releaseId, featureData);
+    await explorerServices.deleteRelease(id);
 
-            // Send response
-            res.status(202).json({
-                status: 202,
-                message: 'Feature added successfully. Video is being uploaded.',
-                data: result
-            });
+    res.status(200).json({
+      success: true,
+      message: 'Release deleted successfully',
+    });
+  } catch (error) {
+    console.error('[Explorer] deleteRelease:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete release', error: error.message });
+  }
+};
 
-            // Upload video in background
-            const addedFeature = result.features[result.features.length - 1];
-            try {
-                const buffer = Buffer.from(videoFile.fileBuffer, 'base64');
-                await uploadToS3(buffer, s3Key, videoFile.mimeType);
-                console.log(`Successfully uploaded video: ${finalFilename}`);
+// ─────────────────────────────────────────────────────────────────────────────
+// Feature Controllers
+// ─────────────────────────────────────────────────────────────────────────────
 
-                await explorerServices.updateFeatureStatus(releaseId, addedFeature._id, 'active');
-            } catch (error) {
-                console.error(`Failed to upload video ${finalFilename}:`, error);
-                await explorerServices.updateFeatureStatus(releaseId, addedFeature._id, 'failed');
-            }
+/**
+ * POST /explorer/releases/:releaseId/features
+ * Adds a new feature to an existing release; video is uploaded to S3 asynchronously.
+ */
+const addFeature = async (req, res) => {
+  try {
+    const { releaseId }                              = req.params;
+    const { headline, description, highlights, videoFile } = req.body;
 
-        } catch (error) {
-            console.error('Error adding feature:', error);
-            res.status(500).json({
-                status: 500,
-                message: 'Failed to add feature',
-                error: error.message
-            });
-        }
+    if (!videoFile?.fileBuffer) {
+      return res.status(400).json({ success: false, message: 'Video file is required' });
     }
 
-    // Update feature
-    static async updateFeature(req, res) {
-        try {
-            const { releaseId, featureId } = req.params;
-            const { headline, description, highlights, videoFile } = req.body;
+    const { finalFilename, s3Key } = generateS3Key(videoFile.fileName);
 
-            const updateData = {
-                headline,
-                description,
-                highlights: highlights ? (Array.isArray(highlights) ? highlights : JSON.parse(highlights)) : undefined
-            };
+    const featureData = {
+      headline,
+      description,
+      highlights:    parseHighlights(highlights),
+      videoUrl:      s3Key,
+      videoFileName: finalFilename,
+      videoMimeType: videoFile.mimeType,
+    };
 
-            // Remove undefined values
-            Object.keys(updateData).forEach(key =>
-                updateData[key] === undefined && delete updateData[key]
-            );
+    const result       = await explorerServices.addFeatureToRelease(releaseId, featureData);
+    const addedFeature = result.features[result.features.length - 1];
 
-            // If new video file is provided
-            if (videoFile && videoFile.fileBuffer) {
-                const ext = path.extname(videoFile.fileName);
-                const timestamp = Date.now();
-                const uniqueId = Math.random().toString(36).substr(2, 9);
-                const finalFilename = `feature-${timestamp}-${uniqueId}${ext}`;
-                const s3Key = `explorer/features/${finalFilename}`;
+    res.status(202).json({
+      success: true,
+      message: 'Feature added successfully. Video is being uploaded.',
+      data:    result,
+    });
 
-                updateData.videoUrl = s3Key;
-                updateData.videoFileName = finalFilename;
-                updateData.videoMimeType = videoFile.mimeType;
-                updateData.uploadStatus = 'uploading';
+    try {
+      const buffer = Buffer.from(videoFile.fileBuffer, 'base64');
+      await uploadToS3(buffer, s3Key, videoFile.mimeType);
+      await explorerServices.updateFeatureStatus(releaseId, addedFeature._id, 'active');
+    } catch (error) {
+      console.error(`[Explorer] addFeature — upload failed for ${finalFilename}:`, error);
+      await explorerServices.updateFeatureStatus(releaseId, addedFeature._id, 'failed');
+    }
+  } catch (error) {
+    console.error('[Explorer] addFeature:', error);
+    res.status(500).json({ success: false, message: 'Failed to add feature', error: error.message });
+  }
+};
 
-                const result = await explorerServices.updateFeature(releaseId, featureId, updateData);
+/**
+ * PUT /explorer/releases/:releaseId/features/:featureId
+ * Updates a feature's metadata and optionally replaces its video.
+ */
+const updateFeature = async (req, res) => {
+  try {
+    const { releaseId, featureId }                         = req.params;
+    const { headline, description, highlights, videoFile } = req.body;
 
-                res.status(202).json({
-                    status: 202,
-                    message: 'Feature updated successfully. New video is being uploaded.',
-                    data: result
-                });
+    const updateData = {
+      ...(headline    !== undefined && { headline }),
+      ...(description !== undefined && { description }),
+      ...(highlights  !== undefined && { highlights: parseHighlights(highlights) }),
+    };
 
-                // Upload new video in background
-                try {
-                    const buffer = Buffer.from(videoFile.fileBuffer, 'base64');
-                    await uploadToS3(buffer, s3Key, videoFile.mimeType);
-                    console.log(`Successfully uploaded new video: ${finalFilename}`);
-                    await explorerServices.updateFeatureStatus(releaseId, featureId, 'active');
-                } catch (error) {
-                    console.error(`Failed to upload video ${finalFilename}:`, error);
-                    await explorerServices.updateFeatureStatus(releaseId, featureId, 'failed');
-                }
-            } else {
-                const result = await explorerServices.updateFeature(releaseId, featureId, updateData);
-                res.status(200).json({
-                    status: 200,
-                    message: 'Feature updated successfully',
-                    data: result
-                });
-            }
+    if (videoFile?.fileBuffer) {
+      const { finalFilename, s3Key } = generateS3Key(videoFile.fileName);
 
-        } catch (error) {
-            console.error('Error updating feature:', error);
-            res.status(500).json({
-                status: 500,
-                message: 'Failed to update feature',
-                error: error.message
-            });
-        }
+      Object.assign(updateData, {
+        videoUrl:      s3Key,
+        videoFileName: finalFilename,
+        videoMimeType: videoFile.mimeType,
+        uploadStatus:  'uploading',
+      });
+
+      const result = await explorerServices.updateFeature(releaseId, featureId, updateData);
+
+      res.status(202).json({
+        success: true,
+        message: 'Feature updated successfully. New video is being uploaded.',
+        data:    result,
+      });
+
+      try {
+        const buffer = Buffer.from(videoFile.fileBuffer, 'base64');
+        await uploadToS3(buffer, s3Key, videoFile.mimeType);
+        await explorerServices.updateFeatureStatus(releaseId, featureId, 'active');
+      } catch (error) {
+        console.error(`[Explorer] updateFeature — upload failed for ${finalFilename}:`, error);
+        await explorerServices.updateFeatureStatus(releaseId, featureId, 'failed');
+      }
+    } else {
+      const result = await explorerServices.updateFeature(releaseId, featureId, updateData);
+
+      res.status(200).json({
+        success: true,
+        message: 'Feature updated successfully',
+        data:    result,
+      });
+    }
+  } catch (error) {
+    console.error('[Explorer] updateFeature:', error);
+    res.status(500).json({ success: false, message: 'Failed to update feature', error: error.message });
+  }
+};
+
+/**
+ * DELETE /explorer/releases/:releaseId/features/:featureId
+ * Removes a single feature from a release.
+ */
+const deleteFeature = async (req, res) => {
+  try {
+    const { releaseId, featureId } = req.params;
+
+    await explorerServices.deleteFeature(releaseId, featureId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Feature deleted successfully',
+    });
+  } catch (error) {
+    console.error('[Explorer] deleteFeature:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete feature', error: error.message });
+  }
+};
+
+/**
+ * PUT /explorer/releases/:releaseId/features/reorder
+ * Updates the display order of features within a release.
+ */
+const reorderFeatures = async (req, res) => {
+  try {
+    const { releaseId }  = req.params;
+    const { featureIds } = req.body;
+
+    if (!Array.isArray(featureIds)) {
+      return res.status(400).json({ success: false, message: 'featureIds must be an array' });
     }
 
-    // Delete feature
-    static async deleteFeature(req, res) {
-        try {
-            const { releaseId, featureId } = req.params;
+    const result = await explorerServices.reorderFeatures(releaseId, featureIds);
 
-            await explorerServices.deleteFeature(releaseId, featureId);
+    res.status(200).json({
+      success: true,
+      message: 'Features reordered successfully',
+      data:    result,
+    });
+  } catch (error) {
+    console.error('[Explorer] reorderFeatures:', error);
+    res.status(500).json({ success: false, message: 'Failed to reorder features', error: error.message });
+  }
+};
 
-            res.status(200).json({
-                status: 200,
-                message: 'Feature deleted successfully'
-            });
-        } catch (error) {
-            console.error('Error deleting feature:', error);
-            res.status(500).json({
-                status: 500,
-                message: 'Failed to delete feature',
-                error: error.message
-            });
-        }
+// ─────────────────────────────────────────────────────────────────────────────
+// User Exploration Controllers
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * POST /explorer/features/mark-explored
+ * Marks a specific feature as explored for the authenticated user.
+ */
+const markFeatureAsExplored = async (req, res) => {
+  try {
+    const userId                 = req.user.id;
+    const { releaseId, featureId } = req.body;
+
+    const user = await User.findById(userId);
+
+    const alreadyExplored = user.exploredFeatures.some(
+      ef =>
+        ef.releaseId.toString() === releaseId &&
+        ef.featureId.toString() === featureId,
+    );
+
+    if (!alreadyExplored) {
+      user.exploredFeatures.push({ releaseId, featureId, exploredAt: new Date() });
     }
 
-    // Delete entire release
-    static async deleteRelease(req, res) {
-        try {
-            const { id } = req.params;
+    const release             = await Explorer.findById(releaseId);
+    const allFeaturesExplored = release.features.every(feature =>
+      user.exploredFeatures.some(
+        ef =>
+          ef.releaseId.toString() === releaseId &&
+          ef.featureId.toString() === feature._id.toString(),
+      ),
+    );
 
-            await explorerServices.deleteRelease(id);
-
-            res.status(200).json({
-                status: 200,
-                message: 'Release deleted successfully'
-            });
-        } catch (error) {
-            console.error('Error deleting release:', error);
-            res.status(500).json({
-                status: 500,
-                message: 'Failed to delete release',
-                error: error.message
-            });
-        }
+    if (allFeaturesExplored) {
+      user.lastExploredVersion = release.releaseVersion;
     }
 
-    // Reorder features
-    static async reorderFeatures(req, res) {
-        try {
-            const { releaseId } = req.params;
-            const { featureIds } = req.body;
+    await user.save();
 
-            if (!Array.isArray(featureIds)) {
-                return res.status(400).json({
-                    status: 400,
-                    message: 'featureIds must be an array'
-                });
-            }
+    res.status(200).json({
+      success: true,
+      message: 'Feature marked as explored',
+      data:    { allFeaturesExplored },
+    });
+  } catch (error) {
+    console.error('[Explorer] markFeatureAsExplored:', error);
+    res.status(500).json({ success: false, message: 'Failed to mark feature as explored', error: error.message });
+  }
+};
 
-            const result = await explorerServices.reorderFeatures(releaseId, featureIds);
+// ─────────────────────────────────────────────────────────────────────────────
+// Exports
+// ─────────────────────────────────────────────────────────────────────────────
 
-            res.status(200).json({
-                status: 200,
-                message: 'Features reordered successfully',
-                data: result
-            });
-        } catch (error) {
-            console.error('Error reordering features:', error);
-            res.status(500).json({
-                status: 500,
-                message: 'Failed to reorder features',
-                error: error.message
-            });
-        }
-    }
-}
-
-module.exports = ExplorerController;
+module.exports = {
+  // Releases
+  getAllReleases,
+  getLatestRelease,
+  getLatestReleaseForUser,
+  createRelease,
+  deleteRelease,
+  // Features
+  addFeature,
+  updateFeature,
+  deleteFeature,
+  reorderFeatures,
+  // User Exploration
+  markFeatureAsExplored,
+};

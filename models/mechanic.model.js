@@ -1,316 +1,191 @@
+// models/mechanic.model.js
 const mongoose = require('mongoose');
-const Schema = mongoose.Schema;
 
-// Define the toolkit schema (unchanged)
-const ToolkitSchema = new Schema({
-  name: {
-    type: String,
-    trim: true
-  },
-  type: {
-    type: String,
-    trim: true
-  },
-  toolkitId: {
-    type: String,
-    required: [true, 'toolkitId is required'],
-    trim: true,
-    default: 'No One'
-  },
-  toolkitName: {
-    type: String,
-    required: [true, 'toolkitName is required'],
-    trim: true,
-    default: 'No One',
-  },
-  variantId: {
-    type: String,
-    required: [true, 'variantId is required'],
-    default: 'No One',
-    trim: true
-  },
-  size: {
-    type: String,
-    required: [true, 'Size is required'],
-    trim: true
-  },
-  color: {
-    type: String,
-    required: [true, 'Color is required'],
-    trim: true
-  },
-  assignedDate: {
-    type: String,
-    default: new Date(),
-    required: [true, 'assignedDate is required'],
-    trim: true
-  },
-  reason: {
-    type: String,
-    required: [true, 'reason is required'],
-    trim: true,
-    default: 'No Reason'
-  },
-  quantity: {
-    type: Number,
-    required: [true, 'quantity is required'],
-    min: 0,
-    default: 0
-  },
-  minStockLevel: {
-    type: Number,
-    required: [true, 'Minimum stock level is required'],
-    min: 1,
-    default: 5
-  },
-  status: {
-    type: String,
-    enum: ['available', 'low', 'out', 'assigned'],
-    default: 'available'
-  },
-  inuse: {
-    type: Boolean,
-    default: false
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
-});
+// ─────────────────────────────────────────────────────────────────────────────
+// Sub-schemas
+// ─────────────────────────────────────────────────────────────────────────────
 
-// Pre-save middleware for toolkit (unchanged)
-ToolkitSchema.pre('save', function (next) {
-  // Calculate status based on stock count and minimum stock level
-  if (this.stockCount <= 0) {
-    this.status = 'out';
-  } else if (this.stockCount < this.minStockLevel) {
-    this.status = 'low';
-  } else {
-    this.status = 'available';
-  }
+const toolkitSchema = new mongoose.Schema(
+  {
+    // Identity
+    name:        { type: String, trim: true },
+    type:        { type: String, trim: true },
+    toolkitId:   { type: String, required: [true, 'toolkitId is required'],   trim: true, default: 'No One' },
+    toolkitName: { type: String, required: [true, 'toolkitName is required'], trim: true, default: 'No One' },
+    variantId:   { type: String, required: [true, 'variantId is required'],   trim: true, default: 'No One' },
 
-  // Update the updatedAt field
-  this.updatedAt = Date.now();
+    // Attributes
+    size:  { type: String, required: [true, 'Size is required'],  trim: true },
+    color: { type: String, required: [true, 'Color is required'], trim: true },
 
+    // Stock
+    quantity:      { type: Number, required: [true, 'quantity is required'],              min: 0, default: 0 },
+    minStockLevel: { type: Number, required: [true, 'Minimum stock level is required'],   min: 1, default: 5 },
+    status:        { type: String, enum: ['available', 'low', 'out', 'assigned'], default: 'available'       },
+    inuse:         { type: Boolean, default: false                                                            },
+
+    // Assignment
+    assignedDate: { type: String, required: [true, 'assignedDate is required'], trim: true, default: () => new Date().toISOString() },
+    reason:       { type: String, required: [true, 'reason is required'],       trim: true, default: 'No Reason'                    },
+  },
+  {
+    timestamps: true,
+  },
+);
+
+const overtimeEntrySchema = new mongoose.Schema(
+  {
+    date:          { type: Date,     required: [true, 'Date is required'] },
+    formattedDate: { type: String,   required: true                       }, // dd-mm-yyyy
+    totalTime:     { type: Number,   default: 0                           }, // minutes
+    formattedTime: { type: String,   default: ''                          },
+    regNo:         { type: [Number], default: []                          },
+    workDetails:   { type: [String], default: []                          },
+    times: {
+      type: [
+        new mongoose.Schema(
+          { in: { type: Date, required: true }, out: { type: Date } },
+          { _id: false },
+        ),
+      ],
+      default: [],
+    },
+  },
+  { _id: false },
+);
+
+const monthlyOvertimeSchema = new mongoose.Schema(
+  {
+    month:              { type: String, required: true }, // "Month Year" e.g. "May 2025"
+    totalMonthTime:     { type: Number, default: 0     }, // minutes
+    formattedMonthTime: { type: String, default: '0h 0m' },
+    entries:            { type: [overtimeEntrySchema], default: [] },
+  },
+  { _id: false },
+);
+
+const attendanceRecordSchema = new mongoose.Schema(
+  {
+    id:             { type: Number },
+    pin:            { type: Number },
+    punch_time:     { type: String },
+    punch_state:    { type: String },
+    emp_name:       { type: String },
+    verify_type:    { type: String },
+    work_code:      { type: String },
+    gps_location:   { type: String },
+    terminal_alias: { type: String },
+    capture:        { type: String },
+    upload_time:    { type: String },
+    icon:           { type: String },
+    location:       { type: String },
+    photo:          { type: String },
+  },
+  { _id: false },
+);
+
+const pushTokenSchema = new mongoose.Schema(
+  {
+    token:        { type: String,  required: true                        },
+    platform:     { type: String,  enum: ['ios', 'android']             },
+    isActive:     { type: Boolean, default: true                        },
+    registeredAt: { type: Date,    default: Date.now                    },
+    lastUsed:     { type: Date,    default: Date.now                    },
+  },
+  { _id: false },
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main Schema
+// ─────────────────────────────────────────────────────────────────────────────
+
+const mechanicSchema = new mongoose.Schema(
+  {
+    // Identity
+    name:       { type: String, required: [true, 'Mechanic name is required'], trim: true },
+    userId:     { type: Number, required: [true, 'User ID is required'], ref: 'User'      },
+    uniqueCode: { type: String },
+    userType:   { type: String, default: 'mechanic'           },
+    tag:        { type: String, default: process.env.TAG_CODE },
+    zktecoPin:  { type: Number },
+    status:     { type: String },
+
+    // Auth
+    email: {
+      type:  String,
+      trim:  true,
+      lowercase: true,
+      match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email address'],
+    },
+    authMail: {
+      type:      String,
+      trim:      true,
+      lowercase: true,
+      match:     [/^\S+@\S+\.\S+$/, 'Please enter a valid email address'],
+      default:   '',
+    },
+    password: {
+      type:      String,
+      minlength: [6, 'Password should be at least 6 characters long'],
+    },
+
+    // Flags
+    isActive: { type: Boolean, default: false },
+
+    // Relations
+    toolkits:        { type: [toolkitSchema],          default: [] },
+    monthlyOvertime: { type: [monthlyOvertimeSchema],  default: [] },
+    attendance:      { type: [attendanceRecordSchema], default: [] },
+    pushTokens:      { type: [pushTokenSchema],        default: [] },
+  },
+  {
+    timestamps: true,
+  },
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Middleware
+// ─────────────────────────────────────────────────────────────────────────────
+
+toolkitSchema.pre('save', function (next) {
+  if (this.stockCount <= 0)                    this.status = 'out';
+  else if (this.stockCount < this.minStockLevel) this.status = 'low';
+  else                                           this.status = 'available';
   next();
 });
 
-// Define the individual overtime entry schema
-const OvertimeEntrySchema = new Schema({
-  date: {
-    type: Date,
-    required: [true, 'Date is required']
-  },
-  formattedDate: {
-    type: String,  // Store date in "dd-mm-yyyy" format
-    required: true
-  },
-  regNo: [{
-    type: Number
-  }],
-  times: [{
-    in: {
-      type: Date,
-      required: true
-    },
-    out: {
-      type: Date
-    },
-    _id: false
-  }],
-  workDetails: [{
-    type: String
-  }],
-  totalTime: {
-    type: Number, // Store total overtime in minutes
-    default: 0
-  },
-  formattedTime: {
-    type: String,
-    default: ''
-  }
-});
-
-// Calculate total overtime and formatted time for each entry
-OvertimeEntrySchema.pre('save', function (next) {
+overtimeEntrySchema.pre('save', function (next) {
   let totalMinutes = 0;
 
-  if (this.times && this.times.length > 0) {
-    this.times.forEach(timeEntry => {
-      if (timeEntry.in && timeEntry.out) {
-        // Calculate minutes only if out time is after in time
-        if (timeEntry.out > timeEntry.in) {
-          const minutes = Math.floor((timeEntry.out - timeEntry.in) / (1000 * 60));
-          totalMinutes += minutes > 0 ? minutes : 0;
-        }
-      }
-    });
-  }
-
-  this.totalTime = totalMinutes;
-
-  // Format the time as hours and minutes
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  this.formattedTime = `${hours}h ${minutes}m`;
-
-  // Format the date as "dd-mm-yyyy"
-  const date = new Date(this.date);
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
-  this.formattedDate = `${day}-${month}-${year}`;
-
-  next();
-});
-
-// Define the monthly overtime schema
-const MonthlyOvertimeSchema = new Schema({
-  month: {
-    type: String,  // Store month in "Month Year" format (e.g., "May 2025")
-    required: true
-  },
-  entries: [OvertimeEntrySchema],
-  totalMonthTime: {
-    type: Number, // Store total monthly overtime in minutes
-    default: 0
-  },
-  formattedMonthTime: {
-    type: String,
-    default: '0h 0m'
-  }
-});
-
-// Calculate total monthly overtime
-MonthlyOvertimeSchema.pre('save', function (next) {
-  let totalMonthMinutes = 0;
-
-  if (this.entries && this.entries.length > 0) {
-    totalMonthMinutes = this.entries.reduce((total, entry) => total + entry.totalTime, 0);
-  }
-
-  this.totalMonthTime = totalMonthMinutes;
-
-  // Format the time as hours and minutes
-  const hours = Math.floor(totalMonthMinutes / 60);
-  const minutes = totalMonthMinutes % 60;
-  this.formattedMonthTime = `${hours}h ${minutes}m`;
-
-  next();
-});
-
-// Define the main Mechanic schema
-const MechanicSchema = new Schema({
-  name: {
-    type: String,
-    required: [true, 'Mechanic name is required'],
-    trim: true
-  },
-  email: {
-    type: String,
-    trim: true,
-    lowercase: true,
-    match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email address']
-    // Removed unique: true from here
-  },
-  password: {
-    type: String,
-    minlength: [6, 'Password should be at least 6 characters long']
-  },
-  authMail: {
-    type: String,
-    trim: true,
-    lowercase: true,
-    match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email address'],
-    default: ''
-  },
-  userId: {
-    type: Number,
-    required: [true, 'User ID is required'],
-    ref: 'User' // Assuming you have a User model
-  },
-  uniqueCode: {
-    type: String,
-  },
-  tag: {
-    type: String,
-    default: process.env.TAG_CODE
-  },
-  isActive: {
-    type: Boolean,
-    default: false
-  },
-  userType: {
-    type: String,
-    default: 'mechanic'
-  },
-  toolkits: [ToolkitSchema],
-  // Only use the monthly overtime structure
-  monthlyOvertime: [MonthlyOvertimeSchema],
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  },
-  attendance: [{
-    id: Number,
-    punch_time: String,
-    punch_state: String,
-    emp_name: String,
-    verify_type: String,
-    work_code: String,
-    gps_location: String,
-    terminal_alias: String,
-    capture: String,
-    upload_time: String,
-    icon: String,
-    location: String,
-    photo: String,
-    pin: Number
-  }],
-  zktecoPin: {
-    type: Number
-  },
-  status: {
-    type: String,
-  },
-  pushTokens: [{
-    token: {
-      type: String,   // Expo push token
-      required: true
-    },
-    platform: {
-      type: String,   // 'ios' or 'android'
-      enum: ['ios', 'android']
-    },
-    registeredAt: {
-      type: Date,
-      default: Date.now
-    },
-    isActive: {
-      type: Boolean,
-      default: true
-    },
-    lastUsed: {
-      type: Date,
-      default: Date.now
+  this.times?.forEach(({ in: inTime, out }) => {
+    if (inTime && out && out > inTime) {
+      totalMinutes += Math.floor((out - inTime) / (1000 * 60));
     }
-  }],
+  });
+
+  this.totalTime     = totalMinutes;
+  this.formattedTime = `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`;
+
+  const d = new Date(this.date);
+  this.formattedDate = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${d.getFullYear()}`;
+
+  next();
 });
 
-// Update timestamp on save
-MechanicSchema.pre('save', function (next) {
+monthlyOvertimeSchema.pre('save', function (next) {
+  const total            = this.entries?.reduce((sum, e) => sum + e.totalTime, 0) ?? 0;
+  this.totalMonthTime    = total;
+  this.formattedMonthTime = `${Math.floor(total / 60)}h ${total % 60}m`;
+  next();
+});
+
+mechanicSchema.pre('save', function (next) {
   this.updatedAt = Date.now();
   next();
 });
 
-// Create and export the Mechanic model
-const Mechanic = mongoose.model('Mechanic', MechanicSchema);
-module.exports = Mechanic;
+// ─────────────────────────────────────────────────────────────────────────────
+// Export
+// ─────────────────────────────────────────────────────────────────────────────
+
+module.exports = mongoose.model('Mechanic', mechanicSchema);
