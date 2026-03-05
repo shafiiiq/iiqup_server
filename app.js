@@ -95,7 +95,7 @@ app.get('/', (req, res) => res.send('Server is running!'));
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Public routes (no auth required) ──────────────────────────────────────────
-app.use('/ztech',               ztechRouter);
+app.use('/ztech',          ztechRouter);
 app.use('/users',          userRouter);
 app.use('/otp',            otpRouter);
 app.use('/equipments',     equipmentRouter);

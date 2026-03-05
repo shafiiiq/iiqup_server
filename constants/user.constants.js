@@ -2,9 +2,9 @@
 // User Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
-export const USER_ROLES = {
+const USER_ROLES = {
   CEO:                    'CEO',
   MD:                     'MD',
   SUPER_ADMIN:            'SUPER_ADMIN',
@@ -31,7 +31,7 @@ export const USER_ROLES = {
   CHARISHMA:              'CHARISHMA',
 };
 
-export const ROLE_PREFIX_MAP = {
+const ROLE_PREFIX_MAP = {
   CEO:                    'CEO',
   SUPER_ADMIN:            'SAD',
   CAMP_BOSS:              'CBS',
@@ -51,3 +51,5 @@ export const ROLE_PREFIX_MAP = {
   SUB_ACCOUNTANT:         'SBC',
   GUEST_USER:             'GUE',
 };
+
+module.exports = { JWT_SECRET, USER_ROLES, ROLE_PREFIX_MAP };

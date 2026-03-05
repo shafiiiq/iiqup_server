@@ -899,7 +899,9 @@ const getComplaintsByStatus = async (workflowStatus) => {
  */
 const getComplaintsByMechanic = async (email) => {
   try {
-    const mechanic = await Mechanic.findOne({ email });
+    console.log(email);
+    
+    const mechanic = await Mechanic.findOne({ email }); 
     if (!mechanic) throw new Error('Mechanic not found');
 
     return await Complaint.find({ assignedMechanic: { $elemMatch: { mechanicId: mechanic.userId } } }).sort({ createdAt: -1 });

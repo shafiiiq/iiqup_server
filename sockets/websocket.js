@@ -1,5 +1,5 @@
 // utils/websocket.js
-const { checkSessionStatus } = require('../services/user.service');
+const { checkSessionStatus }  = require('../services/session.service');
 const messageService          = require('../services/message.service');
 const chatService             = require('../services/chat.service');
 

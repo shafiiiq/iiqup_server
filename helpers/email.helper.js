@@ -6,7 +6,10 @@
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const MIME_TYPES = {
+const fs   = require('fs');
+const path = require('path');
+
+const MIME_TYPES = {
   '.pdf':  'application/pdf',
   '.doc':  'application/msword',
   '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -24,7 +27,7 @@ export const MIME_TYPES = {
 /**
  * Load a local image and return a base64 data URI, or '' on failure.
  */
-export const loadImageAsBase64 = (filename) => {
+const loadImageAsBase64 = (filename) => {
   try {
     const imgPath = path.join(__dirname, '../assets/images', filename);
     const buffer  = fs.readFileSync(imgPath);
@@ -38,5 +41,7 @@ export const loadImageAsBase64 = (filename) => {
 /**
  * Resolve MIME type from a filename extension.
  */
-export const getMimeType = (filename) =>
+const getMimeType = (filename) =>
   MIME_TYPES[path.extname(filename).toLowerCase()] ?? 'application/octet-stream';
+
+module.exports = { MIME_TYPES, loadImageAsBase64, getMimeType };

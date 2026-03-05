@@ -64,7 +64,7 @@ const createOperator = async (req, res) => {
     });
   } catch (error) {
     console.error('[Operator] createOperator:', error);
-    res.status(error.statusCode || 500).json({
+    res.status(error.status || 500).json({
       success: false,
       message: error.message || 'Failed to create operator',
       ...(error.details && { details: error.details }),
@@ -91,7 +91,7 @@ const verifyOperator = async (req, res) => {
     });
   } catch (error) {
     console.error('[Operator] verifyOperator:', error);
-    res.status(error.statusCode || 500).json({
+    res.status(error.status || 500).json({
       success: false,
       message: error.message || 'Failed to verify operator',
       ...(error.details && { details: error.details }),
@@ -121,7 +121,7 @@ const uploadProfilePic = async (req, res) => {
     });
   } catch (error) {
     console.error('[Operator] uploadProfilePic:', error);
-    res.status(error.statusCode || 500).json({
+    res.status(error.status || 500).json({
       success: false,
       message: error.message || 'Failed to upload profile picture',
     });
@@ -144,7 +144,7 @@ const getAllOperators = async (req, res) => {
     });
   } catch (error) {
     console.error('[Operator] getAllOperators:', error);
-    res.status(error.statusCode || 500).json({
+    res.status(error.status || 500).json({
       success: false,
       message: error.message || 'Failed to retrieve operators',
     });
@@ -169,7 +169,7 @@ const getOperatorByQatarId = async (req, res) => {
     });
   } catch (error) {
     console.error('[Operator] getOperatorByQatarId:', error);
-    res.status(error.statusCode || 500).json({
+    res.status(error.status || 500).json({
       success: false,
       message: error.message || 'Failed to retrieve operator',
     });
@@ -182,7 +182,7 @@ const getOperatorByQatarId = async (req, res) => {
  */
 const updateOperator = async (req, res) => {
   try {
-    const errors = validate({ id: { required: true } }, req.params);
+    const errors = validate({ qatarId: { required: true } }, req.params);
     if (errors.length) return sendValidationError(res, errors);
 
     if (req.body.equipmentNumber?.trim()) {
@@ -195,7 +195,7 @@ const updateOperator = async (req, res) => {
       }
     }
 
-    const operator = await OperatorService.updateOperator(req.params.id, req.body);
+    const operator = await OperatorService.updateOperator(req.params.qatarId, req.body);
 
     res.json({
       success: true,
@@ -204,7 +204,7 @@ const updateOperator = async (req, res) => {
     });
   } catch (error) {
     console.error('[Operator] updateOperator:', error);
-    res.status(error.statusCode || 500).json({
+    res.status(error.status || 500).json({
       success: false,
       message: error.message || 'Failed to update operator',
     });
@@ -228,7 +228,7 @@ const deleteOperator = async (req, res) => {
     });
   } catch (error) {
     console.error('[Operator] deleteOperator:', error);
-    res.status(error.statusCode || 500).json({
+    res.status(error.status || 500).json({
       success: false,
       message: error.message || 'Failed to delete operator',
     });

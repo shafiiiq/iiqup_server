@@ -39,12 +39,12 @@ class OAuth2GmailClient {
   constructor() {
     this.oauth2Client = null;
     this.gmail        = null;
-    this.refreshToken = process.env.SERVICE_GMAIL_REFRESH_TOKEN;
+    this.refreshToken = process.env.OPERATIONS_GMAIL_REFRESH_TOKEN;
   }
 
   async initialize() {
-    const clientId     = process.env.SERVICE_GOOGLE_CLIENT_ID?.replace(/"/g, '');
-    const clientSecret = process.env.SERVICE_GOOGLE_CLEINT_SECRET?.replace(/"/g, '');
+    const clientId     = process.env.OPERATIONS_GOOGLE_CLIENT_ID?.replace(/"/g, '');
+    const clientSecret = process.env.OPERATIONS_GOOGLE_CLEINT_SECRET?.replace(/"/g, '');
 
     if (!clientId || !clientSecret) {
       throw new Error('[Gmail] Missing Google OAuth credentials');
@@ -126,7 +126,7 @@ class OAuth2GmailClient {
     const boundary = `boundary_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
     const lines = [
-      `From: "SERVICE AL ANSARI TRANSPORT" <${process.env.SERVICE_OTP_MAILER}>`,
+      `From: "SALIH K. BASHEER" <${process.env.OPERATIONS_MAILER}>`,
       `To: ${to}`,
       ...(cc ? [`Cc: ${cc}`] : []),
       `Subject: =?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`,
