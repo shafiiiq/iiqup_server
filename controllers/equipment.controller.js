@@ -25,7 +25,7 @@ const paginationShape = (result) => ({
  */
 const addEquipments = async (req, res) => {
   try {
-    const result = await equipmentServices.insertEquipments(req.body);
+    await equipmentServices.insertEquipment(req.body);
 
     res.status(result.status).json(result);
   } catch (error) {
@@ -102,7 +102,7 @@ const updateEquipments = async (req, res) => {
     const { regNo }  = req.params;
     const updateData = req.body;
 
-    const result = await equipmentServices.updateEquipments(regNo, updateData);
+    const result = await equipmentServices.updateEquipment(regNo, updateData);
 
     res.status(result.status).json(result);
   } catch (error) {
@@ -118,7 +118,7 @@ const updateEquipments = async (req, res) => {
 const deleteEquipments = async (req, res) => {
   try {
     const { regNo } = req.params;
-    const result    = await equipmentServices.deleteEquipments(regNo);
+    const result    = await equipmentServices.deleteEquipment(regNo);
 
     res.status(result.status).json(result);
   } catch (error) {
