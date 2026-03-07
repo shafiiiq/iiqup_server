@@ -104,7 +104,7 @@ const logoutAllSessions = async (userId, currentSessionToken) => {
   } catch (error) {
     return { status: 500, success: false, message: 'Failed to logout all sessions', error: error.message };
   }
-};
+}; 
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Read

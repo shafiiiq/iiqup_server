@@ -16,7 +16,6 @@ const documentFileSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-    _id:        false,
   },
 );
 
@@ -28,7 +27,6 @@ const documentSourceSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-    _id:        false,
   },
 );
 

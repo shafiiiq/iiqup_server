@@ -11,7 +11,7 @@ const serviceHistoryServices = require('../services/history.service.js');
  */
 const addServiceHistory = async (req, res) => {
   try {
-    const result = await serviceHistoryServices.insertServiceHisory(req.body);
+    const result = await serviceHistoryServices.insertServiceHistory(req.body);
 
     res.status(result.status).json(result);
   } catch (error) {

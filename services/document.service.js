@@ -207,7 +207,7 @@ const getDocuments = async (sourceType, sourceId) => {
  * Returns all document records in the system.
  * @returns {Promise<object>}
  */
-const getAllDocuments = async () => {
+const getAllDocuments = async () => { 
   try {
     const documents = await documentModel.find({});
     return { status: 200, documents };

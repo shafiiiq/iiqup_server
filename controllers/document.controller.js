@@ -106,6 +106,7 @@ const getAllDocumentsTypes = async (req, res) => {
  */
 const downloadDocument = async (req, res) => {
   try {
+    console.log("hiiiiiiiiiiiiiiii")
     const { documentId } = req.params;
 
     if (!documentId) {
@@ -126,6 +127,7 @@ const downloadDocument = async (req, res) => {
  */
 const viewDocument = async (req, res) => {
   try {
+    console.log("fffffffffffffffff")
     const { documentId } = req.params;
 
     if (!documentId) {
