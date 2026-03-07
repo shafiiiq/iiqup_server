@@ -12,8 +12,8 @@ const s3Services = require('../services/s3.service');
 const getS3Config = async (req, res) => {
   try {
     const { key, isLong, isAuthSign } = req.body;
-    
     console.log("keyyyyyy", key)
+
     if (!key) {
       return res.status(400).json({ success: false, message: 'key is required' });
     }
