@@ -348,7 +348,8 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
 // ─────────────────────────────────────────────────────────────────────────────
 
 const alertMobilizationViaEmail = async (data = {}) => {
-  const to      = process.env.INFO_EMAIL;
+  const toList  = JSON.parse(process.env.MOBILIZATION_TO || '[]');
+  const to      = toList.join(', ');
   const ccList  = JSON.parse(process.env.MOBILIZATION_CC || '[]');
   const cc      = ccList.join(', ');
   const subject = ACTION_SUBJECT(data.machine, data.regNo)[data.action] ?? `Equipment Update – ${data.machine}`;

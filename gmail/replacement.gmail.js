@@ -347,7 +347,8 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const alertReplacementViaEmail = async (data = {}) => {
-  const to      = process.env.INFO_EMAIL;
+  const toList  = JSON.parse(process.env.REPLACEMENT_TO || '[]');
+  const to      = toList.join(', ');
   const ccList  = JSON.parse(process.env.REPLACEMENT_CC || '[]');
   const cc      = ccList.join(', ');
   const subject = REPLACEMENT_SUBJECT(data.machine, data.regNo)[data.type] ?? `Replacement Update – ${data.machine}`;
