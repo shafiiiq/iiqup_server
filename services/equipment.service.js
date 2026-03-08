@@ -865,7 +865,9 @@ const replaceOperator = async (data) => {
       date: selectedDate ? new Date(selectedDate) : new Date(),
       month, year, time, status: 'active',
       type: REPLACEMENT_TYPES.OPERATOR,
-      currentOperator, currentOperatorId, replacedOperator, replacedOperatorId, remarks
+      currentOperator,
+      currentOperatorId: currentOperatorId || undefined,
+      replacedOperator, replacedOperatorId, remarks
     });
 
     const updatedEquipment = await equipmentModel.findOneAndUpdate(
