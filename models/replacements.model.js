@@ -24,7 +24,7 @@ const replacementSchema = new mongoose.Schema(
 
     // Operator Replacement
     currentOperator:    { type: String,              required: function () { return this.type === 'operator'; } },
-    currentOperatorId:  { type: String, default: '', required: function () { return this.type === 'operator';} },
+    currentOperatorId:  { type: String, default: '' },
     replacedOperator:   { type: String,              required: function () { return this.type === 'operator'; } },
     replacedOperatorId: { type: String,              required: function () { return this.type === 'operator'; } },
 
