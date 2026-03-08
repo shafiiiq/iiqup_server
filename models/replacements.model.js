@@ -23,10 +23,10 @@ const replacementSchema = new mongoose.Schema(
     time:  { type: String, required: true                     },
 
     // Operator Replacement
-    currentOperator:    { type: String, required: function () { return this.type === 'operator'; } },
-    currentOperatorId:  { type: String, required: function () { return this.type === 'operator'; } },
-    replacedOperator:   { type: String, required: function () { return this.type === 'operator'; } },
-    replacedOperatorId: { type: String, required: function () { return this.type === 'operator'; } },
+    currentOperator:    { type: String,              required: function () { return this.type === 'operator'; } },
+    currentOperatorId:  { type: String, default: '', required: function () { return this.type === 'operator';} },
+    replacedOperator:   { type: String,              required: function () { return this.type === 'operator'; } },
+    replacedOperatorId: { type: String,              required: function () { return this.type === 'operator'; } },
 
     // Site Replacement
     currentSite:  { type: String, required: function () { return this.type === 'site'; } },

@@ -609,8 +609,7 @@ const replaceOperator = async (req, res) => {
 
     if (
       !equipmentId || !regNo || !machine ||
-      !currentOperator || !currentOperatorId ||
-      !replacedOperator || !replacedOperatorId ||
+      !currentOperator || !replacedOperator || !replacedOperatorId ||
       !month || !year || !time
     ) {
       return res.status(400).json({
