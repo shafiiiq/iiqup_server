@@ -225,6 +225,9 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
     time                   = '',
     date                   = '',
     remarks                = '',
+    hired                  = false,
+    rentRate               = null,
+    location               = [],
   } = data;
 
   const formatDate = (d) => d
@@ -310,8 +313,25 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
         </tr>
         ${remarks ? `
         <tr>
-          <td style="color:#666;">Remarks</td>
+          <td style="color:#666;">Remarks</td> 
           <td>${remarks}</td>
+        </tr>` : ''}
+        ${location?.length ? `
+        <tr>
+          <td style="color:#666;">Location</td>
+          <td>${location[location.length - 1]}</td>
+        </tr>` : ''}
+        ${hired && rentRate ? `
+        <tr style="background:#f5f5f5;">
+          <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Hire Rate</td>
+        </tr>
+        <tr>
+          <td style="color:#666;">Basis</td>
+          <td>${rentRate.basis ? rentRate.basis.charAt(0).toUpperCase() + rentRate.basis.slice(1) : 'N/A'}</td>
+        </tr>
+        <tr>
+          <td style="color:#666;">Rate</td>
+          <td><strong>${rentRate.rate} ${rentRate.currency || 'QAR'}</strong></td>
         </tr>` : ''}
       </table>
 

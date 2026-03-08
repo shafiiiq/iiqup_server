@@ -670,7 +670,10 @@ const mobilizeEquipment = async (data) => {
       action: 'mobilized', regNo, machine, site: deployLocation,
       deployType: deployType || 'site', clientCompany: clientCompany || '',
       operator: withOperator ? operator : '', withOperator,
-      month, year, time, date: selectedDate ? new Date(selectedDate) : new Date(), remarks
+      month, year, time, date: selectedDate ? new Date(selectedDate) : new Date(), remarks,
+      hired:    updatedEquipment?.hired    || false,
+      rentRate: updatedEquipment?.rentRate || null,
+      location: updatedEquipment?.location || [],
     }).catch(e => console.error('Mobilization email failed:', e));
 
     return { status: 201, ok: true, message: 'Equipment mobilized successfully', data: { mobilization, updatedEquipment } };
@@ -694,6 +697,16 @@ const demobilizeEquipment = async (data) => {
     const lastOperator      = currentEquipment?.certificationBody?.slice(-1)[0];
     const currentOperatorId = lastOperator?.operatorId;
 
+    let lastWorkedSite = currentEquipment?.site || [];
+
+    if (!lastWorkedSite.length) {
+      const lastMobilization = await mobilizationModel
+        .findOne({ equipmentId, action: 'mobilized' })
+        .sort({ date: -1, createdAt: -1 })
+        .lean();
+      if (lastMobilization?.site) lastWorkedSite = [lastMobilization.site];
+    }
+
     const [demobilization, updatedEquipment] = await Promise.all([
       mobilizationModel.create({
         equipmentId, regNo, machine,
@@ -703,7 +716,7 @@ const demobilizeEquipment = async (data) => {
       }),
       equipmentModel.findOneAndUpdate(
         { _id: equipmentId },
-        { $set: { status: 'idle', updatedAt: new Date() } },
+        { $set: { status: 'idle', lastSite: lastWorkedSite, updatedAt: new Date() } },
         { new: true }
       )
     ]);
@@ -723,7 +736,11 @@ const demobilizeEquipment = async (data) => {
 
     await alertMobilizationViaEmail({
       action: 'demobilized', regNo, machine,
-      month, year, time, date: selectedDate ? new Date(selectedDate) : new Date(), remarks
+      month, year, time, date: selectedDate ? new Date(selectedDate) : new Date(), remarks,
+      site:     lastWorkedSite?.[0] || '',
+      hired:    currentEquipment?.hired    || false,
+      rentRate: currentEquipment?.rentRate || null,
+      location: currentEquipment?.location || [],
     }).catch(e => console.error('Demobilization email failed:', e));
 
     return { status: 201, ok: true, message: 'Equipment demobilized successfully', data: { demobilization, updatedEquipment } };
@@ -879,7 +896,10 @@ const replaceOperator = async (data) => {
     await alertReplacementViaEmail({
       type: 'operator', regNo, machine,
       currentOperator, replacedOperator, site: updatedEquipment.site,
-      month, year, time, date: selectedDate ? new Date(selectedDate) : new Date(), remarks
+      month, year, time, date: selectedDate ? new Date(selectedDate) : new Date(), remarks,
+      hired:    updatedEquipment?.hired    || false,
+      rentRate: updatedEquipment?.rentRate || null,
+      location: updatedEquipment?.location || [],
     }).catch(e => console.error('Replace operator email failed:', e));
 
     return { status: 201, ok: true, message: 'Operator replaced successfully', data: { replacement, updatedEquipment } };
@@ -949,7 +969,10 @@ const replaceEquipment = async (data) => {
       type: 'equipment', regNo, machine,
       replacedEquipmentRegNo, replacedEquipmentMachine,
       site: currentSite, newSiteForReplaced,
-      month, year, time, date: selectedDate ? new Date(selectedDate) : new Date(), remarks
+      month, year, time, date: selectedDate ? new Date(selectedDate) : new Date(), remarks,
+      hired:    currentEquipment?.hired    || false,
+      rentRate: currentEquipment?.rentRate || null,
+      location: currentEquipment?.location || [],
     }).catch(e => console.error('Replace equipment email failed:', e));
 
     return {

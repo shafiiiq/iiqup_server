@@ -20,7 +20,7 @@ router.put   ('/status-update/:id',               controller.updateStatus);
 router.delete('/delete-equipment/:regNo',         controller.deleteEquipments);
 
 // ── Images ────────────────────────────────────────────────────────────────────
-router.get ('/equipment-images/:regNo',           controller.getEquipmentRegNo);
+router.get ('/equipment-images/:regNo',           controller.getEquipmentImages);
 router.post('/add-equipment-image',               controller.addEquipmentImage);
 router.post('/bulk-equipment-images',             controller.getBulkEquipmentImages);
 

@@ -14,6 +14,15 @@ const certificationBodySchema = new mongoose.Schema(
   { _id: false },
 );
 
+const rentRateSchema = new mongoose.Schema(
+  {
+    basis:    { type: String, enum: ['daily', 'hourly', 'monthly'], default: 'daily' },
+    rate:     { type: Number, default: 0 },
+    currency: { type: String, default: 'QAR' },
+  },
+  { _id: false },
+);
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Schema
 // ─────────────────────────────────────────────────────────────────────────────
@@ -38,6 +47,9 @@ const equipmentSchema = new mongoose.Schema(
     // Ownership & Deployment
     hired:     { type: Boolean, required: true, default: false },
     hiredFrom: { type: String,  default: ''                    },
+    rentRate:  { type: rentRateSchema, default: null },
+    lastSite:  { type: [String], default: [] },
+    location:  { type: [String], default: [] },
     outside:   { type: Boolean, required: true, default: false },
     site:      { type: [String], default: []                   },
 

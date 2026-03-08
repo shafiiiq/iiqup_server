@@ -76,7 +76,7 @@ const getEquipmentsByReg = async (req, res) => {
  * GET /equipment-images/:regNo
  * Returns a lightweight equipment record by registration number.
  */
-const getEquipmentRegNo = async (req, res) => {
+const getEquipmentImages = async (req, res) => {
   try {
     const { regNo } = req.params;
 
@@ -84,11 +84,11 @@ const getEquipmentRegNo = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Equipment regNo is required' });
     }
 
-    const result = await equipmentServices.getEquipmentRegNo(regNo);
+    const result = await equipmentServices.getEquipmentImages(regNo);
 
     res.status(result.status).json(result);
   } catch (error) {
-    console.error('[Equipment] getEquipmentRegNo:', error);
+    console.error('[Equipment] getEquipmentImages:', error);
     res.status(error.status || 500).json({ success: false, message: error.message });
   }
 };
@@ -764,7 +764,7 @@ module.exports = {
   addEquipments,
   getEquipments,
   getEquipmentsByReg,
-  getEquipmentRegNo,
+  getEquipmentImages,
   updateEquipments,
   deleteEquipments,
   updateStatus,
