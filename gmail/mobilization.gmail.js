@@ -336,7 +336,6 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
         </tr>` : ''}
       </table>
 
-      <p>For more details, please contact the Operations Supervisor at <strong>+974-51700493</strong>.</p>
       <br/>
       <p>
         Thanks &amp; Regards,<br/><br/>

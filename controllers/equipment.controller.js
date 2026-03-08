@@ -495,10 +495,10 @@ const demobilizeEquipment = async (req, res) => {
   } catch (error) {
     console.error('[Equipment] demobilizeEquipment:', error);
     res.status(500).json({ status: 500, ok: false, message: error.message });
-  }
+  } 
 };
 
-/**
+/** 
  * GET /mobilization-history/:equipmentId
  * Returns paginated mobilization history for a specific equipment unit.
  */
