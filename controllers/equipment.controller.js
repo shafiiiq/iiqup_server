@@ -25,7 +25,7 @@ const paginationShape = (result) => ({
  */
 const addEquipments = async (req, res) => {
   try {
-    await equipmentServices.insertEquipment(req.body);
+    const result = await equipmentServices.insertEquipment(req.body);
 
     res.status(result.status).json(result);
   } catch (error) {
