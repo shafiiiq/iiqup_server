@@ -31,8 +31,8 @@ const { equipments } = require('./data/equipments.js');
 // ─────────────────────────────────────────────────────────────────────────────
 
 const addActivationKey = async () => {
-  const userId = '68b6b3da0efac176acd70a8c';   // <-- fill in
-  const activationKey = '80134690154762403647';   // <-- fill in
+  const userId = '68b6b3970efac176acd70a89';   // <-- fill in
+  const activationKey = '51076237924015394049';   // <-- fill in
 
   if (!userId || !activationKey) throw new Error('userId and activationKey are required');
   if (activationKey.length !== 20) throw new Error('Activation key must be exactly 20 digits');
@@ -567,7 +567,7 @@ const run = async () => {
   console.log('🟢 DB connected\n');
 
   // ↓ swap this line to call whichever function you need
-  // await addActivationKey();
+  await addActivationKey();
   // await addCodeInSameSupplier();
   // await addCodeInSameVendor();
   // await setupOAuth();
@@ -580,7 +580,7 @@ const run = async () => {
   // await setCarsSiteToOffice();
   // await fixCarsAndIdleSites();
   // await syncEquipmentLocations();
-  await migrateEquipmentSchema();
+  // await migrateEquipmentSchema();
 };
 
 

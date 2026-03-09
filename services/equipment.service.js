@@ -367,7 +367,7 @@ const updateEquipment = async (regNo, updatedData, equipmentNumber = null, opera
     const originalEquipment = equipment.toObject();
 
     // Strip fields that must not be overwritten directly
-    const { _id, __v, createdAt, operator, operatorId, ...cleanUpdatedData } = updatedData;
+    const { _id, __v, createdAt, operator, operatorId, lastSite, lastLocation, lastCertificationBody, ...cleanUpdatedData } = updatedData;
 
     const setFields  = { ...cleanUpdatedData, updatedAt: new Date() };
     const pushFields = {};
