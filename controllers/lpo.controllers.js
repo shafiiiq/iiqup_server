@@ -584,7 +584,7 @@ const getPendingSignatures = async (req, res) => {
       return res.status(400).json({ success: false, message: 'uniqueCode is required' });
     }
 
-    const pending = await lpoService.getPendingSignatures(uniqueCode);    
+    const pending = await lpoService.getPendingSignatures(uniqueCode);      
 
     res.status(200).json({
       success: true,

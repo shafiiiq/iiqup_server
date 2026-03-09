@@ -777,42 +777,53 @@ const getPendingSignatures = async (uniqueCode) => {
   try {
     const roleMap = [
       {
-        envKey:    process.env.PURCHASE_MANAGER,
-        field:     'pmSigned',
-        // PM signs after upload — workflowStatus must be lpo_uploaded or lpo_amended
-        query:     { pmSigned: { $ne: true }, workflowStatus: { $in: ['lpo_uploaded', 'lpo_amended'] } },
+        envKey: process.env.PURCHASE_MANAGER,
+        field: 'pmSigned',
+        query: {
+          pmSigned: { $ne: true },
+          workflowStatus: { $in: ['lpo_uploaded', 'lpo_amended'] },
+        },
       },
       {
-        envKey:    process.env.MANAGER,
-        field:     'managerSigned',
-        query:     { managerSigned: { $ne: true }, pmSigned: true },
+        envKey: process.env.MANAGER,
+        field: 'managerSigned',
+        query: {
+          managerSigned: { $ne: true },
+          workflowStatus: { $in: ['lpo_uploaded', 'lpo_amended'] },
+        },
       },
       {
-        envKey:    process.env.CEO,
-        field:     'ceoSigned',
-        query:     {
-          ceoSigned:      { $ne: true },
-          managerSigned:  true,
+        envKey: process.env.CEO,
+        field: 'ceoSigned',
+        query: {
+          ceoSigned: { $ne: true },
+          workflowStatus: { $in: ['lpo_uploaded', 'lpo_amended'] },
           'signatures.authorizedSignatoryTitle': { $nin: ['MANAGING DIRECTOR'] },
         },
       },
       {
-        envKey:    process.env.MD,
-        field:     'ceoSigned',
-        query:     {
-          ceoSigned:      { $ne: true },
-          managerSigned:  true,
+        envKey: process.env.MD,
+        field: 'ceoSigned',
+        query: {
+          managerSigned: true,
+          workflowStatus: { $in: ['lpo_uploaded', 'lpo_amended'] },
           'signatures.authorizedSignatoryTitle': 'MANAGING DIRECTOR',
         },
       },
       {
-        envKey:    process.env.ACCOUNTS,
-        field:     'accountsSigned',
-        query:     { accountsSigned: { $ne: true }, ceoSigned: true },
+        envKey: process.env.ACCOUNTS,
+        field: 'accountsSigned',
+        query: {
+          accountsSigned: { $ne: true },
+          workflowStatus: { $in: ['lpo_uploaded', 'lpo_amended'] },
+        },
       },
     ];
 
     const matched = roleMap.find(r => r.envKey === uniqueCode);
+
+    console.log("matched", matched);
+    
     if (!matched) return [];    
 
     return await LPO.find(matched.query)
