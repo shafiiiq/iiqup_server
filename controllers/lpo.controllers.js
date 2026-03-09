@@ -571,6 +571,33 @@ const signLPO = async (req, res) => {
   }
 };
 
+/**
+ * GET /lpo/pending-signatures
+ * Returns all LPOs awaiting signature from the calling user.
+ * Role is resolved server-side from uniqueCode — nothing trusted from client.
+ */
+const getPendingSignatures = async (req, res) => {
+  try {
+    const { uniqueCode } = req.body;
+
+    if (!uniqueCode) {
+      return res.status(400).json({ success: false, message: 'uniqueCode is required' });
+    }
+
+    const pending = await lpoService.getPendingSignatures(uniqueCode);
+
+    res.status(200).json({
+      success: true,
+      message: 'Pending LPO signatures retrieved successfully',
+      data:    pending,
+      count:   pending.length,
+    });
+  } catch (error) {
+    console.error('[LPO] getPendingSignatures:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Email Controllers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -668,6 +695,7 @@ module.exports = {
   accountsApproval,
   markItemsAvailable,
   signLPO,
+  getPendingSignatures,
   // Email
   sendLpoViaEmail,
   updateVendorEmail,

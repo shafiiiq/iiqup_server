@@ -4,7 +4,7 @@ const multer  = require('multer');
 
 const controller = require('../controllers/backcharge.controller');
 
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ storage: multer.memoryStorage() }); 
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Backcharge Routes
@@ -31,5 +31,6 @@ router.get('/sites/search',                          controller.searchSites);
 
 // ── Signing ───────────────────────────────────────────────────────────────────
 router.post('/sign/:refNo(*)',                       controller.signBackcharge);
+router.post('/pending-signatures',                    controller.getPendingSignatures);
 
 module.exports = router;

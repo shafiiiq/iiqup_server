@@ -697,7 +697,133 @@ const signLPO = async (lpoRef, signData) => {
   const updated = await LPO.findOneAndUpdate({ lpoRef }, updateFields, { new: true });
   if (!updated) throw { status: 500, message: 'Failed to update LPO record' };
 
+  const nextStepMap = {
+    PURCHASE_MANAGER: {
+      title:       `MANAGER Approval Needed - LPO ${lpoRef}`,
+      description: `Purchase Manager signed LPO ${lpoRef}. Manager approval needed.`,
+      sourceId:    'accounts_approval',
+      navigateTo:  `/(screens)/managerSign/${lpoRef}`,
+      navigateText: 'View and Sign',
+      recipient:   JSON.parse(process.env.OFFICE_HERO),
+    },
+    MANAGER: {
+      title:       `${updated.signatures?.authorizedSignatoryTitle || 'CEO'} Approval Needed - LPO ${lpoRef}`,
+      description: `Manager signed LPO ${lpoRef}. ${updated.signatures?.authorizedSignatoryTitle || 'CEO'} approval needed.`,
+      sourceId:    updated.signatures?.authorizedSignatoryTitle === 'MANAGING DIRECTOR' ? 'md_approval' : 'ceo_approval',
+      navigateTo:  updated.signatures?.authorizedSignatoryTitle === 'MANAGING DIRECTOR'
+        ? `/(screens)/mdSign/${lpoRef}`
+        : `/(screens)/ceoSign/${lpoRef}`,
+      navigateText: 'View and Sign',
+      recipient:   JSON.parse(process.env.OFFICE_HERO),
+    },
+    CEO: {
+      title:       `ACCOUNTS Approval Needed - LPO ${lpoRef}`,
+      description: `CEO signed LPO ${lpoRef}. Accounts approval needed.`,
+      sourceId:    'final_approval',
+      navigateTo:  `/(screens)/accountsSign/${lpoRef}`,
+      navigateText: 'View and Sign',
+      recipient:   JSON.parse(process.env.OFFICE_HERO),
+    },
+    MANAGING_DIRECTOR: {
+      title:       `ACCOUNTS Approval Needed - LPO ${lpoRef}`,
+      description: `MD signed LPO ${lpoRef}. Accounts approval needed.`,
+      sourceId:    'final_approval',
+      navigateTo:  `/(screens)/accountsSign/${lpoRef}`,
+      navigateText: 'View and Sign',
+      recipient:   JSON.parse(process.env.OFFICE_HERO),
+    },
+    ACCOUNTS: {
+      title:       `LPO Signed & Ready - ${lpoRef}`,
+      description: `Accounts signed LPO ${lpoRef}. All signatures complete. Items can now be procured.`,
+      sourceId:    'manager_approval',
+      navigateTo:  `/(screens)/signedLpo/${lpoRef}`,
+      navigateText: 'View the item required',
+      recipient:   JSON.parse(process.env.OFFICE_MAIN),
+    },
+  };
+
+  const notifConfig = nextStepMap[matched.role];
+
+  if (notifConfig) {
+    const { recipient, title, description, sourceId, navigateTo, navigateText } = notifConfig;
+
+    await notify(
+      {
+        title,
+        description,
+        priority:     'high',
+        sourceId,
+        navigateTo,
+        navigateText,
+        navigteToId:  lpoRef,
+        hasButton:    true,
+      },
+      recipient,
+      title,
+      description
+    );
+  }
+
   return { status: 200, message: `${matched.role} signature recorded successfully`, data: updated, role: matched.role };
+};
+
+/**
+ * Returns all LPOs where the calling user has not yet signed
+ * but the preceding step in the chain is complete.
+ * @param {string} uniqueCode
+ * @returns {Promise<object[]>}
+ */
+const getPendingSignatures = async (uniqueCode) => {
+  try {
+    const roleMap = [
+      {
+        envKey:    process.env.PURCHASE_MANAGER,
+        field:     'pmSigned',
+        // PM signs after upload — workflowStatus must be lpo_uploaded or lpo_amended
+        query:     { pmSigned: { $ne: true }, workflowStatus: { $in: ['lpo_uploaded', 'lpo_amended'] } },
+      },
+      {
+        envKey:    process.env.MANAGER,
+        field:     'managerSigned',
+        query:     { managerSigned: { $ne: true }, pmSigned: true },
+      },
+      {
+        envKey:    process.env.CEO,
+        field:     'ceoSigned',
+        query:     {
+          ceoSigned:      { $ne: true },
+          managerSigned:  true,
+          'signatures.authorizedSignatoryTitle': { $nin: ['MANAGING DIRECTOR'] },
+        },
+      },
+      {
+        envKey:    process.env.MD,
+        field:     'ceoSigned',
+        query:     {
+          ceoSigned:      { $ne: true },
+          managerSigned:  true,
+          'signatures.authorizedSignatoryTitle': 'MANAGING DIRECTOR',
+        },
+      },
+      {
+        envKey:    process.env.ACCOUNTS,
+        field:     'accountsSigned',
+        query:     { accountsSigned: { $ne: true }, ceoSigned: true },
+      },
+    ];
+
+    const matched = roleMap.find(r => r.envKey === uniqueCode);
+    if (!matched) return [];
+
+    return await LPO.find(matched.query)
+      .select('lpoRef date company equipments totalAmount workflowStatus pmSigned managerSigned ceoSigned accountsSigned signatures')
+      .sort({ createdAt: -1 })
+      .lean();
+
+  } catch (error) {
+    console.error('[LPOService] getPendingSignatures:', error);
+    throw new Error(`Error fetching pending LPO signatures: ${error.message}`);
+  }
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -887,6 +1013,7 @@ module.exports = {
   accountsApproval,
   markItemsAvailable,
   signLPO,
+  getPendingSignatures,
   getAllLPOs,
   getLPOByRef,
   getAllCompanyDetails,

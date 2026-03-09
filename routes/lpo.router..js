@@ -35,6 +35,7 @@ router.post  ('/items-available/:lpoRef(*)',           controller.markItemsAvail
 
 // ── Signing   ───────────────────────────────────────────────────────────────────
 router.post  ('/sign/:lpoRef(*)',                      controller.signLPO);
+router.post   ('/pending-signatures',                   controller.getPendingSignatures);
 
 // ── Email ─────────────────────────────────────────────────────────────────────
 router.post  ('/send-via-email', upload.single('pdf'), controller.sendLpoViaEmail);

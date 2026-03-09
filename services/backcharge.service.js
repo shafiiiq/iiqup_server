@@ -1,9 +1,33 @@
 // services/backcharge.service.js
 const Backcharge = require('../models/backcharge.model');
+const { createNotification }  = require('./notification.service');
+const PushNotificationService = require('../push/notification.push');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Sends a notification and a push notification together.
+ * @param {object} notifPayload
+ * @param {string|Array} recipient
+ * @param {string} title
+ * @param {string} description
+ * @param {string} priority
+ * @returns {Promise<void>}
+ */
+const notify = async (notifPayload, recipient, title, description, priority = 'high') => {
+  const notification = await createNotification({ ...notifPayload, recipient, time: new Date() });
+
+  await PushNotificationService.sendGeneralNotification(
+    recipient,
+    title,
+    description,
+    priority,
+    'normal',
+    notification.data._id.toString()
+  );
+};
 
 /**
  * Converts flat scopeOfWork / scopeLine2Text fields into the structured { combinedText, lines } shape.
@@ -467,7 +491,101 @@ const signBackcharge = async (refNo, signData) => {
   );
   if (!updated) throw { status: 500, message: 'Failed to update backcharge record' };
 
+  const nextStepMap = {
+    WORKSHOP_MANAGER: {
+      title:       `Purchase Manager Approval Needed - ${refNo}`,
+      description: `Workshop Manager signed backcharge ${refNo}. Purchase Manager approval needed.`,
+      sourceId:    'backcharge_approval',
+      recipient:   JSON.parse(process.env.OFFICE_HERO),
+    },
+    PURCHASE_MANAGER: {
+      title:       `Manager Approval Needed - ${refNo}`,
+      description: `Purchase Manager signed backcharge ${refNo}. Manager approval needed.`,
+      sourceId:    'backcharge_approval',
+      recipient:   JSON.parse(process.env.OFFICE_HERO),
+    },
+    MANAGER: {
+       title:       `${updated.signatures?.authorizedSignatory?.authorizedSignatoryMode || 'CEO'} Approval Needed - ${refNo}`,
+      description: `Manager signed backcharge ${refNo}. ${updated.signatures?.authorizedSignatory?.authorizedSignatoryMode || 'CEO'} approval needed.`,
+      sourceId:    updated.signatures?.authorizedSignatory?.authorizedSignatoryMode === 'MANAGING DIRECTOR'
+        ? 'md_approval'
+        : 'ceo_approval',
+       recipient:   JSON.parse(process.env.OFFICE_HERO),
+     },
+    CEO: {
+      title:       `Backcharge Signed & Ready - ${refNo}`,
+      description: `CEO signed backcharge ${refNo}. All signatures complete.`,
+      sourceId:    'backcharge_final',
+       recipient:   JSON.parse(process.env.OFFICE_MAIN),
+    },
+     MANAGING_DIRECTOR: {
+      title:       `Backcharge Signed & Ready - ${refNo}`,
+      description: `MD signed backcharge ${refNo}. All signatures complete.`,
+      sourceId:    'backcharge_final',
+      recipient:   JSON.parse(process.env.OFFICE_MAIN),
+     },
+  };
+
+  const notifConfig = nextStepMap[matched.role];
+
+  if (notifConfig) {
+   const { recipient, title, description, sourceId } = notifConfig;
+
+   await notify(
+     { title, description, priority: 'high', sourceId },
+     recipient,
+      title,
+      description
+    );
+  }
+
   return { status: 200, message: `${matched.role} signature recorded successfully`, data: updated, role: matched.role };
+};
+
+/**
+ * Returns all backcharge documents where the given uniqueCode has NOT yet signed
+ * their corresponding role field, but the previous role in the chain has signed.
+ * @param {string} uniqueCode
+ * @returns {Promise<Array>}
+ */
+const getPendingSignatures = async (uniqueCode) => {
+  try {
+    const roleMap = [
+      { envKey: process.env.WORKSHOP_MANAGER, field: 'workshopManager',     prevField: null                },
+      { envKey: process.env.PURCHASE_MANAGER, field: 'purchaseManager',     prevField: 'workshopManager'   },
+      { envKey: process.env.MANAGER,          field: 'operationsManager',   prevField: 'purchaseManager'   },
+      { envKey: process.env.CEO,              field: 'authorizedSignatory', prevField: 'operationsManager' },
+      { envKey: process.env.MD,               field: 'authorizedSignatory', prevField: 'operationsManager' },
+    ];
+
+    const matched = roleMap.find(r => r.envKey === uniqueCode);
+    if (!matched) return [];
+
+    // Build query: their field is not yet signed
+    const query = { [`signatures.${matched.field}.signed`]: { $ne: true } };
+
+    // If there's a previous step, that step must already be signed
+    if (matched.prevField) {
+      query[`signatures.${matched.prevField}.signed`] = true;
+    }
+
+    // CEO/MD: also filter by authorizedSignatoryMode matching their role
+    if (matched.envKey === process.env.CEO) {
+      query['signatures.authorizedSignatory.authorizedSignatoryMode'] = { $nin: ['MANAGING DIRECTOR'] };
+    }
+    if (matched.envKey === process.env.MD) {
+      query['signatures.authorizedSignatory.authorizedSignatoryMode'] = 'MANAGING DIRECTOR';
+    }
+
+    return await Backcharge.find(query)
+      .select('refNo reportNo supplierName equipmentType plateNo date signatures')
+      .sort({ createdAt: -1 })
+      .lean();
+
+  } catch (error) {
+    console.error('[BackchargeService] getPendingSignatures:', error);
+    throw new Error(`Error fetching pending signatures: ${error.message}`);
+  }
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -490,4 +608,5 @@ module.exports = {
   deleteBackcharge,
   saveSupplierEmail,
   signBackcharge,
+  getPendingSignatures
 };

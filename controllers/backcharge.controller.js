@@ -347,6 +347,33 @@ const signBackcharge = async (req, res) => {
   }
 };
 
+/**
+ * GET /pending-signatures
+ * Returns all backcharge documents awaiting signature from the calling user.
+ * uniqueCode is passed as a query param (resolved server-side — no role trusted from client).
+ */
+const getPendingSignatures = async (req, res) => {
+  try {
+    const { uniqueCode } = req.body;
+
+    if (!uniqueCode) {
+      return res.status(400).json({ success: false, message: 'uniqueCode is required' });
+    }
+
+    const pending = await backchargeService.getPendingSignatures(uniqueCode);
+
+    res.status(200).json({
+      success: true,
+      message: 'Pending signatures retrieved successfully',
+      data:    pending,
+      count:   pending.length,
+    });
+  } catch (error) {
+    console.error('[Backcharge] getPendingSignatures:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Exports
 // ─────────────────────────────────────────────────────────────────────────────
@@ -366,4 +393,5 @@ module.exports = {
   searchSuppliers,
   searchSites,
   signBackcharge,
+  getPendingSignatures
 };
