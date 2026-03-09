@@ -42,16 +42,18 @@ const equipmentSchema = new mongoose.Schema(
     istimaraExpiry:    { type: String, default: '' },
     insuranceExpiry:   { type: String, default: '' },
     tpcExpiry:         { type: String, default: '' },
-    certificationBody: { type: [certificationBodySchema], default: [] },
 
     // Ownership & Deployment
     hired:     { type: Boolean, required: true, default: false },
     hiredFrom: { type: String,  default: ''                    },
     rentRate:  { type: rentRateSchema, default: null },
-    lastSite:  { type: [String], default: [] },
-    location:  { type: [String], default: [] },
     outside:   { type: Boolean, required: true, default: false },
-    site:      { type: [String], default: []                   },
+    certificationBody: { type: [certificationBodySchema], default: [] },
+    lastCertificationBody: { type: [certificationBodySchema], default: [] },
+    site: { type: [String], default: [] },
+    lastSite:     { type: [String], default: [] },
+    location:     { type: String, default: null },
+    lastLocation: { type: [String], default: [] },
 
     // Lifecycle
     status: { type: String, required: true },

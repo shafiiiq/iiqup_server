@@ -250,7 +250,7 @@ const getEquipmentCount = async (req, res) => {
           { company:           { $regex: searchTerm, $options: 'i' } },
           { status:            { $regex: searchTerm, $options: 'i' } },
           { site:              { $regex: searchTerm, $options: 'i' } },
-          { certificationBody: { $regex: searchTerm, $options: 'i' } },
+          { 'certificationBody.operatorName': { $regex: searchTerm, $options: 'i' } },
         ];
         if (!isNaN(searchTerm)) query.$or.push({ year: parseInt(searchTerm) });
       } else if (searchField === 'site') {

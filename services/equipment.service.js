@@ -126,8 +126,6 @@ const insertEquipment = async (data) => {
 
     const count  = await equipmentModel.countDocuments();
     data.id      = await _resolveNextId(count + 1);
-    data.certificationBody = normaliseCertificationBody(data.certificationBody);
-    data.site              = normaliseSite(data.site);
 
     const equipment = await equipmentModel.create(data);
 
@@ -279,9 +277,8 @@ const fetchEquipmentStats = async (hiredFilter = null) => {
       ]),
       equipmentModel.aggregate([
         { $match: query },
-        { $unwind: '$site' },
-        { $group: { _id: null, sites: { $last: '$site' } } },
-        { $group: { _id: '$sites', count: { $sum: 1 } } },
+        { $match: { site: { $ne: null } } },
+        { $group: { _id: '$site', count: { $sum: 1 } } },
         { $sort:  { count: -1 } }
       ])
     ]);
@@ -315,9 +312,7 @@ const fetchEquipmentStats = async (hiredFilter = null) => {
 const fetchUniqueSites = async () => {
   try {
     const sites = await equipmentModel.distinct('site');
-    return [...new Set(sites.flat())]
-      .filter(site => site?.trim())
-      .sort();
+    return sites.filter(s => s?.trim()).sort();
   } catch (err) {
     console.error('[EquipmentService] fetchUniqueSites:', err);
     throw err;
@@ -365,13 +360,6 @@ const updateEquipment = async (regNo, updatedData, equipmentNumber = null, opera
     const equipment = await equipmentModel.findOne({ regNo });
     if (!equipment) return { status: 404, ok: false, message: 'Equipment not found' };
 
-    // Migration: convert legacy string certificationBody entries to objects
-    if (equipment.certificationBody?.some(item => typeof item === 'string')) {
-      const migrated = normaliseCertificationBody(equipment.certificationBody);
-      await equipmentModel.findOneAndUpdate({ regNo }, { $set: { certificationBody: migrated } });
-      equipment.certificationBody = migrated;
-    }
-
     if (updatedData.company === 'HIRED' && !updatedData.hiredFrom && !equipment.hiredFrom) {
       return { status: 400, ok: false, message: 'hiredFrom is required when company is HIRED' };
     }
@@ -379,18 +367,36 @@ const updateEquipment = async (regNo, updatedData, equipmentNumber = null, opera
     const originalEquipment = equipment.toObject();
 
     // Strip fields that must not be overwritten directly
-    const { _id, __v, createdAt, certificationBody, ...cleanUpdatedData } = updatedData;
-    const { updateData, newOperatorId } = buildOperatorUpdateData(cleanUpdatedData);
+    const { _id, __v, createdAt, operator, operatorId, ...cleanUpdatedData } = updatedData;
 
-    const result = await equipmentModel.findOneAndUpdate(
-      { regNo },
-      updateData,
-      { new: true, runValidators: true }
-    );
+    const setFields  = { ...cleanUpdatedData, updatedAt: new Date() };
+    const pushFields = {};
+    let   newOperatorId = null;
+
+    if (cleanUpdatedData.site !== undefined && cleanUpdatedData.site !== originalEquipment.site) {
+      if (originalEquipment.site) pushFields.lastSite = originalEquipment.site;
+      setFields.site = cleanUpdatedData.site || null;
+    }
+
+    if (cleanUpdatedData.location !== undefined && cleanUpdatedData.location !== originalEquipment.location) {
+      if (originalEquipment.location) pushFields.lastLocation = originalEquipment.location;
+      setFields.location = cleanUpdatedData.location || null;
+    }
+
+    if (operator !== undefined && operator !== originalEquipment.certificationBody?.operatorName) {
+      if (originalEquipment.certificationBody) pushFields.lastCertificationBody = originalEquipment.certificationBody;
+      newOperatorId = operatorId || null;
+      setFields.certificationBody = { operatorName: operator, operatorId: operatorId || '', assignedAt: new Date() };
+    }
+
+    const updateOp = { $set: setFields };
+    if (Object.keys(pushFields).length) updateOp.$push = pushFields;
+
+    const result = await equipmentModel.findOneAndUpdate({ regNo }, updateOp, { new: true, runValidators: true });
 
     // Update operator assignment records
     if (newOperatorId) {
-      const prevOperatorId = originalEquipment.certificationBody?.slice(-1)[0]?.operatorId;
+      const prevOperatorId = originalEquipment.certificationBody?.operatorId;
       if (prevOperatorId && prevOperatorId !== newOperatorId) {
         await safeUpdateOperator(prevOperatorId, { equipmentNumber: '' });
       }
@@ -635,14 +641,21 @@ const mobilizeEquipment = async (data) => {
       status:        newStatus
     });
 
+    const currentEquipment = await equipmentModel.findById(equipmentId);
+
     const updateOperation = {
-      $set: { status: newStatus, site: [deployLocation], updatedAt: new Date() }
+      $set: { status: newStatus, site: deployLocation, updatedAt: new Date() }
     };
 
+    if (currentEquipment?.site) {
+      updateOperation.$push = { lastSite: currentEquipment.site };
+    }
+
     if (withOperator && operator && operatorId) {
-      updateOperation.$push = {
-        certificationBody: { operatorName: operator, operatorId, assignedAt: new Date() }
-      };
+      if (currentEquipment?.certificationBody) {
+        updateOperation.$push = { ...(updateOperation.$push || {}), lastCertificationBody: currentEquipment.certificationBody };
+      }
+      updateOperation.$set.certificationBody = { operatorName: operator, operatorId, assignedAt: new Date() };
     }
 
     const updatedEquipment = await equipmentModel.findOneAndUpdate(
@@ -673,7 +686,7 @@ const mobilizeEquipment = async (data) => {
       month, year, time, date: selectedDate ? new Date(selectedDate) : new Date(), remarks,
       hired:    updatedEquipment?.hired    || false,
       rentRate: updatedEquipment?.rentRate || null,
-      location: updatedEquipment?.location || [],
+      location: updatedEquipment?.location ? [updatedEquipment.location] : []
     }).catch(e => console.error('Mobilization email failed:', e));
 
     return { status: 201, ok: true, message: 'Equipment mobilized successfully', data: { mobilization, updatedEquipment } };
@@ -694,18 +707,8 @@ const demobilizeEquipment = async (data) => {
     const { equipmentId, regNo, machine, month, year, time, selectedDate, remarks } = data;
 
     const currentEquipment  = await equipmentModel.findById(equipmentId);
-    const lastOperator      = currentEquipment?.certificationBody?.slice(-1)[0];
-    const currentOperatorId = lastOperator?.operatorId;
-
-    let lastWorkedSite = currentEquipment?.site || [];
-
-    if (!lastWorkedSite.length) {
-      const lastMobilization = await mobilizationModel
-        .findOne({ equipmentId, action: 'mobilized' })
-        .sort({ date: -1, createdAt: -1 })
-        .lean();
-      if (lastMobilization?.site) lastWorkedSite = [lastMobilization.site];
-    }
+    const currentOperatorId = currentEquipment?.certificationBody?.operatorId;
+    const currentSite       = currentEquipment?.site || null;
 
     const [demobilization, updatedEquipment] = await Promise.all([
       mobilizationModel.create({
@@ -715,11 +718,13 @@ const demobilizeEquipment = async (data) => {
         time, remarks, status: 'idle'
       }),
       equipmentModel.findOneAndUpdate(
-        { _id: equipmentId },
-        { $set: { status: 'idle', lastSite: lastWorkedSite, updatedAt: new Date() } },
-        { new: true }
-      )
-    ]);
+      { _id: equipmentId },
+      {
+        $set:  { status: 'idle', site: null, updatedAt: new Date() },
+        ...(currentSite && { $push: { lastSite: currentSite } })
+      },
+      { new: true }
+    )]);
 
     if (!updatedEquipment) return { status: 404, ok: false, message: 'Equipment not found' };
 
@@ -737,10 +742,10 @@ const demobilizeEquipment = async (data) => {
     await alertMobilizationViaEmail({
       action: 'demobilized', regNo, machine,
       month, year, time, date: selectedDate ? new Date(selectedDate) : new Date(), remarks,
-      site:     lastWorkedSite?.[0] || '',
+      site:     currentSite || '',
       hired:    currentEquipment?.hired    || false,
       rentRate: currentEquipment?.rentRate || null,
-      location: currentEquipment?.location || [],
+      location: currentEquipment?.location ? [currentEquipment.location] : [],
     }).catch(e => console.error('Demobilization email failed:', e));
 
     return { status: 201, ok: true, message: 'Equipment demobilized successfully', data: { demobilization, updatedEquipment } };
@@ -870,14 +875,19 @@ const replaceOperator = async (data) => {
       replacedOperator, replacedOperatorId, remarks
     });
 
-    const updatedEquipment = await equipmentModel.findOneAndUpdate(
-      { _id: equipmentId },
-      {
-        $push: { certificationBody: { operatorName: replacedOperator, operatorId: replacedOperatorId, assignedAt: new Date() } },
-        $set:  { updatedAt: new Date() }
-      },
-      { new: true }
-    );
+    const currentEquipment = await equipmentModel.findById(equipmentId);
+
+    const replaceOp = {
+      $set: {
+        certificationBody: { operatorName: replacedOperator, operatorId: replacedOperatorId, assignedAt: new Date() },
+        updatedAt: new Date()
+      }
+    };
+    if (currentEquipment?.certificationBody) {
+      replaceOp.$push = { lastCertificationBody: currentEquipment.certificationBody };
+    }
+
+    const updatedEquipment = await equipmentModel.findOneAndUpdate({ _id: equipmentId }, replaceOp, { new: true });
 
     if (!updatedEquipment) return { status: 404, ok: false, message: 'Equipment not found' };
 
@@ -897,11 +907,11 @@ const replaceOperator = async (data) => {
 
     await alertReplacementViaEmail({
       type: 'operator', regNo, machine,
-      currentOperator, replacedOperator, site: updatedEquipment.site,
+      currentOperator, replacedOperator, site: updatedEquipment.site || '',
       month, year, time, date: selectedDate ? new Date(selectedDate) : new Date(), remarks,
       hired:    updatedEquipment?.hired    || false,
       rentRate: updatedEquipment?.rentRate || null,
-      location: updatedEquipment?.location || [],
+      location: updatedEquipment?.location ? [updatedEquipment.location] : []
     }).catch(e => console.error('Replace operator email failed:', e));
 
     return { status: 201, ok: true, message: 'Operator replaced successfully', data: { replacement, updatedEquipment } };
@@ -928,7 +938,7 @@ const replaceEquipment = async (data) => {
     const currentEquipment = await equipmentModel.findById(equipmentId);
     if (!currentEquipment) return { status: 404, ok: false, message: 'Current equipment not found' };
 
-    const currentSite = currentEquipment.site?.[0];
+    const currentSite = currentEquipment.site;
     if (!currentSite) return { status: 400, ok: false, message: 'Current equipment has no site assigned' };
 
     const replacement = await replacementsModel.create({
@@ -939,19 +949,23 @@ const replaceEquipment = async (data) => {
       replacedEquipmentId, remarks
     });
 
-    const currentEquipmentUpdate = newSiteForReplaced
-      ? { site: [newSiteForReplaced], status: 'active', updatedAt: new Date() }
-      : { site: [],                   status: 'idle',   updatedAt: new Date() };
+    const replacedEquipment = await equipmentModel.findById(replacedEquipmentId);
 
     const [updatedReplacedEquipment, updatedCurrentEquipment] = await Promise.all([
       equipmentModel.findOneAndUpdate(
         { _id: replacedEquipmentId },
-        { $set: { site: [currentSite], status: 'active', updatedAt: new Date() } },
+        {
+          $set:  { site: currentSite, status: 'active', updatedAt: new Date() },
+          ...(replacedEquipment?.site && { $push: { lastSite: replacedEquipment.site } })
+        },
         { new: true }
       ),
       equipmentModel.findOneAndUpdate(
         { _id: equipmentId },
-        { $set: currentEquipmentUpdate },
+        {
+          $set:  { site: newSiteForReplaced || null, status: newSiteForReplaced ? 'active' : 'idle', updatedAt: new Date() },
+          $push: { lastSite: currentSite }
+        },
         { new: true }
       )
     ]);
@@ -966,7 +980,7 @@ const replaceEquipment = async (data) => {
       sourceId:    updatedCurrentEquipment._id,
       recipient:   officeMain
     });
-
+ 
     await alertReplacementViaEmail({
       type: 'equipment', regNo, machine,
       replacedEquipmentRegNo, replacedEquipmentMachine,
@@ -974,7 +988,7 @@ const replaceEquipment = async (data) => {
       month, year, time, date: selectedDate ? new Date(selectedDate) : new Date(), remarks,
       hired:    currentEquipment?.hired    || false,
       rentRate: currentEquipment?.rentRate || null,
-      location: currentEquipment?.location || [],
+      location: currentEquipment?.location ? [currentEquipment.location] : []
     }).catch(e => console.error('Replace equipment email failed:', e));
 
     return {
