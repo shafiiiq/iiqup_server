@@ -34,7 +34,7 @@ router.post  ('/accounts-approval/:lpoRef(*)',         controller.accountsApprov
 router.post  ('/items-available/:lpoRef(*)',           controller.markItemsAvailable);
 
 // ── Signing   ───────────────────────────────────────────────────────────────────
-router.post  ('/sign/:lpoRef(*)',                      controller.signLPO);
+router.post  ('/sign/:lpoRef(*)',                       controller.signLPO);
 router.post   ('/pending-signatures',                   controller.getPendingSignatures);
 
 // ── Email ─────────────────────────────────────────────────────────────────────

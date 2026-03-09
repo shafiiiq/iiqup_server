@@ -813,7 +813,7 @@ const getPendingSignatures = async (uniqueCode) => {
     ];
 
     const matched = roleMap.find(r => r.envKey === uniqueCode);
-    if (!matched) return [];
+    if (!matched) return [];    
 
     return await LPO.find(matched.query)
       .select('lpoRef date company equipments totalAmount workflowStatus pmSigned managerSigned ceoSigned accountsSigned signatures')
