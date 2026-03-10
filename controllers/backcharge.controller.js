@@ -321,12 +321,13 @@ const searchSites = async (req, res) => {
 /**
  * POST /sign/:refNo
  * Identifies the signer by uniqueCode server-side and records the signature.
+ * Supports override flag for out-of-order signing.
  * No role is trusted from the client.
  */
 const signBackcharge = async (req, res) => {
   try {
-    const { refNo }                                                    = req.params;
-    const { uniqueCode, signedDate, signedFrom, signedIP, signedDevice, signedLocation } = req.body;
+    const { refNo }                                                                               = req.params;
+    const { uniqueCode, signedDate, signedFrom, override = false, signedIP, signedDevice, signedLocation } = req.body;
 
     if (!uniqueCode) {
       return res.status(400).json({ success: false, message: 'uniqueCode is required' });
@@ -337,8 +338,13 @@ const signBackcharge = async (req, res) => {
     }
 
     const result = await backchargeService.signBackcharge(refNo, {
-      uniqueCode, signedDate, signedFrom, signedIP, signedDevice, signedLocation,
+      uniqueCode, signedDate, signedFrom, override, signedIP, signedDevice, signedLocation,
     });
+
+    // Out-of-order detected — frontend will show override prompt
+    if (result.requireOverride) {
+      return res.status(202).json({ success: false, requireOverride: true, unsignedAbove: result.unsignedAbove, message: result.message });
+    }
 
     res.status(200).json(result);
   } catch (error) {
@@ -374,6 +380,33 @@ const getPendingSignatures = async (req, res) => {
   }
 };
 
+/**
+ * POST /signed-by-user
+ * Returns all backcharge documents the calling user has already signed.
+ * uniqueCode is resolved server-side — no role trusted from client.
+ */
+const getSignedByUser = async (req, res) => {
+  try {
+    const { uniqueCode } = req.body;
+
+    if (!uniqueCode) {
+      return res.status(400).json({ success: false, message: 'uniqueCode is required' });
+    }
+
+    const signed = await backchargeService.getSignedByUser(uniqueCode);
+
+    res.status(200).json({
+      success: true,
+      message: 'Signed documents retrieved successfully',
+      data:    signed,
+      count:   signed.length,
+    });
+  } catch (error) {
+    console.error('[Backcharge] getSignedByUser:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Exports
 // ─────────────────────────────────────────────────────────────────────────────
@@ -393,5 +426,6 @@ module.exports = {
   searchSuppliers,
   searchSites,
   signBackcharge,
-  getPendingSignatures
+  getPendingSignatures,
+  getSignedByUser
 };

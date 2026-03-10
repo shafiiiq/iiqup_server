@@ -137,6 +137,60 @@ const getLPOByRef = async (req, res) => {
 };
 
 /**
+ * POST /lpo/pending-signatures
+ * Returns all LPOs awaiting signature from the calling user.
+ * Role is resolved server-side from uniqueCode — nothing trusted from client.
+ */
+const getPendingSignatures = async (req, res) => {
+  try {
+    const { uniqueCode } = req.body;
+
+    if (!uniqueCode) {
+      return res.status(400).json({ success: false, message: 'uniqueCode is required' });
+    }
+
+    const pending = await lpoService.getPendingSignatures(uniqueCode);      
+
+    res.status(200).json({
+      success: true,
+      message: 'Pending LPO signatures retrieved successfully',
+      data:    pending,
+      count:   pending.length,
+    });
+  } catch (error) {
+    console.error('[LPO] getPendingSignatures:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * POST /lpo/signed-by-user
+ * Returns all LPOs already signed by the calling user.
+ * Role resolved server-side from uniqueCode.
+ */
+const getSignedByUser = async (req, res) => {
+  try {
+    const { uniqueCode } = req.body;
+
+    if (!uniqueCode) {
+      return res.status(400).json({ success: false, message: 'uniqueCode is required' });
+    }
+
+    const signed = await lpoService.getSignedByUser(uniqueCode);
+
+    res.status(200).json({
+      success: true,
+      message: 'Signed LPOs retrieved successfully',
+      data:    signed,
+      count:   signed.length,
+    });
+  } catch (error) {
+    console.error('[LPO] getSignedByUser:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
  * GET /lpo/latest
  * Returns the most recently created LPO.
  */
@@ -551,50 +605,41 @@ const markItemsAvailable = async (req, res) => {
  */
 const signLPO = async (req, res) => {
   try {
-    const { lpoRef }                                                     = req.params;
-    const { uniqueCode, signedDate, signedFrom, signedIP, signedDevice, signedLocation } = req.body;
+    const { lpoRef } = req.params;
+    const {
+      uniqueCode, signedDate, signedFrom,
+      signedIP, signedDevice, signedLocation,
+      override = false,        
+    } = req.body;
 
     if (!uniqueCode || !signedDate || !signedFrom) {
       return res.status(400).json({ success: false, message: 'uniqueCode, signedDate, and signedFrom are required' });
     }
 
-    const result = await lpoService.signLPO(lpoRef, { uniqueCode, signedDate, signedFrom, signedIP, signedDevice, signedLocation });
+    const result = await lpoService.signLPO(lpoRef, {
+      uniqueCode, signedDate, signedFrom,
+      signedIP, signedDevice, signedLocation,
+      override,                
+    });
+
+    // Out-of-order prompt — return 202 so frontend can ask user
+    if (result.requireOverride) {
+      return res.status(202).json({
+        success:         false,
+        requireOverride: true,
+        message:         result.message,
+        unsignedAbove:   result.unsignedAbove,
+      });
+    }
 
     res.status(200).json({
       success: true,
-      message: 'LPO signed successfully',
-      data:    result,
+      message: result.message,
+      data:    result.data,
     });
   } catch (error) {
     console.error('[LPO] signLPO:', error);
     res.status(error.status || 500).json({ success: false, message: error.message || 'Signing failed' });
-  }
-};
-
-/**
- * GET /lpo/pending-signatures
- * Returns all LPOs awaiting signature from the calling user.
- * Role is resolved server-side from uniqueCode — nothing trusted from client.
- */
-const getPendingSignatures = async (req, res) => {
-  try {
-    const { uniqueCode } = req.body;
-
-    if (!uniqueCode) {
-      return res.status(400).json({ success: false, message: 'uniqueCode is required' });
-    }
-
-    const pending = await lpoService.getPendingSignatures(uniqueCode);      
-
-    res.status(200).json({
-      success: true,
-      message: 'Pending LPO signatures retrieved successfully',
-      data:    pending,
-      count:   pending.length,
-    });
-  } catch (error) {
-    console.error('[LPO] getPendingSignatures:', error);
-    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -688,7 +733,7 @@ module.exports = {
   getLposForStock,
   getLposForAllEquipments,
   // Approvals
-  uploadLPO,
+  uploadLPO, 
   purchaseApproval,
   managerApproval,
   ceoApproval,
@@ -696,6 +741,7 @@ module.exports = {
   markItemsAvailable,
   signLPO,
   getPendingSignatures,
+  getSignedByUser,
   // Email
   sendLpoViaEmail,
   updateVendorEmail,

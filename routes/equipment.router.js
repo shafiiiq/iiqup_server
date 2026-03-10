@@ -13,7 +13,7 @@ router.get   ('/get-equipment/:regNo',            controller.getEquipmentsByReg)
 router.get   ('/equipment-count',                 controller.getEquipmentCount);
 router.get   ('/equipment-stats',                 controller.getEquipmentStats);
 router.get   ('/get-equipments-by-status',        controller.getEquipmentsByStatus);
-router.post  ('/add-equipment',                   controller.addEquipments);
+router.post  ('/add-equipment',                   controller.addEquipment);
 router.post  ('/search-equipments',               controller.searchEquipments);
 router.put   ('/update-equipment/:regNo',         controller.updateEquipments);
 router.put   ('/status-update/:id',               controller.updateStatus);

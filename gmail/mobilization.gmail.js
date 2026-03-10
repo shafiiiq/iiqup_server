@@ -23,12 +23,14 @@ const ACTION_LABEL = {
   mobilized:      'MOBILIZATION',
   demobilized:    'DEMOBILIZATION',
   status_changed: 'STATUS CHANGE',
+  one_day_mob: 'ONE DAY MOBILIZATION',
 };
 
 const ACTION_SUBJECT = (machine, regNo) => ({
   mobilized:      `Mobilized - ${machine} (${regNo})`,
   demobilized:    `Demobilized - ${machine} (${regNo})`,
   status_changed: `Status Changed - ${machine} (${regNo})`,
+  one_day_mob:    `One Day Mobilization - ${machine} (${regNo})`,
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -134,8 +136,8 @@ class OAuth2GmailClient {
       `Content-Type: multipart/mixed; boundary="${boundary}"`,
       '',
       `--${boundary}`,
-      'Content-Type: multipart/alternative; boundary="alt_boundary"',
-      '',
+      'Content-Type: multipart/alternative; boundary="alt_boundary"', 
+      '', 
       '--alt_boundary',
       'Content-Type: text/plain; charset=utf-8',
       '',
@@ -150,7 +152,7 @@ class OAuth2GmailClient {
     ];
 
     for (const attachment of attachments) {
-      const resolved = this._resolveAttachment(attachment);
+      const resolved = this._resolveAttachment(attachment); 
       if (!resolved) continue;
 
       const { fileContent, filename, mimeType } = resolved;
@@ -236,6 +238,11 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
     rentRate       = null,
     location       = [],
     remarks        = '',
+    demobDate    = '',
+    demobMonth   = '',
+    demobYear    = '',
+    demobTime    = '',
+    demobRemarks = '',
   } = data;
 
   const formatDate = (d) => d
@@ -298,7 +305,7 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
           <td>${operator}</td>
         </tr>` : ''}
         <tr style="background:#f5f5f5;">
-          <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Date &amp; Time</td>
+          <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Mobilization Details</td>
         </tr>
         <tr>
           <td style="color:#666;">Date</td>
@@ -312,6 +319,27 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
           <td style="color:#666;">Time</td>
           <td>${time}</td>
         </tr>
+        ${action === 'one_day_mob' ? `
+        <tr style="background:#f5f5f5;">
+          <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Demobilization Details</td>
+        </tr>
+        <tr>
+          <td style="color:#666;">Demob Date</td>
+          <td>${formatDate(demobDate)}</td>
+        </tr>
+        <tr>
+          <td style="color:#666;">Demob Month / Year</td>
+          <td>${MONTH_NAMES[demobMonth] ?? demobMonth} ${demobYear}</td>
+        </tr>
+        <tr>
+          <td style="color:#666;">Demob Time</td>
+          <td>${demobTime}</td>        
+        </tr>
+        ${demobRemarks ? `
+        <tr>
+          <td style="color:#666;">Demob Remarks</td>
+          <td>${demobRemarks}</td>
+        </tr>` : ''}` : ''}
         ${remarks ? `
         <tr>
           <td style="color:#666;">Remarks</td>
@@ -322,9 +350,9 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
           <td style="color:#666;">Location</td>
           <td>${location[location.length - 1]}</td>
         </tr>` : ''}
-        ${hired && rentRate ? `
+        ${rentRate ? `
         <tr style="background:#f5f5f5;">
-          <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Hire Rate</td>
+          <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">${hired ? 'Hire Details' : 'Working Details'}</td>
         </tr>
         <tr>
           <td style="color:#666;">Basis</td>
@@ -332,7 +360,7 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
         </tr>
         <tr>
           <td style="color:#666;">Rate</td>
-          <td><strong>${rentRate.rate} ${rentRate.currency || 'QAR'}</strong></td>
+          <td><strong>${rentRate.rate ? `${rentRate.rate} ${rentRate.currency || 'QAR'}` : 'N/A'}</strong></td>
         </tr>` : ''}
       </table>
 

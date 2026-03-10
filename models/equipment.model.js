@@ -87,7 +87,7 @@ equipmentSchema.index({
   company: 'text',
 });
 
-// Nested field lookups
+// Nested field lookups 
 equipmentSchema.index({ 'certificationBody.operatorId':   1 });
 equipmentSchema.index({ 'certificationBody.operatorName': 1 });
 

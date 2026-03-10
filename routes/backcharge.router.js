@@ -31,6 +31,7 @@ router.get('/sites/search',                          controller.searchSites);
 
 // ── Signing ───────────────────────────────────────────────────────────────────
 router.post('/sign/:refNo(*)',                       controller.signBackcharge);
-router.post('/pending-signatures',                    controller.getPendingSignatures);
+router.post('/pending-signatures',                   controller.getPendingSignatures);
+router.post('/signed-by-user',                       controller.getSignedByUser);
 
 module.exports = router;

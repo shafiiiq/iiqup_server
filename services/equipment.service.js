@@ -621,7 +621,8 @@ const mobilizeEquipment = async (data) => {
     const {
       equipmentId, regNo, machine, site, operator, operatorId,
       withOperator, deployType, clientCompany,
-      month, year, time, selectedDate, remarks
+      month, year, time, selectedDate, remarks,
+      isOneDayMob, demobDate, demobTime, demobRemarks,
     } = data;
 
     const isCompanyDeploy = deployType === 'company';
@@ -630,15 +631,19 @@ const mobilizeEquipment = async (data) => {
 
     const mobilization = await mobilizationModel.create({
       equipmentId, regNo, machine,
-      action:       'mobilized',
-      deployType:   deployType || 'site',
+      action:        'mobilized',
+      deployType:    deployType || 'site',
       clientCompany: clientCompany || '',
       site:          deployLocation,
       operator:      withOperator ? operator : undefined,
       withOperator, month, year,
       date:          selectedDate ? new Date(selectedDate) : new Date(),
       time, remarks,
-      status:        newStatus
+      status:        newStatus,
+      isOneDayMob:   isOneDayMob || false,
+      demobDate:     isOneDayMob && demobDate ? new Date(demobDate) : null,
+      demobTime:     isOneDayMob ? demobTime  : '',
+      demobRemarks:  isOneDayMob ? demobRemarks : '',
     });
 
     const currentEquipment = await equipmentModel.findById(equipmentId);
@@ -669,25 +674,90 @@ const mobilizeEquipment = async (data) => {
     if (withOperator && operatorId) await safeUpdateOperator(operatorId, { equipmentNumber: regNo });
 
     const officeMain = JSON.parse(process.env.OFFICE_MAIN);
-    await _sendNotification({
-      title:       `${machine} (${regNo}) Mobilized`,
-      description: isCompanyDeploy
-        ? `${machine} (${regNo}) has been leased to company: ${clientCompany}`
-        : `${machine} (${regNo}) has been mobilized to site: ${site}`,
-      priority:    NOTIFICATION_PRIORITY.HIGH,
-      sourceId:    updatedEquipment._id,
-      recipient:   officeMain
-    });
 
-    await alertMobilizationViaEmail({
-      action: 'mobilized', regNo, machine, site: deployLocation,
-      deployType: deployType || 'site', clientCompany: clientCompany || '',
-      operator: withOperator ? operator : '', withOperator,
-      month, year, time, date: selectedDate ? new Date(selectedDate) : new Date(), remarks,
-      hired:    updatedEquipment?.hired    || false,
-      rentRate: updatedEquipment?.rentRate || null,
-      location: updatedEquipment?.location ? [updatedEquipment.location] : []
-    }).catch(e => console.error('Mobilization email failed:', e));
+    // ── One Day Mobilization: auto-demobilize ─────────────────────────────────
+    if (isOneDayMob && demobDate) {
+      const demobDateTime = new Date(demobDate);
+      const demobMonth    = demobDateTime.getMonth() + 1;
+      const demobYear     = demobDateTime.getFullYear();
+
+      const demobilization = await mobilizationModel.create({
+        equipmentId, regNo, machine,
+        action:       'demobilized',
+        withOperator: false,
+        site:         deployLocation,
+        month:        demobMonth,
+        year:         demobYear,
+        date:         demobDateTime,
+        time:         demobTime || time,
+        remarks:      demobRemarks || '',
+        status:       'idle',
+        isOneDayMob:  true,
+        linkedMobId:  mobilization._id,
+      });
+
+      await mobilizationModel.findByIdAndUpdate(mobilization._id, { linkedMobId: demobilization._id });
+
+      await _sendNotification({
+        title:       `${machine} (${regNo}) One Day Mobilization`,
+        description: isCompanyDeploy
+          ? `${machine} (${regNo}) leased to ${clientCompany} and will be demobilized on ${demobDateTime.toLocaleDateString('en-GB')}`
+          : `${machine} (${regNo}) mobilized to site: ${deployLocation} and will be demobilized on ${demobDateTime.toLocaleDateString('en-GB')}`,
+        priority:  NOTIFICATION_PRIORITY.HIGH,
+        sourceId:  updatedEquipment._id,
+        recipient: officeMain,
+      });
+
+      await alertMobilizationViaEmail({
+        action:        'one_day_mob',
+        regNo, machine,
+        site:          deployLocation,
+        deployType:    deployType    || 'site',
+        clientCompany: clientCompany || '',
+        operator:      withOperator ? operator : '',
+        withOperator,
+        month, year, time,
+        date:          selectedDate ? new Date(selectedDate) : new Date(),
+        remarks,
+        demobDate:     demobDateTime,
+        demobMonth,
+        demobYear,
+        demobTime:     demobTime || time,
+        demobRemarks:  demobRemarks || '',
+        hired:         updatedEquipment?.hired    || false,
+        rentRate:      updatedEquipment?.rentRate || null,
+        location:      updatedEquipment?.location ? [updatedEquipment.location] : [],
+      }).catch(e => console.error('One day mob email failed:', e));
+
+    } else {
+
+      await _sendNotification({
+        title:       `${machine} (${regNo}) Mobilized`,
+        description: isCompanyDeploy
+          ? `${machine} (${regNo}) has been leased to company: ${clientCompany}`
+          : `${machine} (${regNo}) has been mobilized to site: ${deployLocation}`,
+        priority:  NOTIFICATION_PRIORITY.HIGH,
+        sourceId:  updatedEquipment._id,
+        recipient: officeMain,
+      });
+
+      await alertMobilizationViaEmail({
+        action:        'mobilized',
+        regNo, machine,
+        site:          deployLocation,
+        deployType:    deployType    || 'site',
+        clientCompany: clientCompany || '',
+        operator:      withOperator ? operator : '',
+        withOperator,
+        month, year, time,
+        date:          selectedDate ? new Date(selectedDate) : new Date(),
+        remarks,
+        hired:         updatedEquipment?.hired    || false,
+        rentRate:      updatedEquipment?.rentRate || null,
+        location:      updatedEquipment?.location ? [updatedEquipment.location] : [],
+      }).catch(e => console.error('Mobilization email failed:', e));
+
+    }
 
     return { status: 201, ok: true, message: 'Equipment mobilized successfully', data: { mobilization, updatedEquipment } };
 

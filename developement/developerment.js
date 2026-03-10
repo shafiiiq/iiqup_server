@@ -31,16 +31,16 @@ const { equipments } = require('./data/equipments.js');
 // ─────────────────────────────────────────────────────────────────────────────
 
 const addActivationKey = async () => {
-  const userId = '68b6b3970efac176acd70a89';   // <-- fill in
-  const activationKey = '51076237924015394049';   // <-- fill in
+  const email = 'md@ansarigroup.co';   // <-- fill in
+  const activationKey = '70139504683027894026';   // <-- fill in
 
-  if (!userId || !activationKey) throw new Error('userId and activationKey are required');
+  if (!email || !activationKey) throw new Error('userId and activationKey are required');
   if (activationKey.length !== 20) throw new Error('Activation key must be exactly 20 digits');
 
   const hashedKey = await bcrypt.hash(activationKey, 10);
 
   const result = await User.updateOne(
-    { _id: userId },
+    { email: email },
     {
       $set: {
         signatureActivation: [
@@ -58,7 +58,7 @@ const addActivationKey = async () => {
 
   if (result.matchedCount === 0) throw new Error('User not found');
 
-  console.log('✅ Activation key added:', { userId, activationKey });
+  console.log('✅ Activation key added:', { email, activationKey });
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

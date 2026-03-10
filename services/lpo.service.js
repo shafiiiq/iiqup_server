@@ -104,6 +104,59 @@ const notify = async (notifPayload, recipient, title, description, priority = 'h
   );
 };
 
+const roleScreenMap = (role, isMD) => {
+  const map = {
+    PURCHASE_MANAGER:  'purchaseManagerSign',
+    MANAGER:           'managerSign',
+    CEO:               isMD ? 'mdSign' : 'ceoSign',
+    MANAGING_DIRECTOR: 'mdSign',
+    ACCOUNTS:          'accountsSign',
+  };
+  return map[role] || 'lpoSign';
+};
+
+const buildNextStepNotif = (role, lpoRef, updated) => {
+  const isMD = updated.signatures?.authorizedSignatoryTitle === 'MANAGING DIRECTOR';
+
+  const map = {
+    PURCHASE_MANAGER: {
+      title:       `MANAGER Approval Needed — LPO ${lpoRef}`,
+      description: `Purchase Manager signed LPO ${lpoRef}. Manager approval needed.`,
+      sourceId:    'accounts_approval',
+      navigateTo:  `/(screens)/managerSign/${lpoRef}`,
+      navigateText: 'View and Sign',
+      recipient:   JSON.parse(process.env.OFFICE_HERO),
+    },
+    MANAGER: {
+      title:       `${updated.signatures?.authorizedSignatoryTitle || 'CEO'} Approval Needed — LPO ${lpoRef}`,
+      description: `Manager signed LPO ${lpoRef}. ${updated.signatures?.authorizedSignatoryTitle || 'CEO'} approval needed.`,
+      sourceId:    isMD ? 'md_approval' : 'ceo_approval',
+      navigateTo:  isMD ? `/(screens)/mdSign/${lpoRef}` : `/(screens)/ceoSign/${lpoRef}`,
+      navigateText: 'View and Sign',
+      recipient:   JSON.parse(process.env.OFFICE_HERO),
+    },
+    CEO: {
+      title:       `ACCOUNTS Approval Needed — LPO ${lpoRef}`,
+      description: `CEO signed LPO ${lpoRef}. Accounts approval needed.`,
+      sourceId:    'final_approval',
+      navigateTo:  `/(screens)/accountsSign/${lpoRef}`,
+      navigateText: 'View and Sign',
+      recipient:   JSON.parse(process.env.OFFICE_HERO),
+    },
+    MANAGING_DIRECTOR: {
+      title:       `ACCOUNTS Approval Needed — LPO ${lpoRef}`,
+      description: `MD signed LPO ${lpoRef}. Accounts approval needed.`,
+      sourceId:    'final_approval',
+      navigateTo:  `/(screens)/accountsSign/${lpoRef}`,
+      navigateText: 'View and Sign',
+      recipient:   JSON.parse(process.env.OFFICE_HERO),
+    },
+    // ACCOUNTS intentionally omitted — handled by allSigned check
+  };
+
+  return map[role] || null;
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Write
 // ─────────────────────────────────────────────────────────────────────────────
@@ -642,16 +695,17 @@ const markItemsAvailable = async (lpoRef, markedBy) => {
  */
 const signLPO = async (lpoRef, signData) => {
   const {
-    uniqueCode, signedDate, signedFrom,
+    uniqueCode, signedDate, signedFrom, override = false,
     signedIP = null, signedDevice = null, signedLocation = null
   } = signData;
 
+  // ── Role resolution ────────────────────────────────────────────────────────
   const roleMap = [
-    { envKey: process.env.PURCHASE_MANAGER, field: 'pmSigned',       detailsPrefix: 'PMR',      role: 'PURCHASE_MANAGER'  },
-    { envKey: process.env.MANAGER,          field: 'managerSigned',  detailsPrefix: 'MANAGER',  role: 'MANAGER'            },
-    { envKey: process.env.CEO,              field: 'ceoSigned',      detailsPrefix: 'CEO',      role: 'CEO'                },
-    { envKey: process.env.MD,               field: 'ceoSigned',      detailsPrefix: 'MD',       role: 'MANAGING_DIRECTOR'  },
-    { envKey: process.env.ACCOUNTS,         field: 'accountsSigned', detailsPrefix: 'ACCOUNTS', role: 'ACCOUNTS'           }
+    { envKey: process.env.PURCHASE_MANAGER, field: 'pmSigned',       detailsPrefix: 'PMR',      role: 'PURCHASE_MANAGER',  order: 1 },
+    { envKey: process.env.MANAGER,          field: 'managerSigned',  detailsPrefix: 'MANAGER',  role: 'MANAGER',           order: 2 },
+    { envKey: process.env.CEO,              field: 'ceoSigned',      detailsPrefix: 'CEO',      role: 'CEO',               order: 3 },
+    { envKey: process.env.MD,               field: 'ceoSigned',      detailsPrefix: 'MD',       role: 'MANAGING_DIRECTOR', order: 3 },
+    { envKey: process.env.ACCOUNTS,         field: 'accountsSigned', detailsPrefix: 'ACCOUNTS', role: 'ACCOUNTS',          order: 4 },
   ];
 
   const matched = roleMap.find(r => r.envKey === uniqueCode);
@@ -662,19 +716,44 @@ const signLPO = async (lpoRef, signData) => {
   const lpo = await LPO.findOne({ lpoRef });
   if (!lpo) throw { status: 404, message: `LPO not found: ${lpoRef}` };
 
+  // ── CEO vs MD guard ────────────────────────────────────────────────────────
   if (matched.role === 'CEO' || matched.role === 'MANAGING_DIRECTOR') {
     const savedTitle   = lpo.signatures?.authorizedSignatoryTitle || 'CEO';
     const expectedRole = savedTitle === 'MANAGING DIRECTOR' ? 'MANAGING_DIRECTOR' : 'CEO';
-
     if (matched.role !== expectedRole) {
       throw { status: 403, message: `This document requires ${savedTitle} signature, not ${matched.role}` };
     }
   }
 
+  // ── Already signed guard ───────────────────────────────────────────────────
   if (lpo[matched.field] === true) {
     throw { status: 409, message: `This position (${matched.role}) has already been signed` };
   }
 
+  // ── Out-of-order detection ─────────────────────────────────────────────────
+  const isMD     = lpo.signatures?.authorizedSignatoryTitle === 'MANAGING DIRECTOR';
+  const authRole = isMD ? 'MANAGING_DIRECTOR' : 'CEO';
+
+  const chain = [
+    { role: 'PURCHASE_MANAGER', signed: lpo.pmSigned,       order: 1 },
+    { role: 'MANAGER',          signed: lpo.managerSigned,  order: 2 },
+    { role: authRole,           signed: lpo.ceoSigned,      order: 3 },
+    { role: 'ACCOUNTS',         signed: lpo.accountsSigned, order: 4 },
+  ];
+
+  const myOrder       = matched.order;
+  const unsignedAbove = chain.filter(c => c.order < myOrder && !c.signed);
+
+  if (unsignedAbove.length > 0 && !override) {
+    return {
+      status:          202,
+      requireOverride: true,
+      message:         'Out-of-order signing detected. Confirm override to proceed.',
+      unsignedAbove:   unsignedAbove.map(c => c.role),
+    };
+  }
+
+  // ── Write the signature ────────────────────────────────────────────────────
   const p            = matched.detailsPrefix;
   const updateFields = {
     [matched.field]:                     true,
@@ -688,8 +767,13 @@ const signLPO = async (lpoRef, signData) => {
     [`lpoDetails.${p}approvedLocation`]: signedLocation,
     $push: {
       approvalTrail: {
-        approvedBy: uniqueCode, role: matched.role, action: 'approved',
-        comments: `Signed via web by ${matched.role}`, approvalDate: new Date()
+        approvedBy:   uniqueCode,
+        role:         matched.role,
+        action:       override && unsignedAbove.length > 0 ? 'override_signed' : 'signed',
+        comments:     override && unsignedAbove.length > 0
+          ? `Override signed by ${matched.role} — predecessors not yet signed`
+          : `Signed via web by ${matched.role}`,
+        approvalDate: new Date(),
       }
     }
   };
@@ -697,74 +781,115 @@ const signLPO = async (lpoRef, signData) => {
   const updated = await LPO.findOneAndUpdate({ lpoRef }, updateFields, { new: true });
   if (!updated) throw { status: 500, message: 'Failed to update LPO record' };
 
-  const nextStepMap = {
-    PURCHASE_MANAGER: {
-      title:       `MANAGER Approval Needed - LPO ${lpoRef}`,
-      description: `Purchase Manager signed LPO ${lpoRef}. Manager approval needed.`,
-      sourceId:    'accounts_approval',
-      navigateTo:  `/(screens)/managerSign/${lpoRef}`,
-      navigateText: 'View and Sign',
-      recipient:   JSON.parse(process.env.OFFICE_HERO),
-    },
-    MANAGER: {
-      title:       `${updated.signatures?.authorizedSignatoryTitle || 'CEO'} Approval Needed - LPO ${lpoRef}`,
-      description: `Manager signed LPO ${lpoRef}. ${updated.signatures?.authorizedSignatoryTitle || 'CEO'} approval needed.`,
-      sourceId:    updated.signatures?.authorizedSignatoryTitle === 'MANAGING DIRECTOR' ? 'md_approval' : 'ceo_approval',
-      navigateTo:  updated.signatures?.authorizedSignatoryTitle === 'MANAGING DIRECTOR'
-        ? `/(screens)/mdSign/${lpoRef}`
-        : `/(screens)/ceoSign/${lpoRef}`,
-      navigateText: 'View and Sign',
-      recipient:   JSON.parse(process.env.OFFICE_HERO),
-    },
-    CEO: {
-      title:       `ACCOUNTS Approval Needed - LPO ${lpoRef}`,
-      description: `CEO signed LPO ${lpoRef}. Accounts approval needed.`,
-      sourceId:    'final_approval',
-      navigateTo:  `/(screens)/accountsSign/${lpoRef}`,
-      navigateText: 'View and Sign',
-      recipient:   JSON.parse(process.env.OFFICE_HERO),
-    },
-    MANAGING_DIRECTOR: {
-      title:       `ACCOUNTS Approval Needed - LPO ${lpoRef}`,
-      description: `MD signed LPO ${lpoRef}. Accounts approval needed.`,
-      sourceId:    'final_approval',
-      navigateTo:  `/(screens)/accountsSign/${lpoRef}`,
-      navigateText: 'View and Sign',
-      recipient:   JSON.parse(process.env.OFFICE_HERO),
-    },
-    ACCOUNTS: {
-      title:       `LPO Signed & Ready - ${lpoRef}`,
-      description: `Accounts signed LPO ${lpoRef}. All signatures complete. Items can now be procured.`,
-      sourceId:    'manager_approval',
-      navigateTo:  `/(screens)/signedLpo/${lpoRef}`,
-      navigateText: 'View the item required',
-      recipient:   JSON.parse(process.env.OFFICE_MAIN),
-    },
-  };
+  // ── Notifications ──────────────────────────────────────────────────────────
 
-  const notifConfig = nextStepMap[matched.role];
+  // 1. Override — notify OFFICE_HERO once per unsigned person above
+  if (override && unsignedAbove.length > 0) {
+    for (const above of unsignedAbove) {
+      const title       = `Action Required — LPO ${lpoRef} override signed`;
+      const description = `${matched.role} has signed LPO ${lpoRef} out of order. ${above.role} signature is still required.`;
 
-  if (notifConfig) {
-    const { recipient, title, description, sourceId, navigateTo, navigateText } = notifConfig;
+      await notify(
+        {
+          title, description, priority: 'high', sourceId: 'lpo_approval',
+          navigateTo:   `/(screens)/${roleScreenMap(above.role, isMD)}/${lpoRef}`,
+          navigateText: 'View and Sign',
+          navigteToId:  lpoRef,
+          hasButton:    true,
+        },
+        JSON.parse(process.env.OFFICE_HERO),
+        title,
+        description
+      );
+    }
+  }
+
+  // 2. Normal next-step notification (only when signing in order)
+  if (!override || unsignedAbove.length === 0) {
+    const nextNotif = buildNextStepNotif(matched.role, lpoRef, updated);
+    if (nextNotif) {
+      await notify(
+        {
+          title:        nextNotif.title,
+          description:  nextNotif.description,
+          priority:     'high',
+          sourceId:     nextNotif.sourceId,
+          navigateTo:   nextNotif.navigateTo,
+          navigateText: nextNotif.navigateText,
+          navigteToId:  lpoRef,
+          hasButton:    true,
+        },
+        nextNotif.recipient,
+        nextNotif.title,
+        nextNotif.description
+      );
+    }
+  }
+
+  // 3. All signed — only fire when all 4 have signed
+  const allSigned =
+    updated.pmSigned &&
+    updated.managerSigned &&
+    updated.ceoSigned &&
+    updated.accountsSigned;
+
+  if (allSigned) {
+    const title       = `LPO Signed & Ready — ${lpoRef}`;
+    const description = `All 4 signatures complete on LPO ${lpoRef}. Items can now be procured.`;
 
     await notify(
       {
-        title,
-        description,
-        priority:     'high',
-        sourceId,
-        navigateTo,
-        navigateText,
+        title, description, priority: 'high', sourceId: 'manager_approval',
+        navigateTo:   `/(screens)/signedLpo/${lpoRef}`,
+        navigateText: 'View the item required',
         navigteToId:  lpoRef,
         hasButton:    true,
       },
-      recipient,
+      JSON.parse(process.env.OFFICE_MAIN),
       title,
       description
     );
   }
 
-  return { status: 200, message: `${matched.role} signature recorded successfully`, data: updated, role: matched.role };
+  return {
+    status:  200,
+    message: `${matched.role} signature recorded successfully`,
+    data:    updated,
+    role:    matched.role,
+  };
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Read
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Returns all LPO records sorted by creation date descending.
+ * @returns {Promise<object[]>}
+ */
+const getAllLPOs = async () => {
+  try {
+    return await LPO.find({}).sort({ createdAt: -1 });
+  } catch (error) {
+    console.error('[LPOService] getAllLPOs:', error);
+    throw new Error(`Error fetching LPOs: ${error.message}`);
+  }
+};
+
+/**
+ * Returns a single LPO by its reference number.
+ * @param {string} refNo
+ * @returns {Promise<object>}
+ */
+const getLPOByRef = async (refNo) => {
+  try {
+    const lpo = await LPO.findOne({ lpoRef: refNo });
+    if (!lpo) throw new Error('LPO not found');
+    return lpo;
+  } catch (error) {
+    console.error('[LPOService] getLPOByRef:', error);
+    throw new Error(`Error fetching LPO: ${error.message}`);
+  }
 };
 
 /**
@@ -821,8 +946,6 @@ const getPendingSignatures = async (uniqueCode) => {
     ];
 
     const matched = roleMap.find(r => r.envKey === uniqueCode);
-
-    console.log("matched", matched);
     
     if (!matched) return [];    
 
@@ -837,36 +960,53 @@ const getPendingSignatures = async (uniqueCode) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Read
-// ─────────────────────────────────────────────────────────────────────────────
-
 /**
- * Returns all LPO records sorted by creation date descending.
+ * Returns all LPOs where the calling user has already signed their role field.
+ * @param {string} uniqueCode
  * @returns {Promise<object[]>}
  */
-const getAllLPOs = async () => {
+const getSignedByUser = async (uniqueCode) => {
   try {
-    return await LPO.find({}).sort({ createdAt: -1 });
-  } catch (error) {
-    console.error('[LPOService] getAllLPOs:', error);
-    throw new Error(`Error fetching LPOs: ${error.message}`);
-  }
-};
+    const roleMap = [
+      {
+        envKey: process.env.PURCHASE_MANAGER,
+        query:  { pmSigned: true },
+      },
+      {
+        envKey: process.env.MANAGER,
+        query:  { managerSigned: true },
+      },
+      {
+        envKey: process.env.CEO,
+        query:  {
+          ceoSigned: true,
+          'signatures.authorizedSignatoryTitle': { $nin: ['MANAGING DIRECTOR'] },
+        },
+      },
+      {
+        envKey: process.env.MD,
+        query:  {
+          ceoSigned: true,
+          'signatures.authorizedSignatoryTitle': 'MANAGING DIRECTOR',
+        },
+      },
+      {
+        envKey: process.env.ACCOUNTS,
+        query:  { accountsSigned: true },
+      },
+    ];
 
-/**
- * Returns a single LPO by its reference number.
- * @param {string} refNo
- * @returns {Promise<object>}
- */
-const getLPOByRef = async (refNo) => {
-  try {
-    const lpo = await LPO.findOne({ lpoRef: refNo });
-    if (!lpo) throw new Error('LPO not found');
-    return lpo;
+    const matched = roleMap.find(r => r.envKey === uniqueCode);
+    if (!matched) return [];
+
+    return await LPO.find(matched.query)
+      .select('lpoRef date company equipments totalAmount workflowStatus pmSigned managerSigned ceoSigned accountsSigned signatures')
+      .sort({ createdAt: -1 })
+      .lean();
+
   } catch (error) {
-    console.error('[LPOService] getLPOByRef:', error);
-    throw new Error(`Error fetching LPO: ${error.message}`);
+    console.error('[LPOService] getSignedByUser:', error);
+    throw new Error(`Error fetching signed LPOs: ${error.message}`);
   }
 };
 
@@ -1024,9 +1164,10 @@ module.exports = {
   accountsApproval,
   markItemsAvailable,
   signLPO,
-  getPendingSignatures,
   getAllLPOs,
   getLPOByRef,
+  getPendingSignatures,
+  getSignedByUser,
   getAllCompanyDetails,
   getLatestLPORef,
   getLatestLPO,

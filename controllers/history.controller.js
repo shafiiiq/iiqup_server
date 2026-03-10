@@ -93,7 +93,7 @@ const deleteServiceHistory = async (req, res) => {
  */
 const addMaintananceHistory = async (req, res) => {
   try {
-    const result = await serviceHistoryServices.insertMaintananceHisory(req.body);
+    const result = await serviceHistoryServices.insertMaintananceHistory(req.body);
 
     res.status(result.status).json(result);
   } catch (error) {

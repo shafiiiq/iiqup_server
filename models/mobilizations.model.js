@@ -54,6 +54,13 @@ const mobilizationSchema = new mongoose.Schema(
     date:    { type: Date,   required: true, default: Date.now },
     time:    { type: String, required: true                   },
 
+    // One Day Mobilization
+    isOneDayMob:   { type: Boolean, default: false },
+    demobDate:     { type: Date,    default: null   },
+    demobTime:     { type: String,  default: ''     },
+    demobRemarks:  { type: String,  default: ''     },
+    linkedMobId:   { type: mongoose.Schema.Types.ObjectId, ref: 'Mobilization', default: null },
+
     // Notes
     remarks: { type: String, default: '' },
   },

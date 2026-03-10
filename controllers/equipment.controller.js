@@ -23,13 +23,13 @@ const paginationShape = (result) => ({
  * POST /add-equipment
  * Creates a new equipment record.
  */
-const addEquipments = async (req, res) => {
+const addEquipment = async (req, res) => {
   try {
     const result = await equipmentServices.insertEquipment(req.body);
 
     res.status(result.status).json(result);
   } catch (error) {
-    console.error('[Equipment] addEquipments:', error);
+    console.error('[Equipment] addEquipment:', error);
     res.status(error.status || 500).json({ success: false, message: error.message });
   }
 };
@@ -426,6 +426,7 @@ const mobilizeEquipment = async (req, res) => {
       equipmentId, regNo, machine, site, operator, operatorId,
       withOperator, deployType, clientCompany, selectedDate,
       month, year, time, remarks,
+      isOneDayMob, demobDate, demobTime, demobRemarks,
     } = req.body;
 
     if (!equipmentId || !regNo || !machine || !month || !year || !time) {
@@ -456,6 +457,11 @@ const mobilizeEquipment = async (req, res) => {
       selectedDate:  selectedDate  || null,
       month, year, time,
       remarks: remarks || '',
+      isOneDayMob:  isOneDayMob  || false,
+      demobDate:    demobDate    || null,     
+      demobTime:    demobTime    || '',     
+      demobRemarks: demobRemarks || '',       
+
     });
 
     res.status(result.status).json(result);
@@ -761,7 +767,7 @@ const getFilteredReplacements = async (req, res) => {
 
 module.exports = {
   // CRUD
-  addEquipments,
+  addEquipment,
   getEquipments,
   getEquipmentsByReg,
   getEquipmentImages,
