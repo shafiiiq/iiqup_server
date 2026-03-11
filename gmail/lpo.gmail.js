@@ -103,12 +103,13 @@ class OAuth2GmailClient {
     }
   }
 
-  _buildRawEmail(to, subject, htmlContent, textContent, attachments = []) {
+  _buildRawEmail(to, subject, htmlContent, textContent, attachments = [], cc = '') {
     const boundary = `boundary_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
     const lines = [
       `From: "SERVICE AL ANSARI TRANSPORT" <${process.env.SERVICE_OTP_MAILER}>`,
       `To: ${to}`,
+      ...(cc ? [`Cc: ${cc}`] : []),
       `Subject: ${subject}`,
       'MIME-Version: 1.0',
       `Content-Type: multipart/mixed; boundary="${boundary}"`,
@@ -149,14 +150,14 @@ class OAuth2GmailClient {
     return lines.join('\n');
   }
 
-  async sendEmail(to, subject, htmlContent, textContent, attachments = []) {
+  async sendEmail(to, subject, htmlContent, textContent, attachments = [], cc = '') {
     if (!this.gmail) {
       const initialized = await this.initialize();
       if (!initialized) throw new Error('[Gmail] Client not initialized — refresh token required');
     }
 
     try {
-      const raw          = this._buildRawEmail(to, subject, htmlContent, textContent, attachments);
+      const raw = this._buildRawEmail(to, subject, htmlContent, textContent, attachments, cc);
       const encodedEmail = Buffer.from(raw).toString('base64')
         .replace(/\+/g, '-')
         .replace(/\//g, '_')
@@ -178,7 +179,7 @@ class OAuth2GmailClient {
 
       if (isAuthError) {
         await this.oauth2Client.refreshAccessToken();
-        return this.sendEmail(to, subject, htmlContent, textContent, attachments);
+        return this.sendEmail(to, subject, htmlContent, textContent, attachments, cc);
       }
 
       throw new Error(`[Gmail] Send failed: ${error.message}`);
@@ -241,14 +242,20 @@ const generateLPOTemplate = () => {
 // Public API
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Replace the current function body:
 const sendLPOViaEmail = async (email, client = '', recipientName = '', attachments = [], equipment = '') => {
   if (!email?.includes('@')) throw new Error('[Gmail] Invalid email address');
 
+  const toList  = JSON.parse(process.env.LPO_TO  || '[]');
+  const ccList  = JSON.parse(process.env.LPO_CC  || '[]');
+  const to      = toList.length ? toList.join(', ') : email;
+  const cc      = ccList.join(', ');
+
   const subject     = `M/S ${client} - MR. ${recipientName} LPO for ${equipment}`;
   const htmlContent = generateLPOTemplate();
-  const textContent = `Please find the attached LPO for your reference. If you need any further details, please don't hesitate to contact our Purchase Manager Mr. Abdul Malik.00974-51700494.`;
+  const textContent = `Please find the attached LPO...`;
 
-  return gmailClient.sendEmail(email, subject, htmlContent, textContent, attachments);
+  return gmailClient.sendEmail(to, subject, htmlContent, textContent, attachments, cc);
 };
 
 const getAuthorizationUrl = async () => {

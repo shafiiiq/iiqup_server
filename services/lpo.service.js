@@ -716,6 +716,10 @@ const signLPO = async (lpoRef, signData) => {
   const lpo = await LPO.findOne({ lpoRef });
   if (!lpo) throw { status: 404, message: `LPO not found: ${lpoRef}` };
 
+  if (lpo.workflowStatus === 'lpo_created') {
+     throw { status: 403, message: 'LPO_NOT_UPLOADED' }; 
+  }
+
   // ── CEO vs MD guard ────────────────────────────────────────────────────────
   if (matched.role === 'CEO' || matched.role === 'MANAGING_DIRECTOR') {
     const savedTitle   = lpo.signatures?.authorizedSignatoryTitle || 'CEO';

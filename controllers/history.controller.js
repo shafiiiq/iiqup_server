@@ -89,7 +89,7 @@ const deleteServiceHistory = async (req, res) => {
 
 /**
  * POST /service-history/maintenance
- * Adds a new maintenance history record.
+ * Adds a new maintenance history record. 
  */
 const addMaintananceHistory = async (req, res) => {
   try {
