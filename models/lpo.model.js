@@ -166,7 +166,7 @@ const lpoSchema = new mongoose.Schema(
       designation: { type: String, required: true },
     },
     vendorCode: { type: String, default: null, trim: true },
-    vendorMail: { type: String, default: null, trim: true },
+    vendorMail: { type: [String], default: [] },
 
     // Line Items & Totals
     items:              { type: [lpoItemSchema], default: []  },

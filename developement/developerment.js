@@ -31,8 +31,8 @@ const { equipments } = require('./data/equipments.js');
 // ─────────────────────────────────────────────────────────────────────────────
 
 const addActivationKey = async () => {
-  const email = 'firoz@ansarigroup.co';   // <-- fill in
-  const activationKey = '10348904692716570342';   // <-- fill in
+  const email = 'shafeek@ansarigroup.co';   // <-- fill in
+  const activationKey = '30754690183456710348';   // <-- fill in
 
   if (!email || !activationKey) throw new Error('userId and activationKey are required');
   if (activationKey.length !== 20) throw new Error('Activation key must be exactly 20 digits');

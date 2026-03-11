@@ -39,7 +39,7 @@ router.post  ('/pending-signatures',                    controller.getPendingSig
 router.post  ('/signed-by-user',                        controller.getSignedByUser);
 
 // ── Email ─────────────────────────────────────────────────────────────────────
-router.post  ('/send-via-email', upload.single('pdf'), controller.sendLpoViaEmail);
+router.post  ('/send-via-email', upload.fields([{ name: 'pdf', maxCount: 1 }, { name: 'attachments', maxCount: 10 }]), controller.sendLpoViaEmail);
 router.put   ('/update-vendor-email/:vendorCode',      controller.updateVendorEmail);
 
 module.exports = router;

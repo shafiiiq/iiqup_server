@@ -243,17 +243,16 @@ const generateLPOTemplate = () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Replace the current function body:
-const sendLPOViaEmail = async (email, client = '', recipientName = '', attachments = [], equipment = '') => {
-  if (!email?.includes('@')) throw new Error('[Gmail] Invalid email address');
+const sendLPOViaEmail = async (toList = [], client = '', recipientName = '', attachments = [], equipment = '') => {
+  if (!toList.length) throw new Error('[Gmail] No recipient email provided');
 
-  const toList  = JSON.parse(process.env.LPO_TO  || '[]');
-  const ccList  = JSON.parse(process.env.LPO_CC  || '[]');
-  const to      = toList.length ? toList.join(', ') : email;
-  const cc      = ccList.join(', ');
+  const to     = toList.join(', ');
+  const ccList = JSON.parse(process.env.LPO_CC || '[]'); 
+  const cc     = ccList.join(', ');
 
   const subject     = `M/S ${client} - MR. ${recipientName} LPO for ${equipment}`;
   const htmlContent = generateLPOTemplate();
-  const textContent = `Please find the attached LPO...`;
+  const textContent = `Please find the attached LPO for your reference...`;
 
   return gmailClient.sendEmail(to, subject, htmlContent, textContent, attachments, cc);
 };

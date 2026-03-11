@@ -603,7 +603,7 @@ const markItemsAvailable = async (req, res) => {
  * POST /lpo/:lpoRef/sign
  * Records a signature on the LPO identified by uniqueCode server-side.
  */
-const signLPO = async (req, res) => {
+const signLPO = async (req, res) => { 
   try {
     const { lpoRef } = req.params;
     const {
@@ -653,11 +653,13 @@ const signLPO = async (req, res) => {
  */
 const sendLpoViaEmail = async (req, res) => {
   try {
-    const { email, recipientName, vendorName, equipment, lpoRef } = req.body;
-    const pdfFile = req.file;
+    const { emails: rawEmails, recipientName, vendorName, equipment, lpoRef } = req.body;
+    const emails = typeof rawEmails === 'string' ? JSON.parse(rawEmails) : rawEmails;
+    const pdfFile = req.files?.pdf?.[0];
+    const extraFiles = req.files?.attachments || [];
 
-    if (!email || !pdfFile) {
-      return res.status(400).json({ success: false, message: 'Email and PDF are required' });
+    if (!emails?.length || !pdfFile) {
+      return res.status(400).json({ success: false, message: 'At least one email and PDF are required' });
     }
 
     const cleanEquipment = equipment
@@ -667,17 +669,24 @@ const sendLpoViaEmail = async (req, res) => {
     if (lpoRef) {
       const doc = await lpoService.getLPOByRef(lpoRef);
       if (doc?.vendorCode) {
-        await lpoService.saveVendorEmail(doc.vendorCode, email);
+        await lpoService.saveVendorEmail(doc.vendorCode, emails);
       }
     }
 
-    const attachment = {
-      content:  pdfFile.buffer,
-      filename: pdfFile.originalname || 'lpo.pdf',
-      mimeType: 'application/pdf',
-    };
+    const attachmentsList = [
+      {
+        content: pdfFile.buffer,
+        filename: pdfFile.originalname || 'lpo.pdf',
+        mimeType: 'application/pdf',
+      },
+      ...extraFiles.map(f => ({
+        content: f.buffer,
+        filename: f.originalname || 'attachment',
+        mimeType: f.mimetype || 'application/octet-stream',
+      }))
+    ];
 
-    const result = await sendLPOViaEmail(email, vendorName || '', recipientName || '', [attachment], cleanEquipment);
+    const result = await sendLPOViaEmail(emails, vendorName || '', recipientName || '', attachmentsList, cleanEquipment);
 
     res.status(200).json({ success: true, data: result });
   } catch (error) {

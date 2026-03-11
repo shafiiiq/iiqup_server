@@ -31,7 +31,7 @@ const resolveVendorCode = async (vendorName) => {
   }).select('vendorCode vendorMail');
 
   if (existingVendor) {
-    return { vendorCode: existingVendor.vendorCode, vendorMail: existingVendor.vendorMail || null };
+    return { vendorCode: existingVendor.vendorCode, vendorMail: existingVendor.vendorMail || [] };
   }
 
   const lastVendor = await LPO.findOne({ vendorCode: { $ne: null } })
@@ -385,9 +385,10 @@ const deleteLPO = async (refNo) => {
  * @param {string} email
  * @returns {Promise<object>}
  */
-const saveVendorEmail = async (vendorCode, email) => {
+const saveVendorEmail = async (vendorCode, emails) => {
   try {
-    return await LPO.updateMany({ vendorCode }, { $set: { vendorMail: email } });
+    const emailArray = Array.isArray(emails) ? emails : [emails];
+    return await LPO.updateMany({ vendorCode }, { $set: { vendorMail: emailArray } });
   } catch (error) {
     console.error('[LPOService] saveVendorEmail:', error);
     throw new Error(`Error saving vendor email: ${error.message}`);
