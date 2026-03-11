@@ -365,12 +365,12 @@ const addBackcharge = async (data) => {
  */
 const updateBackcharge = async (id, updateData) => {
   try {
-    if (updateData.scopeOfWork || updateData.scopeLine2Text) {
+    if ('scopeOfWork' in updateData || 'scopeLine2Text' in updateData) {
       updateData.scopeOfWork = buildTextLines(updateData.scopeOfWork, updateData.scopeLine2Text);
       delete updateData.scopeLine2Text;
     }
 
-    if (updateData.workshopComments || updateData.workSummaryLine2) {
+    if ('workshopComments' in updateData || 'workSummaryLine2' in updateData) {
       updateData.workshopComments = buildTextLines(updateData.workshopComments, updateData.workSummaryLine2);
       delete updateData.workSummaryLine2;
     }

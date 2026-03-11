@@ -25,7 +25,7 @@ const textLineSchema = new mongoose.Schema(
 
 const multiLineTextSchema = new mongoose.Schema(
   {
-    combinedText: { type: String,       default: [] },
+    combinedText: { type: String, default: '' },
     lines:        { type: [textLineSchema], default: [] },
   },
   { _id: false },
