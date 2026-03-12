@@ -58,7 +58,7 @@ const verifyToken = (token) => {
   try {
     return jwt.verify(token, JWT_SECRET);
   } catch (error) {
-    console.log('Token verification error:', error.message);
+    console.log('[JWT] Token verification error:', error.message);
     throw error; // Re-throw so middleware can handle it
   }
 };
@@ -87,7 +87,7 @@ const authMiddleware = (req, res, next) => {
     req.userId = decoded.id;
     next();
   } catch (error) {
-    console.log('Auth middleware error:', error.message);
+    console.log('[JWT Middleware] Auth middleware error:', error.message);
     return res.status(403).json({ message: 'Invalid token.', status: 401 });
   }
 };

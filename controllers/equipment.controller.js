@@ -651,11 +651,12 @@ const replaceEquipment = async (req, res) => {
       equipmentId, regNo, machine,
       replacedEquipmentId, replacedEquipmentRegNo, replacedEquipmentMachine,
       newSiteForReplaced, selectedDate, month, year, time, remarks,
+      operator, operatorId,
     } = req.body;
 
     if (
       !equipmentId || !regNo || !machine ||
-      !replacedEquipmentId || !replacedEquipmentRegNo || !replacedEquipmentMachine ||
+      !replacedEquipmentId || !replacedEquipmentRegNo || !replacedEquipmentMachine ||  
       !month || !year || !time
     ) {
       return res.status(400).json({
@@ -671,7 +672,9 @@ const replaceEquipment = async (req, res) => {
       newSiteForReplaced: newSiteForReplaced || null,
       selectedDate:       selectedDate       || null,
       month, year, time,
-      remarks: remarks || '',
+      remarks:    remarks    || '',
+      operator:   operator   || '',
+      operatorId: operatorId || '',
     });
 
     res.status(result.status).json(result);

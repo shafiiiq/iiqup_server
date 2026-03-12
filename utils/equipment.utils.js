@@ -23,7 +23,7 @@ const { normaliseImages } = require('../helpers/equipment.helper');
  */
 const safeUpdateOperator = async (operatorId, updateData) => {
   if (!operatorId || !mongoose.Types.ObjectId.isValid(operatorId)) {
-    console.log('Skipping operator update — invalid operatorId:', operatorId);
+    console.log('[Operator] Skipping operator update — invalid operatorId:', operatorId);
     return null;
   }
 

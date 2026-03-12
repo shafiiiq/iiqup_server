@@ -54,6 +54,10 @@ const equipmentSchema = new mongoose.Schema(
     lastSite:     { type: [String], default: [] },
     location:     { type: String, default: null },
     lastLocation: { type: [String], default: [] },
+    mobDate:      { type: Date, default: null },
+    lastMobDate:  { type: [Date], default: [] },
+    demobDate:    { type: Date, default: null },
+    lastDemobDate: { type: [Date], default: [] },
 
     // Lifecycle
     status: { type: String, required: true },

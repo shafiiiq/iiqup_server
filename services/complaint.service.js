@@ -898,9 +898,7 @@ const getComplaintsByStatus = async (workflowStatus) => {
  * @returns {Promise<Array>}
  */
 const getComplaintsByMechanic = async (email) => {
-  try {
-    console.log(email);
-    
+  try {    
     const mechanic = await Mechanic.findOne({ email }); 
     if (!mechanic) throw new Error('Mechanic not found');
 

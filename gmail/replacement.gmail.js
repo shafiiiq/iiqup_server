@@ -216,6 +216,7 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
     machine                = '',
     currentOperator        = '',
     replacedOperator       = '',
+    operator               = '',
     replacedEquipmentRegNo    = '',
     replacedEquipmentMachine  = '',
     site                   = '',
@@ -290,6 +291,11 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
           <td style="color:#666;">Incoming Equipment</td>
           <td><strong>${replacedEquipmentMachine} (${replacedEquipmentRegNo})</strong></td>
         </tr>
+        ${(operator || currentOperator) ? `
+        <tr>
+          <td style="color:#666;">Operator</td>
+          <td>${operator || currentOperator}</td>
+        </tr>` : ''}
         ${newSiteForReplaced ? `
         <tr>
           <td style="color:#666;">New Site for Outgoing</td>

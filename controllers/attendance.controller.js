@@ -72,12 +72,6 @@ const sendToServer = async (attendanceData) => {
       photo:          'auth_files/photo/7.jpg?_=1757838507',
       pin:            parsedPin,
     };
-
-    const saved = await attendanceService.addAttendance(newAttendance);
-
-    if (saved) console.log(`✅ Attendance saved for ${empName} at ${qatarTime}`);
-    else       console.log(`⏭️ Duplicate skipped for ${empName}`);
-
   } catch (error) {
     console.error('[Attendance] Error saving attendance:', error);
   }
