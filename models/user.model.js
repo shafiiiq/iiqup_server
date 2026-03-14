@@ -134,13 +134,15 @@ const userSchema = new mongoose.Schema(
     specialNotification: { type: [specialNotificationSchema],                                                                                                                       default: []                   },
 
     // Devices & Tokens
-    pushTokens:          { type: [pushTokenSchema],                                                                                                                                 default: []                   },
+    pushTokens:          { type: [pushTokenSchema],   
+    webPushSubscription: { type: Object, default: null },                                                                                                                              default: []                   },
     biometricTokens:     { type: [biometricTokenSchema],                                                                                                                            default: []                   },
     signatureActivation: { type: [signatureActivationSchema],                                                                                                                       default: []                   },
 
     // Feature Discovery
-    exploredFeatures:    { type: [exploredFeatureSchema],                                                                                                                           default: []                   },
-    lastExploredVersion: { type: String,                                                                                                                                            default: null                 },
+    exploredFeatures:    { type: [exploredFeatureSchema], default: [] },
+    lastExploredVersion: { type: String,   default: null },
+    tutorialsSeen:       { type: [String], default: []   },
   },
   {
     timestamps: true,

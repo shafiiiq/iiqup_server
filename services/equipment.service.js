@@ -789,10 +789,12 @@ const demobilizeEquipment = async (data) => {
     const currentOperatorId = currentEquipment?.certificationBody?.operatorId;
     const currentSite       = currentEquipment?.site || null;
 
-    const [demobilization, updatedEquipment] = await Promise.all([
-      mobilizationModel.create({
+    const currentOperatorName = currentEquipment?.certificationBody?.operatorName || '';
+    const [demobilization, updatedEquipment] = await Promise.all([ 
+      mobilizationModel.create({ 
         equipmentId, regNo, machine,
         action: 'demobilized', withOperator: false,
+        operator: currentOperatorName,
         month, year, date: selectedDate ? new Date(selectedDate) : new Date(),
         time, remarks, status: 'idle'
       }),
@@ -824,10 +826,12 @@ const demobilizeEquipment = async (data) => {
     await alertMobilizationViaEmail({
       action: 'demobilized', regNo, machine,
       month, year, time, date: selectedDate ? new Date(selectedDate) : new Date(), remarks,
-      site:     currentSite || '',
-      hired:    currentEquipment?.hired    || false,
-      rentRate: currentEquipment?.rentRate || null,
-      location: currentEquipment?.location ? [currentEquipment.location] : [],
+      site:         currentSite || '',
+      hired:        currentEquipment?.hired    || false,
+      rentRate:     currentEquipment?.rentRate || null,
+      location:     currentEquipment?.location ? [currentEquipment.location] : [],
+      operator:     currentEquipment?.certificationBody?.operatorName || '',
+      withOperator: !!currentEquipment?.certificationBody?.operatorName,
     }).catch(e => console.error('Demobilization email failed:', e));
 
     return { status: 201, ok: true, message: 'Equipment demobilized successfully', data: { demobilization, updatedEquipment } };

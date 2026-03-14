@@ -145,6 +145,8 @@ const getPendingSignatures = async (req, res) => {
   try {
     const { uniqueCode } = req.body;
 
+    console.log("uniqueCode", uniqueCode)
+
     if (!uniqueCode) {
       return res.status(400).json({ success: false, message: 'uniqueCode is required' });
     }

@@ -37,6 +37,7 @@ const attendanceRouter     = require('./routes/attendance.router');
 const backchargeRouter     = require('./routes/backcharge.router');
 const chatRouter           = require('./routes/chat.router');
 const explorerRouter       = require('./routes/explorer.router');
+const webPushRouter        = require('./routes/webpush.router');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // App Initialisation
@@ -52,7 +53,7 @@ require('./db/ansarigroup.db');
 // ── CORS configuration ─────────────────────────────────────────────────────────
 
 const corsOptions = {
-  origin: [
+  origin: [ 
     'https://iiqup.vercel.app',
     'https://ansarigroup.online',
     'https://www.ansarigroup.online',
@@ -109,6 +110,7 @@ app.use('/oauth',          oauthRouter);
 app.use('/fuels',          fuelsRouter);
 app.use('/attendance',     attendanceRouter);
 app.use('/backcharge',     backchargeRouter);
+app.use('/webpush',        webPushRouter);
 
 // ── Protected routes (auth required) ──────────────────────────────────────────
 app.use('/service-history', authMiddleware, serviceHistoryRouter);

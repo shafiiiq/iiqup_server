@@ -63,5 +63,7 @@ router.post('/doc-oauth-authorized-sign-key',        authMiddleware, controller.
 router.post('/doc-oauth-seal-sign-key',              authMiddleware, controller.getSealKey);
 router.post('/activate-signature',                   authMiddleware, controller.activateSignature);
 router.post('/verify-device-trust',                  authMiddleware, controller.verifyDeviceTrust);
+router.get ('/tutorials',                            authMiddleware, controller.getTutorials);
+router.post('/tutorials/complete',                   authMiddleware, controller.completeTutorial);
 
 module.exports = router;

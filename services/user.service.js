@@ -416,6 +416,40 @@ const checkRole = (...roles) => (req, res, next) => {
   next();
 };
 
+/**
+ * Returns the tutorialsSeen array for a user.
+ * @param {string} userId
+ * @returns {Promise<{ status: number, success: boolean, tutorialsSeen: string[] }>}
+ */
+const getTutorialsSeen = async (userId) => {
+  try {
+    const user = await User.findById(userId).select('tutorialsSeen').lean();
+    if (!user) return { status: 404, success: false, message: 'User not found' };
+    return { status: 200, success: true, tutorialsSeen: user.tutorialsSeen || [] };
+  } catch (error) {
+    console.error('[UserService] getTutorialsSeen:', error);
+    throw new Error(`Error fetching tutorials: ${error.message}`);
+  }
+};
+
+/**
+ * Marks a tutorial as seen for a user (idempotent — safe to call multiple times).
+ * @param {string} userId
+ * @param {string} tutorialId
+ * @returns {Promise<{ status: number, success: boolean }>}
+ */
+const completeTutorial = async (userId, tutorialId) => {
+  try {
+    await User.findByIdAndUpdate(userId, {
+      $addToSet: { tutorialsSeen: tutorialId }
+    });
+    return { status: 200, success: true };
+  } catch (error) {
+    console.error('[UserService] completeTutorial:', error);
+    throw new Error(`Error completing tutorial: ${error.message}`);
+  }
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Exports
 // ─────────────────────────────────────────────────────────────────────────────
@@ -438,4 +472,6 @@ module.exports = {
   resetPassword,
   verifyToken,
   checkRole,
+  getTutorialsSeen,
+  completeTutorial
 };

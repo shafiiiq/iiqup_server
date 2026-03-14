@@ -753,6 +753,39 @@ const revokeBiometricToken = async (req, res) => {
   }
 };
 
+/**
+ * GET /users/tutorials
+ * Returns all tutorial IDs the user has already completed.
+ */
+const getTutorials = async (req, res) => {
+  try {
+    const result = await userService.getTutorialsSeen(req.user.id);
+    res.status(result.status).json(result);
+  } catch (error) {
+    console.error('[User] getTutorials:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * POST /users/tutorials/complete
+ * Marks a tutorial as completed for the authenticated user.
+ * Body: { tutorialId: string }
+ */
+const completeTutorial = async (req, res) => {
+  try {
+    const { tutorialId } = req.body;
+    if (!tutorialId) {
+      return res.status(400).json({ success: false, message: 'tutorialId is required' });
+    }
+    const result = await userService.completeTutorial(req.user.id, tutorialId);
+    res.status(result.status).json(result);
+  } catch (error) {
+    console.error('[User] completeTutorial:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Exports
 // ─────────────────────────────────────────────────────────────────────────────
@@ -780,4 +813,6 @@ module.exports = {
   activateSignature, verifyDeviceTrust,
   // Biometric
   generateBiometricToken, biometricLogin, revokeBiometricToken,
+  // Tutorials & Explores
+  getTutorials,completeTutorial
 };

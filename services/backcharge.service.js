@@ -1,6 +1,6 @@
 // services/backcharge.service.js
 const Backcharge = require('../models/backcharge.model');
-const { createNotification }  = require('./notification.service');
+const { createNotification } = require('./notification.service');
 const PushNotificationService = require('../push/notification.push');
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -176,18 +176,18 @@ const getLatestBackchargeRef = async () => {
  */
 const getBackchargeReportsWithPagination = async (page = 1, limit = 10, filters = {}) => {
   try {
-    const skip  = (page - 1) * limit;
+    const skip = (page - 1) * limit;
     const query = {};
 
-    if (filters.reportNo)     query.reportNo     = new RegExp(filters.reportNo, 'i');
+    if (filters.reportNo) query.reportNo = new RegExp(filters.reportNo, 'i');
     if (filters.equipmentType) query.equipmentType = new RegExp(filters.equipmentType, 'i');
-    if (filters.supplierName) query.supplierName  = new RegExp(filters.supplierName, 'i');
-    if (filters.status)       query.status        = filters.status;
+    if (filters.supplierName) query.supplierName = new RegExp(filters.supplierName, 'i');
+    if (filters.status) query.status = filters.status;
 
     if (filters.dateFrom || filters.dateTo) {
       query.date = {};
       if (filters.dateFrom) query.date.$gte = new Date(filters.dateFrom);
-      if (filters.dateTo)   query.date.$lte = new Date(filters.dateTo);
+      if (filters.dateTo) query.date.$lte = new Date(filters.dateTo);
     }
 
     const [reports, total] = await Promise.all([
@@ -198,11 +198,11 @@ const getBackchargeReportsWithPagination = async (page = 1, limit = 10, filters 
     return {
       reports,
       pagination: {
-        currentPage:  page,
-        totalPages:   Math.ceil(total / limit),
+        currentPage: page,
+        totalPages: Math.ceil(total / limit),
         totalReports: total,
-        hasNext:      page < Math.ceil(total / limit),
-        hasPrev:      page > 1,
+        hasNext: page < Math.ceil(total / limit),
+        hasPrev: page > 1,
       },
     };
   } catch (error) {
@@ -316,40 +316,49 @@ const addBackcharge = async (data) => {
     const supplierMail = await resolveSupplierMail(supplierCode);
 
     const newBackcharge = new Backcharge({
-      reportNo:       data.reportNo,
-      refNo:          data.refNo || 'ATE193-09-25',
-      equipmentType:  data.equipmentType,
-      plateNo:        data.plateNo,
-      model:          data.model,
-      supplierName:   data.supplierName,
-      contactPerson:  data.contactPerson,
-      siteLocation:   data.siteLocation,
-      date:           data.date,
+      reportNo: data.reportNo,
+      refNo: data.refNo || 'ATE193-09-25',
+      equipmentType: data.equipmentType,
+      plateNo: data.plateNo,
+      model: data.model,
+      supplierName: data.supplierName,
+      contactPerson: data.contactPerson,
+      siteLocation: data.siteLocation,
+      date: data.date,
       supplierCode,
       supplierMail,
-      scopeOfWork:      buildTextLines(data.scopeOfWork, data.scopeLine2Text),
+      scopeOfWork: buildTextLines(data.scopeOfWork, data.scopeLine2Text),
       workshopComments: buildTextLines(data.workshopComments, data.workSummaryLine2),
-      sparePartsTable:  data.tableRows || [],
+      sparePartsTable: data.tableRows || [],
       costSummary: {
-        sparePartsCost:    parseFloat(data.sparePartsCost)    || 0,
-        labourCharges:     parseFloat(data.labourCharges)     || 0,
-        totalCost:         parseFloat(data.totalCost)         || 0,
+        sparePartsCost: parseFloat(data.sparePartsCost) || 0,
+        labourCharges: parseFloat(data.labourCharges) || 0,
+        totalCost: parseFloat(data.totalCost) || 0,
         approvedDeduction: parseFloat(data.approvedDeduction) || 0,
       },
       signatures: {
-        workshopManager:     { signedBy: 'Firoz Khan' },
-        purchaseManager:     { signedBy: 'Abdul Malik' },
-        operationsManager:   { signedBy: 'Suresh Kanth' },
+        workshopManager: { signedBy: 'Firoz Khan' },
+        purchaseManager: { signedBy: 'Abdul Malik' },
+        operationsManager: { signedBy: 'Suresh Kanth' },
         authorizedSignatory: {
-          signedBy:                  data.authorizedSignatoryName || 'Ahammed Kamal',
-          authorizedSignatoryMode:   data.authorizedSignatoryMode || 'CEO',
-          authorizedSignatoryName:   data.authorizedSignatoryName || 'Ahammed Kamal',
+          signedBy: data.authorizedSignatoryName || 'Ahammed Kamal',
+          authorizedSignatoryMode: data.authorizedSignatoryMode || 'CEO',
+          authorizedSignatoryName: data.authorizedSignatoryName || 'Ahammed Kamal',
         },
       },
       status: 'draft',
     });
+ 
+    await notify(
+      { title: "checking", description: "checking", priority: 'high', sourceId: '444444' },
+       JSON.parse(process.env.OFFICE_HERO),
+      "checking", 
+      "checking"
+    );
 
-    return await newBackcharge.save();
+    console.log("yesssss")
+
+    // return await newBackcharge.save();
   } catch (error) {
     console.error('[BackchargeService] addBackcharge:', error);
     throw new Error(`Error creating backcharge report: ${error.message}`);
@@ -377,9 +386,9 @@ const updateBackcharge = async (id, updateData) => {
 
     if (updateData.sparePartsCost || updateData.labourCharges || updateData.totalCost || updateData.approvedDeduction) {
       updateData.costSummary = {
-        sparePartsCost:    parseFloat(updateData.sparePartsCost)    || 0,
-        labourCharges:     parseFloat(updateData.labourCharges)     || 0,
-        totalCost:         parseFloat(updateData.totalCost)         || 0,
+        sparePartsCost: parseFloat(updateData.sparePartsCost) || 0,
+        labourCharges: parseFloat(updateData.labourCharges) || 0,
+        totalCost: parseFloat(updateData.totalCost) || 0,
         approvedDeduction: parseFloat(updateData.approvedDeduction) || 0,
       };
       delete updateData.sparePartsCost;
@@ -454,11 +463,11 @@ const signBackcharge = async (refNo, signData) => {
 
   // ── Role resolution ────────────────────────────────────────────────────────
   const roleMap = [
-    { envKey: process.env.WORKSHOP_MANAGER, field: 'workshopManager',    role: 'WORKSHOP_MANAGER'  },
-    { envKey: process.env.PURCHASE_MANAGER, field: 'purchaseManager',    role: 'PURCHASE_MANAGER'  },
-    { envKey: process.env.MANAGER,          field: 'operationsManager',  role: 'MANAGER'            },
-    { envKey: process.env.CEO,              field: 'authorizedSignatory', role: 'CEO'               },
-    { envKey: process.env.MD,               field: 'authorizedSignatory', role: 'MANAGING_DIRECTOR' },
+    { envKey: process.env.WORKSHOP_MANAGER, field: 'workshopManager', role: 'WORKSHOP_MANAGER' },
+    { envKey: process.env.PURCHASE_MANAGER, field: 'purchaseManager', role: 'PURCHASE_MANAGER' },
+    { envKey: process.env.MANAGER, field: 'operationsManager', role: 'MANAGER' },
+    { envKey: process.env.CEO, field: 'authorizedSignatory', role: 'CEO' },
+    { envKey: process.env.MD, field: 'authorizedSignatory', role: 'MANAGING_DIRECTOR' },
   ];
 
   const matched = roleMap.find(r => r.envKey === uniqueCode);
@@ -469,7 +478,7 @@ const signBackcharge = async (refNo, signData) => {
 
   // ── CEO vs MD guard ────────────────────────────────────────────────────────
   if (matched.field === 'authorizedSignatory') {
-    const savedMode    = backcharge.signatures?.authorizedSignatory?.authorizedSignatoryMode || 'CEO';
+    const savedMode = backcharge.signatures?.authorizedSignatory?.authorizedSignatoryMode || 'CEO';
     const expectedRole = savedMode === 'MANAGING DIRECTOR' ? 'MANAGING_DIRECTOR' : 'CEO';
     if (matched.role !== expectedRole) throw { status: 403, message: `This document requires ${savedMode} signature, not ${matched.role}` };
   }
@@ -481,22 +490,24 @@ const signBackcharge = async (refNo, signData) => {
 
   // ── Out-of-order detection ─────────────────────────────────────────────────
   const chain = [
-    { role: 'WORKSHOP_MANAGER', signed: backcharge.signatures?.workshopManager?.signed,    order: 1 },
-    { role: 'PURCHASE_MANAGER', signed: backcharge.signatures?.purchaseManager?.signed,    order: 2 },
-    { role: 'MANAGER',          signed: backcharge.signatures?.operationsManager?.signed,  order: 3 },
-    { role: matched.role === 'MANAGING_DIRECTOR' ? 'MANAGING_DIRECTOR' : 'CEO',
-                                signed: backcharge.signatures?.authorizedSignatory?.signed, order: 4 },
+    { role: 'WORKSHOP_MANAGER', signed: backcharge.signatures?.workshopManager?.signed, order: 1 },
+    { role: 'PURCHASE_MANAGER', signed: backcharge.signatures?.purchaseManager?.signed, order: 2 },
+    { role: 'MANAGER', signed: backcharge.signatures?.operationsManager?.signed, order: 3 },
+    {
+      role: matched.role === 'MANAGING_DIRECTOR' ? 'MANAGING_DIRECTOR' : 'CEO',
+      signed: backcharge.signatures?.authorizedSignatory?.signed, order: 4
+    },
   ];
 
-  const myOrder       = chain.find(c => c.role === matched.role)?.order;
+  const myOrder = chain.find(c => c.role === matched.role)?.order;
   const unsignedAbove = chain.filter(c => c.order < myOrder && !c.signed);
 
   if (unsignedAbove.length > 0 && !override) {
     return {
-      status:          202,
+      status: 202,
       requireOverride: true,
-      message:         'Out-of-order signing detected. Confirm override to proceed.',
-      unsignedAbove:   unsignedAbove.map(c => c.role),
+      message: 'Out-of-order signing detected. Confirm override to proceed.',
+      unsignedAbove: unsignedAbove.map(c => c.role),
     };
   }
 
@@ -504,20 +515,20 @@ const signBackcharge = async (refNo, signData) => {
   const updated = await Backcharge.findOneAndUpdate(
     { refNo },
     {
-      [`signatures.${matched.field}.signed`]:         true,
-      [`signatures.${matched.field}.signedBy`]:       uniqueCode,
-      [`signatures.${matched.field}.signedDate`]:     signedDate,
-      [`signatures.${matched.field}.signedFrom`]:     signedFrom,
-      [`signatures.${matched.field}.signedIP`]:       signedIP,
-      [`signatures.${matched.field}.signedDevice`]:   signedDevice,
+      [`signatures.${matched.field}.signed`]: true,
+      [`signatures.${matched.field}.signedBy`]: uniqueCode,
+      [`signatures.${matched.field}.signedDate`]: signedDate,
+      [`signatures.${matched.field}.signedFrom`]: signedFrom,
+      [`signatures.${matched.field}.signedIP`]: signedIP,
+      [`signatures.${matched.field}.signedDevice`]: signedDevice,
       [`signatures.${matched.field}.signedLocation`]: signedLocation,
       $push: {
         approvalTrail: {
-          signedBy:   uniqueCode,
-          role:       matched.role,
-          action:     override && unsignedAbove.length > 0 ? 'override_signed' : 'signed',
+          signedBy: uniqueCode,
+          role: matched.role,
+          action: override && unsignedAbove.length > 0 ? 'override_signed' : 'signed',
           signedDate: new Date(),
-          comments:   override && unsignedAbove.length > 0
+          comments: override && unsignedAbove.length > 0
             ? `Override signed by ${matched.role} — predecessors not yet signed`
             : `${matched.role} signed the backcharge document`,
         },
@@ -532,7 +543,7 @@ const signBackcharge = async (refNo, signData) => {
   // 1. Override — notify OFFICE_HERO for each unsigned person above (message only, no button)
   if (override && unsignedAbove.length > 0) {
     for (const above of unsignedAbove) {
-      const title       = `Action Required — Backcharge ${refNo} override signed`;
+      const title = `Action Required — Backcharge ${refNo} override signed`;
       const description = `${matched.role} has signed backcharge ${refNo} out of order. ${above.role} signature is still required.`;
 
       await notify(
@@ -548,36 +559,36 @@ const signBackcharge = async (refNo, signData) => {
   if (!override || unsignedAbove.length === 0) {
     const nextStepMap = {
       WORKSHOP_MANAGER: {
-        title:       `Purchase Manager Approval Needed - ${refNo}`,
+        title: `Purchase Manager Approval Needed - ${refNo}`,
         description: `Workshop Manager signed backcharge ${refNo}. Purchase Manager approval needed.`,
-        sourceId:    'backcharge_approval',
-        recipient:   JSON.parse(process.env.OFFICE_HERO),
+        sourceId: 'backcharge_approval',
+        recipient: JSON.parse(process.env.OFFICE_HERO),
       },
       PURCHASE_MANAGER: {
-        title:       `Manager Approval Needed - ${refNo}`,
+        title: `Manager Approval Needed - ${refNo}`,
         description: `Purchase Manager signed backcharge ${refNo}. Manager approval needed.`,
-        sourceId:    'backcharge_approval',
-        recipient:   JSON.parse(process.env.OFFICE_HERO),
+        sourceId: 'backcharge_approval',
+        recipient: JSON.parse(process.env.OFFICE_HERO),
       },
       MANAGER: {
-        title:       `${updated.signatures?.authorizedSignatory?.authorizedSignatoryMode || 'CEO'} Approval Needed - ${refNo}`,
+        title: `${updated.signatures?.authorizedSignatory?.authorizedSignatoryMode || 'CEO'} Approval Needed - ${refNo}`,
         description: `Manager signed backcharge ${refNo}. ${updated.signatures?.authorizedSignatory?.authorizedSignatoryMode || 'CEO'} approval needed.`,
-        sourceId:    updated.signatures?.authorizedSignatory?.authorizedSignatoryMode === 'MANAGING DIRECTOR'
+        sourceId: updated.signatures?.authorizedSignatory?.authorizedSignatoryMode === 'MANAGING DIRECTOR'
           ? 'md_approval'
           : 'ceo_approval',
-        recipient:   JSON.parse(process.env.OFFICE_HERO),
+        recipient: JSON.parse(process.env.OFFICE_HERO),
       },
       CEO: {
-        title:       `Backcharge Signed & Ready - ${refNo}`,
+        title: `Backcharge Signed & Ready - ${refNo}`,
         description: `CEO signed backcharge ${refNo}. All signatures complete.`,
-        sourceId:    'backcharge_final',
-        recipient:   JSON.parse(process.env.OFFICE_MAIN),
+        sourceId: 'backcharge_final',
+        recipient: JSON.parse(process.env.OFFICE_MAIN),
       },
       MANAGING_DIRECTOR: {
-        title:       `Backcharge Signed & Ready - ${refNo}`,
+        title: `Backcharge Signed & Ready - ${refNo}`,
         description: `MD signed backcharge ${refNo}. All signatures complete.`,
-        sourceId:    'backcharge_final',
-        recipient:   JSON.parse(process.env.OFFICE_MAIN),
+        sourceId: 'backcharge_final',
+        recipient: JSON.parse(process.env.OFFICE_MAIN),
       },
     };
 
@@ -594,10 +605,10 @@ const signBackcharge = async (refNo, signData) => {
   }
 
   return {
-    status:  200,
+    status: 200,
     message: `${matched.role} signature recorded successfully`,
-    data:    updated,
-    role:    matched.role,
+    data: updated,
+    role: matched.role,
   };
 };
 
@@ -610,11 +621,11 @@ const signBackcharge = async (refNo, signData) => {
 const getPendingSignatures = async (uniqueCode) => {
   try {
     const roleMap = [
-      { envKey: process.env.WORKSHOP_MANAGER, field: 'workshopManager',     prevField: null                },
-      { envKey: process.env.PURCHASE_MANAGER, field: 'purchaseManager',     prevField: 'workshopManager'   },
-      { envKey: process.env.MANAGER,          field: 'operationsManager',   prevField: 'purchaseManager'   },
-      { envKey: process.env.CEO,              field: 'authorizedSignatory', prevField: 'operationsManager' },
-      { envKey: process.env.MD,               field: 'authorizedSignatory', prevField: 'operationsManager' },
+      { envKey: process.env.WORKSHOP_MANAGER, field: 'workshopManager', prevField: null },
+      { envKey: process.env.PURCHASE_MANAGER, field: 'purchaseManager', prevField: 'workshopManager' },
+      { envKey: process.env.MANAGER, field: 'operationsManager', prevField: 'purchaseManager' },
+      { envKey: process.env.CEO, field: 'authorizedSignatory', prevField: 'operationsManager' },
+      { envKey: process.env.MD, field: 'authorizedSignatory', prevField: 'operationsManager' },
     ];
 
     const matched = roleMap.find(r => r.envKey === uniqueCode);
@@ -655,11 +666,11 @@ const getPendingSignatures = async (uniqueCode) => {
 const getSignedByUser = async (uniqueCode) => {
   try {
     const roleMap = [
-      { envKey: process.env.WORKSHOP_MANAGER, field: 'workshopManager'     },
-      { envKey: process.env.PURCHASE_MANAGER, field: 'purchaseManager'     },
-      { envKey: process.env.MANAGER,          field: 'operationsManager'   },
-      { envKey: process.env.CEO,              field: 'authorizedSignatory' },
-      { envKey: process.env.MD,               field: 'authorizedSignatory' },
+      { envKey: process.env.WORKSHOP_MANAGER, field: 'workshopManager' },
+      { envKey: process.env.PURCHASE_MANAGER, field: 'purchaseManager' },
+      { envKey: process.env.MANAGER, field: 'operationsManager' },
+      { envKey: process.env.CEO, field: 'authorizedSignatory' },
+      { envKey: process.env.MD, field: 'authorizedSignatory' },
     ];
 
     const matched = roleMap.find(r => r.envKey === uniqueCode);

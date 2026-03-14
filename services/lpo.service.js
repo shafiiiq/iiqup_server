@@ -85,10 +85,10 @@ const buildSignedFields = (prefix, creds) => {
 /**
  * Sends a notification and a push notification together.
  * @param {object} notifPayload
- * @param {string|Array} recipient
+ * @param {string|Array} recipient 
  * @param {string} title
  * @param {string} description
- * @param {string} priority
+ * @param {string} priority 
  * @returns {Promise<void>}
  */
 const notify = async (notifPayload, recipient, title, description, priority = 'high') => {
@@ -119,39 +119,47 @@ const buildNextStepNotif = (role, lpoRef, updated) => {
   const isMD = updated.signatures?.authorizedSignatoryTitle === 'MANAGING DIRECTOR';
 
   const map = {
-    PURCHASE_MANAGER: {
-      title:       `MANAGER Approval Needed — LPO ${lpoRef}`,
-      description: `Purchase Manager signed LPO ${lpoRef}. Manager approval needed.`,
-      sourceId:    'accounts_approval',
-      navigateTo:  `/(screens)/managerSign/${lpoRef}`,
-      navigateText: 'View and Sign',
-      recipient:   JSON.parse(process.env.OFFICE_HERO),
-    },
-    MANAGER: {
-      title:       `${updated.signatures?.authorizedSignatoryTitle || 'CEO'} Approval Needed — LPO ${lpoRef}`,
-      description: `Manager signed LPO ${lpoRef}. ${updated.signatures?.authorizedSignatoryTitle || 'CEO'} approval needed.`,
-      sourceId:    isMD ? 'md_approval' : 'ceo_approval',
-      navigateTo:  isMD ? `/(screens)/mdSign/${lpoRef}` : `/(screens)/ceoSign/${lpoRef}`,
-      navigateText: 'View and Sign',
-      recipient:   JSON.parse(process.env.OFFICE_HERO),
-    },
-    CEO: {
-      title:       `ACCOUNTS Approval Needed — LPO ${lpoRef}`,
-      description: `CEO signed LPO ${lpoRef}. Accounts approval needed.`,
-      sourceId:    'final_approval',
-      navigateTo:  `/(screens)/accountsSign/${lpoRef}`,
-      navigateText: 'View and Sign',
-      recipient:   JSON.parse(process.env.OFFICE_HERO),
-    },
-    MANAGING_DIRECTOR: {
-      title:       `ACCOUNTS Approval Needed — LPO ${lpoRef}`,
-      description: `MD signed LPO ${lpoRef}. Accounts approval needed.`,
-      sourceId:    'final_approval',
-      navigateTo:  `/(screens)/accountsSign/${lpoRef}`,
-      navigateText: 'View and Sign',
-      recipient:   JSON.parse(process.env.OFFICE_HERO),
-    },
-    // ACCOUNTS intentionally omitted — handled by allSigned check
+     MANAGER: {
+       title:        `Purchase Manager Approval Needed — LPO ${lpoRef}`,
+       description:  `Manager signed LPO ${lpoRef}. Purchase Manager approval needed.`,
+       sourceId:     'lpo_approval',
+       navigateTo:   `/(screens)/purchaseManagerSign/${lpoRef}`,
+       navigateText: 'View and Sign',
+       recipient:    JSON.parse(process.env.OFFICE_HERO),
+     },
+     PURCHASE_MANAGER: {
+       title:        `Accounts Approval Needed — LPO ${lpoRef}`,
+       description:  `Purchase Manager signed LPO ${lpoRef}. Accounts approval needed.`,
+       sourceId:     'accounts_approval',
+       navigateTo:   `/(screens)/accountsSign/${lpoRef}`,
+       navigateText: 'View and Sign',
+       recipient:    JSON.parse(process.env.OFFICE_HERO),
+     },
+     ACCOUNTS: {
+       title:        `${updated.signatures?.authorizedSignatoryTitle || 'CEO'} Approval Needed — LPO ${lpoRef}`,
+       description:  `Accounts signed LPO ${lpoRef}. ${updated.signatures?.authorizedSignatoryTitle || 'CEO'} approval needed.`,
+       sourceId:     isMD ? 'md_approval' : 'ceo_approval',
+       navigateTo:   isMD ? `/(screens)/mdSign/${lpoRef}` : `/(screens)/ceoSign/${lpoRef}`,
+       navigateText: 'View and Sign',
+       recipient:    JSON.parse(process.env.OFFICE_HERO),
+     },
+     CEO: {
+       title:        `LPO ${lpoRef} Fully Signed`,
+       description:  `CEO signed LPO ${lpoRef}. All signatures complete.`,
+       sourceId:     'final_approval',
+       navigateTo:   `/(screens)/signedLpo/${lpoRef}`,
+       navigateText: 'View LPO',
+       recipient:    JSON.parse(process.env.OFFICE_MAIN),
+     },
+     MANAGING_DIRECTOR: {
+       title:        `LPO ${lpoRef} Fully Signed`,
+       description:  `MD signed LPO ${lpoRef}. All signatures complete.`,
+       sourceId:     'final_approval',
+       navigateTo:   `/(screens)/signedLpo/${lpoRef}`,
+       navigateText: 'View LPO',
+       recipient:    JSON.parse(process.env.OFFICE_MAIN),
+     },
+     // ACCOUNTS intentionally omitted — handled by allSigned check
   };
 
   return map[role] || null;
@@ -702,11 +710,12 @@ const signLPO = async (lpoRef, signData) => {
 
   // ── Role resolution ────────────────────────────────────────────────────────
   const roleMap = [
-    { envKey: process.env.PURCHASE_MANAGER, field: 'pmSigned',       detailsPrefix: 'PMR',      role: 'PURCHASE_MANAGER',  order: 1 },
-    { envKey: process.env.MANAGER,          field: 'managerSigned',  detailsPrefix: 'MANAGER',  role: 'MANAGER',           order: 2 },
-    { envKey: process.env.CEO,              field: 'ceoSigned',      detailsPrefix: 'CEO',      role: 'CEO',               order: 3 },
-    { envKey: process.env.MD,               field: 'ceoSigned',      detailsPrefix: 'MD',       role: 'MANAGING_DIRECTOR', order: 3 },
-    { envKey: process.env.ACCOUNTS,         field: 'accountsSigned', detailsPrefix: 'ACCOUNTS', role: 'ACCOUNTS',          order: 4 },
+    { envKey: process.env.MANAGER,          field: 'managerSigned',  detailsPrefix: 'MANAGER',  role: 'MANAGER',           order: 1 },
+    { envKey: process.env.PURCHASE_MANAGER, field: 'pmSigned',       detailsPrefix: 'PMR',      role: 'PURCHASE_MANAGER',  order: 2 },
+    { envKey: process.env.WORKSHOP_MANAGER, field: 'pmSigned',       detailsPrefix: 'PMR',      role: 'PURCHASE_MANAGER',  order: 2 },  // shares same field
+    { envKey: process.env.CEO,              field: 'ceoSigned',      detailsPrefix: 'CEO',      role: 'CEO',               order: 4 },
+    { envKey: process.env.MD,               field: 'ceoSigned',      detailsPrefix: 'MD',       role: 'MANAGING_DIRECTOR', order: 4 },
+    { envKey: process.env.ACCOUNTS,         field: 'accountsSigned', detailsPrefix: 'ACCOUNTS', role: 'ACCOUNTS',          order: 3 },
   ];
 
   const matched = roleMap.find(r => r.envKey === uniqueCode);
@@ -740,10 +749,10 @@ const signLPO = async (lpoRef, signData) => {
   const authRole = isMD ? 'MANAGING_DIRECTOR' : 'CEO';
 
   const chain = [
-    { role: 'PURCHASE_MANAGER', signed: lpo.pmSigned,       order: 1 },
-    { role: 'MANAGER',          signed: lpo.managerSigned,  order: 2 },
-    { role: authRole,           signed: lpo.ceoSigned,      order: 3 },
-    { role: 'ACCOUNTS',         signed: lpo.accountsSigned, order: 4 },
+    { role: 'MANAGER',          signed: lpo.managerSigned,  order: 1 },
+    { role: 'PURCHASE_MANAGER', signed: lpo.pmSigned,       order: 2 },
+    { role: 'ACCOUNTS',         signed: lpo.accountsSigned, order: 3 },
+    { role: authRole,           signed: lpo.ceoSigned,      order: 4 },
   ];
 
   const myOrder       = matched.order;
@@ -907,52 +916,69 @@ const getPendingSignatures = async (uniqueCode) => {
   try {
     const roleMap = [
       {
-        envKey: process.env.PURCHASE_MANAGER,
-        field: 'pmSigned',
-        query: {
-          pmSigned: { $ne: true },
-          workflowStatus: { $in: ['lpo_uploaded', 'lpo_amended'] },
-        },
-      },
-      {
+        // Manager signs first — no prerequisite
         envKey: process.env.MANAGER,
-        field: 'managerSigned',
         query: {
-          managerSigned: { $ne: true },
+          managerSigned:  { $ne: true },
           workflowStatus: { $in: ['lpo_uploaded', 'lpo_amended'] },
         },
       },
       {
+         // PM signs after Manager
+         envKey: process.env.PURCHASE_MANAGER,
+        query: {
+          managerSigned:  true,
+           pmSigned:       { $ne: true },
+           workflowStatus: { $in: ['lpo_uploaded', 'lpo_amended'] },
+        },
+      },
+      {
+        // Workshop Manager also signs at step 2 — same field as PM
+        envKey: process.env.WORKSHOP_MANAGER,
+         query: {
+           managerSigned:  true,
+           pmSigned:       { $ne: true },
+           workflowStatus: { $in: ['lpo_uploaded', 'lpo_amended'] },
+        },
+       },
+       {
+        // Accounts signs after Manager + PM
+         envKey: process.env.ACCOUNTS,
+         query: {
+           managerSigned:  true,
+          pmSigned:       true,
+           accountsSigned: { $ne: true },
+          workflowStatus: { $in: ['lpo_uploaded', 'lpo_amended'] },
+         },
+      },
+      {
+      // CEO signs after all three above
         envKey: process.env.CEO,
-        field: 'ceoSigned',
         query: {
-          ceoSigned: { $ne: true },
-          workflowStatus: { $in: ['lpo_uploaded', 'lpo_amended'] },
-          'signatures.authorizedSignatoryTitle': { $nin: ['MANAGING DIRECTOR'] },
-        },
-      },
-      {
+          managerSigned:  true,
+           pmSigned:       true,
+           accountsSigned: true,
+           ceoSigned:      { $ne: true },
+           workflowStatus: { $in: ['lpo_uploaded', 'lpo_amended'] },
+           'signatures.authorizedSignatoryTitle': { $nin: ['MANAGING DIRECTOR'] },
+         },
+       },
+       {
+        // MD signs after all three above
         envKey: process.env.MD,
-        field: 'ceoSigned',
         query: {
-          managerSigned: true,
-          workflowStatus: { $in: ['lpo_uploaded', 'lpo_amended'] },
-          'signatures.authorizedSignatoryTitle': 'MANAGING DIRECTOR',
-        },
-      },
-      {
-        envKey: process.env.ACCOUNTS,
-        field: 'accountsSigned',
-        query: {
-          accountsSigned: { $ne: true },
-          workflowStatus: { $in: ['lpo_uploaded', 'lpo_amended'] },
-        },
-      },
+          managerSigned:  true,
+          pmSigned:       true,
+          accountsSigned: true,
+           ceoSigned:      { $ne: true },
+           workflowStatus: { $in: ['lpo_uploaded', 'lpo_amended'] },
+           'signatures.authorizedSignatoryTitle': 'MANAGING DIRECTOR',
+         },
+       },
     ];
 
     const matched = roleMap.find(r => r.envKey === uniqueCode);
-    
-    if (!matched) return [];    
+    if (!matched) return [];
 
     return await LPO.find(matched.query)
       .select('lpoRef date company equipments totalAmount workflowStatus pmSigned managerSigned ceoSigned accountsSigned signatures')
@@ -976,6 +1002,10 @@ const getSignedByUser = async (uniqueCode) => {
       {
         envKey: process.env.PURCHASE_MANAGER,
         query:  { pmSigned: true },
+      },
+      {
+        envKey: process.env.WORKSHOP_MANAGER,
+        query:  { pmSigned: true },  
       },
       {
         envKey: process.env.MANAGER,

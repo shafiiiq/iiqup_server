@@ -6,6 +6,17 @@ const User     = require('../models/user.model');
 const Operator = require('../models/operator.model');
 const Mechanic = require('../models/mechanic.model');
 const { default: mongoose } = require('mongoose');
+const webpush = require('web-push');
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Setup Web Push
+// ─────────────────────────────────────────────────────────────────────────────
+
+webpush.setVapidDetails(
+  process.env.VAPID_EMAIL,
+  process.env.VAPID_PUBLIC_KEY,
+  process.env.VAPID_PRIVATE_KEY
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FCM Direct
@@ -203,8 +214,13 @@ const _dispatchToUser = async (uniqueCode, notificationData) => {
   const results = { websocket: { success: false }, pushNotification: { success: false } };
 
   try {
-    await sendWebSocketNotification(uniqueCode, notificationData);
-    results.websocket = { success: true };
+    if (global.io) {
+      global.io.to(`user_${uniqueCode}`).emit('new_notification', {
+        ...notificationData,
+        meta: { targetUser: uniqueCode, sentAt: new Date().toISOString() },
+      });
+      results.websocket = { success: true };
+    }
   } catch (error) {
     results.websocket = { success: false, error: error.message };
   }
@@ -213,6 +229,20 @@ const _dispatchToUser = async (uniqueCode, notificationData) => {
     results.pushNotification = await tokenService.sendNotificationToUser(uniqueCode, notificationData);
   } catch (error) {
     results.pushNotification = { success: false, error: error.message };
+  }
+
+  try {
+    const user = await User.findOne({ uniqueCode }).select('webPushSubscription');
+    if (user?.webPushSubscription) {
+      await webpush.sendNotification(
+        user.webPushSubscription,
+        JSON.stringify({ title: notificationData.title, description: notificationData.description || notificationData.message })
+      );
+    }
+  } catch (err) {
+    if (err.statusCode === 410) {
+      await User.findOneAndUpdate({ uniqueCode }, { $set: { webPushSubscription: null } });
+    }
   }
 
   if (notificationData.type === 'special') {
@@ -227,14 +257,16 @@ const _dispatchBroadcast = async (notificationData) => {
   const results = { websocket: { success: false }, pushNotification: { success: false } };
 
   try {
-    broadcastWebSocketNotification(notificationData);
-    results.websocket = { success: true };
+    if (global.io) {
+      global.io.emit('new_notification', notificationData);
+      results.websocket = { success: true };
+    }
   } catch (error) {
     results.websocket = { success: false, error: error.message };
   }
 
   try {
-    const allUsers    = await User.find({ isActive: true }).select('uniqueCode');
+    const allUsers = await User.find({ isActive: true }).select('uniqueCode');
     const uniqueCodes = allUsers.map(u => u.uniqueCode);
     if (uniqueCodes.length > 0) results.pushNotification = await tokenService.sendBulkNotifications(uniqueCodes, notificationData);
   } catch (error) {
@@ -254,21 +286,40 @@ const _dispatchToUsers = async (uniqueCodes, notificationData) => {
     const userResult = { uniqueCode, websocket: { success: false }, pushNotification: { success: false } };
 
     try {
-      sendWebSocketNotification(uniqueCode, notificationData);
-      userResult.websocket = { success: true };
-      results.websocket.success++;
+      if (global.io) {
+        global.io.to(`user_${uniqueCode}`).emit('new_notification', {
+          ...notificationData,
+          meta: { targetUser: uniqueCode, sentAt: new Date().toISOString() },
+        });
+        userResult.websocket = { success: true };
+        results.websocket.success++;
+      }
     } catch (error) {
       userResult.websocket = { success: false, error: error.message };
       results.websocket.failed++;
     }
 
-    try {
+    try { 
       const pushResult = await tokenService.sendNotificationToUser(uniqueCode, notificationData);
       userResult.pushNotification = pushResult;
       pushResult.success ? results.pushNotification.success++ : results.pushNotification.failed++;
     } catch (error) {
       userResult.pushNotification = { success: false, error: error.message };
       results.pushNotification.failed++;
+    }
+
+    try {
+      const user = await User.findOne({ uniqueCode }).select('webPushSubscription');
+      if (user?.webPushSubscription) {
+        await webpush.sendNotification(
+          user.webPushSubscription,
+          JSON.stringify({ title: notificationData.title, description: notificationData.description || notificationData.message })
+        );
+      }
+    } catch (err) {
+      if (err.statusCode === 410) {
+        await User.findOneAndUpdate({ uniqueCode }, { $set: { webPushSubscription: null } });
+      }
     }
 
     if (notificationData.type === 'special') {
@@ -279,7 +330,7 @@ const _dispatchToUsers = async (uniqueCodes, notificationData) => {
   }));
 
   const overallSuccess = results.websocket.success > 0 || results.pushNotification.success > 0;
-  return { success: overallSuccess, message: overallSuccess ? `Notifications sent to ${results.websocket.success + results.pushNotification.success} users` : 'Failed to send notifications', data: results };
+  return { success: overallSuccess, message: overallSuccess ? 'Notifications sent' : 'Failed to send notifications', data: results };
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
