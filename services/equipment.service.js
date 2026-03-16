@@ -786,10 +786,10 @@ const demobilizeEquipment = async (data) => {
     const { equipmentId, regNo, machine, month, year, time, selectedDate, remarks } = data;
 
     const currentEquipment  = await equipmentModel.findById(equipmentId);
-    const currentOperatorId = currentEquipment?.certificationBody?.operatorId;
+    const currentOperatorId = currentEquipment?.certificationBody?.at(-1)?.operatorId;
     const currentSite       = currentEquipment?.site || null;
 
-    const currentOperatorName = currentEquipment?.certificationBody?.operatorName || '';
+    const currentOperatorName = currentEquipment?.certificationBody?.at(-1)?.operatorName || '';
     const [demobilization, updatedEquipment] = await Promise.all([ 
       mobilizationModel.create({ 
         equipmentId, regNo, machine,
@@ -830,8 +830,8 @@ const demobilizeEquipment = async (data) => {
       hired:        currentEquipment?.hired    || false,
       rentRate:     currentEquipment?.rentRate || null,
       location:     currentEquipment?.location ? [currentEquipment.location] : [],
-      operator:     currentEquipment?.certificationBody?.operatorName || '',
-      withOperator: !!currentEquipment?.certificationBody?.operatorName,
+      operator:     currentEquipment?.certificationBody?.at(-1)?.operatorName || '',
+      withOperator: !!currentEquipment?.certificationBody?.at(-1)?.operatorName,
     }).catch(e => console.error('Demobilization email failed:', e));
 
     return { status: 201, ok: true, message: 'Equipment demobilized successfully', data: { demobilization, updatedEquipment } };

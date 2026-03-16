@@ -290,6 +290,11 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
           <td style="color:#666;">Removed from Site</td>
           <td>${site || 'N/A'}</td>
         </tr>` : ''}
+        ${(withOperator || action === 'demobilized') && operator ? `
+        <tr>
+          <td style="color:#666;">Operator</td>
+          <td>${operator}</td>
+        </tr>` : ''}
         ${action === 'status_changed' ? `
         <tr>
           <td style="color:#666;">Previous Status</td>
@@ -299,13 +304,8 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
           <td style="color:#666;">New Status</td>
           <td><strong>${newStatus}</strong></td>
         </tr>` : ''}
-        ${withOperator && operator ? `
-        <tr>
-          <td style="color:#666;">Assigned Operator</td>
-          <td>${operator}</td>
-        </tr>` : ''}
         <tr style="background:#f5f5f5;">
-          <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Mobilization Details</td>
+          <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">${action === 'demobilized' ? 'Demobilization Details' : 'Mobilization Details'}</td>
         </tr>
         <tr>
           <td style="color:#666;">Date</td>
