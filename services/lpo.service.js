@@ -159,7 +159,6 @@ const buildNextStepNotif = (role, lpoRef, updated) => {
        navigateText: 'View LPO',
        recipient:    JSON.parse(process.env.OFFICE_MAIN),
      },
-     // ACCOUNTS intentionally omitted — handled by allSigned check
   };
 
   return map[role] || null;

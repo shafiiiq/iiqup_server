@@ -348,17 +348,8 @@ const addBackcharge = async (data) => {
       },
       status: 'draft',
     });
- 
-    await notify(
-      { title: "checking", description: "checking", priority: 'high', sourceId: '444444' },
-       JSON.parse(process.env.OFFICE_HERO),
-      "checking", 
-      "checking"
-    );
 
-    console.log("yesssss")
-
-    // return await newBackcharge.save();
+    return await newBackcharge.save();
   } catch (error) {
     console.error('[BackchargeService] addBackcharge:', error);
     throw new Error(`Error creating backcharge report: ${error.message}`);
