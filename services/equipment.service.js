@@ -129,10 +129,14 @@ const insertEquipment = async (data) => {
 
     const equipment = await equipmentModel.create(data);
 
+    const isHired = data.company === 'HIRED';
+
     const officeMain = JSON.parse(process.env.OFFICE_MAIN);
     await _sendNotification({
-      title:       'New Asset Launched',
-      description: `Alhamdulillah, We are happy to inform you! We have bought a brand new ${equipment.machine} (${equipment.brand}) today`,
+      title:       isHired ? 'New Equipment Hired' : 'New Asset Launched',
+      description: isHired
+        ? `We have hired a new ${equipment.machine} (${equipment.brand}) from ${equipment.hiredFrom} today`
+        : `Alhamdulillah, We are happy to inform you! We have bought a brand new ${equipment.machine} (${equipment.brand}) today`,
       priority:    NOTIFICATION_PRIORITY.HIGH,
       sourceId:    equipment._id,
       recipient:   officeMain
