@@ -165,9 +165,13 @@ const insertEquipment = async (data) => {
 const fetchEquipments = async (page = 1, limit = DEFAULT_PAGE_LIMITS.FETCH, hiredFilter = null, statusFilter = null) => {
   try {
     const skip  = (page - 1) * limit;
+    const statusQuery = Array.isArray(statusFilter)
+      ? { status: { $in: statusFilter } }
+      : statusFilter ? { status: statusFilter } : {};
+
     const query = {
       ...buildHiredQuery(hiredFilter),
-      ...(statusFilter ? { status: statusFilter } : {})
+      ...statusQuery
     };
 
     const [totalCount, equipments] = await Promise.all([

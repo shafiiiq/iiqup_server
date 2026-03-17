@@ -41,8 +41,9 @@ const addEquipment = async (req, res) => {
 const getEquipments = async (req, res) => {
   try {
     const { page = 1, limit = 20, hired, status } = req.query;
+    const statusFilter = Array.isArray(status) ? status : status ? [status] : null;
     
-    const result = await equipmentServices.fetchEquipments(parseInt(page), parseInt(limit), hired, status);
+    const result = await equipmentServices.fetchEquipments(parseInt(page), parseInt(limit), hired, statusFilter);
 
     res.status(200).json({
       status:     200,
