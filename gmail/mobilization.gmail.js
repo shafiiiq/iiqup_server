@@ -26,11 +26,11 @@ const ACTION_LABEL = {
   one_day_mob: 'ONE DAY MOBILIZATION',
 };
 
-const ACTION_SUBJECT = (machine, regNo) => ({
-  mobilized:      `Mobilized - ${machine} (${regNo})`,
-  demobilized:    `Demobilized - ${machine} (${regNo})`,
+const ACTION_SUBJECT = (machine, regNo, site, clientCompany) => ({
+  mobilized:      `Mobilized - ${machine} (${regNo})${clientCompany ? ` - ${clientCompany}` : site ? ` - ${site}` : ''}`,
+  demobilized:    `Demobilized - ${machine} (${regNo})${site ? ` - ${site}` : ''}`,
   status_changed: `Status Changed - ${machine} (${regNo})`,
-  one_day_mob:    `One Day Mobilization - ${machine} (${regNo})`,
+  one_day_mob:    `One Day Mobilization - ${machine} (${regNo})${clientCompany ? ` - ${clientCompany}` : site ? ` - ${site}` : ''}`,
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -399,7 +399,7 @@ const alertMobilizationViaEmail = async (data = {}) => {
   const to      = toList.join(', ');
   const ccList  = JSON.parse(process.env.MOBILIZATION_CC || '[]');
   const cc      = ccList.join(', ');
-  const subject = ACTION_SUBJECT(data.machine, data.regNo)[data.action] ?? `Equipment Update – ${data.machine}`;
+  const subject = ACTION_SUBJECT(data.machine, data.regNo, data.site, data.clientCompany)[data.action] ?? `Equipment Update – ${data.machine}`;
 
   const htmlContent = generateMobilizationTemplate('Team', data);
   const textContent = `Equipment ${data.action}: ${data.machine} (${data.regNo}). Site: ${data.site || 'N/A'}. Date: ${data.date}. Time: ${data.time}. Remarks: ${data.remarks || 'None'}.`;

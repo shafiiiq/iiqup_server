@@ -19,11 +19,10 @@ const { loadImageAsBase64, getMimeType } = require('../helpers/email.helper');
 const MONTH_NAMES = ['', 'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'];
 
-const REPLACEMENT_SUBJECT = (machine, regNo) => ({
-  operator:  `Operator Replacement - ${machine} (${regNo})`,
-  equipment: `Equipment Replacement - ${machine} (${regNo})`,
+const REPLACEMENT_SUBJECT = (machine, regNo, site, clientCompany) => ({
+  operator:  `Operator Replacement - ${machine} (${regNo})${site ? ` - ${site}` : ''}`,
+  equipment: `Equipment Replacement - ${machine} (${regNo})${clientCompany ? ` - ${clientCompany}` : site ? ` - ${site}` : ''}`,
 });
-
 // ─────────────────────────────────────────────────────────────────────────────
 // OAuth2 Gmail Client
 // ─────────────────────────────────────────────────────────────────────────────
@@ -376,7 +375,7 @@ const alertReplacementViaEmail = async (data = {}) => {
   const to      = toList.join(', ');
   const ccList  = JSON.parse(process.env.REPLACEMENT_CC || '[]');
   const cc      = ccList.join(', ');
-  const subject = REPLACEMENT_SUBJECT(data.machine, data.regNo)[data.type] ?? `Replacement Update – ${data.machine}`;
+  const subject = REPLACEMENT_SUBJECT(data.machine, data.regNo, data.site, data.clientCompany)[data.type] ?? `Replacement Update – ${data.machine}`;
 
   const htmlContent = generateReplacementTemplate('Team', data);
   const textContent = `${data.type === 'operator' ? 'Operator' : 'Equipment'} Replacement: ${data.machine} (${data.regNo}). Date: ${data.date}. Time: ${data.time}. Remarks: ${data.remarks || 'None'}.`;
