@@ -7,6 +7,11 @@ const stocksModel            = require('../models/stock.model.js');
 const equipmnentModel        = require('../models/equipment.model.js');
 const toolkitModel           = require('../models/toolkit.model.js');
 const complaintModel         = require('../models/complaint.model.js');
+const mobilizationModel      = require('../models/mobilizations.model.js');
+const replacementModel       = require('../models/replacements.model.js');
+const lpoModel               = require('../models/lpo.model.js');
+const backchargeModel        = require('../models/backcharge.model.js');
+const documentModel          = require('../models/document.model.js');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Cache
@@ -37,15 +42,20 @@ const cache = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const models = [
-  { model: serviceHistoryModel,    source: 'serviceHistoryModel',    content: 'service-history'    },
-  { model: serviceReportModel,     source: 'serviceReportModel',     content: 'service-report'     },
-  { model: maintananceHistoryModel, source: 'maintananceHistoryModel', content: 'maintenance-history' },
-  { model: tyreModel,              source: 'tyreModel',              content: 'tyre-history'       },
-  { model: batteryModel,           source: 'batteryModel',           content: 'battery-history'    },
-  { model: equipmnentModel,        source: 'equipmnentModel',        content: 'equipment'          },
-  { model: stocksModel,            source: 'stocksModel',            content: 'stocks'             },
-  { model: toolkitModel,           source: 'toolkitModel',           content: 'toolkit'            },
-  { model: complaintModel,         source: 'complaintModel',         content: 'complaints'         }
+  { model: serviceHistoryModel,     source: 'serviceHistoryModel',      content: 'service-history'     },
+  { model: serviceReportModel,      source: 'serviceReportModel',       content: 'service-report'      },
+  { model: maintananceHistoryModel, source: 'maintananceHistoryModel',  content: 'maintenance-history' },
+  { model: tyreModel,               source: 'tyreModel',                content: 'tyre-history'        },
+  { model: batteryModel,            source: 'batteryModel',             content: 'battery-history'     },
+  { model: equipmnentModel,         source: 'equipmnentModel',          content: 'equipment'           },
+  { model: stocksModel,             source: 'stocksModel',              content: 'stocks'              },
+  { model: toolkitModel,            source: 'toolkitModel',             content: 'toolkit'             },
+  { model: complaintModel,          source: 'complaintModel',           content: 'complaints'          },
+  { model: mobilizationModel,       source: 'mobilizationModel',        content: 'mobilization'        },
+  { model: replacementModel,        source: 'replacementModel',         content: 'replacement'         },
+  { model: lpoModel,                source: 'lpoModel',                 content: 'lpo'                 },
+  { model: backchargeModel,         source: 'backchargeModel',          content: 'backcharge'          },
+  { model: documentModel,           source: 'documentModel',            content: 'document'            },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

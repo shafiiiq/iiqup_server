@@ -61,8 +61,8 @@ const _sendNotification = async (title, description, priority = 'high', recipien
  */
 const insertStocks = async (data) => {
   try {
-    if (!data.product || !data.serialNumber || !data.type || !data.rate || !data.stockCount) {
-      return { status: 400, ok: false, message: 'Missing required fields: product, type, serialNumber, rate, and stockCount are required' };
+    if ( !data.product || !data.serialNumber || !data.type || data.rate      == null || data.rate === '' || data.stockCount == null || data.stockCount === '' ) {
+       return { status: 400, ok: false, message: 'Missing required fields: product, type, serialNumber, rate, and stockCount are required' }
     }
 
     if (data.type === 'equipment' && !data.equipments) {
@@ -90,7 +90,11 @@ const insertStocks = async (data) => {
       category:      data.category,
       subCategory:   data.subCategory,
       location:      data.location,
-      warehouse:     data.warehouse
+      warehouse:        data.warehouse,
+      hasSubUnits:      data.hasSubUnits      || false,
+      subUnitName:      data.subUnitName      || '',
+      subUnitCapacity:  data.subUnitCapacity  || 0,
+      subUnitRemaining: data.subUnitRemaining || 0,
     }).save();
 
     const officeHero = JSON.parse(process.env.OFFICE_HERO);
@@ -190,6 +194,51 @@ const deleteStock = async (stockId) => {
   }
 };
 
+/**
+ * Returns a single stock record by ID.
+ * @param {string} stockId
+ * @returns {Promise<object>}
+ */
+const getStockById = async (stockId) => {
+  try {
+    if (!stockId) return { status: 400, ok: false, message: 'Stock ID is required' }
+
+    const stock = await Stock.findById(stockId).lean()
+    if (!stock) return { status: 404, ok: false, success: false, message: 'Stock not found' }
+
+    return { status: 200, ok: true, success: true, message: 'Stock fetched successfully', data: stock }
+  } catch (err) {
+    console.error('[StockService] getStockById:', err)
+    return { status: 500, ok: false, message: 'Internal server error while fetching stock', error: err.message }
+  }
+}
+
+/**
+ * Returns paginated movement history for a single stock item.
+ * @param {string} stockId
+ * @param {number} limit
+ * @param {number} offset
+ * @returns {Promise<object>}
+ */
+const getStockMovements = async (stockId, limit = 50, offset = 0) => {
+  try {
+    if (!stockId) return { status: 400, ok: false, message: 'Stock ID is required' }
+
+    const stock = await Stock.findById(stockId).lean()
+    if (!stock) return { status: 404, ok: false, message: 'Stock not found' }
+
+    const allMovements = [...(stock.movements || [])]
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+
+    const paginated = allMovements.slice(offset, offset + limit)
+
+    return { status: 200, ok: true, data: paginated, total: allMovements.length, limit, offset }
+  } catch (err) {
+    console.error('[StockService] getStockMovements:', err)
+    return { status: 500, ok: false, message: 'Internal server error while fetching movements', error: err.message }
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Update
 // ─────────────────────────────────────────────────────────────────────────────
@@ -209,7 +258,20 @@ const updateProduct = async (stockId, updateData) => {
 
     const updated = await Stock.findByIdAndUpdate(
       stockId,
-      { product: updateData.product, equipments: updateData.equipments, stockCount: updateData.stockCount, updatedAt: new Date() },
+      {
+        product:          updateData.product,
+        serialNumber:     updateData.serialNumber,
+        type:             updateData.type,
+        equipments:       updateData.equipments,
+        rate:             updateData.rate      !== undefined ? parseFloat(updateData.rate)   : undefined,
+        stockCount:       updateData.stockCount !== undefined ? parseInt(updateData.stockCount) : undefined,
+        date:             updateData.date      ? new Date(updateData.date) : undefined,
+        hasSubUnits:      updateData.hasSubUnits,
+        subUnitName:      updateData.hasSubUnits ? updateData.subUnitName     : '',
+        subUnitCapacity:  updateData.hasSubUnits ? (updateData.subUnitCapacity || 0) : 0,
+        subUnitRemaining: updateData.hasSubUnits ? (updateData.subUnitRemaining || updateData.subUnitCapacity || 0) : 0,
+        updatedAt:        new Date(),
+      },
       { new: true, runValidators: true }
     );
 
@@ -229,40 +291,83 @@ const updateProduct = async (stockId, updateData) => {
  */
 const updateStock = async (stockId, updateData) => {
   try {
-    if (!stockId) return { status: 400, ok: false, message: 'Stock ID is required' };
+    if (!stockId) return { status: 400, ok: false, message: 'Stock ID is required' }
 
-    const currentStock = await Stock.findById(stockId);
-    if (!currentStock) return { status: 404, ok: false, message: 'Stock not found' };
+    const currentStock = await Stock.findById(stockId)
+    if (!currentStock) return { status: 404, ok: false, message: 'Stock not found' }
 
-    const officeHero      = JSON.parse(process.env.OFFICE_HERO);
-    const movementTypes   = ['add', 'deduct', 'adjustment', 'initial'];
-    const isMovement      = movementTypes.includes(updateData.type);
+    const officeHero    = JSON.parse(process.env.OFFICE_HERO)
+    const movementTypes = ['add', 'deduct', 'adjustment', 'initial']
+    const isMovement    = movementTypes.includes(updateData.type)
 
-    let updatedStock;
-    let quantityChange = 0;
+    let updatedStock
+    let quantityChange = 0
 
     if (isMovement) {
       if (updateData.type === 'deduct' && (!updateData.equipmentName || !updateData.mechanicName)) {
-        return { status: 400, ok: false, message: 'Equipment name and mechanic name are required for deductions' };
+        return { status: 400, ok: false, message: 'Equipment name and mechanic name are required for deductions' }
       }
 
-      let newQuantity;
-      if (updateData.type === 'deduct') {
-        newQuantity    = currentStock.stockCount - updateData.stockCount;
-        quantityChange = updateData.stockCount;
+      let newQuantity
+      let newSubUnitRemaining = currentStock.subUnitRemaining || 0
+      let quantityChange      = parseInt(updateData.stockCount) || 0
+
+      // ── Sub-unit deduct path ──────────────────────────────────────────────
+      if (currentStock.hasSubUnits && updateData.type === 'deduct' && updateData.reduceType === 'subunit') {
+        let toDeduct   = quantityChange
+        let remaining  = currentStock.subUnitRemaining || 0
+        let containers = currentStock.stockCount       || 0
+
+        while (toDeduct > 0) {
+          if (remaining === 0) {
+            if (containers > 0) {
+              containers -= 1
+              remaining   = currentStock.subUnitCapacity || 0
+            } else {
+              break
+            }
+          }
+          if (toDeduct <= remaining) {
+            remaining -= toDeduct
+            toDeduct   = 0
+          } else {
+            toDeduct  -= remaining
+            remaining  = 0
+          }
+        }
+
+        // If remaining hits 0 and there are still containers, open the next one
+        if (remaining === 0 && containers > 0) {
+          containers -= 1
+          remaining   = currentStock.subUnitCapacity || 0
+        }
+
+        newQuantity         = containers
+        newSubUnitRemaining = remaining
+
+      // ── Normal stock deduct path ──────────────────────────────────────────
+      } else if (updateData.type === 'deduct') {
+        newQuantity         = currentStock.stockCount - quantityChange
+        newSubUnitRemaining = currentStock.subUnitRemaining || 0
+
+      // ── Add path ──────────────────────────────────────────────────────────
       } else if (updateData.type === 'add') {
-        newQuantity    = currentStock.stockCount + updateData.stockCount;
-        quantityChange = updateData.stockCount;
+        newQuantity         = currentStock.stockCount + quantityChange
+        newSubUnitRemaining = currentStock.subUnitRemaining || 0
+
+      // ── Adjustment ────────────────────────────────────────────────────────
       } else {
-        newQuantity    = updateData.stockCount;
-        quantityChange = Math.abs(updateData.stockCount - currentStock.stockCount);
+        newQuantity         = quantityChange
+        newSubUnitRemaining = currentStock.subUnitRemaining || 0
       }
 
       const movementData = {
-        date:             updateData.date  || new Date(),
-        time:             updateData.time  || new Date().toLocaleTimeString(),
+        date:             updateData.date || new Date(),
+        time:             updateData.time || new Date().toLocaleTimeString(),
         type:             updateData.type,
+        reduceType:       updateData.reduceType || 'stock',
         quantity:         quantityChange,
+        subUnitAmount:    updateData.reduceType === 'subunit' ? quantityChange : 0,
         previousQuantity: currentStock.stockCount,
         newQuantity,
         reason:           updateData.reason || `Stock ${updateData.type}`,
@@ -270,18 +375,23 @@ const updateStock = async (stockId, updateData) => {
         createdAt:        new Date(),
         ...(updateData.createdBy ? { createdBy: updateData.createdBy } : {}),
         ...(updateData.type === 'deduct' ? {
-          equipmentName:   updateData.equipmentName,
-          equipmentNumber: updateData.equipmentNumber,
-          mechanicName:    updateData.mechanicName,
-          mechanicEmployeeId: 1
+          equipmentName:      updateData.equipmentName,
+          equipmentNumber:    updateData.equipmentNumber || '',
+          mechanicName:       updateData.mechanicName,
+          mechanicEmployeeId: '1'
         } : {})
-      };
+      }
 
       updatedStock = await Stock.findByIdAndUpdate(
         stockId,
-        { stockCount: newQuantity, $push: { movements: movementData }, updatedAt: new Date() },
+        {
+          stockCount:       newQuantity,
+          subUnitRemaining: newSubUnitRemaining,
+          $push:            { movements: movementData },
+          updatedAt:        new Date()
+        },
         { new: true, runValidators: true }
-      );
+      )
 
     } else {
       // Regular field update — strip movement-only keys before persisting
@@ -289,64 +399,65 @@ const updateStock = async (stockId, updateData) => {
         type, equipmentId, equipmentName, equipmentNumber,
         mechanicId, mechanicName, mechanicEmployeeId,
         date, time, reason, notes, createdBy,
+        reduceType, subUnitAmount,
         ...regularUpdateData
-      } = updateData;
+      } = updateData
 
       updatedStock = await Stock.findByIdAndUpdate(
         stockId,
         { ...regularUpdateData, updatedAt: new Date() },
         { new: true, runValidators: true }
-      );
+      )
     }
 
-    // Low / out-of-stock alerts
-    if (updatedStock.stockCount < 10) {
-      const message = updatedStock.stockCount === 0
-        ? `Urgent Requirement: ${currentStock.product} with part number ${currentStock.serialNumber} is out of stock`
-        : `Urgent Requirement: ${currentStock.product} with part number ${currentStock.serialNumber} is low in stock — only ${updatedStock.stockCount} items left`;
+    // ── Low / out-of-stock alerts ─────────────────────────────────────────
+    // if (updatedStock.stockCount < 10) {
+    //   const message = updatedStock.stockCount === 0
+    //     ? `Urgent Requirement: ${currentStock.product} with part number ${currentStock.serialNumber} is out of stock`
+    //     : `Urgent Requirement: ${currentStock.product} with part number ${currentStock.serialNumber} is low in stock — only ${updatedStock.stockCount} items left`
 
-      await userServices.pushSpecialNotification(
-        process.env.JALEEL_KA,
-        updatedStock.stockCount,
-        stockId,
-        message
-      ).catch(e => console.error('[StockService] Low stock notification failed:', e));
+    //   await userServices.pushSpecialNotification(
+    //     process.env.JALEEL_KA,
+    //     updatedStock.stockCount,
+    //     stockId,
+    //     message
+    //   ).catch(e => console.error('[StockService] Low stock notification failed:', e))
 
-      await PushNotificationService.sendGeneralNotification(
-        officeHero,
-        'Low Stock',
-        message,
-        'high',
-        'normal'
-      );
-    } else {
-      await _sendNotification(
-        'Stock Update',
-        `${quantityChange} ${currentStock.product} with part number ${currentStock.serialNumber} is used by ${updateData.mechanicName} for ${updateData.equipmentName} ${updateData.equipmentNumber}`,
-        'high',
-        officeHero
-      );
-    }
+    //   await PushNotificationService.sendGeneralNotification(
+    //     officeHero,
+    //     'Low Stock',
+    //     message,
+    //     'high',
+    //     'normal'
+    //   )
+    // } else {
+    //   await _sendNotification(
+    //     'Stock Update',
+    //     `${quantityChange} ${currentStock.product} with part number ${currentStock.serialNumber} is used by ${updateData.mechanicName} for ${updateData.equipmentName} ${updateData.equipmentNumber}`,
+    //     'high',
+    //     officeHero
+    //   )
+    // }
 
-    return { status: 200, ok: true, message: 'Stock updated successfully', data: updatedStock };
+    return { status: 200, ok: true, message: 'Stock updated successfully', data: updatedStock }
 
   } catch (err) {
-    console.error('[StockService] updateStock:', err);
+    console.error('[StockService] updateStock:', err)
 
     if (err.name === 'ValidationError') {
-      const messages = Object.values(err.errors).map(e => e.message).join(', ');
-      return { status: 400, ok: false, message: `Validation error: ${messages}` };
+      const messages = Object.values(err.errors).map(e => e.message).join(', ')
+      return { status: 400, ok: false, message: `Validation error: ${messages}` }
     }
     if (err.name === 'CastError') {
-      return { status: 400, ok: false, message: 'Invalid stock ID format' };
+      return { status: 400, ok: false, message: 'Invalid stock ID format' }
     }
     if (err.code === 11000) {
-      return { status: 409, ok: false, message: 'Duplicate entry — this stock item already exists' };
+      return { status: 409, ok: false, message: 'Duplicate entry — this stock item already exists' }
     }
 
-    return { status: 500, ok: false, message: 'Internal server error while updating stock', error: err.message };
+    return { status: 500, ok: false, message: 'Internal server error while updating stock', error: err.message }
   }
-};
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Movements / Reports
@@ -584,12 +695,14 @@ module.exports = {
   fetchStocks,
   fetchStocksByType,
   fetchStocksByEquipment,
+  getStockById,
   deleteStock,
   // Update
   updateProduct,
   updateStock,
   // Movements / Reports
   getMovementsWithStock,
+  getStockMovements,
   getStockMovementsByEquipment,
   getStockMovementsByMechanic,
   getStockAccountabilityReport,

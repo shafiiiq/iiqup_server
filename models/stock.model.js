@@ -16,10 +16,12 @@ const stockMovementSchema = new mongoose.Schema(
     quantity:         { type: Number, required: true, min: 0 },
     previousQuantity: { type: Number, required: true, min: 0 },
     newQuantity:      { type: Number, required: true, min: 0 },
-
+    reduceType:    { type: String, enum: ['stock', 'subunit'], default: 'stock' },
+    subUnitAmount: { type: Number, default: 0 },  
+    
     // Deduction Context (required when type === 'deduct')
     equipmentName:      { type: String, required: function () { return this.type === 'deduct'; } },
-    equipmentNumber:    { type: String, required: function () { return this.type === 'deduct'; } },
+    equipmentNumber: { type: String, default: '' },
     mechanicName:       { type: String, required: function () { return this.type === 'deduct'; } },
     mechanicEmployeeId: { type: String, required: function () { return this.type === 'deduct'; } },
 
@@ -63,6 +65,12 @@ const stockSchema = new mongoose.Schema(
 
     // Movements
     movements: { type: [stockMovementSchema], default: [] },
+
+    // Sub-unit support
+    hasSubUnits:      { type: Boolean, default: false },
+    subUnitName:      { type: String,  default: ''    },  // 'litre', 'kg', 'ml' etc
+    subUnitCapacity:  { type: Number,  default: 0     },  // e.g. 100 litres per drum
+    subUnitRemaining: { type: Number,  default: 0     },  // remaining in current open container
 
     // Soft Delete
     isDeleted: { type: Boolean, default: false },

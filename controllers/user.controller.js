@@ -10,7 +10,7 @@ const permissionService  = require('../services/permission.service');
 const signatureService   = require('../services/signature.service');
 const biometricService   = require('../services/biometric.service');
 const PushNotification   = require('../push/notification.push');
-
+ 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
@@ -19,7 +19,7 @@ const ROLE_ENV_KEYS = [
   'MECHANIC', 'MAINTENANCE_HEAD', 'OPERATOR', 'CAMP_BOSS', 'MECHANIC_HEAD',
   'SUPER_ADMIN', 'JALEEL_KA', 'WORKSHOP_MANAGER', 'SUB_ADMIN',
   'ASSISTANT_OFFICE_ADMIN', 'OFFICE_ADMIN', 'CEO', 'ACCOUNTANT',
-  'PURCHASE_MANAGER', 'MD', 'MANAGER',
+  'PURCHASE_MANAGER', 'MD', 'MANAGER', 'STORE_KEEPER' 
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

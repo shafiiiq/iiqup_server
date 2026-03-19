@@ -2,22 +2,21 @@
 require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 const mongoose = require('mongoose');
 
-const UserModel = require('../models/user.model.js');
-const BatteryModel = require('../models/battery.model.js');
-const serviceReportModel = require('../models/report.model.js');
-const TyreModel = require('../models/tyre.model.js');
-const serviceHistoryModel = require('../models/history.model.js');
-const MaintananceModel = require('../models/maintenance.model.js');
-const Equipment = require('../models/equipment.model.js');
-const Images = require('../models/images.model.js');
-const Toolkit = require('../models/toolkit.model.js');
-const Stokcs = require('../models/stock.model.js');
-const Mechanic = require('../models/mechanic.model.js');
-const DocumentModel = require('../models/document.model.js');
-const Backcharge = require('../models/backcharge.model.js');
-const LPO = require('../models/lpo.model.js');
-const Fuels = require('../models/fuel.model.js');
-const User = require('../models/user.model.js');
+const serviceHistoryModel     = require('../models/history.model.js');
+const serviceReportModel      = require('../models/report.model.js');
+const maintananceHistoryModel = require('../models/maintenance.model.js');
+const tyreModel               = require('../models/tyre.model.js');
+const batteryModel            = require('../models/battery.model.js');
+const stocksModel             = require('../models/stock.model.js');
+const equipmentModel          = require('../models/equipment.model.js');
+const toolkitModel            = require('../models/toolkit.model.js');
+const complaintModel          = require('../models/complaint.model.js');
+const mobilizationModel       = require('../models/mobilizations.model.js');
+const replacementModel        = require('../models/replacements.model.js');
+const lpoModel                = require('../models/lpo.model.js');
+const backchargeModel         = require('../models/backcharge.model.js');
+const documentModel           = require('../models/document.model.js');
+
 const bcrypt = require('bcrypt');
 const { getAuthorizationUrl, exchangeCodeForTokens } = require('../gmail/backcharge.gmail.js');
 
@@ -31,8 +30,8 @@ const { equipments } = require('./data/equipments.js');
 // ─────────────────────────────────────────────────────────────────────────────
 
 const addActivationKey = async () => {
-  const email = 'shafeek@ansarigroup.co';   // <-- fill in
-  const activationKey = '30754690183456710348';   // <-- fill in
+  const email = '';   // <-- fill in
+  const activationKey = '';   // <-- fill in
 
   if (!email || !activationKey) throw new Error('userId and activationKey are required');
   if (activationKey.length !== 20) throw new Error('Activation key must be exactly 20 digits');
@@ -558,6 +557,316 @@ const migrateEquipmentSchema = async () => {
   console.log('─────────────────────────────────');
 };
 
+const resetAllStocksToZero = async () => {
+  const allStocks = await Stokcs.find({ isDeleted: { $ne: true } }).lean()
+
+  const stats = {
+    total:        allStocks.length,
+    alreadyZero:  0,
+    reset:        0,
+    failed:       0,
+  }
+
+  const now     = new Date()
+  const dateStr = now.toISOString().split('T')[0]
+  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
+  for (const stock of allStocks) {
+    if (stock.stockCount === 0) {
+      stats.alreadyZero++
+      continue
+    }
+
+    const resetMovement = {
+      date:               new Date(`${dateStr}T00:00:00.000Z`),
+      time:               timeStr,
+      type:               'deduct',
+      quantity:           stock.stockCount,
+      previousQuantity:   stock.stockCount,
+      newQuantity:        0,
+      reduceType:         'stock',
+      subUnitAmount:      0,
+      equipmentName:      'Reseting',
+      equipmentNumber:    'Reseting',
+      mechanicName:       'Reseting',
+      mechanicEmployeeId: '1',
+      reason:             'Stock deduct',
+      notes:              '',
+      createdAt:          now,
+    }
+
+    try {
+      await Stokcs.findByIdAndUpdate(
+        stock._id,
+        {
+          $set:  {
+            stockCount:       0,
+            subUnitRemaining: 0,
+            status:           'out_of_stock',
+            updatedAt:        now,
+          },
+          $push: { movements: resetMovement },
+        }
+      )
+      stats.reset++
+    } catch (err) {
+      console.error(`  ❌ Failed to reset ${stock.product} (${stock.serialNumber}):`, err.message)
+      stats.failed++
+    }
+  }
+
+  console.log('─────────────────────────────────────────────')
+  console.log('📊 Reset All Stocks To Zero:')
+  console.log('  Total stocks found  :', stats.total)
+  console.log('  Already at zero     :', stats.alreadyZero)
+  console.log('  Successfully reset  :', stats.reset)
+  console.log('  Failed              :', stats.failed)
+  console.log('─────────────────────────────────────────────')
+}
+
+const analyzeDashboardData = async () => {
+  console.log('\n═══════════════════════════════════════════════════════════');
+  console.log('📊 DASHBOARD DATA ANALYSIS & VERIFICATION');
+  console.log('═══════════════════════════════════════════════════════════\n');
+
+  const now       = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const weekAgo    = new Date(now); weekAgo.setDate(now.getDate() - 7);
+  const monthAgo   = new Date(now); monthAgo.setMonth(now.getMonth() - 1);
+  const yearAgo    = new Date(now); yearAgo.setFullYear(now.getFullYear() - 1);
+
+  const dateRangeQuery = (start, end = null) => ({
+    $or: [
+      { createdAt: end ? { $gte: start, $lte: end } : { $gte: start } },
+      { updatedAt: end ? { $gte: start, $lte: end } : { $gte: start } },
+    ],
+  });
+
+  const models = [
+    { model: serviceHistoryModel,     name: 'Service History'      },
+    { model: serviceReportModel,      name: 'Service Reports'      },
+    { model: maintananceHistoryModel, name: 'Maintenance History'  },
+    { model: tyreModel,               name: 'Tyre History'         },
+    { model: batteryModel,            name: 'Battery History'      },
+    { model: stocksModel,             name: 'Stocks'               },
+    { model: equipmentModel,          name: 'Equipment'            },
+    { model: toolkitModel,            name: 'Toolkit'              },
+    { model: complaintModel,          name: 'Complaints'           },
+    { model: mobilizationModel,       name: 'Mobilization'         },
+    { model: replacementModel,        name: 'Replacement'          },
+    { model: lpoModel,                name: 'LPO'                  },
+    { model: backchargeModel,         name: 'Backcharge'           },
+    { model: documentModel,           name: 'Documents'            },
+  ];
+
+  // ─── 1. TOTAL COUNTS (all time) ──────────────────────────────────────────
+  console.log('─────────────────────────────────────────────────────────────');
+  console.log('1️⃣  TOTAL RECORDS (ALL TIME)');
+  console.log('─────────────────────────────────────────────────────────────');
+
+  let grandTotal = 0;
+  const allTimeCounts = {};
+
+  for (const { model, name } of models) {
+    const count = await model.countDocuments();
+    allTimeCounts[name] = count;
+    grandTotal += count;
+    console.log(`   ${name.padEnd(22)}: ${String(count).padStart(6)}`);
+  }
+
+  console.log('─────────────────────────────────────────────────────────────');
+  console.log(`   ${'GRAND TOTAL'.padEnd(22)}: ${String(grandTotal).padStart(6)}`);
+
+  // ─── 2. PERIOD COUNTS ────────────────────────────────────────────────────
+  const periods = [
+    { label: 'TODAY',        query: dateRangeQuery(todayStart)  },
+    { label: 'LAST 7 DAYS',  query: dateRangeQuery(weekAgo)     },
+    { label: 'LAST 30 DAYS', query: dateRangeQuery(monthAgo)    },
+    { label: 'LAST 365 DAYS',query: dateRangeQuery(yearAgo)     },
+  ];
+
+  for (const { label, query } of periods) {
+    console.log('\n─────────────────────────────────────────────────────────────');
+    console.log(`2️⃣  ${label}`);
+    console.log('─────────────────────────────────────────────────────────────');
+
+    let periodTotal = 0;
+    for (const { model, name } of models) {
+      const count = await model.countDocuments(query);
+      periodTotal += count;
+      if (count > 0) console.log(`   ${name.padEnd(22)}: ${String(count).padStart(6)}`);
+    }
+    console.log(`   ${'PERIOD TOTAL'.padEnd(22)}: ${String(periodTotal).padStart(6)}`);
+  }
+
+  // ─── 3. EQUIPMENT STATS ──────────────────────────────────────────────────
+  console.log('\n─────────────────────────────────────────────────────────────');
+  console.log('3️⃣  EQUIPMENT STATS (StatusBar source)');
+  console.log('─────────────────────────────────────────────────────────────');
+
+  const [totalEq, activeEq, idleEq, maintenanceEq] = await Promise.all([
+    equipmentModel.countDocuments(),
+    equipmentModel.countDocuments({ status: 'active' }),
+    equipmentModel.countDocuments({ status: 'idle' }),
+    equipmentModel.countDocuments({ status: 'maintenance' }),
+  ]);
+
+  const otherEq = totalEq - activeEq - idleEq - maintenanceEq;
+
+  console.log(`   Total Equipment     : ${totalEq}`);
+  console.log(`   Active              : ${activeEq}`);
+  console.log(`   Idle                : ${idleEq}`);
+  console.log(`   In Maintenance      : ${maintenanceEq}`);
+  console.log(`   Other statuses      : ${otherEq}`);
+  console.log(`   ✅ Sum check        : ${activeEq + idleEq + maintenanceEq + otherEq} (should equal ${totalEq})`);
+
+  // ─── 4. COMPLAINTS / PENDING MAINTENANCE ─────────────────────────────────
+  console.log('\n─────────────────────────────────────────────────────────────');
+  console.log('4️⃣  COMPLAINTS BREAKDOWN');
+  console.log('─────────────────────────────────────────────────────────────');
+
+  const allComplaints     = await complaintModel.countDocuments();
+  const pendingComplaints = await complaintModel.countDocuments({ status: 'pending' });
+  const resolvedComplaints= await complaintModel.countDocuments({ status: 'resolved' });
+  const otherComplaints   = allComplaints - pendingComplaints - resolvedComplaints;
+  const criticalAlerts    = Math.round(pendingComplaints * 0.3);
+
+  console.log(`   Total Complaints    : ${allComplaints}`);
+  console.log(`   Pending             : ${pendingComplaints}`);
+  console.log(`   Resolved            : ${resolvedComplaints}`);
+  console.log(`   Other               : ${otherComplaints}`);
+  console.log(`   Critical Alerts     : ${criticalAlerts}  (pending × 0.3)`);
+
+  // ─── 5. STOCK HEALTH ─────────────────────────────────────────────────────
+  console.log('\n─────────────────────────────────────────────────────────────');
+  console.log('5️⃣  STOCK HEALTH');
+  console.log('─────────────────────────────────────────────────────────────');
+
+  const allStocks    = await stocksModel.find().select('product serialNumber stockCount minThreshold status').lean();
+  const inStock      = allStocks.filter(s => s.status === 'in_stock').length;
+  const lowStock     = allStocks.filter(s => s.status === 'low_stock').length;
+  const outOfStock   = allStocks.filter(s => s.status === 'out_of_stock').length;
+  const totalValue   = allStocks.reduce((t, s) => t + (s.totalValue || 0), 0);
+
+  console.log(`   Total Stock Items   : ${allStocks.length}`);
+  console.log(`   In Stock            : ${inStock}`);
+  console.log(`   Low Stock           : ${lowStock}`);
+  console.log(`   Out of Stock        : ${outOfStock}`);
+  console.log(`   Total Value         : ${totalValue.toLocaleString()}`);
+  console.log('\n   Top 5 low/out stocks:');
+  allStocks
+    .filter(s => s.status === 'low_stock' || s.status === 'out_of_stock')
+    .slice(0, 5)
+    .forEach(s => console.log(`     - ${s.product} (${s.serialNumber}) | count: ${s.stockCount} | min: ${s.minThreshold} | ${s.status}`));
+
+  // ─── 6. TOOLKIT HEALTH ───────────────────────────────────────────────────
+  console.log('\n─────────────────────────────────────────────────────────────');
+  console.log('6️⃣  TOOLKIT HEALTH');
+  console.log('─────────────────────────────────────────────────────────────');
+
+  const allToolkits  = await toolkitModel.find().select('name totalStock overallStatus variants').lean();
+  const tkAvailable  = allToolkits.filter(t => t.overallStatus === 'available').length;
+  const tkLow        = allToolkits.filter(t => t.overallStatus === 'low').length;
+  const tkOut        = allToolkits.filter(t => t.overallStatus === 'out').length;
+  const tkVariants   = allToolkits.reduce((t, tk) => t + (tk.variants?.length || 0), 0);
+
+  console.log(`   Total Toolkits      : ${allToolkits.length}`);
+  console.log(`   Available           : ${tkAvailable}`);
+  console.log(`   Low                 : ${tkLow}`);
+  console.log(`   Out                 : ${tkOut}`);
+  console.log(`   Total Variants      : ${tkVariants}`);
+
+  // ─── 7. FLEET EFFICIENCY ─────────────────────────────────────────────────
+  console.log('\n─────────────────────────────────────────────────────────────');
+  console.log('7️⃣  FLEET EFFICIENCY (as computed by dashboard)');
+  console.log('─────────────────────────────────────────────────────────────');
+
+  const todayCounts  = await Promise.all(
+    models.map(({ model }) => model.countDocuments(dateRangeQuery(todayStart)))
+  );
+  const todayTotal   = todayCounts.reduce((a, b) => a + b, 0);
+  const efficiency   = todayTotal > 0
+    ? Math.round(((todayTotal - pendingComplaints) / todayTotal) * 100)
+    : 95;
+
+  console.log(`   Today's total ops   : ${todayTotal}`);
+  console.log(`   Pending complaints  : ${pendingComplaints}`);
+  console.log(`   Fleet Efficiency    : ${efficiency}%`);
+  console.log(`   Formula             : ((${todayTotal} - ${pendingComplaints}) / ${todayTotal}) × 100`);
+
+  // ─── 8. LAST 5 DAYS COMPARISON ───────────────────────────────────────────
+  console.log('\n─────────────────────────────────────────────────────────────');
+  console.log('8️⃣  LAST 5 DAYS COMPARISON');
+  console.log('─────────────────────────────────────────────────────────────');
+
+  for (let i = 4; i >= 0; i--) {
+    const dayStart = new Date(now); dayStart.setDate(now.getDate() - i); dayStart.setHours(0,0,0,0);
+    const dayEnd   = new Date(dayStart); dayEnd.setHours(23,59,59,999);
+    const q        = dateRangeQuery(dayStart, dayEnd);
+
+    const counts = await Promise.all(models.map(({ model }) => model.countDocuments(q)));
+    const total  = counts.reduce((a, b) => a + b, 0);
+    const label  = dayStart.toISOString().split('T')[0];
+    console.log(`   ${label}  total: ${String(total).padStart(4)}  |  ${models.map((m, idx) => `${m.name.split(' ')[0]}:${counts[idx]}`).join('  ')}`);
+  }
+
+  // ─── 9. LAST 5 MONTHS COMPARISON ─────────────────────────────────────────
+  console.log('\n─────────────────────────────────────────────────────────────');
+  console.log('9️⃣  LAST 5 MONTHS COMPARISON');
+  console.log('─────────────────────────────────────────────────────────────');
+
+  for (let i = 4; i >= 0; i--) {
+    const mStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const mEnd   = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
+    const q      = dateRangeQuery(mStart, mEnd);
+
+    const counts = await Promise.all(models.map(({ model }) => model.countDocuments(q)));
+    const total  = counts.reduce((a, b) => a + b, 0);
+    const label  = mStart.toLocaleString('default', { month: 'long', year: 'numeric' });
+    console.log(`   ${label.padEnd(18)}  total: ${String(total).padStart(4)}`);
+  }
+
+  // ─── 10. DATA QUALITY SCORE ──────────────────────────────────────────────
+  console.log('\n─────────────────────────────────────────────────────────────');
+  console.log('🔟  DATA QUALITY (% filled fields, sample 100 docs each)');
+  console.log('─────────────────────────────────────────────────────────────');
+
+  for (const { model, name } of models) {
+    const sample = await model.find().sort({ createdAt: -1 }).limit(100).lean();
+    if (!sample.length) { console.log(`   ${name.padEnd(22)}: no data`); continue; }
+
+    const fields = Object.keys(model.schema.paths).filter(p => !['__v', '_id', 'createdAt', 'updatedAt'].includes(p));
+    let filled = 0, total = 0;
+
+    sample.forEach(doc => {
+      fields.forEach(f => {
+        total++;
+        if (doc[f] != null && doc[f] !== '') filled++;
+      });
+    });
+
+    const score = total ? ((filled / total) * 100).toFixed(1) : 0;
+    const bar   = '█'.repeat(Math.round(score / 10)) + '░'.repeat(10 - Math.round(score / 10));
+    console.log(`   ${name.padEnd(22)}: ${bar} ${score}%  (${sample.length} docs sampled)`);
+  }
+
+  // ─── SUMMARY ─────────────────────────────────────────────────────────────
+  console.log('\n═══════════════════════════════════════════════════════════════');
+  console.log('✅ VERIFICATION SUMMARY — match these numbers in the frontend');
+  console.log('═══════════════════════════════════════════════════════════════');
+  console.log(`   Total Equipment     : ${totalEq}`);
+  console.log(`   Active Equipment    : ${activeEq}`);
+  console.log(`   Idle Equipment      : ${idleEq}`);
+  console.log(`   In Maintenance      : ${maintenanceEq}`);
+  console.log(`   Pending Complaints  : ${pendingComplaints}`);
+  console.log(`   Critical Alerts     : ${criticalAlerts}`);
+  console.log(`   Total Stock Items   : ${allStocks.length}`);
+  console.log(`   Low Stock Alerts    : ${lowStock}`);
+  console.log(`   Fleet Efficiency    : ${efficiency}%`);
+  console.log(`   Grand Total Records : ${grandTotal}`);
+  console.log('═══════════════════════════════════════════════════════════════\n');
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Runner  —  change the function call here to run what you need
 // ─────────────────────────────────────────────────────────────────────────────
@@ -567,7 +876,7 @@ const run = async () => {
   console.log('🟢 DB connected\n');
 
   // ↓ swap this line to call whichever function you need
-  await addActivationKey();
+  // await addActivationKey();
   // await addCodeInSameSupplier();
   // await addCodeInSameVendor();
   // await setupOAuth();
@@ -581,6 +890,8 @@ const run = async () => {
   // await fixCarsAndIdleSites();
   // await syncEquipmentLocations();
   // await migrateEquipmentSchema();
+  // await resetAllStocksToZero()
+  await analyzeDashboardData();
 };
 
 
