@@ -11,6 +11,8 @@ const mongoose           = require('mongoose');
 
 const { createNotification }  = require('./notification.service');
 const PushNotificationService = require('../push/notification.push');
+const { default: wsUtils } = require('../sockets/websocket.js');
+const analyser = require('../analyser/dashboard.analyser');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Internal: Notification helper
@@ -106,6 +108,9 @@ const insertStocks = async (data) => {
       newStock._id
     );
 
+    analyser.clearCache();
+    wsUtils.sendDashboardUpdate('stocks');
+    
     return { status: 201, ok: true, message: 'Stock added successfully', data: newStock };
 
   } catch (err) {

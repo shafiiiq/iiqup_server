@@ -12,6 +12,8 @@ const mongoose = require('mongoose');
 
 const { createNotification }  = require('./notification.service');
 const PushNotificationService = require('../push/notification.push');
+const { default: wsUtils } = require('../sockets/websocket.js');
+const analyser = require('../analyser/dashboard.analyser');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Internal: Stock history helper
@@ -155,6 +157,9 @@ const insertToolkit = async (toolkitData) => {
         'low',
         savedToolkit._id
       );
+
+      analyser.clearCache();
+      wsUtils.sendDashboardUpdate('toolkit');
 
       return {
         status:  200,

@@ -6,6 +6,8 @@ const maintanceHistoryModel = require('../models/maintenance.model.js');
 const serviceReportModel    = require('../models/report.model.js');
 const { createNotification }  = require('./notification.service.js');
 const PushNotificationService = require('../push/notification.push.js');
+const { default: wsUtils } = require('../sockets/websocket.js');
+const analyser = require('../analyser/dashboard.analyser');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -136,6 +138,9 @@ const insertServiceReport = async (data) => {
 
     await createNotification({ title, description: body, priority: 'high', sourceId: 'from applications', recipient: officeMain, time: new Date() });
     await PushNotificationService.sendGeneralNotification(officeMain, title, body, 'high', 'normal');
+    
+    analyser.clearCache();
+    wsUtils.sendDashboardUpdate('serviceReport');
 
     return { status: 200, ok: true, message: 'Service report created successfully', data: { serviceReport: result } };
   } catch (error) {

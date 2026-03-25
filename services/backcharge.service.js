@@ -2,6 +2,8 @@
 const Backcharge = require('../models/backcharge.model');
 const { createNotification } = require('./notification.service');
 const PushNotificationService = require('../push/notification.push');
+const { default: wsUtils } = require('../sockets/websocket.js');
+const analyser = require('../analyser/dashboard.analyser');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -349,6 +351,8 @@ const addBackcharge = async (data) => {
       status: 'draft',
     });
 
+    analyser.clearCache();
+    wsUtils.sendDashboardUpdate('backcharge');
     return await newBackcharge.save();
   } catch (error) {
     console.error('[BackchargeService] addBackcharge:', error);

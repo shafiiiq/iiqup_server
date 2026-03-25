@@ -36,7 +36,6 @@ const REGISTRY = [
   { model: replacementModel,        key: 'replacement',         label: 'Replacement'          },
   { model: lpoModel,                key: 'lpo',                 label: 'LPO'                  },
   { model: backchargeModel,         key: 'backcharge',          label: 'Backcharge'           },
-  { model: documentModel,           key: 'document',            label: 'Documents'            },
   // ← add new model here, nothing else changes
 ];
 

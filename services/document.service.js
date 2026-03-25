@@ -4,6 +4,8 @@ const { PDFDocument }        = require('pdf-lib');
 const { putObject, deleteObject } = require('../aws/s3.aws');
 const { createNotification } = require('./notification.service');
 const PushNotificationService = require('../push/notification.push');
+const { default: wsUtils } = require('../sockets/websocket.js');
+const analyser = require('../analyser/dashboard.analyser');
 const {
   formatDate,
   formatDateTime,
@@ -80,6 +82,9 @@ const saveDocument = async (sourceId, sourceType, documentType, file, descriptio
     await PushNotificationService.sendGeneralNotification(
       null, 'New document added', notifMessage, 'high', 'normal', notification.data._id.toString()
     );
+
+    analyser.clearCache();
+    wsUtils.sendDashboardUpdate('documents');
 
     await document.save();
 

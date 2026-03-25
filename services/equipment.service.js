@@ -15,6 +15,9 @@ const OperatorService              = require('./operator.service');
 const { alertMobilizationViaEmail } = require('../gmail/mobilization.gmail');
 const { alertReplacementViaEmail }  = require('../gmail/replacement.gmail');
 
+const { default: wsUtils } = require('../sockets/websocket.js');
+const analyser = require('../analyser/dashboard.analyser');
+
 const {
   NOTIFICATION_PRIORITY,
   NOTIFICATION_TYPE,
@@ -142,6 +145,9 @@ const insertEquipment = async (data) => {
       recipient:   officeMain
     });
 
+    analyser.clearCache();
+    wsUtils.sendDashboardUpdate('equipment');
+    
     return { status: 200, ok: true, message: 'Equipment added successfully', data: equipment };
 
   } catch (err) {
@@ -444,6 +450,9 @@ const updateEquipment = async (regNo, updatedData, equipmentNumber = null, opera
         sourceId:    equipment._id
       });
     }
+
+    analyser.clearCache();
+    wsUtils.sendDashboardUpdate('equipment')
 
     return { status: 200, ok: true, message: 'Equipment updated successfully', data: result };
 
@@ -776,6 +785,9 @@ const mobilizeEquipment = async (data) => {
 
     }
 
+    analyser.clearCache();
+    wsUtils.sendDashboardUpdate('mobilization');
+
     return { status: 201, ok: true, message: 'Equipment mobilized successfully', data: { mobilization, updatedEquipment } };
 
   } catch (err) {
@@ -841,6 +853,9 @@ const demobilizeEquipment = async (data) => {
       operator:     currentEquipment?.certificationBody?.at(-1)?.operatorName || '',
       withOperator: !!currentEquipment?.certificationBody?.at(-1)?.operatorName,
     }).catch(e => console.error('Demobilization email failed:', e));
+
+    analyser.clearCache();
+    wsUtils.sendDashboardUpdate('mobilization');
 
     return { status: 201, ok: true, message: 'Equipment demobilized successfully', data: { demobilization, updatedEquipment } };
 
@@ -1007,6 +1022,9 @@ const replaceOperator = async (data) => {
       rentRate: updatedEquipment?.rentRate || null,
       location: updatedEquipment?.location ? [updatedEquipment.location] : []
     }).catch(e => console.error('Replace operator email failed:', e));
+
+    analyser.clearCache();
+    wsUtils.sendDashboardUpdate('replacement');
 
     return { status: 201, ok: true, message: 'Operator replaced successfully', data: { replacement, updatedEquipment } };
 

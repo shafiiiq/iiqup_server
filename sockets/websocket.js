@@ -334,6 +334,14 @@ const sendCallNotification = (receiverUniqueCode, callData) => {
   global.io.to(`user_${receiverUniqueCode}`).emit('incoming_call', callData);
 };
 
+const sendDashboardUpdate = (...collectionKeys) => {
+  if (!global.io) return;
+  global.io.emit('dashboard_update', {
+    collectionKeys: collectionKeys.length > 0 ? collectionKeys : null,
+    updatedAt: new Date().toISOString(),
+  });
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Exports
 // ─────────────────────────────────────────────────────────────────────────────
@@ -350,6 +358,7 @@ module.exports = {
     sendTypingIndicator,
     updateMessageStatus,
     sendCallNotification,
+    sendDashboardUpdate,
     connectedUsers,
   },
 };

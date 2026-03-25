@@ -8,6 +8,8 @@ const EquipmentModel          = require('../models/equipment.model.js');
 const { createNotification }  = require('./notification.service.js');
 const PushNotificationService = require('../push/notification.push.js');
 const { default: mongoose }   = require('mongoose');
+const { default: wsUtils } = require('../sockets/websocket.js');
+const analyser = require('../analyser/dashboard.analyser');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -64,6 +66,9 @@ const insertServiceHistory = async (data) => {
       fullService:    data.fullService
     });
 
+    analyser.clearCache();
+    wsUtils.sendDashboardUpdate('serviceHistory', 'maintenanceHistory', 'tyreHistory', 'batteryHistory');
+    
     return { status: 200, ok: true, message: 'Service history added successfully', data: serviceHistory };
   } catch (error) {
     console.error('[ServiceHistoryService] insertServiceHistory:', error);

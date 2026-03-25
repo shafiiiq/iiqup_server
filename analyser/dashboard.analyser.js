@@ -243,6 +243,8 @@ const fetchHistorical = async (periodKey = 'month', limitPerCollection = 100) =>
   if (cached) return cached;
 
   const { start, end, ttl, label } = PERIODS[periodKey]();
+
+  // records are capped — only for table display
   const [counts, records] = await Promise.all([
     countsForRange(start, end),
     docsForRange(start, limitPerCollection),
@@ -253,9 +255,9 @@ const fetchHistorical = async (periodKey = 'month', limitPerCollection = 100) =>
     data: {
       type:     'historical',
       period:   { key: periodKey, label },
-      counts,
+      counts,            
       total:    sumValues(counts),
-      records,
+      records,           
     }
   };
 
@@ -455,6 +457,115 @@ const fetchEquipmentStats = async () => {
   }
 };
 
+const fetchRealTimeStats = async () => {
+  try {
+    const cacheKey = 'realtime-stats';
+    const cached   = cache.get(cacheKey);
+    if (cached) return cached;
+
+    const now        = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekAgo    = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+    const monthAgo   = new Date(); monthAgo.setMonth(monthAgo.getMonth() - 1);
+    const yearAgo    = new Date(); yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+
+    const complaintEntry = REGISTRY.find(r => r.key === 'complaints');
+
+    const [
+      totalEq, activeEq, idleEq, maintenanceEq,
+      pendingComplaints,
+      todayCounts, weeklyCounts, monthlyCounts, yearlyCounts,
+    ] = await Promise.all([
+      equipmentModel.countDocuments(),
+      equipmentModel.countDocuments({ status: 'active' }),
+      equipmentModel.countDocuments({ status: 'idle' }),
+      equipmentModel.countDocuments({ status: 'maintenance' }),
+      complaintEntry.model.countDocuments({ status: 'pending' }),
+      countsForRange(todayStart),
+      countsForRange(weekAgo),
+      countsForRange(monthAgo),
+      countsForRange(yearAgo),
+    ]);
+
+    const todayTotal     = sumValues(todayCounts);
+    const criticalAlerts = Math.round(pendingComplaints * 0.3);
+    const efficiency     = todayTotal > 0
+      ? Math.round(((todayTotal - pendingComplaints) / todayTotal) * 100)
+      : 95;
+
+    const trends = [
+      { period: 'Daily',   ...todayCounts,   total: todayTotal               },
+      { period: 'Weekly',  ...weeklyCounts,  total: sumValues(weeklyCounts)  },
+      { period: 'Monthly', ...monthlyCounts, total: sumValues(monthlyCounts) },
+      { period: 'Yearly',  ...yearlyCounts,  total: sumValues(yearlyCounts)  },
+    ];
+
+    const performanceMetrics = REGISTRY
+      .map(({ key, label }) => ({ key, label, value: todayCounts[key] || 0 }))
+      .filter(m => m.value > 0);
+
+    const result = {
+      status: 200,
+      data: {
+        equipment: {
+          total:       totalEq,
+          active:      activeEq,
+          idle:        idleEq,
+          maintenance: maintenanceEq,
+        },
+        pendingComplaints,
+        criticalAlerts,
+        efficiency: {
+          todayTotal,
+          pct: efficiency,
+        },
+        todayCounts,
+        weeklyCounts,
+        monthlyCounts,
+        yearlyCounts,
+        trends,
+        performanceMetrics,
+      }
+    };
+
+    cache.set(cacheKey, result, 60_000);
+    return result;
+  } catch (error) {
+    console.error('[DashboardService] fetchRealTimeStats:', error);
+    return { status: 500, message: error.message };
+  }
+};
+
+const fetchLatest5 = async () => {
+  try {
+    const cacheKey = 'latest-5';
+    const cached   = cache.get(cacheKey);
+    if (cached) return cached;
+
+    const allDocs = [];
+
+    await Promise.all(
+      REGISTRY.map(async ({ model, key, label }) => {
+        const docs = await model.find().sort({ createdAt: -1 }).limit(5).lean();
+        docs.forEach(doc => allDocs.push({ ...doc, _collection: key, _label: label }));
+      })
+    );
+
+    allDocs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    const result = {
+      status: 200,
+      data:   allDocs.slice(0, 5),
+    };
+
+    cache.set(cacheKey, result, 30_000);
+    return result;
+  } catch (error) {
+    console.error('[DashboardService] fetchLatest5:', error);
+    return { status: 500, message: error.message };
+  }
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Cache clear
 // ─────────────────────────────────────────────────────────────────────────────
@@ -478,5 +589,7 @@ module.exports = {
   fetchActivityHeatmap,
   fetchDataQuality,
   fetchEquipmentStats,
+  fetchRealTimeStats,
   clearCache,
+  fetchLatest5
 };

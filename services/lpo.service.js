@@ -1,6 +1,8 @@
 const LPO                    = require('../models/lpo.model');
 const { createNotification } = require('./notification.service');
 const PushNotificationService = require('../push/notification.push');
+const { default: wsUtils } = require('../sockets/websocket.js');
+const analyser = require('../analyser/dashboard.analyser');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -201,6 +203,9 @@ const createLPO = async (lpoData) => {
       );
     }
 
+    analyser.clearCache();
+    wsUtils.sendDashboardUpdate('lpo');
+    
     return await lpo.save();
   } catch (error) {
     console.error('[LPOService] createLPO:', error);

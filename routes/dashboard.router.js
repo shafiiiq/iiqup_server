@@ -126,4 +126,12 @@ router.get('/equipment-stats', async (req, res) => {
     res.status(500).json({ status: 500, message: err.message });
   }
 });
+router.get('/realtime-stats', async (req, res) => {
+  const result = await analyser.fetchRealTimeStats();
+  res.status(result.status).json(result);
+});
+router.get('/latest-5', async (req, res) => {
+  const result = await analyser.fetchLatest5();
+  res.status(result.status).json(result);
+});
 module.exports = router;
