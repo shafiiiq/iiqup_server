@@ -531,7 +531,7 @@ const fetchRealTimeStats = async () => {
     cache.set(cacheKey, result, 60_000);
     return result;
   } catch (error) {
-    console.error('[DashboardService] fetchRealTimeStats:', error);
+    console.error('[DashboardService] fetchRealTimeStats:', error); 
     return { status: 500, message: error.message };
   }
 };

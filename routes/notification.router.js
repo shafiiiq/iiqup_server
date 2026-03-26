@@ -8,9 +8,8 @@ const controller = require('../controllers/notification.controller');
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Records ───────────────────────────────────────────────────────────────────
-router.get   ('/stats',                    controller.getNotificationStats);
+router.post  ('/stats',                    controller.getNotificationStats);
 router.post  ('/get-all-notification',     controller.getAllNotifications);
-router.post  ('/create-notification',      controller.createNotification);
 router.put   ('/mark-read/:id',            controller.markAsRead);
 router.delete('/delete/:id',               controller.deleteNotification);
 

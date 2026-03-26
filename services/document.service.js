@@ -71,7 +71,7 @@ const saveDocument = async (sourceId, sourceType, documentType, file, descriptio
     const sourceIdentifier = resolveSourceIdentifier(sourceType, sourceData);
     const notifMessage     = `Document ${documentType} is uploaded for ${sourceIdentifier} (${sourceType}), Now you can access new one`;
 
-    const notification = await createNotification({
+    const notification = await createNotification({ 
       title:    'New document added',
       description: notifMessage,
       priority: 'high',

@@ -41,6 +41,7 @@ const createNotification = async (notificationData) => {
       priority,
       sourceId,
       recipient,
+      forYou,
       time,
       navigateTo,
       navigateText,
@@ -48,6 +49,7 @@ const createNotification = async (notificationData) => {
       hasButton,
       directApproval,
       approvalPort,
+      category,
       type = 'normal',
     } = notificationData;
 
@@ -75,7 +77,9 @@ const createNotification = async (notificationData) => {
       directApproval: directApproval || false,
       approvalPort,
       type,
+      category: category || 'general',
       targetUsers,
+      forYou: forYou || [],
       isBroadcast,
       createdAt:     new Date(),
       updatedAt:     new Date(),
@@ -146,6 +150,31 @@ const quickNotification = async (title, sourceId, options = {}) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Read Operations
 // ─────────────────────────────────────────────────────────────────────────────
+
+const getNotificationStatsService = async (uniqueCode) => {
+  try {
+    const [total, unread, forYouUnread] = await Promise.all([
+      Notification.countDocuments({
+        sourceId: { $ne: 'attendance' },
+        $or: [{ isBroadcast: true }, { targetUsers: uniqueCode }],
+      }),
+      Notification.countDocuments({
+        sourceId: { $ne: 'attendance' },
+        $or: [{ isBroadcast: true }, { targetUsers: uniqueCode }],
+        'readBy.uniqueCode': { $ne: uniqueCode },
+      }),
+      Notification.countDocuments({
+        forYou: uniqueCode,
+        'readBy.uniqueCode': { $ne: uniqueCode },
+      }),
+    ])
+
+    return { total, unread, forYouUnread }
+  } catch (error) {
+    console.error('[NotificationService] getNotificationStatsService:', error)
+    throw error
+  }
+}
 
 /**
  * Returns a paginated list of all notifications.
@@ -263,6 +292,30 @@ const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
 // Update Operations
 // ─────────────────────────────────────────────────────────────────────────────
 
+const markNotificationAsRead = async (notificationId, uniqueCode) => {
+  try {
+    const result = await Notification.findByIdAndUpdate(
+      notificationId,
+      {
+        $addToSet: {
+          readBy: {
+            uniqueCode,
+            readAt: new Date(),
+          },
+        },
+      },
+      { new: true }
+    );
+
+    if (!result) return { success: false, message: 'Notification not found' };
+
+    return { success: true, message: 'Marked as read' };
+  } catch (error) {
+    console.error('[NotificationService] markNotificationAsRead:', error);
+    throw error;
+  }
+};
+
 /**
  * Marks a notification as delivered to a specific user.
  *
@@ -309,8 +362,10 @@ module.exports = {
   createBulkNotifications,
   quickNotification,
   // Read
+  getNotificationStatsService,
   getAllNotificationsService,
   getPendingNotifications,
   // Update
   markNotificationAsDelivered,
+  markNotificationAsRead,
 };

@@ -94,7 +94,7 @@ const buildSignedFields = (prefix, creds) => {
  * @returns {Promise<void>}
  */
 const notify = async (notifPayload, recipient, title, description, priority = 'high') => {
-  const notification = await createNotification({ ...notifPayload, recipient, time: new Date() });
+  const notification = await createNotification({ ...notifPayload, category: 'lpo', recipient, time: new Date() });
 
   await PushNotificationService.sendGeneralNotification(
     recipient,

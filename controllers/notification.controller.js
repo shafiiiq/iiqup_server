@@ -38,63 +38,25 @@ const getAllNotifications = async (req, res) => {
 };
 
 /**
- * POST /create-notification
- * Creates a new notification and dispatches it in real-time.
- */
-const createNotification = async (req, res) => {
-  try {
-    const { title, description, priority, type, targetUser } = req.body;
-
-    const newNotification = {
-      title,
-      description,
-      priority: priority || 'medium',
-      type:     type     || 'normal',
-      time:     new Date().toISOString(),
-      _id:      new Date().getTime().toString(),
-    };
-
-    if (targetUser) {
-      sendNotificationToUser(targetUser, newNotification);
-    } else {
-      broadcastNotification(newNotification);
-    }
-
-    res.status(201).json({
-      status:  201,
-      message: 'Notification created and sent successfully',
-      data:    newNotification,
-    });
-  } catch (error) {
-    console.error('[Notification] createNotification:', error);
-    res.status(500).json({ status: 500, message: error.message });
-  }
-};
-
-/**
  * GET /stats
  * Returns notification statistics.
  */
 const getNotificationStats = async (req, res) => {
   try {
-    const stats = {
-      total:        0,
-      normal:       0,
-      special:      0,
-      highPriority: 0,
-      unread:       0,
-    };
+    const { uniqueCode } = req.body
 
-    res.status(200).json({
-      status:  200,
-      message: 'Stats retrieved successfully',
-      data:    stats,
-    });
+    if (!uniqueCode) {
+      return res.status(400).json({ status: 400, message: 'uniqueCode is required' })
+    }
+
+    const stats = await notificationsService.getNotificationStatsService(uniqueCode)
+
+    res.status(200).json({ status: 200, message: 'Stats retrieved successfully', data: stats })
   } catch (error) {
-    console.error('[Notification] getNotificationStats:', error);
-    res.status(500).json({ status: 500, message: error.message });
+    console.error('[Notification] getNotificationStats:', error)
+    res.status(500).json({ status: 500, message: error.message })
   }
-};
+}
 
 /**
  * PUT /mark-read/:id
@@ -103,10 +65,15 @@ const getNotificationStats = async (req, res) => {
 const markAsRead = async (req, res) => {
   try {
     const { id } = req.params;
+    const { uniqueCode } = req.body;
 
-    await Notification.findByIdAndUpdate(id, { isRead: true });
+    if (!uniqueCode) {
+      return res.status(400).json({ status: 400, message: 'uniqueCode is required' });
+    }
 
-    res.status(200).json({ status: 200, message: 'Notification marked as read' });
+    const result = await notificationsService.markNotificationAsRead(id, uniqueCode);
+
+    res.status(200).json({ status: 200, message: result.message });
   } catch (error) {
     console.error('[Notification] markAsRead:', error);
     res.status(500).json({ status: 500, message: error.message });
@@ -194,7 +161,6 @@ const markNotificationAsDelivered = async (req, res) => {
 module.exports = {
   // CRUD
   getAllNotifications,
-  createNotification,
   getNotificationStats,
   markAsRead,
   deleteNotification,
