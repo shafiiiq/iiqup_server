@@ -72,6 +72,9 @@ const sendToServer = async (attendanceData) => {
       photo:          'auth_files/photo/7.jpg?_=1757838507',
       pin:            parsedPin,
     };
+
+    const saved = await attendanceService.addAttendance(newAttendance);
+
   } catch (error) {
     console.error('[Attendance] Error saving attendance:', error);
   }
