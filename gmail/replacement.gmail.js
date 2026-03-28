@@ -217,7 +217,7 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
     replacedOperator       = '',
     operator               = '',
     replacedEquipmentRegNo    = '',
-    replacedEquipmentMachine  = '',
+    replacedEquipmentMachine  = '', 
     site                   = '',
     newSiteForReplaced     = '',
     month                  = '',

@@ -136,7 +136,7 @@ const createComplaint = async (complaint) => {
         sourceId:     complaintData._id,
         recipient:    officeHero,
         time:         new Date(),
-        navigateTo:   `/(screens)/assignMechanic/${complaintData._id}`,
+        navigateTo:   `/(mechanics)/assign/${complaintData._id}`,
         navigateText: 'Assign Mechanic',
         navigteToId:  complaintData._id,
         hasButton:    true,
@@ -235,7 +235,7 @@ const mechanicRequestItems = async (complaintId, requestData, mechanicId) => {
         sourceId:     'mechanic_request',
         recipient:    officeHero,
         time:         new Date(),
-        navigateTo:   `/(screens)/assignMechanic/${complaint._id}`,
+        navigateTo:   `/(mechanics)/assign/${complaint._id}`,
         navigateText: 'View mechanic request',
         navigteToId:  complaint._id,
         hasButton:    true,
@@ -295,7 +295,7 @@ const forwardToWorkshop = async (complaintId, approvedBy, comments = '', documen
 
     const officeMain = JSON.parse(process.env.OFFICE_MAIN);
     await notify(
-      { title: `Create LPO Request - ${complaint.regNo}`, description: notificationMsg, priority: 'high', sourceId: 'lpo_request', recipient: officeMain, time: new Date(), navigateTo: `/(screens)/QuotationRequest/${complaint._id}`, navigateText: `View Hamza's request`, navigteToId: complaint._id, hasButton: true },
+      { title: `Create LPO Request - ${complaint.regNo}`, description: notificationMsg, priority: 'high', sourceId: 'lpo_request', recipient: officeMain, time: new Date(), navigateTo: `/(workflow)/quotation/${complaint._id}`, navigateText: `View Hamza's request`, navigteToId: complaint._id, hasButton: true },
       officeMain, 'LPO Creation Request', pushBody
     );
 
@@ -332,7 +332,7 @@ const forwardToWorkshopWithoutLPO = async (complaintId, approvedBy, comments = '
     const officeMain = JSON.parse(process.env.OFFICE_MAIN);
 
     await notify(
-      { title, description: body, priority: 'high', sourceId: 'wihtout_lpo_request', recipient: officeMain, time: new Date(), navigateTo: `/(screens)/assignMechanic/${complaint._id}`, navigateText: 'Approve', directApproval: true, approvalPort: `complaints/approve-item/without-lpo/${complaint._id}`, navigteToId: complaint._id, hasButton: true },
+      { title, description: body, priority: 'high', sourceId: 'wihtout_lpo_request', recipient: officeMain, time: new Date(), navigateTo: `/(mechanics)/assign/${complaint._id}`, navigateText: 'Approve', directApproval: true, approvalPort: `complaints/approve-item/without-lpo/${complaint._id}`, navigteToId: complaint._id, hasButton: true },
       officeMain, title, body
     );
 
@@ -475,7 +475,7 @@ const uploadLPOForComplaint = async (complaintId, lpoFileData, uploadedBy, lpoRe
 
     const officeHero = JSON.parse(process.env.OFFICE_HERO);
     await notify(
-      { title: notificationTitle, description: notificationDesc, priority: 'high', sourceId: 'lpo_approval', recipient: officeHero, time: new Date(), navigateTo: `/(screens)/purchaseManagerSign/${complaint._id}`, navigateText: 'View and Sign', navigteToId: complaint._id, hasButton: true },
+      { title: notificationTitle, description: notificationDesc, priority: 'high', sourceId: 'lpo_approval', recipient: officeHero, time: new Date(), navigateTo: `/(signature)/pm/${complaint._id}`, navigateText: 'View and Sign', navigteToId: complaint._id, hasButton: true },
       officeHero, notificationTitle, notificationDesc
     );
 
@@ -540,7 +540,7 @@ const purchaseApproval = async (complaintId, approvalData) => {
 
     const officeHero = JSON.parse(process.env.OFFICE_HERO);
     await notify(
-      { title, description, priority: 'high', sourceId: 'accounts_approval', recipient: officeHero, time: new Date(), navigateTo: `/(screens)/managerSign/${complaint._id}`, navigateText: 'View and Sign', navigteToId: complaint._id, hasButton: true },
+      { title, description, priority: 'high', sourceId: 'accounts_approval', recipient: officeHero, time: new Date(), navigateTo: `/(signature)/op/${complaint._id}`, navigateText: 'View and Sign', navigteToId: complaint._id, hasButton: true },
       officeHero, title, description
     );
 
@@ -596,7 +596,7 @@ const managerApproval = async (complaintId, approvedBy, comments = '', approvedC
 
     const prefix      = isAmendment ? 'Amendment! ' : '';
     const target      = isCEO ? process.env.CEO : process.env.MD;
-    const screen      = isCEO ? `/(screens)/ceoSign/${complaint._id}` : `/(screens)/mdSign/${complaint._id}`;
+    const screen      = isCEO ? `/(signature)/ceo/${complaint._id}` : `/(signature)/ceo/${complaint._id}`;
     const roleLabel   = isCEO ? 'CEO' : 'MD';
     const source      = isCEO ? 'ceo_approval' : 'md_approval';
     const title       = `${prefix}${roleLabel} Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`;
@@ -665,7 +665,7 @@ const ceoApproval = async (complaintId, approvedBy, comments = '', approvedCreds
 
     const officeHero = JSON.parse(process.env.OFFICE_HERO);
     await notify(
-      { title, description, priority: 'high', sourceId: 'final_approval', recipient: officeHero, time: new Date(), navigateTo: `/(screens)/accountsSign/${complaint._id}`, navigateText: 'View and Sign', navigteToId: complaint._id, hasButton: true },
+      { title, description, priority: 'high', sourceId: 'final_approval', recipient: officeHero, time: new Date(), navigateTo: `/(signature)/accounts/${complaint._id}`, navigateText: 'View and Sign', navigteToId: complaint._id, hasButton: true },
       officeHero, title, description
     );
 
@@ -718,7 +718,7 @@ const accountsApproval = async (complaintId, approvedBy, comments = '', approved
 
     const officeMain = JSON.parse(process.env.OFFICE_MAIN);
     await notify(
-      { title, description, priority: 'high', sourceId: 'manager_approval', recipient: officeMain, time: new Date(), navigateTo: `/(screens)/signedLpo/${complaint._id}`, navigateText: 'View the item required', navigteToId: complaint._id, hasButton: true },
+      { title, description, priority: 'high', sourceId: 'manager_approval', recipient: officeMain, time: new Date(), navigateTo: `/(workflow)/lpo/${complaint._id}`, navigateText: 'View the item required', navigteToId: complaint._id, hasButton: true },
       officeMain, title, description
     );
 

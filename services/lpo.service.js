@@ -108,11 +108,11 @@ const notify = async (notifPayload, recipient, title, description, priority = 'h
 
 const roleScreenMap = (role, isMD) => {
   const map = {
-    PURCHASE_MANAGER:  'purchaseManagerSign',
-    MANAGER:           'managerSign',
-    CEO:               isMD ? 'mdSign' : 'ceoSign',
-    MANAGING_DIRECTOR: 'mdSign',
-    ACCOUNTS:          'accountsSign',
+    PURCHASE_MANAGER:  'pm',
+    MANAGER:           'op',
+    CEO:               isMD ? 'md' : 'ceo',
+    MANAGING_DIRECTOR: 'md',
+    ACCOUNTS:          'accounts',
   };
   return map[role] || 'lpoSign';
 };
@@ -125,7 +125,7 @@ const buildNextStepNotif = (role, lpoRef, updated) => {
        title:        `Purchase Manager Approval Needed — LPO ${lpoRef}`,
        description:  `Manager signed LPO ${lpoRef}. Purchase Manager approval needed.`,
        sourceId:     'lpo_approval',
-       navigateTo:   `/(screens)/purchaseManagerSign/${lpoRef}`,
+       navigateTo:   `/(signature)/pm/${lpoRef}`,
        navigateText: 'View and Sign',
        recipient:    JSON.parse(process.env.OFFICE_HERO),
      },
@@ -133,7 +133,7 @@ const buildNextStepNotif = (role, lpoRef, updated) => {
        title:        `Accounts Approval Needed — LPO ${lpoRef}`,
        description:  `Purchase Manager signed LPO ${lpoRef}. Accounts approval needed.`,
        sourceId:     'accounts_approval',
-       navigateTo:   `/(screens)/accountsSign/${lpoRef}`,
+       navigateTo:   `/(signature)/accounts/${lpoRef}`,
        navigateText: 'View and Sign',
        recipient:    JSON.parse(process.env.OFFICE_HERO),
      },
@@ -141,7 +141,7 @@ const buildNextStepNotif = (role, lpoRef, updated) => {
        title:        `${updated.signatures?.authorizedSignatoryTitle || 'CEO'} Approval Needed — LPO ${lpoRef}`,
        description:  `Accounts signed LPO ${lpoRef}. ${updated.signatures?.authorizedSignatoryTitle || 'CEO'} approval needed.`,
        sourceId:     isMD ? 'md_approval' : 'ceo_approval',
-       navigateTo:   isMD ? `/(screens)/mdSign/${lpoRef}` : `/(screens)/ceoSign/${lpoRef}`,
+       navigateTo:   isMD ? `/(signature)/md/${lpoRef}` : `/(signature)/md/${lpoRef}`,
        navigateText: 'View and Sign',
        recipient:    JSON.parse(process.env.OFFICE_HERO),
      },
@@ -149,7 +149,7 @@ const buildNextStepNotif = (role, lpoRef, updated) => {
        title:        `LPO ${lpoRef} Fully Signed`,
        description:  `CEO signed LPO ${lpoRef}. All signatures complete.`,
        sourceId:     'final_approval',
-       navigateTo:   `/(screens)/signedLpo/${lpoRef}`,
+       navigateTo:   `/(workflow)/lpo/${lpoRef}`,
        navigateText: 'View LPO',
        recipient:    JSON.parse(process.env.OFFICE_MAIN),
      },
@@ -157,7 +157,7 @@ const buildNextStepNotif = (role, lpoRef, updated) => {
        title:        `LPO ${lpoRef} Fully Signed`,
        description:  `MD signed LPO ${lpoRef}. All signatures complete.`,
        sourceId:     'final_approval',
-       navigateTo:   `/(screens)/signedLpo/${lpoRef}`,
+       navigateTo:   `/(workflow)/lpo/${lpoRef}`,
        navigateText: 'View LPO',
        recipient:    JSON.parse(process.env.OFFICE_MAIN),
      },
@@ -286,7 +286,7 @@ const uploadLPO = async (lpoFileData, uploadedBy, lpoRef, description, isAmendme
     await notify(
       {
         title, description: description2, priority: 'high', sourceId: 'lpo_approval',
-        navigateTo: `/(screens)/purchaseManagerSign/${lpoRef}`,
+        navigateTo: `/(signature)/pm/${lpoRef}`,
         navigateText: 'View and Sign', navigteToId: lpoRef, hasButton: true
       },
       JSON.parse(process.env.OFFICE_HERO),
@@ -443,6 +443,7 @@ const purchaseApproval = async (lpoRef, approvalData) => {
 
     if (signed) {
       Object.assign(updateFields, buildSignedFields('PMR', { approvedBy, authorised, approvedDate, approvedFrom, approvedIP, approvedBDevice, approvedLocation }));
+      updateFields.pmSigned = true;
     }
 
     const lpoUpdated = await LPO.findOneAndUpdate({ lpoRef }, updateFields, { new: true });
@@ -457,7 +458,7 @@ const purchaseApproval = async (lpoRef, approvalData) => {
     await notify(
       {
         title, description, priority: 'high', sourceId: 'accounts_approval',
-        navigateTo: `/(screens)/managerSign/${lpoRef}`,
+        navigateTo: `/(signature)/op/${lpoRef}`,
         navigateText: 'View and Sign', navigteToId: lpoRef, hasButton: true
       },
       JSON.parse(process.env.OFFICE_HERO),
@@ -499,6 +500,7 @@ const managerApproval = async (lpoRef, approvedBy, comments = '', approvedCreds)
 
     if (approvedCreds?.signed) {
       Object.assign(updateFields, buildSignedFields('MANAGER', approvedCreds));
+      updateFields.managerSigned = true;
     }
 
     const lpoUpdated = await LPO.findOneAndUpdate({ lpoRef }, updateFields, { new: true });
@@ -513,22 +515,22 @@ const managerApproval = async (lpoRef, approvedBy, comments = '', approvedCreds)
     let target, screen, title, description, source;
 
     if (isCEO && !isAmendment) {
-      target = process.env.CEO; screen = `/(screens)/ceoSign/${lpoRef}`;
+      target = process.env.CEO; screen = `/(signature)/ceo/${lpoRef}`;
       title  = `CEO Approval Needed - LPO ${lpoRef}`;
       description = `Manager ${signedLabel}approved LPO. CEO approval needed.`;
       source = 'ceo_approval';
     } else if (!isCEO && !isAmendment) {
-      target = process.env.MD; screen = `/(screens)/mdSign/${lpoRef}`;
+      target = process.env.MD; screen = `/(signature)/md/${lpoRef}`;
       title  = `MD Approval Needed - LPO ${lpoRef}`;
       description = `Manager ${signedLabel}approved LPO. MD approval needed.`;
       source = 'md_approval';
     } else if (isCEO && isAmendment) {
-      target = process.env.CEO; screen = `/(screens)/ceoSign/${lpoRef}`;
+      target = process.env.CEO; screen = `/(signature)/ceo/${lpoRef}`;
       title  = `${prefix}CEO Approval Needed - LPO ${lpoRef}`;
       description = `Manager ${signedLabel}approved amendment LPO. CEO approval needed.`;
       source = 'ceo_approval';
     } else if (!isCEO && isAmendment) {
-      target = process.env.MD; screen = `/(screens)/mdSign/${lpoRef}`;
+      target = process.env.MD; screen = `/(signature)/md/${lpoRef}`;
       title  = `${prefix}MD Approval Needed - LPO ${lpoRef}`;
       description = `Manager ${signedLabel}approved amendment LPO. MD approval needed.`;
       source = 'md_approval';
@@ -581,6 +583,7 @@ const ceoApproval = async (lpoRef, approvedBy, comments = '', approvedCreds, aut
 
     if (approvedCreds?.signed) {
       Object.assign(updateFields, buildSignedFields(approverType, approvedCreds));
+      updateFields.ceoSigned = true;
     }
 
     const lpoUpdated = await LPO.findOneAndUpdate({ lpoRef }, updateFields, { new: true });
@@ -596,7 +599,7 @@ const ceoApproval = async (lpoRef, approvedBy, comments = '', approvedCreds, aut
     await notify(
       {
         title, description, priority: 'high', sourceId: 'final_approval',
-        navigateTo: `/(screens)/accountsSign/${lpoRef}`,
+        navigateTo: `/(signature)/accounts/${lpoRef}`,
         navigateText: 'View and Sign', navigteToId: lpoRef, hasButton: true
       },
       JSON.parse(process.env.OFFICE_HERO),
@@ -632,6 +635,7 @@ const accountsApproval = async (lpoRef, approvedBy, comments = '', approvedCreds
 
     if (approvedCreds?.signed) {
       Object.assign(updateFields, buildSignedFields('ACCOUNTS', approvedCreds));
+      updateFields.accountsSigned = true;
     }
 
     const lpoUpdated = await LPO.findOneAndUpdate({ lpoRef }, updateFields, { new: true });
@@ -646,7 +650,7 @@ const accountsApproval = async (lpoRef, approvedBy, comments = '', approvedCreds
     await notify(
       {
         title, description, priority: 'high', sourceId: 'manager_approval',
-        navigateTo: `/(screens)/signedLpo/${lpoRef}`,
+        navigateTo: `/(workflow)/lpo/${lpoRef}`,
         navigateText: 'View the item required', navigteToId: lpoRef, hasButton: true
       },
       JSON.parse(process.env.OFFICE_MAIN),
@@ -810,7 +814,7 @@ const signLPO = async (lpoRef, signData) => {
       await notify(
         {
           title, description, priority: 'high', sourceId: 'lpo_approval',
-          navigateTo:   `/(screens)/${roleScreenMap(above.role, isMD)}/${lpoRef}`,
+          navigateTo:   `/(signature)/${roleScreenMap(above.role, isMD)}/${lpoRef}`,
           navigateText: 'View and Sign',
           navigteToId:  lpoRef,
           hasButton:    true,
@@ -858,7 +862,7 @@ const signLPO = async (lpoRef, signData) => {
     await notify(
       {
         title, description, priority: 'high', sourceId: 'manager_approval',
-        navigateTo:   `/(screens)/signedLpo/${lpoRef}`,
+        navigateTo:   `/(workflow)/lpo/${lpoRef}`,
         navigateText: 'View the item required',
         navigteToId:  lpoRef,
         hasButton:    true,
@@ -901,6 +905,7 @@ const getAllLPOs = async () => {
  */
 const getLPOByRef = async (refNo) => {
   try {
+    console.log("refNo", refNo)
     const lpo = await LPO.findOne({ lpoRef: refNo });
     if (!lpo) throw new Error('LPO not found');
     return lpo;

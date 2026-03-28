@@ -78,7 +78,7 @@ const getEquipmentsByReg = async (req, res) => {
  * Returns a lightweight equipment record by registration number.
  */
 const getEquipmentImages = async (req, res) => {
-  try {
+  try { 
     const { regNo } = req.params;
 
     if (!regNo) {

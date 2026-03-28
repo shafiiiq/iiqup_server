@@ -73,7 +73,7 @@ const sendToServer = async (attendanceData) => {
       pin:            parsedPin,
     };
 
-    const saved = await attendanceService.addAttendance(newAttendance);
+    await attendanceService.addAttendance(newAttendance);
 
   } catch (error) {
     console.error('[Attendance] Error saving attendance:', error);
