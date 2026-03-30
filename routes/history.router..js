@@ -27,6 +27,9 @@ router.post('/add-tyre-history',        controller.addTyreHistory);
 router.get ('/get-battery-history/:regNo', controller.getBatteryHistory);
 router.post('/add-batery-history',         controller.addBatteryHistory);
 
+// ── Muti Record ───────────────────────────────────────────────────────────────────
+router.post('/batch', controller.addBatchServiceHistory);
+
 // ── Delete ────────────────────────────────────────────────────────────────────
 router.delete('/delete-service-history/:type/:id', controller.deleteServiceHistory);
 

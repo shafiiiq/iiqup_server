@@ -1,5 +1,5 @@
 // controllers/service-history.controller.js
-const serviceHistoryServices = require('../services/history.service.js');
+const service = require('../services/history.service.js');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Service History Controllers
@@ -11,7 +11,7 @@ const serviceHistoryServices = require('../services/history.service.js');
  */
 const addServiceHistory = async (req, res) => {
   try {
-    const result = await serviceHistoryServices.insertServiceHistory(req.body);
+    const result = await service.insertServiceHistory(req.body);
 
     res.status(result.status).json(result);
   } catch (error) {
@@ -32,7 +32,7 @@ const getServiceHistory = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Registration number is required' });
     }
 
-    const result = await serviceHistoryServices.fetchServiceHistory(regNo);
+    const result = await service.fetchServiceHistory(regNo);
 
     res.status(result.status).json(result);
   } catch (error) {
@@ -53,7 +53,7 @@ const getServiceHistoryById = async (req, res) => {
       return res.status(400).json({ success: false, message: 'id and serviceType are required' });
     }
 
-    const result = await serviceHistoryServices.fetchServiceHistoryById(id, serviceType);
+    const result = await service.fetchServiceHistoryById(id, serviceType);
 
     res.status(result.status).json(result);
   } catch (error) {
@@ -74,7 +74,7 @@ const deleteServiceHistory = async (req, res) => {
       return res.status(400).json({ success: false, message: 'id and type are required' });
     }
 
-    const result = await serviceHistoryServices.deleteServiceHistory(id, type);
+    const result = await service.deleteServiceHistory(id, type);
 
     res.status(result.status).json(result);
   } catch (error) {
@@ -93,7 +93,7 @@ const deleteServiceHistory = async (req, res) => {
  */
 const addMaintananceHistory = async (req, res) => {
   try {
-    const result = await serviceHistoryServices.insertMaintananceHistory(req.body);
+    const result = await service.insertMaintananceHistory(req.body);
 
     res.status(result.status).json(result);
   } catch (error) {
@@ -114,7 +114,7 @@ const getMaintananceHistory = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Registration number is required' });
     }
 
-    const result = await serviceHistoryServices.fetchMaintananceHistory(regNo);
+    const result = await service.fetchMaintananceHistory(regNo);
 
     res.status(result.status).json(result);
   } catch (error) {
@@ -133,7 +133,7 @@ const getMaintananceHistory = async (req, res) => {
  */
 const addNextFullService = async (req, res) => {
   try {
-    const result = await serviceHistoryServices.insertFullService(req.body);
+    const result = await service.insertFullService(req.body);
 
     res.status(result.status).json(result);
   } catch (error) {
@@ -154,7 +154,7 @@ const getLatestFullService = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Registration number is required' });
     }
 
-    const result = await serviceHistoryServices.fetchLatestFullService(regNo);
+    const result = await service.fetchLatestFullService(regNo);
 
     res.status(result.status).json(result);
   } catch (error) {
@@ -169,7 +169,7 @@ const getLatestFullService = async (req, res) => {
  */
 const getFullServiceNotification = async (req, res) => {
   try {
-    const result = await serviceHistoryServices.fetchFullServiceNotification();
+    const result = await service.fetchFullServiceNotification();
 
     res.status(result.status).json(result);
   } catch (error) {
@@ -188,7 +188,7 @@ const getFullServiceNotification = async (req, res) => {
  */
 const addTyreHistory = async (req, res) => {
   try {
-    const result = await serviceHistoryServices.insertTyreHisory(req.body);
+    const result = await service.insertTyreHistory(req.body);
 
     res.status(result.status).json(result);
   } catch (error) {
@@ -209,7 +209,7 @@ const getTyreHistory = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Registration number is required' });
     }
 
-    const result = await serviceHistoryServices.fetchTyreHistory(regNo);
+    const result = await service.fetchTyreHistory(regNo);
 
     res.status(result.status).json(result);
   } catch (error) {
@@ -228,12 +228,26 @@ const getTyreHistory = async (req, res) => {
  */
 const addBatteryHistory = async (req, res) => {
   try {
-    const result = await serviceHistoryServices.insertBatteryHistory(req.body);
+    const result = await service.insertBatteryHistory(req.body);
 
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[ServiceHistory] addBatteryHistory:', error);
     res.status(error.status || 500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * POST /service-history/batch
+ * Adds a multi records.
+ */
+const addBatchServiceHistory = async (req, res) => {
+  try {
+    const result = await service.insertBatchServiceHistory(req.body);
+    res.status(result.status).json(result);
+  } catch (error) {
+    console.error('[BatchController] addBatchServiceHistory:', error);
+    res.status(500).json({ ok: false, message: error.message || 'Unexpected error' });
   }
 };
 
@@ -249,7 +263,7 @@ const getBatteryHistory = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Registration number is required' });
     }
 
-    const result = await serviceHistoryServices.fetchBatteryHistory(regNo);
+    const result = await service.fetchBatteryHistory(regNo);
 
     res.status(result.status).json(result);
   } catch (error) {
@@ -261,7 +275,7 @@ const getBatteryHistory = async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 // Exports
 // ─────────────────────────────────────────────────────────────────────────────
-
+ 
 module.exports = {
   // Service
   addServiceHistory,
@@ -281,4 +295,6 @@ module.exports = {
   // Battery
   addBatteryHistory,
   getBatteryHistory,
+  // Multi Records
+  addBatchServiceHistory 
 };

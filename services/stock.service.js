@@ -5,8 +5,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 const Stock              = require('../models/stock.model');
-const stockHandoverModel = require('../models/images.model');
-const userServices       = require('./user.service');
 const mongoose           = require('mongoose');
 
 const { createNotification }  = require('./notification.service');
@@ -96,7 +94,9 @@ const insertStocks = async (data) => {
       hasSubUnits:      data.hasSubUnits      || false,
       subUnitName:      data.subUnitName      || '',
       subUnitCapacity:  data.subUnitCapacity  || 0,
-      subUnitRemaining: data.subUnitRemaining || 0,
+      subUnitRemaining: data.hasSubUnits
+        ? (parseInt(data.stockCount) || 0) * (parseInt(data.subUnitCapacity) || 0)
+        : 0,
     }).save();
 
     const officeHero = JSON.parse(process.env.OFFICE_HERO);
@@ -274,7 +274,9 @@ const updateProduct = async (stockId, updateData) => {
         hasSubUnits:      updateData.hasSubUnits,
         subUnitName:      updateData.hasSubUnits ? updateData.subUnitName     : '',
         subUnitCapacity:  updateData.hasSubUnits ? (updateData.subUnitCapacity || 0) : 0,
-        subUnitRemaining: updateData.hasSubUnits ? (updateData.subUnitRemaining || updateData.subUnitCapacity || 0) : 0,
+        subUnitRemaining: updateData.hasSubUnits
+          ? (parseInt(updateData.stockCount) || 0) * (parseInt(updateData.subUnitCapacity) || 0)
+          : 0,
         updatedAt:        new Date(),
       },
       { new: true, runValidators: true }
@@ -319,32 +321,17 @@ const updateStock = async (stockId, updateData) => {
 
       // ── Sub-unit deduct path ──────────────────────────────────────────────
       if (currentStock.hasSubUnits && updateData.type === 'deduct' && updateData.reduceType === 'subunit') {
-        let toDeduct   = quantityChange
-        let remaining  = currentStock.subUnitRemaining || 0
-        let containers = currentStock.stockCount       || 0
+        const capacity     = currentStock.subUnitCapacity || 1
+        let totalRemaining = currentStock.subUnitRemaining || 0
+        let containers     = currentStock.stockCount || 0
+        let remaining      = totalRemaining - quantityChange
 
-        while (toDeduct > 0) {
-          if (remaining === 0) {
-            if (containers > 0) {
-              containers -= 1
-              remaining   = currentStock.subUnitCapacity || 0
-            } else {
-              break
-            }
-          }
-          if (toDeduct <= remaining) {
-            remaining -= toDeduct
-            toDeduct   = 0
-          } else {
-            toDeduct  -= remaining
-            remaining  = 0
-          }
-        }
-
-        // If remaining hits 0 and there are still containers, open the next one
-        if (remaining === 0 && containers > 0) {
-          containers -= 1
-          remaining   = currentStock.subUnitCapacity || 0
+        if (remaining < 0) {
+          const deficit           = Math.abs(remaining)
+          const containersToUse   = Math.ceil(deficit / capacity)
+          containers              = Math.max(0, containers - containersToUse)
+          remaining               = (containersToUse * capacity) - deficit
+          if (remaining < 0) remaining = 0
         }
 
         newQuantity         = containers
@@ -353,12 +340,16 @@ const updateStock = async (stockId, updateData) => {
       // ── Normal stock deduct path ──────────────────────────────────────────
       } else if (updateData.type === 'deduct') {
         newQuantity         = currentStock.stockCount - quantityChange
-        newSubUnitRemaining = currentStock.subUnitRemaining || 0
+        newSubUnitRemaining = currentStock.hasSubUnits
+          ? Math.max(0, (currentStock.subUnitRemaining || 0) - (quantityChange * (currentStock.subUnitCapacity || 0)))
+          : 0
 
       // ── Add path ──────────────────────────────────────────────────────────
       } else if (updateData.type === 'add') {
-        newQuantity         = currentStock.stockCount + quantityChange
-        newSubUnitRemaining = currentStock.subUnitRemaining || 0
+        newQuantity = currentStock.stockCount + quantityChange
+        newSubUnitRemaining = currentStock.hasSubUnits
+          ? (currentStock.subUnitRemaining || 0) + (quantityChange * (currentStock.subUnitCapacity || 0))
+          : 0
 
       // ── Adjustment ────────────────────────────────────────────────────────
       } else {

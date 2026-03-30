@@ -31,6 +31,239 @@ const resolveHistoryModel = (type) => {
   }
 };
 
+ 
+/**
+ * Resolves the correct history model for a given service type.
+ * @param {string} type  'oil'|'normal'|'tyre'|'battery'|'maintenance'
+ * @returns {Model}
+ */
+const resolveModel = (type) => {
+  switch (type) {
+    case 'tyre':        return tyreHistoryModel;
+    case 'battery':     return batteryHistoryModel;
+    case 'maintenance': return maintananceHistoryModel;
+    default:            return serviceHistoryModel; // oil | normal
+  }
+};
+ 
+/**
+ * Derives the checklist status strings that the single-record flow writes into
+ * the history document for oil/normal services, mirroring applyOilServiceChecklist
+ * on the frontend.
+ *
+ * @param {Object} shared  sharedData from the request body
+ * @returns {{ oil, oilFilter, fuelFilter, acFilter, waterSeparator, airFilter }}
+ */
+const deriveOilFlags = (shared) => ({
+  oil:            shared.oil            || 'Check',
+  oilFilter:      shared.oilFilter      || 'Check',
+  fuelFilter:     shared.fuelFilter     || 'Check',
+  acFilter:       shared.acFilter       || 'Clean',
+  waterSeparator: shared.waterSeparator || 'Check',
+  airFilter:      shared.airFilter      || 'Clean',
+});
+ 
+/**
+ * Checks whether the next service crosses a 3 000 hr/km full-service boundary
+ * and, if so, creates the notification — exactly as the single-record flow does.
+ *
+ * @param {string} regNo
+ * @param {string} serviceHrs
+ * @param {string} nextServiceHrs
+ */
+const maybeFireFullServiceNotification = async (regNo, serviceHrs, nextServiceHrs) => {
+  if (!serviceHrs || !nextServiceHrs) return;
+ 
+  const current = parseInt(String(serviceHrs).replace(/[^0-9]/g, ''), 10);
+  const next    = parseInt(String(nextServiceHrs).replace(/[^0-9]/g, ''), 10);
+ 
+  if (isNaN(current) || isNaN(next)) return;
+  if (Math.floor(next / 3000) <= Math.floor(current / 3000)) return;
+ 
+  // Boundary crossed — build and send notification.
+  const equipment  = await EquipmentModel.findOne({ regNo });
+  const label      = equipment ? `${equipment.brand} ${equipment.machine} ${regNo}` : `${regNo}`;
+  const notifTitle = `Time to full service - ${label}`;
+  const notifMsg   = `${label}'s next service is full service, NEXT SERVICE HR/KM: ${nextServiceHrs}`;
+ 
+  const notification = await createNotification({
+    title:       notifTitle,
+    description: notifMsg,
+    priority:    'high',
+    sourceId:    'from applications',
+    time:        new Date(),
+  });
+ 
+  await PushNotificationService.sendGeneralNotification(
+    null, notifTitle, notifMsg, 'high', 'normal',
+    notification.data._id.toString()
+  );
+};
+ 
+// ─────────────────────────────────────────────────────────────────────────────
+// Per-type history builders
+// ─────────────────────────────────────────────────────────────────────────────
+ 
+/**
+ * Builds the history document data for oil / normal service records.
+ * @param {Object} record   Single entry from records[].
+ * @param {Object} shared   sharedData from the request body.
+ * @returns {Object}
+ */
+const buildOilHistoryData = (record, shared) => {
+  const flags = deriveOilFlags(shared);
+  return {
+    regNo:          shared.regNo,
+    date:           record.date,
+    serviceHrs:     record.serviceHrs,
+    nextServiceHrs: record.nextServiceHrs,
+    fullService:    record.fullService || false,
+    ...flags,
+  };
+};
+ 
+/**
+ * Builds the history document data for tyre records.
+ */
+const buildTyreHistoryData = (record, shared) => ({
+  date:         record.date,
+  tyreModel:    shared.tyreModel    || record.tyreModel,
+  tyreNumber:   shared.tyreNumber   || record.tyreNumber,
+  equipment:    shared.machine,
+  equipmentNo:  shared.regNo,
+  location:     shared.location,
+  operator:     shared.operator,
+  runningHours: record.runningHours || record.serviceHrs,
+});
+ 
+/**
+ * Builds the history document data for battery records.
+ */
+const buildBatteryHistoryData = (record, shared) => ({
+  date:         record.date,
+  batteryModel: shared.batteryModel || record.batteryModel,
+  equipment:    shared.machine,
+  equipmentNo:  shared.regNo,
+  location:     shared.location,
+  operator:     shared.operator,
+});
+ 
+/**
+ * Builds the history document data for maintenance records.
+ */
+const buildMaintenanceHistoryData = (record, shared) => ({
+  regNo:       shared.regNo,
+  date:        record.date,
+  equipment:   shared.machine,
+  workRemarks: shared.remarks || record.workRemarks || '',
+  mechanics:   shared.mechanics,
+});
+ 
+/**
+ * Dispatches to the correct history data builder for the given type.
+ * @param {string} type
+ * @param {Object} record
+ * @param {Object} shared
+ * @returns {Object}
+ */
+const buildHistoryData = (type, record, shared) => {
+  switch (type) {
+    case 'tyre':        return buildTyreHistoryData(record, shared);
+    case 'battery':     return buildBatteryHistoryData(record, shared);
+    case 'maintenance': return buildMaintenanceHistoryData(record, shared);
+    default:            return buildOilHistoryData(record, shared); // oil | normal
+  }
+};
+ 
+// ─────────────────────────────────────────────────────────────────────────────
+// Report builder
+// ─────────────────────────────────────────────────────────────────────────────
+ 
+/**
+ * Builds the service report document data from shared + per-record fields.
+ * The historyId is injected after the history document has been saved.
+ *
+ * @param {string} type
+ * @param {Object} record
+ * @param {Object} shared
+ * @param {string} historyId
+ * @returns {Object}
+ */
+const buildReportData = (type, record, shared, historyId) => ({
+  regNo:          String(shared.regNo),
+  machine:        shared.machine        || '',
+  date:           record.date,
+  serviceHrs:     record.serviceHrs     || record.runningHours || '',
+  nextServiceHrs: record.nextServiceHrs || '',
+  serviceType:    type,
+  location:       shared.location       || '',
+  mechanics:      shared.mechanics      || '',
+  operatorName:   shared.operator       || shared.operatorName || '',
+  remarks:        shared.remarks        || record.remarks      || '',
+  checklistItems: shared.checklistItems || [],
+  historyId,
+});
+ 
+// ─────────────────────────────────────────────────────────────────────────────
+// Per-record processor
+// ─────────────────────────────────────────────────────────────────────────────
+ 
+/**
+ * Processes one record from the batch:
+ *   1. Duplicate-check (oil/normal only, same as single-record flow).
+ *   2. Create history document.
+ *   3. Create report document.
+ *   4. Cross-link both documents.
+ *   5. Fire full-service notification if threshold crossed (oil/normal only).
+ *
+ * @param {string} type     Service type.
+ * @param {Object} record   Single entry from records[].
+ * @param {Object} shared   Shared fields across the whole batch.
+ * @returns {Promise<{ ok: true, history, report } | { ok: false, reason: string }>}
+ */
+const processRecord = async (type, record, shared) => {
+  const HistoryModel = resolveModel(type);
+  const isOilNormal  = type === 'oil' || type === 'normal';
+ 
+  // ── 1. Duplicate check (oil / normal only) ─────────────────────────────────
+  if (isOilNormal) {
+    const conflict = await serviceHistoryModel.findOne({
+      regNo: shared.regNo,
+      date:  record.date,
+    });
+    if (conflict) {
+      return { ok: false, reason: `Duplicate — a record for ${shared.regNo} on ${record.date} already exists` };
+    }
+  }
+ 
+  // ── 2. Create history ──────────────────────────────────────────────────────
+  const historyData = buildHistoryData(type, record, shared);
+  const history     = await HistoryModel.create(historyData);
+ 
+  // ── 3. Create report ───────────────────────────────────────────────────────
+  const reportData = buildReportData(type, record, shared, history._id.toString());
+  const report     = await serviceReportModel.create(reportData);
+ 
+  // ── 4. Cross-link ──────────────────────────────────────────────────────────
+  history.reportId    = report._id.toString();
+  history.serviceType = type;
+  await history.save();
+ 
+  // ── 5. Full-service notification (oil / normal only) ──────────────────────
+  if (isOilNormal) {
+    await maybeFireFullServiceNotification(
+      shared.regNo,
+      record.serviceHrs,
+      record.nextServiceHrs
+    ).catch((err) =>
+      // Non-fatal — log but don't fail the record.
+      console.warn('[BatchService] notification error:', err.message)
+    );
+  }
+ 
+  return { ok: true, history, report };
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Service History
 // ─────────────────────────────────────────────────────────────────────────────
@@ -74,6 +307,100 @@ const insertServiceHistory = async (data) => {
     console.error('[ServiceHistoryService] insertServiceHistory:', error);
     return { status: 500, ok: false, message: 'Missing data or an error occurred', error: error.message };
   }
+};
+
+/**
+ * Bulk-inserts service history + report pairs for all records in the batch.
+ *
+ * Expected body shape:
+ * {
+ *   type:        'oil' | 'normal' | 'tyre' | 'battery' | 'maintenance',
+ *   sharedData:  {
+ *     regNo, machine, location, mechanics, operator, operatorName, remarks,
+ *     checklistItems,
+ *     // oil/normal extras:
+ *     oil, oilFilter, fuelFilter, acFilter, waterSeparator, airFilter,
+ *     // tyre extras:  tyreModel, tyreNumber
+ *     // battery extras: batteryModel
+ *   },
+ *   records: [
+ *     // oil/normal:   { date, serviceHrs, nextServiceHrs, fullService? }
+ *     // tyre:         { date, runningHours }
+ *     // battery:      { date }
+ *     // maintenance:  { date, workRemarks? }
+ *   ]
+ * }
+ *
+ * @param {Object} body  Parsed request body.
+ * @returns {Promise<Object>}
+ */
+const insertBatchServiceHistory = async (body) => {
+  const { type, sharedData, records } = body;
+ 
+  // ── Input guards ───────────────────────────────────────────────────────────
+  if (!type)                        return { status: 400, ok: false, message: 'type is required' };
+  if (!sharedData?.regNo)           return { status: 400, ok: false, message: 'sharedData.regNo is required' };
+  if (!sharedData?.machine)         return { status: 400, ok: false, message: 'sharedData.machine is required' };
+  if (!Array.isArray(records) || !records.length)
+    return { status: 400, ok: false, message: 'records array is required and must not be empty' };
+ 
+  const validTypes = ['oil', 'normal', 'tyre', 'battery', 'maintenance'];
+  if (!validTypes.includes(type))   return { status: 400, ok: false, message: `Invalid type. Must be one of: ${validTypes.join(', ')}` };
+ 
+  // ── Process each record independently ─────────────────────────────────────
+  const succeeded = [];
+  const failed    = [];
+ 
+  for (let i = 0; i < records.length; i++) {
+    const record = records[i];
+ 
+    if (!record.date) {
+      failed.push({ index: i, record, reason: 'date is required for every record' });
+      continue;
+    }
+ 
+    try {
+      const result = await processRecord(type, record, sharedData);
+ 
+      if (result.ok) {
+        succeeded.push({
+          index:   i,
+          date:    record.date,
+          history: result.history,
+          report:  result.report,
+        });
+      } else {
+        failed.push({ index: i, record, reason: result.reason });
+      }
+    } catch (err) {
+      console.error(`[BatchService] record ${i} (${record.date}) failed:`, err);
+      failed.push({ index: i, record, reason: err.message || 'Unexpected error' });
+    }
+  }
+ 
+  // ── Invalidate caches / push WS update once for the whole batch ───────────
+  if (succeeded.length > 0) {
+    analyser.clearCache();
+    wsUtils.sendDashboardUpdate('serviceHistory', 'maintenanceHistory', 'tyreHistory', 'batteryHistory');
+  }
+ 
+  // ── Build response ─────────────────────────────────────────────────────────
+  const allFailed  = succeeded.length === 0;
+  const allPassed  = failed.length    === 0;
+ 
+  return {
+    status:  allFailed ? 422 : 200,
+    ok:      !allFailed,
+    message: allFailed  ? 'All records failed to insert'
+           : allPassed  ? `All ${succeeded.length} records inserted successfully`
+           :              `${succeeded.length} record(s) inserted, ${failed.length} failed`,
+    summary: {
+      total:     records.length,
+      succeeded: succeeded.length,
+      failed:    failed.length,
+    },
+    data: { succeeded, failed },
+  };
 };
 
 /**
@@ -387,6 +714,7 @@ const fetchFullServiceNotification = async () => {
 
 module.exports = {
   insertServiceHistory,
+  insertBatchServiceHistory,
   fetchServiceHistory,
   fetchServiceHistoryById,
   fetchLatestFullService,
