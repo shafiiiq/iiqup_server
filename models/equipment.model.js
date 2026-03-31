@@ -10,6 +10,9 @@ const certificationBodySchema = new mongoose.Schema(
     operatorName: { type: String, default: 'Not Assigned' },
     operatorId:   { type: String, default: 'Not Assigned' },
     assignedAt:   { type: Date,   default: Date.now        },
+    shiftName:  { type: String, default: '' },    
+    shiftStart: { type: String, default: '' },    
+    shiftEnd:   { type: String, default: '' },    
   },
   { _id: false },
 );
@@ -47,6 +50,7 @@ const equipmentSchema = new mongoose.Schema(
     hired:     { type: Boolean, required: true, default: false },
     hiredFrom: { type: String,  default: ''                    },
     rentRate:  { type: rentRateSchema, default: null },
+    lastRentRate: [{ basis:     { type: String }, rate: { type: Number }, currency:  { type: String }, changedAt: { type: Date, default: Date.now } }],
     outside:   { type: Boolean, required: true, default: false },
     certificationBody: { type: [certificationBodySchema], default: [] },
     lastCertificationBody: { type: [certificationBodySchema], default: [] },

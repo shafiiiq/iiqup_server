@@ -226,7 +226,7 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
     site           = '',
     deployType     = 'site',
     clientCompany  = '',
-    operator       = '',
+    operators      = [],
     withOperator   = false,
     month          = '',
     year           = '',
@@ -235,6 +235,7 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
     previousStatus = '',
     newStatus      = '',
     hired          = false,
+    hiredFrom      = '',
     rentRate       = null,
     location       = [],
     remarks        = '',
@@ -275,6 +276,11 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
           <td style="color:#666;">Registration No.</td>
           <td><strong>${regNo}</strong></td>
         </tr>
+        ${hiredFrom ? `
+        <tr>
+          <td style="color:#666;">Hired From</td>
+          <td>${hiredFrom}</td>
+        </tr>` : ''}
         ${action === 'mobilized' && deployType === 'company' ? `
         <tr>
           <td style="color:#666;">Leased to Company</td>
@@ -290,11 +296,35 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
           <td style="color:#666;">Removed from Site</td>
           <td>${site || 'N/A'}</td>
         </tr>` : ''}
-        ${(withOperator || action === 'demobilized') && operator ? `
-        <tr>
-          <td style="color:#666;">Operator</td>
-          <td>${operator}</td>
-        </tr>` : ''}
+        ${withOperator && operators?.filter(op => op.operatorName)?.length ? `
+        <tr style="background:#f5f5f5;">
+          <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Operators</td>
+        </tr>
+        ${(() => {
+          const filled = operators.filter(op => op.operatorName);
+          const isDayNight =
+            filled.length === 2 &&
+            operators[0]?.shiftName === 'Day Shift' &&
+            operators[1]?.shiftName === 'Night Shift';
+
+          if (isDayNight) {
+            return `
+            <tr>
+              <td style="color:#666;">Day Shift Operator</td>
+              <td><strong>${operators[0].operatorName}</strong>${operators[0].shiftStart ? ` &nbsp;<span style="color:#888;">${operators[0].shiftStart}${operators[0].shiftEnd ? ' – ' + operators[0].shiftEnd : ''}</span>` : ''}</td>
+            </tr>
+            <tr>
+              <td style="color:#666;">Night Shift Operator</td>
+              <td><strong>${operators[1].operatorName}</strong>${operators[1].shiftStart ? ` &nbsp;<span style="color:#888;">${operators[1].shiftStart}${operators[1].shiftEnd ? ' – ' + operators[1].shiftEnd : ''}</span>` : ''}</td>
+            </tr>`;
+          }
+
+          return filled.map((op, i) => `
+          <tr>
+            <td style="color:#666;">${op.shiftName || `Operator ${i + 1}`}</td>
+            <td><strong>${op.operatorName}</strong>${op.shiftStart ? ` &nbsp;<span style="color:#888;">${op.shiftStart}${op.shiftEnd ? ' – ' + op.shiftEnd : ''}</span>` : ''}</td>
+          </tr>`).join('');
+        })()}` : ''}
         ${action === 'status_changed' ? `
         <tr>
           <td style="color:#666;">Previous Status</td>

@@ -424,10 +424,10 @@ const changeEquipmentStatus = async (req, res) => {
 const mobilizeEquipment = async (req, res) => {
   try {
     const {
-      equipmentId, regNo, machine, site, operator, operatorId,
+      equipmentId, regNo, machine, site, operators,
       withOperator, deployType, clientCompany, selectedDate,
       month, year, time, remarks,
-      isOneDayMob, demobDate, demobTime, demobRemarks,
+      isOneDayMob, demobDate, demobTime, demobRemarks, location, rentRate
     } = req.body;
 
     if (!equipmentId || !regNo || !machine || !month || !year || !time) {
@@ -446,12 +446,13 @@ const mobilizeEquipment = async (req, res) => {
       return res.status(400).json({ status: 400, ok: false, message: 'site is required when deployType is site' });
     }
 
-    if (withOperator && !operator) {
-      return res.status(400).json({ status: 400, ok: false, message: 'Operator is required when withOperator is true' });
+    if (withOperator && (!operators || !operators.length)) {
+      return res.status(400).json({ status: 400, ok: false, message: 'At least one operator is required when withOperator is true' });
     }
 
     const result = await equipmentServices.mobilizeEquipment({
-      equipmentId, regNo, machine, site, operator, operatorId,
+      equipmentId, regNo, machine, site,
+      operators:     operators     || [],
       withOperator:  withOperator  || false,
       deployType:    deployType    || 'site',
       clientCompany: clientCompany || '',
@@ -459,10 +460,9 @@ const mobilizeEquipment = async (req, res) => {
       month, year, time,
       remarks: remarks || '',
       isOneDayMob:  isOneDayMob  || false,
-      demobDate:    demobDate    || null,     
-      demobTime:    demobTime    || '',     
-      demobRemarks: demobRemarks || '',       
-
+      demobDate:    demobDate    || null,
+      demobTime:    demobTime    || '',
+      demobRemarks: demobRemarks || '',
     });
 
     res.status(result.status).json(result);
@@ -611,18 +611,28 @@ const replaceOperator = async (req, res) => {
       equipmentId, regNo, machine,
       currentOperator, currentOperatorId,
       replacedOperator, replacedOperatorId,
-      selectedDate, month, year, time, remarks,
+      targetShiftName, shiftName, shiftStart, shiftEnd,
+      selectedDate, month, year, time, remarks, replaceAll
     } = req.body;
 
+    console.log("mmmmmmmm", req.body)
     if (
       !equipmentId || !regNo || !machine ||
-      !currentOperator || !replacedOperator || !replacedOperatorId ||
+      !replacedOperator || !replacedOperatorId ||
       !month || !year || !time
     ) {
       return res.status(400).json({
         status:  400,
         ok:      false,
-        message: 'Missing required fields: equipmentId, regNo, machine, currentOperator, currentOperatorId, replacedOperator, replacedOperatorId, month, year, time',
+        message: 'Missing required fields: equipmentId, regNo, machine, replacedOperator, replacedOperatorId, month, year, time',
+      });
+    }
+
+    if (!replaceAll && !currentOperator) {
+      return res.status(400).json({
+        status:  400,
+        ok:      false,
+        message: 'currentOperator is required when not replacing all operators',
       });
     }
 
@@ -630,9 +640,14 @@ const replaceOperator = async (req, res) => {
       equipmentId, regNo, machine,
       currentOperator, currentOperatorId,
       replacedOperator, replacedOperatorId,
-      selectedDate: selectedDate || null,
+      targetShiftName: targetShiftName || '',
+      shiftName:       shiftName       || '',
+      shiftStart:      shiftStart      || '',
+      shiftEnd:        shiftEnd        || '',
+      selectedDate:    selectedDate    || null,
       month, year, time,
-      remarks: remarks || '',
+      remarks:    remarks    || '',
+      replaceAll: replaceAll || false,   
     });
 
     res.status(result.status).json(result);

@@ -43,10 +43,13 @@ const mobilizationSchema = new mongoose.Schema(
 
     // Operator
     withOperator: { type: Boolean, required: true, default: false },
-    operator:     {
-      type:     String,
-      required: function () { return this.action === 'mobilized' && this.withOperator === true; },
-    },
+    operators: [{ 
+      operatorName: String, 
+      operatorId:   String,
+      shiftName:    String,
+      shiftStart:   String,
+      shiftEnd:     String,
+    }],
 
     // Timing
     month:   { type: Number, required: true, min: 1, max: 12 },

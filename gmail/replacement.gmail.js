@@ -210,24 +210,31 @@ const gmailClient = new OAuth2GmailClient();
 
 const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {}) => {
   const {
-    type                   = 'operator',
-    regNo                  = '',
-    machine                = '',
-    currentOperator        = '',
-    replacedOperator       = '',
-    operator               = '',
-    replacedEquipmentRegNo    = '',
-    replacedEquipmentMachine  = '',
-    site                   = '',
-    newSiteForReplaced     = '',
-    month                  = '',
-    year                   = '',
-    time                   = '',
-    date                   = '',
-    remarks                = '',
-    hired                  = false,
-    rentRate               = null,
-    location               = [],
+    type                  = 'operator',
+    regNo                 = '',
+    machine               = '',
+    currentOperator       = '',
+    replacedOperator      = '',
+    operator              = '',
+    targetShiftName       = '',
+    shiftName             = '',
+    shiftStart            = '',
+    shiftEnd              = '',
+    remainingShifts       = [],
+    replacedEquipmentRegNo   = '',
+    replacedEquipmentMachine = '',
+    site                  = '',
+    newSiteForReplaced    = '',
+    month                 = '',
+    year                  = '',
+    time                  = '',
+    date                  = '',
+    remarks               = '',
+    hired                 = false,
+    hiredFrom             = '',
+    rentRate              = null,
+    location              = [],
+    replaceAll            = false,
   } = data;
 
   const formatDate = (d) => d
@@ -239,6 +246,63 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
   const sigFacebook   = loadImageAsBase64('sig-facebook.png');
   const sigInstagram  = loadImageAsBase64('sig-instagram.png');
   const sigLinkedin   = loadImageAsBase64('sig-linkedin.png');
+
+  // ── Build "Active Operators After Replacement" rows ──────────────────────
+  const validShifts = remainingShifts.filter(s => s.operatorName);
+
+  const shiftsHtml = validShifts.map((s, i) => {
+    const label    = validShifts.length > 1 ? ` ${i + 1}` : '';
+    const shiftDisplay = s.shiftName
+      ? s.shiftName
+      : (s.shiftStart ? `${s.shiftStart}${s.shiftEnd ? ' – ' + s.shiftEnd : ''}` : 'Full Shift');
+
+    return `
+      <tr>
+        <td style="color:#666;">Operator${label} Name</td>
+        <td><strong>${s.operatorName}</strong></td>
+      </tr>
+      <tr>
+        <td style="color:#666;">Operator${label} Shift</td>
+        <td>${shiftDisplay}</td>
+      </tr>`;
+  }).join('');
+
+  const activeOperatorsSection = validShifts.length ? `
+    <tr style="background:#f5f5f5;">
+      <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Active Operators After Replacement</td>
+    </tr>
+    ${shiftsHtml}` : '';
+
+  // ── Operator replacement section rows ─────────────────────────────────────
+  const operatorReplacementRows = replaceAll
+    ? `
+    <tr>
+      <td style="color:#666;">Replacement Type</td>
+      <td><strong>All Operators Replaced</strong></td>
+   </tr>
+   ${(data.previousOperators?.length ? data.previousOperators : []).map((op, i) => `
+    <tr>
+     <td style="color:#666;">Previous Operator ${data.previousOperators.length > 1 ? i + 1 : ''}</td>
+     <td>${op.operatorName}${op.shiftName ? ` (${op.shiftName})` : ''}</td>
+    </tr>`).join('')}
+    <tr>
+      <td style="color:#666;">New Operator</td>
+     <td><strong>${replacedOperator}</strong></td>
+    </tr>`
+     : `
+      ${targetShiftName ? `
+    <tr>
+      <td style="color:#666;">Shift</td>
+      <td>${targetShiftName}</td>
+    </tr>` : ''}
+    <tr>
+      <td style="color:#666;">Outgoing Operator</td>
+      <td>${currentOperator}</td>
+    </tr>
+    <tr>
+      <td style="color:#666;">Incoming Operator</td>
+      <td><strong>${replacedOperator}</strong></td>
+    </tr>`;
 
   return `
     <!DOCTYPE html>
@@ -264,19 +328,14 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
           <td style="color:#666;">Site</td>
           <td>${site || 'N/A'}</td>
         </tr>
+        ${hiredFrom ? `<tr><td style="color:#666;">Hired From</td><td>${hiredFrom}</td></tr>` : ''}
 
         ${type === 'operator' ? `
         <tr style="background:#f5f5f5;">
           <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Operator Replacement</td>
         </tr>
-        <tr>
-          <td style="color:#666;">Outgoing Operator</td>
-          <td>${currentOperator}</td>
-        </tr>
-        <tr>
-          <td style="color:#666;">Incoming Operator</td>
-          <td><strong>${replacedOperator}</strong></td>
-        </tr>` : ''}
+        ${operatorReplacementRows}
+        ${activeOperatorsSection}` : ''}
 
         ${type === 'equipment' ? `
         <tr style="background:#f5f5f5;">
@@ -290,54 +349,23 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
           <td style="color:#666;">Incoming Equipment</td>
           <td><strong>${replacedEquipmentMachine} (${replacedEquipmentRegNo})</strong></td>
         </tr>
-        ${(operator || currentOperator) ? `
-        <tr>
-          <td style="color:#666;">Operator</td>
-          <td>${operator || currentOperator}</td>
-        </tr>` : ''}
-        ${newSiteForReplaced ? `
-        <tr>
-          <td style="color:#666;">New Site for Outgoing</td>
-          <td>${newSiteForReplaced}</td>
-        </tr>` : ''}` : ''}
+        ${(operator || currentOperator) ? `<tr><td style="color:#666;">Operator</td><td>${operator || currentOperator}</td></tr>` : ''}
+        ${newSiteForReplaced ? `<tr><td style="color:#666;">New Site for Outgoing</td><td>${newSiteForReplaced}</td></tr>` : ''}` : ''}
 
         <tr style="background:#f5f5f5;">
           <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Date &amp; Time</td>
         </tr>
-        <tr>
-          <td style="color:#666;">Date</td>
-          <td>${formatDate(date)}</td>
-        </tr>
-        <tr>
-          <td style="color:#666;">Month / Year</td>
-          <td>${MONTH_NAMES[month] ?? month} ${year}</td>
-        </tr>
-        <tr>
-          <td style="color:#666;">Time</td>
-          <td>${time}</td>
-        </tr>
-        ${remarks ? `
-        <tr>
-          <td style="color:#666;">Remarks</td> 
-          <td>${remarks}</td>
-        </tr>` : ''}
-        ${location?.length ? `
-        <tr>
-          <td style="color:#666;">Location</td>
-          <td>${location[location.length - 1]}</td>
-        </tr>` : ''}
+        <tr><td style="color:#666;">Date</td><td>${formatDate(date)}</td></tr>
+        <tr><td style="color:#666;">Month / Year</td><td>${MONTH_NAMES[month] ?? month} ${year}</td></tr>
+        <tr><td style="color:#666;">Time</td><td>${time}</td></tr>
+        ${remarks  ? `<tr><td style="color:#666;">Remarks</td><td>${remarks}</td></tr>` : ''}
+        ${location?.length ? `<tr><td style="color:#666;">Location</td><td>${location[location.length - 1]}</td></tr>` : ''}
         ${hired && rentRate ? `
         <tr style="background:#f5f5f5;">
           <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Hire Rate</td>
         </tr>
-        <tr>
-          <td style="color:#666;">Basis</td>
-          <td>${rentRate.basis ? rentRate.basis.charAt(0).toUpperCase() + rentRate.basis.slice(1) : 'N/A'}</td>
-        </tr>
-        <tr>
-          <td style="color:#666;">Rate</td>
-          <td><strong>${rentRate.rate} ${rentRate.currency || 'QAR'}</strong></td>
-        </tr>` : ''}
+        <tr><td style="color:#666;">Basis</td><td>${rentRate.basis ? rentRate.basis.charAt(0).toUpperCase() + rentRate.basis.slice(1) : 'N/A'}</td></tr>
+        <tr><td style="color:#666;">Rate</td><td><strong>${rentRate.rate} ${rentRate.currency || 'QAR'}</strong></td></tr>` : ''}
       </table>
 
       <br/>

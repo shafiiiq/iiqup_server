@@ -23,10 +23,30 @@ const replacementSchema = new mongoose.Schema(
     time:  { type: String, required: true                     },
 
     // Operator Replacement
-    currentOperator:    { type: String,              required: function () { return this.type === 'operator'; } },
+    currentOperator: {  type: String,   default: '',  validate: { validator: function(v) {
+         if (this.type === 'operator' && !this.replaceAll) {
+            return v && v.trim().length > 0;
+          }
+          return true;
+          },
+         message: 'currentOperator is required for operator replacements'
+       }
+    },
+    previousOperators: [{
+      operatorName: { type: String, default: '' },
+      operatorId:   { type: String, default: '' },
+      shiftName:    { type: String, default: '' },
+      shiftStart:   { type: String, default: '' },
+      shiftEnd:     { type: String, default: '' },
+    }],
     currentOperatorId:  { type: String, default: '' },
     replacedOperator:   { type: String,              required: function () { return this.type === 'operator'; } },
     replacedOperatorId: { type: String,              required: function () { return this.type === 'operator'; } },
+    shiftName:  { type: String, default: '' },
+    shiftStart: { type: String, default: '' },
+    shiftEnd:   { type: String, default: '' },
+    targetShiftName: { type: String, default: '' },
+    replaceAll: { type: Boolean, default: false },
 
     // Site Replacement
     currentSite:  { type: String, required: function () { return this.type === 'site'; } },

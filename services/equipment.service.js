@@ -641,7 +641,7 @@ const getBulkEquipmentImages = async (regNos) => {
 const mobilizeEquipment = async (data) => {
   try {
     const {
-      equipmentId, regNo, machine, site, operator, operatorId,
+      equipmentId, regNo, machine, site, operators,
       withOperator, deployType, clientCompany,
       month, year, time, selectedDate, remarks,
       isOneDayMob, demobDate, demobTime, demobRemarks,
@@ -657,7 +657,7 @@ const mobilizeEquipment = async (data) => {
       deployType:    deployType || 'site',
       clientCompany: clientCompany || '',
       site:          deployLocation,
-      operator:      withOperator ? operator : undefined,
+      operators:     withOperator ? operators : [],
       withOperator, month, year,
       date:          selectedDate ? new Date(selectedDate) : new Date(),
       time, remarks,
@@ -682,11 +682,21 @@ const mobilizeEquipment = async (data) => {
       updateOperation.$push = { ...(updateOperation.$push || {}), lastMobDate: currentEquipment.mobDate };
     }
 
-    if (withOperator && operator && operatorId) {
-      if (currentEquipment?.certificationBody) {
-        updateOperation.$push = { ...(updateOperation.$push || {}), lastCertificationBody: currentEquipment.certificationBody };
+    if (withOperator && operators?.length) {
+      if (currentEquipment?.certificationBody?.length) {
+        updateOperation.$push = { 
+          ...(updateOperation.$push || {}), 
+          lastCertificationBody: { $each: currentEquipment.certificationBody }
+        };
       }
-      updateOperation.$set.certificationBody = { operatorName: operator, operatorId, assignedAt: new Date() };
+      updateOperation.$set.certificationBody = operators.map(op => ({
+        operatorName: op.operatorName,
+        operatorId:   op.operatorId,
+        shiftName:    op.shiftName  || '',
+        shiftStart:   op.shiftStart || '',
+        shiftEnd:     op.shiftEnd   || '',
+        assignedAt:   new Date(),
+      }));
     }
 
     const updatedEquipment = await equipmentModel.findOneAndUpdate(
@@ -697,7 +707,11 @@ const mobilizeEquipment = async (data) => {
 
     if (!updatedEquipment) return { status: 404, ok: false, message: 'Equipment not found' };
 
-    if (withOperator && operatorId) await safeUpdateOperator(operatorId, { equipmentNumber: regNo });
+    if (withOperator && operators?.length) {
+      await Promise.all(operators.map(op => 
+       op.operatorId ? safeUpdateOperator(op.operatorId, { equipmentNumber: regNo }) : Promise.resolve()
+     ));
+    }
 
     const officeMain = JSON.parse(process.env.OFFICE_MAIN);
 
@@ -740,7 +754,7 @@ const mobilizeEquipment = async (data) => {
         site:          deployLocation,
         deployType:    deployType    || 'site',
         clientCompany: clientCompany || '',
-        operator:      withOperator ? operator : '',
+        operators:     withOperator ? operators : [],
         withOperator,
         month, year, time,
         date:          selectedDate ? new Date(selectedDate) : new Date(),
@@ -751,6 +765,7 @@ const mobilizeEquipment = async (data) => {
         demobTime:     demobTime || time,
         demobRemarks:  demobRemarks || '',
         hired:         updatedEquipment?.hired    || false,
+        hiredFrom: updatedEquipment?.hiredFrom || '',
         rentRate:      updatedEquipment?.rentRate || null,
         location:      updatedEquipment?.location ? [updatedEquipment.location] : [],
       }).catch(e => console.error('One day mob email failed:', e));
@@ -773,12 +788,13 @@ const mobilizeEquipment = async (data) => {
         site:          deployLocation,
         deployType:    deployType    || 'site',
         clientCompany: clientCompany || '',
-        operator:      withOperator ? operator : '',
+        operators:     withOperator ? operators : [],
         withOperator,
         month, year, time,
         date:          selectedDate ? new Date(selectedDate) : new Date(),
         remarks,
         hired:         updatedEquipment?.hired    || false,
+        hiredFrom:     updatedEquipment?.hiredFrom || '',
         rentRate:      updatedEquipment?.rentRate || null,
         location:      updatedEquipment?.location ? [updatedEquipment.location] : [],
       }).catch(e => console.error('Mobilization email failed:', e));
@@ -848,6 +864,7 @@ const demobilizeEquipment = async (data) => {
       month, year, time, date: selectedDate ? new Date(selectedDate) : new Date(), remarks,
       site:         currentSite || '',
       hired:        currentEquipment?.hired    || false,
+      hiredFrom:    updatedEquipment?.hiredFrom || '',
       rentRate:     currentEquipment?.rentRate || null,
       location:     currentEquipment?.location ? [currentEquipment.location] : [],
       operator:     currentEquipment?.certificationBody?.at(-1)?.operatorName || '',
@@ -970,57 +987,136 @@ const replaceOperator = async (data) => {
   try {
     const {
       equipmentId, regNo, machine,
-      currentOperator, currentOperatorId, replacedOperator, replacedOperatorId,
-      month, year, time, selectedDate, remarks
+      currentOperator, currentOperatorId,
+      replacedOperator, replacedOperatorId,
+      targetShiftName, shiftName, shiftStart, shiftEnd,
+      month, year, time, selectedDate, remarks,
+      replaceAll = false,
     } = data;
+
+    const currentEquipment = await equipmentModel.findById(equipmentId);
+    const existingShifts   = currentEquipment?.certificationBody || [];
+
+    let updatedShifts;
+    let allPreviousOperatorIds = [];
+
+    if (replaceAll) {
+      // collect all previous operator ids to unassign them all
+      allPreviousOperatorIds = existingShifts.map(s => s.operatorId).filter(Boolean);
+
+      // collapse to a single operator with no shift info
+      updatedShifts = [{
+        operatorName: replacedOperator,
+        operatorId:   replacedOperatorId,
+        shiftName:    '',
+        shiftStart:   '',
+        shiftEnd:     '',
+        assignedAt:   new Date(),
+      }];
+    } else {
+      // single shift replacement — find the target slot
+      const targetIndex = targetShiftName
+        ? existingShifts.findIndex(s => s.shiftName === targetShiftName)
+        : 0;
+
+      updatedShifts = [...existingShifts];
+
+      if (targetIndex >= 0) {
+        updatedShifts[targetIndex] = {
+          operatorName: replacedOperator,
+          operatorId:   replacedOperatorId,
+          shiftName:    shiftName  || existingShifts[targetIndex]?.shiftName  || '',
+          shiftStart:   shiftStart || existingShifts[targetIndex]?.shiftStart || '',
+          shiftEnd:     shiftEnd   || existingShifts[targetIndex]?.shiftEnd   || '',
+          assignedAt:   new Date(),
+        };
+      } else {
+        // shift not found — add as new entry
+        updatedShifts.push({
+          operatorName: replacedOperator,
+          operatorId:   replacedOperatorId,
+          shiftName:    shiftName  || '',
+          shiftStart:   shiftStart || '',
+          shiftEnd:     shiftEnd   || '',
+          assignedAt:   new Date(),
+        });
+      }
+    }
 
     const replacement = await replacementsModel.create({
       equipmentId, regNo, machine,
-      date: selectedDate ? new Date(selectedDate) : new Date(),
-      month, year, time, status: 'active',
-      type: REPLACEMENT_TYPES.OPERATOR,
-      currentOperator,
-      currentOperatorId: currentOperatorId || undefined,
-      replacedOperator, replacedOperatorId, remarks
+      date:     selectedDate ? new Date(selectedDate) : new Date(),
+      month, year, time,
+      status:   'active',
+      type:     REPLACEMENT_TYPES.OPERATOR,
+      currentOperator:    replaceAll 
+        ? existingShifts.map(s => s.operatorName).filter(Boolean).join(', ')   
+        : currentOperator,
+      currentOperatorId:  currentOperatorId || undefined,
+      replacedOperator,
+      replacedOperatorId,
+      targetShiftName: replaceAll ? 'ALL' : (targetShiftName || ''),
+      shiftName:       shiftName  || '',
+      shiftStart:      shiftStart || '',
+      shiftEnd:        shiftEnd   || '',
+      remarks,
+      replaceAll,
+      previousOperators: replaceAll ? existingShifts : [], 
     });
 
-    const currentEquipment = await equipmentModel.findById(equipmentId);
-
     const replaceOp = {
-      $set: {
-        certificationBody: { operatorName: replacedOperator, operatorId: replacedOperatorId, assignedAt: new Date() },
-        updatedAt: new Date()
-      }
+      $set: { certificationBody: updatedShifts, updatedAt: new Date() },
     };
-    if (currentEquipment?.certificationBody) {
-      replaceOp.$push = { lastCertificationBody: currentEquipment.certificationBody };
+    if (existingShifts.length) {
+      replaceOp.$push = { lastCertificationBody: { $each: existingShifts } };
     }
 
-    const updatedEquipment = await equipmentModel.findOneAndUpdate({ _id: equipmentId }, replaceOp, { new: true });
+    const updatedEquipment = await equipmentModel.findOneAndUpdate(
+      { _id: equipmentId }, replaceOp, { new: true }
+    );
 
     if (!updatedEquipment) return { status: 404, ok: false, message: 'Equipment not found' };
 
-    await Promise.all([
-      safeUpdateOperator(currentOperatorId,  { equipmentNumber: ''    }),
-      safeUpdateOperator(replacedOperatorId, { equipmentNumber: regNo })
-    ]);
+    // unassign operators
+    if (replaceAll) {
+      await Promise.all(allPreviousOperatorIds.map(id =>
+        safeUpdateOperator(id, { equipmentNumber: '' })
+      ));
+    } else {
+      if (currentOperatorId) await safeUpdateOperator(currentOperatorId, { equipmentNumber: '' });
+    }
+    if (replacedOperatorId) await safeUpdateOperator(replacedOperatorId, { equipmentNumber: regNo });
 
     const officeMain = JSON.parse(process.env.OFFICE_MAIN);
     await _sendNotification({
       title:       `Operator Replaced on ${machine} (${regNo})`,
-      description: `Operator changed from ${currentOperator} to ${replacedOperator} on ${machine} (${regNo})`,
-      priority:    NOTIFICATION_PRIORITY.MEDIUM,
-      sourceId:    updatedEquipment._id,
-      recipient:   officeMain
+      description: replaceAll
+        ? `All operators replaced by ${replacedOperator} on ${machine} (${regNo})`
+        : `Operator changed from ${currentOperator} to ${replacedOperator} on ${machine} (${regNo})`,
+      priority:  NOTIFICATION_PRIORITY.MEDIUM,
+      sourceId:  updatedEquipment._id,
+      recipient: officeMain
     });
 
     await alertReplacementViaEmail({
       type: 'operator', regNo, machine,
-      currentOperator, replacedOperator, site: updatedEquipment.site || '',
-      month, year, time, date: selectedDate ? new Date(selectedDate) : new Date(), remarks,
-      hired:    updatedEquipment?.hired    || false,
-      rentRate: updatedEquipment?.rentRate || null,
-      location: updatedEquipment?.location ? [updatedEquipment.location] : []
+      currentOperator,
+      replacedOperator,
+      replaceAll,
+      previousOperators: replaceAll ? existingShifts : [],
+      targetShiftName: replaceAll ? 'ALL' : (targetShiftName || ''),
+      shiftName:       shiftName  || '',
+      shiftStart:      shiftStart || '',
+      shiftEnd:        shiftEnd   || '',
+      remainingShifts: updatedEquipment?.certificationBody || [],
+      site:            updatedEquipment.site || '',
+      month, year, time,
+      date:      selectedDate ? new Date(selectedDate) : new Date(),
+      remarks,
+      hired:     updatedEquipment?.hired     || false,
+      hiredFrom: updatedEquipment?.hiredFrom || '',
+      rentRate:  updatedEquipment?.rentRate  || null,
+      location:  updatedEquipment?.location  ? [updatedEquipment.location] : [],
     }).catch(e => console.error('Replace operator email failed:', e));
 
     analyser.clearCache();
@@ -1131,6 +1227,7 @@ const replaceEquipment = async (data) => {
       site: currentSite, newSiteForReplaced,
       month, year, time, date: selectedDate ? new Date(selectedDate) : new Date(), remarks,
       hired:           currentEquipment?.hired    || false,
+      hiredFrom:       currentEquipment?.hiredFrom || '',
       rentRate:        currentEquipment?.rentRate || null,
       location:        currentEquipment?.location ? [currentEquipment.location] : [],
       currentOperator: finalOperatorName,
