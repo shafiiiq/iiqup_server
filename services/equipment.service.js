@@ -370,7 +370,7 @@ const updateEquipment = async (regNo, updatedData, equipmentNumber = null, opera
       return { status: 200, ok: true, message: 'Equipment updated successfully', data: result };
     }
 
-    // ── Standard update ─────────────────────────────────────────────────────── 
+    // ── Standard update ───────────────────────────────────────────────────────
     const equipment = await equipmentModel.findOne({ regNo });
     if (!equipment) return { status: 404, ok: false, message: 'Equipment not found' };
 
@@ -381,7 +381,12 @@ const updateEquipment = async (regNo, updatedData, equipmentNumber = null, opera
     const originalEquipment = equipment.toObject();
 
     // Strip fields that must not be overwritten directly
-    const { _id, __v, createdAt, operator, operatorId, lastSite, lastLocation, lastCertificationBody, ...cleanUpdatedData } = updatedData;
+    const {
+      _id, __v, createdAt,
+      operator, operatorId,
+      lastSite, lastLocation, lastCertificationBody, lastRentRate,
+      ...cleanUpdatedData
+    } = updatedData;
 
     // Sync hired flag with company field
     if (cleanUpdatedData.company !== undefined) {
@@ -392,16 +397,37 @@ const updateEquipment = async (regNo, updatedData, equipmentNumber = null, opera
     const pushFields = {};
     let   newOperatorId = null;
 
+    // ── site history ──────────────────────────────────────────────────────────
     if (cleanUpdatedData.site !== undefined && cleanUpdatedData.site !== originalEquipment.site) {
       if (originalEquipment.site) pushFields.lastSite = originalEquipment.site;
       setFields.site = cleanUpdatedData.site || null;
     }
 
+    // ── location history ──────────────────────────────────────────────────────
     if (cleanUpdatedData.location !== undefined && cleanUpdatedData.location !== originalEquipment.location) {
       if (originalEquipment.location) pushFields.lastLocation = originalEquipment.location;
       setFields.location = cleanUpdatedData.location || null;
     }
 
+    // ── rentRate history ──────────────────────────────────────────────────────
+    if (cleanUpdatedData.rentRate) {
+      const oldRate = originalEquipment.rentRate;
+      const newRate = cleanUpdatedData.rentRate;
+      const rateChanged = oldRate && (
+        Number(oldRate.rate) !== Number(newRate.rate) ||
+        oldRate.basis !== newRate.basis
+      );
+      if (rateChanged) {
+        pushFields.lastRentRate = {
+          basis:     oldRate.basis,
+          rate:      oldRate.rate,
+          currency:  oldRate.currency || 'QAR',
+          changedAt: new Date(),
+        };
+      }
+    }
+
+    // ── operator ──────────────────────────────────────────────────────────────
     if (operator !== undefined && operator !== originalEquipment.certificationBody?.operatorName) {
       if (originalEquipment.certificationBody) pushFields.lastCertificationBody = originalEquipment.certificationBody;
       newOperatorId = operatorId || null;
@@ -413,7 +439,7 @@ const updateEquipment = async (regNo, updatedData, equipmentNumber = null, opera
 
     const result = await equipmentModel.findOneAndUpdate({ regNo }, updateOp, { new: true, runValidators: true });
 
-    // Update operator assignment records
+    // ── operator assignment records ───────────────────────────────────────────
     if (newOperatorId) {
       const prevOperatorId = originalEquipment.certificationBody?.operatorId;
       if (prevOperatorId && prevOperatorId !== newOperatorId) {
@@ -422,7 +448,7 @@ const updateEquipment = async (regNo, updatedData, equipmentNumber = null, opera
       await safeUpdateOperator(newOperatorId, { equipmentNumber: regNo });
     }
 
-    // Log status change as mobilization record
+    // ── log status change ─────────────────────────────────────────────────────
     if (updatedData.status && originalEquipment.status !== updatedData.status) {
       const { month, year, time } = getCurrentDateTime();
       await mobilizationModel.create({
@@ -439,7 +465,7 @@ const updateEquipment = async (regNo, updatedData, equipmentNumber = null, opera
       });
     }
 
-    // Notification for meaningful changes
+    // ── notification ──────────────────────────────────────────────────────────
     const changes = extractEquipmentChanges(originalEquipment, result, updatedData);
     if (changes.length) {
       const description = `${equipment.machine} - ${equipment.regNo}'s new ${changes.join(', ')}`;
@@ -452,7 +478,7 @@ const updateEquipment = async (regNo, updatedData, equipmentNumber = null, opera
     }
 
     analyser.clearCache();
-    wsUtils.sendDashboardUpdate('equipment')
+    wsUtils.sendDashboardUpdate('equipment');
 
     return { status: 200, ok: true, message: 'Equipment updated successfully', data: result };
 
@@ -645,6 +671,7 @@ const mobilizeEquipment = async (data) => {
       withOperator, deployType, clientCompany,
       month, year, time, selectedDate, remarks,
       isOneDayMob, demobDate, demobTime, demobRemarks,
+      location, rentRate,
     } = data;
 
     const isCompanyDeploy = deployType === 'company';
@@ -682,10 +709,30 @@ const mobilizeEquipment = async (data) => {
       updateOperation.$push = { ...(updateOperation.$push || {}), lastMobDate: currentEquipment.mobDate };
     }
 
+    // ── location update ───────────────────────────────────────────────────────
+    if (location) {
+      if (currentEquipment?.location) {
+        updateOperation.$push = { ...(updateOperation.$push || {}), lastLocation: currentEquipment.location };
+      }
+      updateOperation.$set.location = location;
+    }
+
+    // ── rentRate update + history ─────────────────────────────────────────────
+    if (rentRate?.basis || rentRate?.rate) {
+      const newRentRate = { basis: rentRate.basis || 'daily', rate: Number(rentRate.rate) || 0, currency: rentRate.currency || 'QAR' };
+      if (currentEquipment?.rentRate?.rate || currentEquipment?.rentRate?.basis) {
+        updateOperation.$push = {
+          ...(updateOperation.$push || {}),
+          lastRentRate: { ...currentEquipment.rentRate.toObject(), changedAt: new Date() }
+        };
+      }
+      updateOperation.$set.rentRate = newRentRate;
+    }
+
     if (withOperator && operators?.length) {
       if (currentEquipment?.certificationBody?.length) {
-        updateOperation.$push = { 
-          ...(updateOperation.$push || {}), 
+        updateOperation.$push = {
+          ...(updateOperation.$push || {}),
           lastCertificationBody: { $each: currentEquipment.certificationBody }
         };
       }
@@ -708,14 +755,30 @@ const mobilizeEquipment = async (data) => {
     if (!updatedEquipment) return { status: 404, ok: false, message: 'Equipment not found' };
 
     if (withOperator && operators?.length) {
-      await Promise.all(operators.map(op => 
-       op.operatorId ? safeUpdateOperator(op.operatorId, { equipmentNumber: regNo }) : Promise.resolve()
-     ));
+      await Promise.all(operators.map(op =>
+        op.operatorId ? safeUpdateOperator(op.operatorId, { equipmentNumber: regNo }) : Promise.resolve()
+      ));
     }
 
     const officeMain = JSON.parse(process.env.OFFICE_MAIN);
 
-    // ── One Day Mobilization: auto-demobilize ─────────────────────────────────
+    const emailBase = {
+      regNo, machine,
+      site:          Array.isArray(deployLocation) ? deployLocation.at(-1) || '' : deployLocation || '',
+      deployType:    deployType    || 'site',
+      clientCompany: clientCompany || '',
+      operators:     withOperator ? operators : [],
+      withOperator,
+      month, year, time,
+      date:          selectedDate ? new Date(selectedDate) : new Date(),
+      remarks,
+      hired:         updatedEquipment?.hired     || false,
+      hiredFrom:     updatedEquipment?.hiredFrom || '',
+      rentRate:      updatedEquipment?.rentRate  || null,
+      location:      updatedEquipment?.location  ? [updatedEquipment.location] : [],
+    };
+
+    // ── One Day Mobilization ──────────────────────────────────────────────────
     if (isOneDayMob && demobDate) {
       const demobDateTime = new Date(demobDate);
       const demobMonth    = demobDateTime.getMonth() + 1;
@@ -749,25 +812,13 @@ const mobilizeEquipment = async (data) => {
       });
 
       await alertMobilizationViaEmail({
-        action:        'one_day_mob',
-        regNo, machine,
-        site:          deployLocation,
-        deployType:    deployType    || 'site',
-        clientCompany: clientCompany || '',
-        operators:     withOperator ? operators : [],
-        withOperator,
-        month, year, time,
-        date:          selectedDate ? new Date(selectedDate) : new Date(),
-        remarks,
-        demobDate:     demobDateTime,
+        ...emailBase,
+        action:       'one_day_mob',
+        demobDate:    demobDateTime,
         demobMonth,
         demobYear,
-        demobTime:     demobTime || time,
-        demobRemarks:  demobRemarks || '',
-        hired:         updatedEquipment?.hired    || false,
-        hiredFrom: updatedEquipment?.hiredFrom || '',
-        rentRate:      updatedEquipment?.rentRate || null,
-        location:      updatedEquipment?.location ? [updatedEquipment.location] : [],
+        demobTime:    demobTime || time,
+        demobRemarks: demobRemarks || '',
       }).catch(e => console.error('One day mob email failed:', e));
 
     } else {
@@ -783,22 +834,9 @@ const mobilizeEquipment = async (data) => {
       });
 
       await alertMobilizationViaEmail({
-        action:        'mobilized',
-        regNo, machine,
-        site:          deployLocation,
-        deployType:    deployType    || 'site',
-        clientCompany: clientCompany || '',
-        operators:     withOperator ? operators : [],
-        withOperator,
-        month, year, time,
-        date:          selectedDate ? new Date(selectedDate) : new Date(),
-        remarks,
-        hired:         updatedEquipment?.hired    || false,
-        hiredFrom:     updatedEquipment?.hiredFrom || '',
-        rentRate:      updatedEquipment?.rentRate || null,
-        location:      updatedEquipment?.location ? [updatedEquipment.location] : [],
+        ...emailBase,
+        action: 'mobilized',
       }).catch(e => console.error('Mobilization email failed:', e));
-
     }
 
     analyser.clearCache();
@@ -821,13 +859,19 @@ const demobilizeEquipment = async (data) => {
   try {
     const { equipmentId, regNo, machine, month, year, time, selectedDate, remarks } = data;
 
-    const currentEquipment  = await equipmentModel.findById(equipmentId);
-    const currentOperatorId = currentEquipment?.certificationBody?.at(-1)?.operatorId;
-    const currentSite       = currentEquipment?.site || null;
+    const currentEquipment    = await equipmentModel.findById(equipmentId);
+    const currentOperatorIds  = currentEquipment?.certificationBody?.map(cb => cb.operatorId).filter(Boolean) || [];
+    const currentSite         = currentEquipment?.site || null;
+    const currentOperatorName = currentEquipment?.certificationBody?.map(cb => cb.operatorName).filter(Boolean).join(', ') || '';
 
-    const currentOperatorName = currentEquipment?.certificationBody?.at(-1)?.operatorName || '';
-    const [demobilization, updatedEquipment] = await Promise.all([ 
-      mobilizationModel.create({ 
+    const pushFields = {
+      ...(currentSite                    && { lastSite:     currentSite                    }),
+      ...(currentEquipment?.demobDate    && { lastDemobDate: currentEquipment.demobDate    }),
+      ...(currentEquipment?.certificationBody?.length && { lastCertificationBody: { $each: currentEquipment.certificationBody } }),
+    };
+
+    const [demobilization, updatedEquipment] = await Promise.all([
+      mobilizationModel.create({
         equipmentId, regNo, machine,
         action: 'demobilized', withOperator: false,
         operator: currentOperatorName,
@@ -835,20 +879,25 @@ const demobilizeEquipment = async (data) => {
         time, remarks, status: 'idle'
       }),
       equipmentModel.findOneAndUpdate(
-      { _id: equipmentId },
-      {
-        $set:  { status: 'idle', site: null, updatedAt: new Date(), demobDate: new Date() },
-        $push: {
-          ...(currentSite && { lastSite: currentSite }),
-          ...(currentEquipment?.demobDate && { lastDemobDate: currentEquipment.demobDate }),
-        }
-      },
-      { new: true }
-    )]);
+        { _id: equipmentId },
+        {
+          $set:  { 
+            status:            'idle',
+            site:              null,
+            updatedAt:         new Date(),
+            demobDate:         new Date(),
+            certificationBody: [],       // ← clear operators on demob
+          },
+          ...(Object.keys(pushFields).length && { $push: pushFields }),
+        },
+        { new: true }
+      )
+    ]);
 
     if (!updatedEquipment) return { status: 404, ok: false, message: 'Equipment not found' };
 
-    await safeUpdateOperator(currentOperatorId, { equipmentNumber: '' });
+    // Unassign ALL operators
+    await Promise.all(currentOperatorIds.map(id => safeUpdateOperator(id, { equipmentNumber: '' })));
 
     const officeMain = JSON.parse(process.env.OFFICE_MAIN);
     await _sendNotification({
@@ -860,15 +909,15 @@ const demobilizeEquipment = async (data) => {
     });
 
     await alertMobilizationViaEmail({
-      action: 'demobilized', regNo, machine,
+      action:      'demobilized', regNo, machine,
       month, year, time, date: selectedDate ? new Date(selectedDate) : new Date(), remarks,
-      site:         currentSite || '',
-      hired:        currentEquipment?.hired    || false,
-      hiredFrom:    updatedEquipment?.hiredFrom || '',
-      rentRate:     currentEquipment?.rentRate || null,
-      location:     currentEquipment?.location ? [currentEquipment.location] : [],
-      operator:     currentEquipment?.certificationBody?.at(-1)?.operatorName || '',
-      withOperator: !!currentEquipment?.certificationBody?.at(-1)?.operatorName,
+      site:        Array.isArray(currentSite) ? currentSite.at(-1) || '' : currentSite || '',
+      hired:       currentEquipment?.hired     || false,
+      hiredFrom:   currentEquipment?.hiredFrom || '',
+      rentRate:    currentEquipment?.rentRate  || null,
+      location:    currentEquipment?.location  ? [currentEquipment.location] : [],
+      operator:    currentOperatorName,
+      withOperator: !!currentOperatorName,
     }).catch(e => console.error('Demobilization email failed:', e));
 
     analyser.clearCache();

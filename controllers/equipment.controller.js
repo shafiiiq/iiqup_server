@@ -463,6 +463,8 @@ const mobilizeEquipment = async (req, res) => {
       demobDate:    demobDate    || null,
       demobTime:    demobTime    || '',
       demobRemarks: demobRemarks || '',
+      location:     location     || null,    
+      rentRate:     rentRate     || null,    
     });
 
     res.status(result.status).json(result);

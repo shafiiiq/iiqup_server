@@ -40,7 +40,7 @@ const variantSchema = new mongoose.Schema(
     // History
     stockHistory: { type: [toolkitHistorySchema], default: [] },
   },
-  { _id: false },
+  { _id: true },
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -69,7 +69,7 @@ const toolkitSchema = new mongoose.Schema(
 // Middleware
 // ─────────────────────────────────────────────────────────────────────────────
 
-toolkitSchema.pre('save', function (next) {
+toolkitSchema.pre('save', function (next) { 
   this.variants.forEach(variant => {
     if      (variant.stockCount <= 0)                    variant.status = 'out';
     else if (variant.stockCount < variant.minStockLevel) variant.status = 'low';

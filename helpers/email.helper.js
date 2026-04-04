@@ -44,4 +44,16 @@ const loadImageAsBase64 = (filename) => {
 const getMimeType = (filename) =>
   MIME_TYPES[path.extname(filename).toLowerCase()] ?? 'application/octet-stream';
 
-module.exports = { MIME_TYPES, loadImageAsBase64, getMimeType };
+/**
+ * Format time to AM/PM
+ */
+const formatTime = (t) => {
+  if (!t) return '';
+  const [h, m] = t.split(':').map(Number);
+  if (isNaN(h) || isNaN(m)) return t;
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hour   = h % 12 || 12;
+  return `${hour}:${String(m).padStart(2, '0')} ${period}`;
+};
+
+module.exports = { MIME_TYPES, loadImageAsBase64, getMimeType, formatTime };

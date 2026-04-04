@@ -12,7 +12,7 @@ const sparePartSchema = new mongoose.Schema(
     cost:        { type: String, default: '' },
     total:       { type: String, default: '' },
   },
-  { _id: false },
+  { _id: false }, 
 );
 
 const textLineSchema = new mongoose.Schema(

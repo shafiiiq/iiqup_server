@@ -1,60 +1,48 @@
-// models/service-report.model.js
+// models/report.model.js
 const mongoose = require('mongoose');
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-schemas
-// ─────────────────────────────────────────────────────────────────────────────
-
-const checklistItemSchema = new mongoose.Schema(
+const checklistItemSchema = new mongoose.Schema(   
   {
     id:          { type: Number, required: true },
     description: { type: String, required: true },
     status:      { type: String, enum: ['✓', '✗', '--', ''], default: '' },
   },
-  { _id: false },
+  { _id: false }
 );
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Main Schema
-// ─────────────────────────────────────────────────────────────────────────────
 
 const serviceReportSchema = new mongoose.Schema(
   {
-    // Equipment Reference
+    // ── Equipment Reference ───────────────────────────────────────────────────
     regNo:   { type: String, required: true },
     machine: { type: String, required: true },
 
-    // Service Details
+    // ── Service Details ───────────────────────────────────────────────────────
     date:           { type: String, required: true },
-    serviceHrs:     { type: String, required: true },
-    nextServiceHrs: { type: String, required: true },
-    serviceType:    { type: String                 },
-    location:       { type: String, required: true },
+    serviceType:    { type: String, required: true, enum: ['oil', 'normal', 'tyre', 'battery', 'major'] },
+    serviceHrs:     { type: String, default: null },
+    nextServiceHrs: { type: String, default: null },
+    location:       { type: String, default: null },
 
-    // Personnel
-    mechanics:    { type: String, required: true },
-    operatorName: { type: String, required: true },
+    // ── Personnel ─────────────────────────────────────────────────────────────
+    mechanics:    { type: String, default: null },
+    operatorName: { type: String, default: null },
 
-    // Content
-    remarks:       { type: String,               default: ''  },
-    checklistItems: { type: [checklistItemSchema], default: [] },
+    // ── Content ───────────────────────────────────────────────────────────────
+    remarks:        { type: String,                default: null },
+    checklistItems: { type: [checklistItemSchema], default: []   },
 
-    // Reference
+    // ── Reference ─────────────────────────────────────────────────────────────
     historyId: { type: String, default: null },
   },
   {
     timestamps: true,
-  },
+  }
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Indexes
-// ─────────────────────────────────────────────────────────────────────────────
-
+// ── Indexes ───────────────────────────────────────────────────────────────────
 serviceReportSchema.index({ regNo: 1 });
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Export
-// ─────────────────────────────────────────────────────────────────────────────
+serviceReportSchema.index({ regNo: 1, date: 1 });
+serviceReportSchema.index({ regNo: 1, serviceType: 1 });
+serviceReportSchema.index({ date: 1 });
 
 module.exports = mongoose.model('ServiceReport', serviceReportSchema);

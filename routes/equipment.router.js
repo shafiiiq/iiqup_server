@@ -6,7 +6,7 @@ const controller = require('../controllers/equipment.controller');
 // ─────────────────────────────────────────────────────────────────────────────
 // Equipment Routes
 // ─────────────────────────────────────────────────────────────────────────────
-
+ 
 // ── CRUD ──────────────────────────────────────────────────────────────────────
 router.get   ('/get-equipments',                  controller.getEquipments);
 router.get   ('/get-equipment/:regNo',            controller.getEquipmentsByReg);

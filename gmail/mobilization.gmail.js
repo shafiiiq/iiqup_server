@@ -10,7 +10,7 @@ require('dotenv').config();
 // ─────────────────────────────────────────────────────────────────────────────
 
 const { GMAIL_SCOPES }                   = require('../constants/email.constants');
-const { loadImageAsBase64, getMimeType } = require('../helpers/email.helper');
+const { loadImageAsBase64, getMimeType, formatTime} = require('../helpers/email.helper');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -304,25 +304,26 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
           const filled = operators.filter(op => op.operatorName);
           const isDayNight =
             filled.length === 2 &&
-            operators[0]?.shiftName === 'Day Shift' &&
-            operators[1]?.shiftName === 'Night Shift';
+            filled[0]?.shiftName === 'Day Shift' &&
+            filled[1]?.shiftName === 'Night Shift';
 
           if (isDayNight) {
             return `
             <tr>
               <td style="color:#666;">Day Shift Operator</td>
-              <td><strong>${operators[0].operatorName}</strong>${operators[0].shiftStart ? ` &nbsp;<span style="color:#888;">${operators[0].shiftStart}${operators[0].shiftEnd ? ' – ' + operators[0].shiftEnd : ''}</span>` : ''}</td>
+              <td><strong>${filled[0].operatorName}</strong>${filled[0].shiftStart ? ` &nbsp;<span style="color:#888;">${formatTime(filled[0].shiftStart)}${filled[0].shiftEnd ? ' – ' + formatTime(filled[0].shiftEnd) : ''}</span>` : ''}</td>
             </tr>
             <tr>
               <td style="color:#666;">Night Shift Operator</td>
-              <td><strong>${operators[1].operatorName}</strong>${operators[1].shiftStart ? ` &nbsp;<span style="color:#888;">${operators[1].shiftStart}${operators[1].shiftEnd ? ' – ' + operators[1].shiftEnd : ''}</span>` : ''}</td>
+              <td><strong>${filled[1].operatorName}</strong>${filled[1].shiftStart ? ` &nbsp;<span style="color:#888;">${formatTime(filled[1].shiftStart)}${filled[1].shiftEnd ? ' – ' + formatTime(filled[1].shiftEnd) : ''}</span>` : ''}</td>
             </tr>`;
           }
 
+          // All other cases — numbered list, ignore shiftName label
           return filled.map((op, i) => `
           <tr>
-            <td style="color:#666;">${op.shiftName || `Operator ${i + 1}`}</td>
-            <td><strong>${op.operatorName}</strong>${op.shiftStart ? ` &nbsp;<span style="color:#888;">${op.shiftStart}${op.shiftEnd ? ' – ' + op.shiftEnd : ''}</span>` : ''}</td>
+            <td style="color:#666;">Operator ${i + 1}</td>
+            <td><strong>${op.operatorName}</strong>${op.shiftStart ? ` &nbsp;<span style="color:#888;">${formatTime(op.shiftStart)}${op.shiftEnd ? ' – ' + formatTime(op.shiftEnd) : ''}</span>` : ''}</td>
           </tr>`).join('');
         })()}` : ''}
         ${action === 'status_changed' ? `
