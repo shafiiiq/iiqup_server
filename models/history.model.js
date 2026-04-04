@@ -1,41 +1,48 @@
-// models/service-history.model.js
+// models/history.model.js
 const mongoose = require('mongoose');
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Main Schema
-// ─────────────────────────────────────────────────────────────────────────────
 
 const serviceHistorySchema = new mongoose.Schema(
   {
-    // Equipment Reference
-    regNo: { type: Number, required: true },
+    // ── Core (all types) ──────────────────────────────────────────────────────
+    regNo:       { type: String, required: true },
+    serviceType: { type: String, required: true, enum: ['oil', 'normal', 'tyre', 'battery', 'major'] },
+    date:        { type: String, required: true },
+    equipment:   { type: String, default: null  },
+    location:    { type: String, default: null  },
+    operator:    { type: String, default: null  },
+    mechanics:   { type: String, default: null  },
+    remarks:     { type: String, default: null  },
 
-    // Service Details
-    date:           { type: String,  required: true },
-    serviceHrs:     { type: String,  required: true },
-    nextServiceHrs: { type: String,  required: true },
-    serviceType:    { type: String                  },
-    fullService:    { type: Boolean                 },
+    // ── Oil / Normal ──────────────────────────────────────────────────────────
+    serviceHrs:     { type: String,  default: null },
+    nextServiceHrs: { type: String,  default: null },
+    fullService:    { type: Boolean, default: false },
+    oil:            { type: String,  default: null },
+    oilFilter:      { type: String,  default: null },
+    fuelFilter:     { type: String,  default: null },
+    acFilter:       { type: String,  default: null },
+    waterSeparator: { type: String,  default: null },
+    airFilter:      { type: String,  default: null },
 
-    // Filters & Fluids
-    oil:            { type: String, required: true },
-    oilFilter:      { type: String, required: true },
-    fuelFilter:     { type: String, required: true },
-    acFilter:       { type: String, required: true },
-    waterSeparator: { type: String, required: true },
-    airFilter:      { type: String, required: true },
+    // ── Tyre ──────────────────────────────────────────────────────────────────
+    tyreModel:    { type: String, default: null },
+    tyreNumber:   { type: String, default: null },
+    runningHours: { type: String, default: null },
 
-    // Reference
-    reportId:      { type: String, default: null },
-    serviceReport: { type: [],     default: []   },
+    // ── Battery ───────────────────────────────────────────────────────────────
+    batteryModel: { type: String, default: null },
+
+    // ── Reference ─────────────────────────────────────────────────────────────
+    reportId: { type: mongoose.Schema.Types.ObjectId, ref: 'ServiceReport', default: null },
   },
   {
     timestamps: true,
-  },
+  }
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Export
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Indexes ───────────────────────────────────────────────────────────────────
+serviceHistorySchema.index({ regNo: 1, serviceType: 1 });
+serviceHistorySchema.index({ regNo: 1, serviceType: 1, date: 1 }, { unique: true });
+serviceHistorySchema.index({ date: 1 });
 
 module.exports = mongoose.model('ServiceHistory', serviceHistorySchema);

@@ -32,7 +32,7 @@ const serviceReportSchema = new mongoose.Schema(
     checklistItems: { type: [checklistItemSchema], default: []   },
 
     // ── Reference ─────────────────────────────────────────────────────────────
-    historyId: { type: String, default: null },
+    historyId: { type: mongoose.Schema.Types.ObjectId, ref: 'ServiceHistory', default: null },
   },
   {
     timestamps: true,
