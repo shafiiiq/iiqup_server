@@ -208,7 +208,7 @@ const insertServiceHistory = async (data) => {
       date:        data.date,
     });
     if (conflict) {
-      return { status: 408, ok: false, message: 'A record for this equipment, type and date already exists' };
+      return { status: 409, ok: false, message: 'data is already added' };
     }
 
     // ── Build and save history ────────────────────────────────────────────────
@@ -218,7 +218,7 @@ const insertServiceHistory = async (data) => {
 
     // ── Handle full-service notification deletion if applicable ───────────────
     if (OIL_TYPES.has(type) && data.fullService === true) {
-      await NotificationModel.findOneAndDelete({ regNo: data.regNo });
+      await NotificationModel.findOneAndDelete({ regNo: data.regNo }); 
     }
 
     analyser.clearCache();
@@ -226,9 +226,12 @@ const insertServiceHistory = async (data) => {
 
     return { status: 200, ok: true, message: 'Service history added successfully', data: history };
   } catch (error) {
+    if (error.code === 11000) {
+      return { status: 409, ok: false, message: 'data is already added' };
+    }
     console.error('[HistoryService] insertServiceHistory:', error);
     return { status: 500, ok: false, message: 'Failed to insert service history', error: error.message };
-  }
+}
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
