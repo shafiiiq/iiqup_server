@@ -54,7 +54,7 @@ require('./db/ansarigroup.db');
 
 const corsOptions = {
   origin: [  
-    'https://iiqup.vercel.app',
+    'https://iiqup.vercel.app', 
     'https://ansarigroup.online',
     'https://www.ansarigroup.online',
     'http://192.168.100.53:3000', 

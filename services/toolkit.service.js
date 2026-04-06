@@ -238,51 +238,105 @@ const searchToolkits = async (searchTerm) => {
 
 /**
  * Looks up a toolkit by its ObjectId (barcode scan).
+ * Handles BOTH toolkit-level barcodes AND variant-level barcodes.
+ * When a variant _id is scanned, finds the parent toolkit and marks
+ * which variant was scanned via `scannedVariantId`.
+ *
  * @param {string} objectId
  * @returns {Promise<object>}
  */
 const scanToolkitByBarcode = async (objectId) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(objectId)) {
-      return { status: 400, ok: false, message: 'Invalid barcode format. Please scan a valid toolkit barcode.' };
+      return {
+        status:  400,
+        ok:      false,
+        success: false,
+        message: 'Invalid barcode format. Please scan a valid toolkit barcode.',
+      };
     }
-
-    const toolkit = await Toolkit.findById(objectId);
+ 
+    // ── 1. Try direct toolkit match ───────────────────────────────────────
+    let toolkit        = await Toolkit.findById(objectId);
+    let scannedVariantId = null;
+ 
+    // ── 2. If not found, search variants whose _id matches ────────────────
     if (!toolkit) {
-      return { status: 404, ok: false, message: 'Toolkit not found. This item may have been deleted or does not exist.' };
+      toolkit = await Toolkit.findOne({
+        'variants._id': new mongoose.Types.ObjectId(objectId),
+      });
+ 
+      if (toolkit) {
+        scannedVariantId = objectId;
+      }
     }
-
+ 
+    if (!toolkit) {
+      return {
+        status:  404,
+        ok:      false,
+        success: false,
+        message: 'Toolkit not found. This item may have been deleted or does not exist.',
+      };
+    }
+ 
     const result = toolkit.toObject();
-
-    // Sort variants by availability, then sort each variant's history newest-first
+ 
+    // ── Sort variants: scanned variant first, then by stock status ─────────
     result.variants.sort((a, b) => {
+      // Scanned variant always comes first
+      const aIsScanned = a._id.toString() === scannedVariantId;
+      const bIsScanned = b._id.toString() === scannedVariantId;
+      if (aIsScanned) return -1;
+      if (bIsScanned) return  1;
+ 
+      // Then sort by availability
       const order = { available: 0, low: 1, out: 2 };
       return (order[a.status] ?? 3) - (order[b.status] ?? 3);
     });
-
+ 
+    // ── Sort each variant's history newest-first ───────────────────────────
     result.variants.forEach(v => {
       if (v.stockHistory?.length) {
         v.stockHistory.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
       }
     });
-
+ 
     const totalVariants      = result.variants.length;
     const inStockVariants    = result.variants.filter(v => v.status === 'available').length;
     const lowStockVariants   = result.variants.filter(v => v.status === 'low').length;
     const outOfStockVariants = result.variants.filter(v => v.status === 'out').length;
-
+ 
     return {
-      status: 200,
-      ok:     true,
-      message: 'Toolkit scanned successfully',
+      status:  200,
+      ok:      true,
+      success: true,
+      message: scannedVariantId
+        ? 'Variant scanned successfully'
+        : 'Toolkit scanned successfully',
       data: {
         ...result,
-        metrics: { totalVariants, inStockVariants, lowStockVariants, outOfStockVariants, totalStock: toolkit.totalStock, overallStatus: toolkit.overallStatus }
-      }
+        // Tell the mobile scanner exactly which variant was scanned
+        scannedVariantId: scannedVariantId || null,
+        metrics: {
+          totalVariants,
+          inStockVariants,
+          lowStockVariants,
+          outOfStockVariants,
+          totalStock:    toolkit.totalStock,
+          overallStatus: toolkit.overallStatus,
+        },
+      },
     };
   } catch (err) {
     console.error('[ToolkitService] scanToolkitByBarcode:', err);
-    return { status: 500, ok: false, message: 'Error scanning toolkit barcode', error: err.message };
+    return {
+      status:  500,
+      ok:      false,
+      success: false,
+      message: 'Error scanning toolkit barcode',
+      error:   err.message,
+    };
   }
 };
 

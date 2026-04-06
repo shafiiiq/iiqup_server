@@ -507,6 +507,26 @@ const demobilizeEquipment = async (req, res) => {
   } 
 };
 
+/**
+ * POST /add-shift
+ * Add more shift on an equipment that already mobilized.
+ */
+const addShifts = async (req, res) => {
+  try {
+    const { equipmentId, regNo, machine, operators, month, year, time, selectedDate, remarks } = req.body;
+
+    if (!equipmentId || !regNo || !operators?.length) {
+      return res.status(400).json({ status: 400, ok: false, message: 'equipmentId, regNo, operators are required' });
+    }
+
+    const result = await equipmentServices.addShifts({ equipmentId, regNo, machine, operators, month, year, time, selectedDate, remarks });
+    res.status(result.status).json(result);
+  } catch (error) {
+    console.error('[Equipment] addShifts:', error);
+    res.status(500).json({ status: 500, ok: false, message: error.message });
+  }
+};
+
 /** 
  * GET /mobilization-history/:equipmentId
  * Returns paginated mobilization history for a specific equipment unit.
@@ -809,6 +829,7 @@ module.exports = {
   // Mobilization
   mobilizeEquipment,
   demobilizeEquipment,
+  addShifts,
   getMobilizationHistory,
   getAllMobilizations,
   getFilteredMobilizations,

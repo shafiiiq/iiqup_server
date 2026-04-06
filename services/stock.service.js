@@ -631,12 +631,22 @@ const getStockAccountabilityReport = async (startDate, endDate) => {
 const scanStockByBarcode = async (objectId) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(objectId)) {
-      return { status: 400, ok: false, message: 'Invalid barcode format. Please scan a valid stock barcode.' };
+      return {
+        status:  400,
+        ok:      false,
+        success: false,
+        message: 'Invalid barcode format. Please scan a valid stock barcode.',
+      };
     }
 
     const stock = await Stock.findOne({ _id: objectId, isDeleted: { $ne: true } });
     if (!stock) {
-      return { status: 404, ok: false, message: 'Stock not found. This item may have been deleted or does not exist.' };
+      return {
+        status:  404,
+        ok:      false,
+        success: false,
+        message: 'Stock not found. This item may have been deleted or does not exist.',
+      };
     }
 
     const result = stock.toObject();
@@ -646,9 +656,13 @@ const scanStockByBarcode = async (objectId) => {
       result.movements.sort((a, b) => new Date(b.date) - new Date(a.date));
     }
 
-    const totalMovements = result.movements?.length       || 0;
-    const totalAdded     = (result.movements || []).filter(m => m.type === 'add').reduce((s, m) => s + (m.quantity || 0), 0);
-    const totalDeducted  = (result.movements || []).filter(m => m.type === 'deduct').reduce((s, m) => s + (m.quantity || 0), 0);
+    const totalMovements = result.movements?.length ?? 0;
+    const totalAdded     = (result.movements || [])
+      .filter(m => m.type === 'add')
+      .reduce((s, m) => s + (m.quantity || 0), 0);
+    const totalDeducted  = (result.movements || [])
+      .filter(m => m.type === 'deduct')
+      .reduce((s, m) => s + (m.quantity || 0), 0);
 
     const lastMovement = result.movements?.[0] ?? null;
     const lastActivity = lastMovement?.date ?? null;
@@ -661,6 +675,7 @@ const scanStockByBarcode = async (objectId) => {
     return {
       status:  200,
       ok:      true,
+      success: true,
       message: 'Stock scanned successfully',
       data: {
         ...result,
@@ -671,13 +686,19 @@ const scanStockByBarcode = async (objectId) => {
           lastActivity,
           lastActionBy,
           totalValue: stock.rate * stock.stockCount,
-          stockAge:   Math.floor((Date.now() - new Date(stock.createdAt)) / (1000 * 60 * 60 * 24))
-        }
-      }
+          stockAge:   Math.floor((Date.now() - new Date(stock.createdAt)) / (1000 * 60 * 60 * 24)),
+        },
+      },
     };
   } catch (err) {
     console.error('[StockService] scanStockByBarcode:', err);
-    return { status: 500, ok: false, message: 'Error scanning stock barcode', error: err.message };
+    return {
+      status:  500,
+      ok:      false,
+      success: false,
+      message: 'Error scanning stock barcode',
+      error:   err.message,
+    };
   }
 };
 

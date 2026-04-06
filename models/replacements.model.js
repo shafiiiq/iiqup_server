@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 // Main Schema
 // ─────────────────────────────────────────────────────────────────────────────
 
-const replacementSchema = new mongoose.Schema(
+const replacementSchema = new mongoose.Schema( 
   {
     // Equipment Reference
     equipmentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Equipments', required: true },

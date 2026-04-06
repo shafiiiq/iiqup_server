@@ -34,6 +34,7 @@ router.get ('/filtered-mobilizations',            controller.getFilteredMobiliza
 router.get ('/get-sites',                         controller.getSites);
 router.post('/mobilize-equipment',                controller.mobilizeEquipment);
 router.post('/demobilize-equipment',              controller.demobilizeEquipment);
+router.post('/add-shifts',                        controller.addShifts);
 
 // ── Replacements ──────────────────────────────────────────────────────────────
 router.get ('/all-replacements',                  controller.getAllReplacements);

@@ -431,7 +431,7 @@ const updateEquipment = async (regNo, updatedData, equipmentNumber = null, opera
     if (operator !== undefined && operator !== originalEquipment.certificationBody?.operatorName) {
       if (originalEquipment.certificationBody) pushFields.lastCertificationBody = originalEquipment.certificationBody;
       newOperatorId = operatorId || null;
-      setFields.certificationBody = { operatorName: operator, operatorId: operatorId || '', assignedAt: new Date() };
+      setFields.certificationBody = [{ operatorName: operator, operatorId: operatorId || '', shiftName: updatedData.operatorShift || '', shiftStart: '', shiftEnd: '', assignedAt: new Date() }];
     }
 
     const updateOp = { $set: setFields };
@@ -931,6 +931,82 @@ const demobilizeEquipment = async (data) => {
   }
 };
 
+const addShifts = async (data) => {
+  try {
+    const { equipmentId, regNo, machine, operators, month, year, time, selectedDate, remarks } = data;
+
+    const currentEquipment = await equipmentModel.findById(equipmentId);
+    if (!currentEquipment) return { status: 404, ok: false, message: 'Equipment not found' };
+
+    const existingShifts = currentEquipment.certificationBody || [];
+
+    const newShifts = operators.map(op => ({
+      operatorName: op.operatorName,
+      operatorId:   op.operatorId,
+      shiftName:    op.shiftName  || '',
+      shiftStart:   op.shiftStart || '',
+      shiftEnd:     op.shiftEnd   || '',
+      assignedAt:   new Date(),
+    }));
+
+    const updatedShifts = [...existingShifts, ...newShifts];
+
+    const mobilizationRecord = await mobilizationModel.findOne({ equipmentId, action: 'mobilized' }).sort({ date: -1 });
+
+    if (mobilizationRecord) {
+      await mobilizationModel.findByIdAndUpdate(mobilizationRecord._id, {
+        $push: { operators: { $each: newShifts } },
+        $set:  { withOperator: true },
+      });
+    }
+
+    const updatedEquipment = await equipmentModel.findByIdAndUpdate(
+      equipmentId,
+      { $set: { certificationBody: updatedShifts, updatedAt: new Date() } },
+      { new: true }
+    );
+
+    await Promise.all(operators.map(op =>
+      op.operatorId ? safeUpdateOperator(op.operatorId, { equipmentNumber: regNo }) : Promise.resolve()
+    ));
+
+    const officeMain = JSON.parse(process.env.OFFICE_MAIN);
+    await _sendNotification({
+      title:       `Shifts Added — ${machine} (${regNo})`,
+      description: `${operators.length} new shift(s) added to ${machine} (${regNo})`,
+      priority:    NOTIFICATION_PRIORITY.MEDIUM,
+      sourceId:    updatedEquipment._id,
+      recipient:   officeMain,
+    });
+
+    await alertMobilizationViaEmail({
+      action:       'add_shifts',
+      regNo,  machine,
+      site:         Array.isArray(currentEquipment.site) ? currentEquipment.site.at(-1) || '' : currentEquipment.site || '',
+      operators:    newShifts,
+      allOperators: updatedShifts,
+      withOperator: true,
+      deployType:   'site',
+      month, year, time,
+      date:         selectedDate ? new Date(selectedDate) : new Date(),
+      remarks:      remarks || '',
+      hired:        currentEquipment.hired     || false,
+      hiredFrom:    currentEquipment.hiredFrom || '',
+      rentRate:     currentEquipment.rentRate  || null,
+      location:     currentEquipment.location  ? [currentEquipment.location] : [],
+    }).catch(e => console.error('Add shifts email failed:', e));
+
+    analyser.clearCache();
+    wsUtils.sendDashboardUpdate('equipment');
+
+    return { status: 200, ok: true, message: 'Shifts added successfully', data: updatedEquipment };
+
+  } catch (err) {
+    console.error('[EquipmentService] addShifts:', err);
+    throw err;
+  }
+};
+
 /**
  * Returns paginated mobilization history for a single equipment.
  * @param {string} equipmentId
@@ -1424,6 +1500,7 @@ module.exports = {
   // Mobilization
   mobilizeEquipment,
   demobilizeEquipment,
+  addShifts,
   getMobilizationHistory,
   fetchAllMobilizations,
   fetchFilteredMobilizations,
