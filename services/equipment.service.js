@@ -802,7 +802,7 @@ const mobilizeEquipment = async (data) => {
       await mobilizationModel.findByIdAndUpdate(mobilization._id, { linkedMobId: demobilization._id });
 
       await _sendNotification({
-        title:       `${machine} (${regNo}) One Day Mobilization`,
+        title:       `${machine} (${regNo}) Mobilization`,
         description: isCompanyDeploy
           ? `${machine} (${regNo}) leased to ${clientCompany} and will be demobilized on ${demobDateTime.toLocaleDateString('en-GB')}`
           : `${machine} (${regNo}) mobilized to site: ${deployLocation} and will be demobilized on ${demobDateTime.toLocaleDateString('en-GB')}`,

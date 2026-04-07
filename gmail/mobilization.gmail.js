@@ -23,7 +23,7 @@ const ACTION_LABEL = {
   mobilized:      'MOBILIZATION',
   demobilized:    'DEMOBILIZATION',
   status_changed: 'STATUS CHANGE',
-  one_day_mob:    'ONE DAY MOBILIZATION',
+  one_day_mob:    'MOBILIZATION',
   add_shifts:     'ADDITIONAL SHIFTS ADDED',
 };
 
@@ -31,7 +31,7 @@ const ACTION_SUBJECT = (machine, regNo, site, clientCompany) => ({
   mobilized:      `Mobilized - ${machine} (${regNo})${clientCompany ? ` - ${clientCompany}` : site ? ` - ${site}` : ''}`,
   demobilized:    `Demobilized - ${machine} (${regNo})${site ? ` - ${site}` : ''}`,
   status_changed: `Status Changed - ${machine} (${regNo})`,
-  one_day_mob:    `One Day Mobilization - ${machine} (${regNo})${clientCompany ? ` - ${clientCompany}` : site ? ` - ${site}` : ''}`,
+  one_day_mob:    `Mobilization - ${machine} (${regNo})${clientCompany ? ` - ${clientCompany}` : site ? ` - ${site}` : ''}`,
   add_shifts:     `Additional Shifts Added - ${machine} (${regNo})${site ? ` - ${site}` : ''}`,
 });
 
