@@ -50,6 +50,10 @@ const server = http.createServer(app);
 
 require('./db/ansarigroup.db');
 
+// ── Background Workers ─────────────────────────────────────────────────────────
+ 
+require('./workers/backup.worker');
+
 // ── CORS configuration ─────────────────────────────────────────────────────────
 
 const corsOptions = {

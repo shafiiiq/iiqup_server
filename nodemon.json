@@ -1,0 +1,7 @@
+{
+  "ignore": [
+    "backup/*"
+  ],
+  "ext": "js,json,ts",
+  "delay": "1000"
+}
