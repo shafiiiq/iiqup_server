@@ -38,7 +38,7 @@ const notificationSchema = new mongoose.Schema(
     navigateText:  { type: String                  },
     navigateTo:    { type: String                  },
     navigteToId:   { type: String                  },  
-    sourceId:      { type: String                  },
+    sourceId:      { type: String                  }, 
     type:        { type: String, default: 'normal'  },
     category:    { type: String, default: 'general' },
 
@@ -51,6 +51,7 @@ const notificationSchema = new mongoose.Schema(
     targetUsers: { type: [String],  default: []    },  
     deliveredTo: { type: [deliveryReceiptSchema], default: [] },
     forYou:      { type: [String], default: []    },
+    visibleTo:   { type: [String], default: []    },
     readBy:      { type: [readReceiptSchema], default: [] },
   },
   {

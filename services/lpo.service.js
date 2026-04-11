@@ -141,7 +141,7 @@ const buildNextStepNotif = (role, lpoRef, updated) => {
        title:        `${updated.signatures?.authorizedSignatoryTitle || 'CEO'} Approval Needed — LPO ${lpoRef}`,
        description:  `Accounts signed LPO ${lpoRef}. ${updated.signatures?.authorizedSignatoryTitle || 'CEO'} approval needed.`,
        sourceId:     isMD ? 'md_approval' : 'ceo_approval',
-       navigateTo:   isMD ? `/(signature)/md/${lpoRef}` : `/(signature)/md/${lpoRef}`,
+       navigateTo:   isMD ? `/(signature)/md/${lpoRef}` : `/(signature)/ceo/${lpoRef}`,
        navigateText: 'View and Sign',
        recipient:    JSON.parse(process.env.OFFICE_HERO),
      },
