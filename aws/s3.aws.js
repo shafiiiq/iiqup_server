@@ -39,7 +39,7 @@ const putObject = async (fileName, key, contentType) => {
     ContentType: contentType,
   });
 
-  const url = await getSignedUrl(s3Client, command, { expiresIn: 60 });
+  const url = await getSignedUrl(s3Client, command, { expiresIn: 900 });
   return url;
 };
 

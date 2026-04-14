@@ -75,17 +75,22 @@ const sendMessage = async (messageData) => {
     await chatService.updateLastMessage(chatId, lastMessageContent, senderId, senderName);
     await chatService.incrementUnreadCount(chatId, senderId);
 
-    const receiver = await User.findById(recieverId);
-
-    if (receiver) {
-      const PushNotificationService = require('../push/notification.push');
-      await PushNotificationService.sendGeneralNotification(
-        receiver.uniqueCode,
-        senderName,
-        lastMessageContent,
-        'high',
-        'normal'
-      );
+    const PushNotificationService = require('../push/notification.push');
+    const chat = await Chat.findById(chatId).lean();
+    if (chat) {
+      const recipientCodes = chat.participants
+        .filter(p => p.userId.toString() !== senderId.toString())
+        .map(p => p.uniqueCode)
+        .filter(Boolean);
+      if (recipientCodes.length > 0) {
+        await PushNotificationService.sendGeneralNotification(
+          recipientCodes,
+          senderName,
+          lastMessageContent,
+          'high',
+          'normal'
+        );
+      }
     }
 
     return message;

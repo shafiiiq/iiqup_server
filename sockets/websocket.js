@@ -72,8 +72,8 @@ const setupWebSocket = (io) => {
 
     socket.on('send_message', async (data) => {
       try {
-        const { chatId, senderId, senderType, senderName, senderAvatar, content, messageType, participants } = data;
-
+        const { chatId, senderId, senderType, senderName, senderAvatar, content, messageType, participants, tempId } = data;
+    
         const message = await messageService.sendMessage({
           chatId,
           senderId,
@@ -84,17 +84,16 @@ const setupWebSocket = (io) => {
           content,
           recieverId: participants[0].userId,
         });
-
+    
+        const messageObj = { ...message.toObject(), chatId };
+    
         participants.forEach(participant => {
           if (participant.uniqueCode !== data.senderUniqueCode) {
-            global.io.to(`user_${participant.uniqueCode}`).emit('new_message', {
-              ...message.toObject(),
-              chatId,
-            });
+            global.io.to(`user_${participant.uniqueCode}`).emit('new_message', messageObj);
           }
         });
-
-        socket.emit('message_sent', { success: true, message: message.toObject() });
+    
+        socket.emit('message_sent', { success: true, message: messageObj, tempId });
       } catch (error) {
         console.error('[WebSocket] send_message:', error);
         socket.emit('message_error', { success: false, message: error.message });

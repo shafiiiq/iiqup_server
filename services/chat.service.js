@@ -37,12 +37,17 @@ const enrichParticipants = async (participants) => {
 const getUserChats = async (userId, userType, teamType = null) => {
   try {
     const query = {
-      'participants.userId':     userId,
-      'participants.userType':   userType,
+      $and: [
+        {
+          participants: {
+            $elemMatch: { userId: new mongoose.Types.ObjectId(userId.toString()), userType }
+          }
+        }
+      ]
     };
 
     if (teamType && teamType !== 'all') {
-      query.teamType = teamType;
+      query.$and.push({ teamType });
     }
 
     const chats = await Chat.find(query).sort({ lastMessageTime: -1 }).lean();
