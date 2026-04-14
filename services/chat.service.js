@@ -36,15 +36,20 @@ const enrichParticipants = async (participants) => {
  */
 const getUserChats = async (userId, userType, teamType = null) => {
   try {
+    console.log('getUserChats called for userId:', userId, 'userType:', userType, 'teamType:', teamType)
     const query = {
       $and: [
         {
           participants: {
-            $elemMatch: { userId: new mongoose.Types.ObjectId(userId.toString()), userType }
+            $elemMatch: { userId: new mongoose.Types.ObjectId(userId.toString()) }
           }
         }
       ]
     };
+
+    if (userType) {
+      query.$and[0].participants.$elemMatch.userType = userType;
+    }
 
     if (teamType && teamType !== 'all') {
       query.$and.push({ teamType });
@@ -52,6 +57,7 @@ const getUserChats = async (userId, userType, teamType = null) => {
 
     const chats = await Chat.find(query).sort({ lastMessageTime: -1 }).lean();
 
+    console.log('Found chats count:', chats.length)
     return chats.map(chat => ({
       ...chat,
       unreadCount:  chat.unreadCount?.[userId.toString()] || 0,

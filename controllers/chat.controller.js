@@ -137,6 +137,41 @@ const getChatDetails = async (req, res) => {
 };
 
 /**
+ * GET /chats/:chatId/presence
+ * Returns current presence data for participants in the chat.
+ */
+const getChatPresence = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const userId     = req.user.id;
+
+    const chat = await chatService.getChatById(chatId, userId);
+    if (!chat) {
+      return res.status(404).json({ success: false, message: 'Chat not found or access denied' });
+    }
+
+    const presence = (chat.participants || [])
+      .filter(participant => participant.userId !== userId)
+      .map(participant => ({
+        chatId,
+        userId: participant.userId,
+        uniqueCode: participant.uniqueCode,
+        isOnline: websocket.default.isUserConnected(participant.uniqueCode),
+        lastSeen: undefined,
+      }));
+
+    res.status(200).json({
+      success: true,
+      message: 'Chat presence retrieved successfully',
+      data:    presence,
+    });
+  } catch (error) {
+    console.error('[Chat] getChatPresence:', error);
+    res.status(500).json({ success: false, message: 'Failed to retrieve chat presence', error: error.message });
+  }
+};
+
+/**
  * PUT /chats/:chatId
  * Updates a group chat's name, avatar, or participants.
  */
@@ -535,6 +570,7 @@ module.exports = {
   getOrCreateIndividualChat,
   createGroupChat,
   getChatDetails,
+  getChatPresence,
   updateGroupChat,
   deleteChat,
   // Messages

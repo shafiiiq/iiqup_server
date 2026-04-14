@@ -10,6 +10,7 @@ const controller = require('../controllers/chat.controller');
 // ── Chats ─────────────────────────────────────────────────────────────────────
 router.get   ('/chats',                  controller.getUserChats);
 router.get   ('/chats/:chatId',          controller.getChatDetails);
+router.get   ('/chats/:chatId/presence',    controller.getChatPresence);
 router.post  ('/chats/individual',       controller.getOrCreateIndividualChat);
 router.post  ('/chats/group',            controller.createGroupChat);
 router.put   ('/chats/:chatId',          controller.updateGroupChat);

@@ -41,6 +41,7 @@ const setupWebSocket = (io) => {
       if (!uniqueCode) return;
 
       const userSessions = connectedUsers.get(uniqueCode) || [];
+      const wasAlreadyOnline = userSessions.length > 0;
       userSessions.push({ socketId: socket.id, userId, sessionToken, connectedAt: new Date() });
       connectedUsers.set(uniqueCode, userSessions);
 
@@ -48,20 +49,62 @@ const setupWebSocket = (io) => {
       socket.emit('authenticated', { success: true, message: 'Connected successfully' });
 
       console.log(`[WebSocket] authenticated — uniqueCode: ${uniqueCode}, sessions: ${userSessions.length}`);
+
+      if (!wasAlreadyOnline) {
+        try {
+          const chats = await chatService.getUserChats(userId)
+          chats.forEach(chat => {
+            chat.participants.forEach(participant => {
+              global.io.to(`user_${participant.uniqueCode}`).emit('user_online', {
+                chatId: chat._id,
+                userId,
+                uniqueCode,
+                isOnline: true,
+                timestamp: new Date().toISOString(),
+              })
+            })
+          })
+        } catch (error) {
+          console.error('[WebSocket] presence broadcast on authenticate failed:', error)
+        }
+      }
     });
 
     // ── Disconnect ─────────────────────────────────────────────────────────
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
+      let offlineUser = null
       for (const [uniqueCode, sessions] of connectedUsers.entries()) {
         const remaining = sessions.filter(s => s.socketId !== socket.id);
         if (remaining.length === 0) {
           connectedUsers.delete(uniqueCode);
+          const userSession = sessions.find(s => s.socketId === socket.id)
+          if (userSession) offlineUser = { uniqueCode, userId: userSession.userId }
         } else {
           connectedUsers.set(uniqueCode, remaining);
         }
       }
       console.log(`[WebSocket] client disconnected: ${socket.id} — users online: ${connectedUsers.size}`);
+
+      if (offlineUser) {
+        const { uniqueCode, userId } = offlineUser
+        try {
+          const chats = await chatService.getUserChats(userId)
+          chats.forEach(chat => {
+            chat.participants.forEach(participant => {
+              global.io.to(`user_${participant.uniqueCode}`).emit('user_offline', {
+                chatId: chat._id,
+                userId,
+                uniqueCode,
+                isOnline: false,
+                timestamp: new Date().toISOString(),
+              })
+            })
+          })
+        } catch (error) {
+          console.error('[WebSocket] presence broadcast on disconnect failed:', error)
+        }
+      }
     });
 
     // ── Ping ───────────────────────────────────────────────────────────────
@@ -71,6 +114,7 @@ const setupWebSocket = (io) => {
     // ── Chat ───────────────────────────────────────────────────────────────
 
     socket.on('send_message', async (data) => {
+      console.log('[WebSocket] Received send_message:', data)
       try {
         const { chatId, senderId, senderType, senderName, senderAvatar, content, messageType, participants, tempId } = data;
     
@@ -85,6 +129,7 @@ const setupWebSocket = (io) => {
           recieverId: participants[0].userId,
         });
     
+        console.log('[WebSocket] Message saved:', message)
         const messageObj = { ...message.toObject(), chatId };
     
         participants.forEach(participant => {
@@ -94,6 +139,7 @@ const setupWebSocket = (io) => {
         });
     
         socket.emit('message_sent', { success: true, message: messageObj, tempId });
+        console.log('[WebSocket] Emitted message_sent and new_message')
       } catch (error) {
         console.error('[WebSocket] send_message:', error);
         socket.emit('message_error', { success: false, message: error.message });
@@ -103,7 +149,7 @@ const setupWebSocket = (io) => {
     socket.on('typing', async (data) => {
       try {
         const { chatId, userId, userName, participants, senderUniqueCode } = data;
-        const PushNotificationService = require('./push-notification');
+        const PushNotificationService = require('../push/notification.push');
         const typingNotificationSent  = new Map();
 
         participants.forEach(participant => {
@@ -129,7 +175,7 @@ const setupWebSocket = (io) => {
     socket.on('stop_typing', async (data) => {
       try {
         const { chatId, userId, userName, participants, senderUniqueCode } = data;
-        const PushNotificationService = require('./push-notification');
+        const PushNotificationService = require('../push/notification.push');
 
         for (const participant of participants) {
           if (participant.uniqueCode === senderUniqueCode) continue;
@@ -182,7 +228,7 @@ const setupWebSocket = (io) => {
     socket.on('call_user', async (data) => {
       try {
         const { callerId, callerUniqueCode, receiverUniqueCode, callerName, chatId, callType } = data;
-        const PushNotificationService = require('./push-notification');
+        const PushNotificationService = require('../push/notification.push');
 
         const callData = { callerId, callerUniqueCode, callerName, chatId, callType: callType || 'voice', timestamp: new Date() };
 

@@ -24,6 +24,7 @@ const { FILE_MESSAGE_TYPES } = require('../constants/message.contants');
  */
 const getMessages = async (chatId, page = 1, limit = 50, userId) => {
   try {
+    console.log('getMessages called for chatId:', chatId, 'userId:', userId)
     const skip = (page - 1) * limit;
 
     const messages = await Message.find({ chatId, deletedFor: { $ne: userId } })
@@ -32,6 +33,7 @@ const getMessages = async (chatId, page = 1, limit = 50, userId) => {
       .limit(parseInt(limit))
       .lean();
 
+    console.log('Found messages count:', messages.length)
     const messagesWithUrls = await Promise.all(
       messages.map(async (msg) => {
         if (!FILE_MESSAGE_TYPES.includes(msg.messageType)) return msg;
@@ -43,6 +45,7 @@ const getMessages = async (chatId, page = 1, limit = 50, userId) => {
       })
     );
 
+    console.log('Returning messages count:', messagesWithUrls.length)
     return messagesWithUrls.reverse();
   } catch (error) {
     console.error('[MessageService] getMessages:', error);
