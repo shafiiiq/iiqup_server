@@ -8,6 +8,7 @@ const chatService             = require('../services/chat.service');
 // ─────────────────────────────────────────────────────────────────────────────
 
 const connectedUsers = new Map(); // uniqueCode → [{ socketId, userId, sessionToken, connectedAt }]
+const typingNotifications = new Map(); // key: `${chatId}_${userId}_${participant.uniqueCode}` → sent
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Setup
@@ -132,11 +133,26 @@ const setupWebSocket = (io) => {
         console.log('[WebSocket] Message saved:', message)
         const messageObj = { ...message.toObject(), chatId };
     
-        participants.forEach(participant => {
-          if (participant.uniqueCode !== data.senderUniqueCode) {
-            global.io.to(`user_${participant.uniqueCode}`).emit('new_message', messageObj);
-          }
-        });
+        const PushNotificationService = require('../push/notification.push');
+        
+        for (const participant of participants) {
+          if (participant.uniqueCode === data.senderUniqueCode) continue;
+          
+          // Dismiss typing notification first and wait
+          await PushNotificationService.dismissNotification(
+            participant.uniqueCode, `typing_${chatId}_${senderId}`
+          );
+          const key = `${chatId}_${senderId}_${participant.uniqueCode}`;
+          typingNotifications.delete(key);
+          
+          // Emit typing stopped (after dismiss)
+          global.io.to(`user_${participant.uniqueCode}`).emit('user_typing', {
+            chatId, userId: senderId, userName: senderName, isTyping: false,
+          });
+          
+          // Emit message (after typing cleared)
+          global.io.to(`user_${participant.uniqueCode}`).emit('new_message', messageObj);
+        }
     
         socket.emit('message_sent', { success: true, message: messageObj, tempId });
         console.log('[WebSocket] Emitted message_sent and new_message')
@@ -150,7 +166,6 @@ const setupWebSocket = (io) => {
       try {
         const { chatId, userId, userName, participants, senderUniqueCode } = data;
         const PushNotificationService = require('../push/notification.push');
-        const typingNotificationSent  = new Map();
 
         participants.forEach(participant => {
           if (participant.uniqueCode === senderUniqueCode) return;
@@ -160,11 +175,11 @@ const setupWebSocket = (io) => {
           });
 
           const key = `${chatId}_${userId}_${participant.uniqueCode}`;
-          if (!typingNotificationSent.has(key)) {
+          if (!typingNotifications.has(key)) {
             PushNotificationService.sendGeneralNotification(
               participant.uniqueCode, `${userName}`, 'is typing...', 'low', 'typing', `typing_${chatId}_${userId}`
             );
-            typingNotificationSent.set(key, true);
+            typingNotifications.set(key, true);
           }
         });
       } catch (error) {
@@ -187,6 +202,9 @@ const setupWebSocket = (io) => {
           await PushNotificationService.dismissNotification(
             participant.uniqueCode, `typing_${chatId}_${userId}`
           );
+
+          const key = `${chatId}_${userId}_${participant.uniqueCode}`;
+          typingNotifications.delete(key);
         }
       } catch (error) {
         console.error('[WebSocket] stop_typing:', error);
