@@ -193,6 +193,64 @@ const setupWebSocket = (io) => {
       }
     });
 
+    // ── Live Status ────────────────────────────────────────────────────────
+
+    socket.on('start_recording', (data) => {
+      try {
+        const { chatId, userId, userName, participants, senderUniqueCode } = data;
+        participants.forEach(participant => {
+          if (participant.uniqueCode === senderUniqueCode) return;
+          global.io.to(`user_${participant.uniqueCode}`).emit('user_recording', {
+            chatId, userId, userName, isRecording: true,
+          });
+        });
+      } catch (error) {
+        console.error('[WebSocket] start_recording:', error);
+      }
+    });
+
+    socket.on('stop_recording', (data) => {
+      try {
+        const { chatId, userId, userName, participants, senderUniqueCode } = data;
+        participants.forEach(participant => {
+          if (participant.uniqueCode === senderUniqueCode) return;
+          global.io.to(`user_${participant.uniqueCode}`).emit('user_recording', {
+            chatId, userId, userName, isRecording: false,
+          });
+        });
+      } catch (error) {
+        console.error('[WebSocket] stop_recording:', error);
+      }
+    });
+
+    socket.on('start_uploading', (data) => {
+      try {
+        const { chatId, userId, userName, participants, senderUniqueCode, mediaType } = data;
+        participants.forEach(participant => {
+          if (participant.uniqueCode === senderUniqueCode) return;
+          global.io.to(`user_${participant.uniqueCode}`).emit('user_uploading', {
+            chatId, userId, userName, isUploading: true, mediaType,
+          });
+        });
+      } catch (error) {
+        console.error('[WebSocket] start_uploading:', error);
+      }
+    });
+
+    socket.on('stop_uploading', (data) => {
+      try {
+        const { chatId, userId, userName, participants, senderUniqueCode, mediaType } = data;
+        participants.forEach(participant => {
+          if (participant.uniqueCode === senderUniqueCode) return;
+          global.io.to(`user_${participant.uniqueCode}`).emit('user_uploading', {
+            chatId, userId, userName, isUploading: false, mediaType,
+          });
+        });
+      } catch (error) {
+        console.error('[WebSocket] stop_uploading:', error);
+      }
+    });
+
     socket.on('message_delivered', async (data) => {
       try {
         const { messageIds, userId, senderUniqueCode } = data;
