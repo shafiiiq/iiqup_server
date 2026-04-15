@@ -166,6 +166,13 @@ const setupWebSocket = (io) => {
       try {
         const { chatId, userId, userName, participants, senderUniqueCode } = data;
         const PushNotificationService = require('../push/notification.push');
+        const globalKey = `typing_${chatId}_${userId}`; // Global key per user per chat
+
+        // Check if we already sent a typing notification for this user in this chat
+        if (typingNotifications.has(globalKey)) {
+          console.log('[WebSocket] Typing notification already sent for', globalKey);
+          return; // Don't send duplicate
+        }
 
         participants.forEach(participant => {
           if (participant.uniqueCode === senderUniqueCode) return;
@@ -174,14 +181,13 @@ const setupWebSocket = (io) => {
             chatId, userId, userName, isTyping: true,
           });
 
-          const key = `${chatId}_${userId}_${participant.uniqueCode}`;
-          if (!typingNotifications.has(key)) {
-            PushNotificationService.sendGeneralNotification(
-              participant.uniqueCode, `${userName}`, 'is typing...', 'low', 'typing', `typing_${chatId}_${userId}`
-            );
-            typingNotifications.set(key, true);
-          }
+          PushNotificationService.sendGeneralNotification(
+            participant.uniqueCode, `${userName}`, 'is typing...', 'low', 'typing', globalKey
+          );
         });
+
+        // Mark as sent globally (not per participant)
+        typingNotifications.set(globalKey, true);
       } catch (error) {
         console.error('[WebSocket] typing:', error);
       }
@@ -191,6 +197,7 @@ const setupWebSocket = (io) => {
       try {
         const { chatId, userId, userName, participants, senderUniqueCode } = data;
         const PushNotificationService = require('../push/notification.push');
+        const globalKey = `typing_${chatId}_${userId}`;
 
         for (const participant of participants) {
           if (participant.uniqueCode === senderUniqueCode) continue;
@@ -200,12 +207,11 @@ const setupWebSocket = (io) => {
           });
 
           await PushNotificationService.dismissNotification(
-            participant.uniqueCode, `typing_${chatId}_${userId}`
+            participant.uniqueCode, globalKey
           );
-
-          const key = `${chatId}_${userId}_${participant.uniqueCode}`;
-          typingNotifications.delete(key);
         }
+
+        typingNotifications.delete(globalKey);
       } catch (error) {
         console.error('[WebSocket] stop_typing:', error);
       }
