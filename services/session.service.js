@@ -18,7 +18,7 @@ const User    = require('../models/user.model.js');
 const createSession = async (userId, userModel, deviceInfo, location) => {
   const sessionToken = crypto.randomBytes(32).toString('hex');
   const expiresAt    = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 30);
+  expiresAt.setFullYear(expiresAt.getFullYear() + 10)
 
   const session = new Session({ userId, userModel, sessionToken, deviceInfo, location, isActive: true, expiresAt });
   await session.save();

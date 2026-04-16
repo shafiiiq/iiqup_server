@@ -108,8 +108,8 @@ const biometricLogin = async (biometricToken, deviceInfo) => {
      loginTime:   new Date().toISOString(),
     };
     const sessionToken = await createSession(user._id, 'User', deviceData, null);
-    const auth0token    = jwt.sign({ userId: user._id, email: user.email, uniqueCode: user.uniqueCode }, process.env.JWT_SECRET, { expiresIn: '7d' });
-    const refresh_token = jwt.sign({ userId: user._id }, process.env.JWT_REFRESH_SECRET, { expiresIn: '30d' });
+    const auth0token    = jwt.sign({ userId: user._id, email: user.email, uniqueCode: user.uniqueCode }, process.env.JWT_SECRET, { expiresIn: '365d' });
+    const refresh_token = jwt.sign({ userId: user._id }, process.env.JWT_REFRESH_SECRET, { expiresIn: '365d' });
 
     return {
       success: true,

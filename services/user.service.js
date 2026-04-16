@@ -24,7 +24,7 @@ const { JWT_SECRET, USER_ROLES, ROLE_PREFIX_MAP } = require('../constants/user.c
 const generateToken = (user) => jwt.sign(
   { id: user._id, email: user.email, role: user.role, uniqueCode: user.uniqueCode },
   JWT_SECRET,
-  { expiresIn: '24h' }
+  { expiresIn: '365d' }
 );
 
 /**

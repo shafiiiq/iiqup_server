@@ -31,7 +31,7 @@ const generateTokens = (user) => {
       type: 'access'
     },
     JWT_SECRET,
-    { expiresIn: '15m' }
+    { expiresIn: '365d' }
   );
 
   const refreshToken = jwt.sign(
