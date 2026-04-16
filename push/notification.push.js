@@ -344,8 +344,18 @@ class PushNotificationService {
   static dismissNotification     = dismissNotification;
   static sendVoIPCallNotification = sendVoIPCallNotification;
 
-  static async sendGeneralNotification(uniqueCode, title, description, priority = 'medium', type = 'normal', notificationId) {
-    const notification = { _id: notificationId, type, title, description, message: description, priority, time: new Date().toISOString(), notificationId };
+  static async sendGeneralNotification(uniqueCode, title, description, priority = 'medium', type = 'normal', notificationId, extraData = {}) {
+    const notification = {
+      _id: notificationId,
+      type,
+      title,
+      description,
+      message: description,
+      priority,
+      time: new Date().toISOString(),
+      notificationId,
+      ...extraData,
+    };
     if (Array.isArray(uniqueCode)) return _dispatchToUsers(uniqueCode, notification);
     if (uniqueCode)                return _dispatchToUser(uniqueCode, notification);
     return _dispatchBroadcast(notification);

@@ -302,6 +302,9 @@ const markNotificationAsDelivered = async (req, res) => {
     }
 
     const result = await notificationsService.markNotificationAsDelivered(notificationId, uniqueCode);
+    if (!result.success && result.message === 'Invalid notification ID') {
+      return res.status(400).json(result);
+    }
 
     res.json(result);
   } catch (error) {

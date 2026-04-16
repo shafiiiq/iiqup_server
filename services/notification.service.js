@@ -1,6 +1,7 @@
 // services/notification.service.js
 const Notification = require('../models/notification.model');
 const User         = require('../models/user.model');
+const mongoose     = require('mongoose');
 require('dotenv').config();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -551,6 +552,11 @@ const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
 
 const markNotificationAsRead = async (notificationId, uniqueCode) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(notificationId)) {
+      console.warn(`[NotificationService] markNotificationAsRead — invalid notification id ${notificationId}`);
+      return { success: false, message: 'Invalid notification ID' };
+    }
+
     const result = await Notification.findByIdAndUpdate(
       notificationId,
       {
@@ -583,6 +589,11 @@ const markNotificationAsRead = async (notificationId, uniqueCode) => {
 const markNotificationAsDelivered = async (notificationId, uniqueCode) => {
   try {
     console.log(`[NotificationService] markNotificationAsDelivered — ${notificationId} → ${uniqueCode}`);
+
+    if (!mongoose.Types.ObjectId.isValid(notificationId)) {
+      console.warn(`[NotificationService] markNotificationAsDelivered — invalid notification id ${notificationId}`);
+      return { success: false, message: 'Invalid notification ID' };
+    }
 
     const result = await Notification.findByIdAndUpdate(
       notificationId,

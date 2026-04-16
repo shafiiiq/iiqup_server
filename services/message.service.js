@@ -91,7 +91,9 @@ const sendMessage = async (messageData) => {
           senderName,
           lastMessageContent,
           'high',
-          'normal'
+          'message',
+          undefined,
+          { chatId, senderName }
         );
       }
     }
