@@ -139,7 +139,13 @@ const getUserSessions = async (userId, currentSessionToken) => {
  */
 const checkSessionStatus = async (sessionId, userId) => {
   try {
-    const session = await Session.findOne({ sessionToken: sessionId, userId });
+    const mongoose = require('mongoose');
+    const session = await Session.findOne({ 
+      sessionToken: sessionId, 
+      userId: mongoose.Types.ObjectId.isValid(userId) 
+        ? new mongoose.Types.ObjectId(userId) 
+        : userId 
+    });
 
     if (!session) {
       return { status: 401, success: false, sessionStatus: 'blocked', message: 'Session was blocked from another device', action: 'redirect_to_login' };
