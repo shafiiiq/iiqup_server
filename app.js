@@ -118,7 +118,7 @@ app.use('/webpush',        webPushRouter);
 
 // ── Protected routes (auth required) ──────────────────────────────────────────
 app.use('/service-history', authMiddleware, serviceHistoryRouter);
-app.use('/dashboard',       authMiddleware, dashboardRouter);
+app.use('/dashboard',       dashboardRouter);
 app.use('/toolkits',        authMiddleware, toolkitsRouter);
 app.use('/notification',    authMiddleware, notificationRouter);
 app.use('/lpo',             authMiddleware, lpoRouter);
