@@ -72,6 +72,7 @@ const verifyToken = (token) => {
 const authMiddleware = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
+    console.log('[AUTH] Header:', authHeader);
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ message: 'Access denied. No token provided.' });
     }
