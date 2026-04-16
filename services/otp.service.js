@@ -150,6 +150,9 @@ const verifyOTP = async (email, otp, type, qatarId = null) => {
       uniqueCode: user.uniqueCode,
     });
 
+    const { createSession } = require('./session.service.js');
+    const sessionToken = await createSession(user._id, type === 'mechanic' ? 'Mechanic' : type === 'operator' ? 'Operator' : 'User', { loginTime: new Date().toISOString() }, null);
+
     await OTP.deleteOne({ email });
 
     return {
@@ -169,6 +172,7 @@ const verifyOTP = async (email, otp, type, qatarId = null) => {
           qatarId: user.qatarId || null,
           auth0token: _auth_tokens.accessToken,
           refresh_token: _auth_tokens.refreshToken,
+          sessionToken,
         },
       },
     };

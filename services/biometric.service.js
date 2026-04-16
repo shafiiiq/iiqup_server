@@ -96,7 +96,18 @@ const biometricLogin = async (biometricToken, deviceInfo) => {
     user.lastLogin     = new Date();
     await user.save();
 
-    const sessionToken  = crypto.randomBytes(32).toString('hex');
+    const { createSession } = require('./session.service.js');
+    const deviceData = {
+      deviceName:  deviceInfo?.deviceName  || 'Unknown Device',
+      deviceModel: deviceInfo?.deviceModel || 'Unknown Model',
+      deviceId:    deviceInfo?.deviceId    || 'Unknown ID',
+      brand:       deviceInfo?.brand       || 'Unknown',
+      osName:      deviceInfo?.osName      || 'Unknown OS',
+      osVersion:   deviceInfo?.osVersion   || 'Unknown',
+     platform:    deviceInfo?.platform    || 'Unknown',
+     loginTime:   new Date().toISOString(),
+    };
+    const sessionToken = await createSession(user._id, 'User', deviceData, null);
     const auth0token    = jwt.sign({ userId: user._id, email: user.email, uniqueCode: user.uniqueCode }, process.env.JWT_SECRET, { expiresIn: '7d' });
     const refresh_token = jwt.sign({ userId: user._id }, process.env.JWT_REFRESH_SECRET, { expiresIn: '30d' });
 
