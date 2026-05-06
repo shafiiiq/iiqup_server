@@ -6,6 +6,7 @@ const cors          = require('cors');
 const http          = require('http');
 const socketIo      = require('socket.io');
 require('dotenv').config();
+try { require('./development/local') } catch {}
 
 // ── Middleware ─────────────────────────────────────────────────────────────────
 const { authMiddleware }            = require('./utils/jwt.utils');
@@ -61,7 +62,7 @@ const corsOptions = {
     'https://iiqup.vercel.app', 
     'https://ansarigroup.online',
     'https://www.ansarigroup.online',
-    'http://192.168.100.53:3000', 
+    'http://192.168.100.54:3000',
     'http://localhost:3000',
   ],
   methods:          ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],

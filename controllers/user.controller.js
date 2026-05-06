@@ -348,6 +348,22 @@ const addPushToken = async (req, res) => {
 };
 
 /**
+ * POST /user/register-voip-token
+ * Registers a VoIP notification token for a user.
+ */
+const registerVoipToken = async (req, res) => {
+  try {
+    const { uniqueCode, voipToken } = req.body
+    if (!uniqueCode || !voipToken) return res.status(400).json({ success: false, message: 'uniqueCode and voipToken are required' })
+    const result = await tokenService.insertVoipToken(uniqueCode, voipToken)
+    res.status(result.success ? 200 : 404).json(result)
+  } catch (error) {
+    console.error('[User] registerVoipToken:', error)
+    res.status(500).json({ success: false, message: error.message })
+  }
+}
+
+/**
  * POST /user/remove-push-token
  * Removes a push notification token for a user.
  */
@@ -802,7 +818,7 @@ module.exports = {
   // Sessions
   getUserSessions, logoutSession, logoutAllSessions, blockDevice,
   // Push tokens
-  addPushToken, removePushToken, getUserPushTokens, sendTestNotification,
+  addPushToken, removePushToken, getUserPushTokens, sendTestNotification, registerVoipToken,
   // Special notifications
   getSpecialNotification, deleteSpecialNotification,
   // Permissions

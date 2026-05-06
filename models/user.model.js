@@ -135,6 +135,7 @@ const userSchema = new mongoose.Schema(
 
     // Devices & Tokens
     pushTokens:          { type: [pushTokenSchema],   
+    voipPushToken:       { type: String, default: null },
     webPushSubscription: { type: Object, default: null },                                                                                                                              default: []                   },
     biometricTokens:     { type: [biometricTokenSchema],                                                                                                                            default: []                   },
     signatureActivation: { type: [signatureActivationSchema],                                                                                                                       default: []                   },

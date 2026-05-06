@@ -38,6 +38,7 @@ router.post  ('/sessions/:sessionId/block',          authMiddleware, controller.
 
 // ── Push tokens ───────────────────────────────────────────────────────────────
 router.post('/register-push-token',                                  controller.addPushToken);
+router.post('/register-voip-token', controller.registerVoipToken);
 router.post('/remove-push-token',                                    controller.removePushToken);
 router.post('/get-push-tokens',                                      controller.getUserPushTokens);
 router.post('/send-test-notification',                               controller.sendTestNotification);

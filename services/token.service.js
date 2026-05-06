@@ -54,6 +54,21 @@ const insertPushToken = async (uniqueCode, pushToken, platform = null) => {
   }
 };
 
+const insertVoipToken = async (uniqueCode, voipToken) => {
+  try {
+    const user = await User.findOneAndUpdate(
+      { uniqueCode },
+      { voipPushToken: voipToken, updatedAt: new Date() },
+      { new: true }
+    )
+    if (!user) return { success: false, message: 'User not found' }
+    return { success: true, message: 'VoIP token registered successfully' }
+  } catch (error) {
+    console.error('[TokenService] insertVoipToken:', error)
+    return { success: false, message: 'Failed to register VoIP token', error: error.message }
+  }
+}
+
 /**
  * Removes a specific push token from a user.
  * @param {string} uniqueCode
@@ -246,4 +261,4 @@ const sendNetworkReconnectPush = async (uniqueCode) => {
 // Exports
 // ─────────────────────────────────────────────────────────────────────────────
 
-module.exports = { insertPushToken, removePushToken, cleanupInvalidTokens, getUserPushTokens, sendNotificationToUser, sendBulkNotifications, sendNetworkReconnectPush };
+module.exports = { insertPushToken, removePushToken, cleanupInvalidTokens, getUserPushTokens, sendNotificationToUser, sendBulkNotifications, sendNetworkReconnectPush, insertVoipToken };

@@ -88,6 +88,68 @@ const sendVoIPCallNotification = async (uniqueCode, callerName, callerId, chatId
   }
 };
 
+const sendVoipSyncPush = async (uniqueCode, notificationId) => {
+  try {
+    const user = await User.findOne({ uniqueCode }).select('voipPushToken')
+    if (!user?.voipPushToken) return { success: false }
+
+    const https  = require('https')
+    const jwt    = require('jsonwebtoken')
+    const fs     = require('fs')
+
+    const teamId  = process.env.APNS_TEAM_ID
+    const keyId   = process.env.APNS_KEY_ID
+    const keyPath = process.env.APNS_KEY_PATH
+    const bundleId = process.env.APNS_BUNDLE_ID
+
+    const privateKey = fs.readFileSync(keyPath)
+    const token = jwt.sign({}, privateKey, {
+      algorithm:  'ES256',
+      keyid:      keyId,
+      issuer:     teamId,
+      audience:   'https://api.push.apple.com',
+      expiresIn:  '1h',
+    })
+
+    const payload = JSON.stringify({
+      aps: { 'content-available': 1 },
+      notificationId: String(notificationId),
+      type: 'sync',
+    })
+
+    const isProd = process.env.NODE_ENV === 'production'
+    const host   = isProd ? 'api.push.apple.com' : 'api.sandbox.push.apple.com'
+
+    return new Promise((resolve) => {
+      const req = https.request({
+        hostname: host,
+        path:     `/3/device/${user.voipPushToken}`,
+        method:   'POST',
+        headers: {
+          'authorization':  `bearer ${token}`,
+          'apns-topic':     `${bundleId}.voip`,
+          'apns-push-type': 'voip',
+          'apns-priority':  '10',
+          'content-type':   'application/json',
+          'content-length': Buffer.byteLength(payload),
+        },
+        protocol: 'https:',
+      }, (res) => {
+        resolve({ success: res.statusCode === 200 })
+      })
+      req.on('error', (e) => {
+        console.error('[NotificationPush] sendVoipSyncPush:', e)
+        resolve({ success: false })
+      })
+      req.write(payload)
+      req.end()
+    })
+  } catch (error) {
+    console.error('[NotificationPush] sendVoipSyncPush:', error)
+    return { success: false }
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Special Notifications (user DB storage)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -227,6 +289,7 @@ const _dispatchToUser = async (uniqueCode, notificationData) => {
 
   try {
     results.pushNotification = await tokenService.sendNotificationToUser(uniqueCode, notificationData);
+    sendVoipSyncPush(uniqueCode, notificationData._id || notificationData.notificationId).catch(() => {})
   } catch (error) {
     results.pushNotification = { success: false, error: error.message };
   }
