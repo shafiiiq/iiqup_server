@@ -58,6 +58,22 @@ const replacementSchema = new mongoose.Schema(
       ref:      'Equipments',
       required: function () { return this.type === 'equipment'; },
     },
+    replacedEquipmentRegNo:   { type: String, default: '' },
+    replacedEquipmentMachine: { type: String, default: '' },
+    newSiteForReplaced:       { type: String, default: '' },
+    site:                     { type: String, default: '' },
+    remainingShifts: [{
+      operatorName: { type: String, default: '' },
+      operatorId:   { type: String, default: '' },
+      shiftName:    { type: String, default: '' },
+      shiftStart:   { type: String, default: '' },
+      shiftEnd:     { type: String, default: '' },
+      assignedAt:   { type: Date,   default: null },
+    }],
+    hired:     { type: Boolean, default: false },
+    hiredFrom: { type: String,  default: '' },
+    rentRate:  { type: Object,  default: null },
+    location:  { type: [String], default: [] },
 
     // Notes
     remarks: { type: String, default: '' },

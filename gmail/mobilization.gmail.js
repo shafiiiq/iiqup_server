@@ -222,32 +222,35 @@ const gmailClient = new OAuth2GmailClient();
 
 const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = {}) => {
   const {
-    action         = 'mobilized',
-    regNo          = '',
-    machine        = '',
-    site           = '',
-    deployType     = 'site',
-    clientCompany  = '',
-    operators      = [],
-    withOperator   = false,
-    month          = '',
-    year           = '',
-    time           = '',
-    date           = '',
-    previousStatus = '',
-    newStatus      = '',
-    hired          = false,
-    hiredFrom      = '',
-    rentRate       = null,
-    location       = [],
-    remarks        = '',
-    allOperators   = [],
-    demobDate    = '',
-    demobMonth   = '',
-    demobYear    = '',
-    demobTime    = '',
-    demobRemarks = '',
-  } = data;
+      action             = 'mobilized',
+      regNo              = '',
+      machine            = '',
+      site               = '',
+      deployType         = 'site',
+      clientCompany      = '',
+      operators          = [],
+      withOperator       = false,
+      month              = '',
+      year               = '',
+      time               = '',
+      date               = '',
+      previousStatus     = '',
+      newStatus          = '',
+      hired              = false,
+      hiredFrom          = '',
+      rentRate           = null,
+      location           = [],
+      remarks            = '',
+      allOperators       = [],
+      previousOperators  = [],
+      lastMobilizedDate  = '',
+      lastMobilizedTime  = '',
+      demobDate          = '',
+      demobMonth         = '',
+      demobYear          = '',
+      demobTime          = '',
+      demobRemarks       = '',
+    } = data;
 
   const formatDate = (d) => d
     ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
@@ -298,7 +301,25 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
         <tr>
           <td style="color:#666;">Removed from Site</td>
           <td>${site || 'N/A'}</td>
-        </tr>` : ''}
+        </tr>
+        ${previousOperators?.filter(op => op.operatorName)?.length ? `
+        <tr style="background:#f5f5f5;">
+          <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Previous Operator(s)</td>
+        </tr>
+        ${previousOperators.map((op, i) => `
+        <tr>
+          <td style="color:#666;">Operator ${previousOperators.length > 1 ? i + 1 : ''}</td>
+          <td><strong>${op.operatorName}</strong>${op.shiftName ? ` &nbsp;<span style="color:#888;">${op.shiftName}</span>` : op.shiftStart ? ` &nbsp;<span style="color:#888;">${formatTime(op.shiftStart)}${op.shiftEnd ? ' – ' + formatTime(op.shiftEnd) : ''}</span>` : ''}</td>
+        </tr>`).join('')}` : ''}
+        ${!previousOperators?.filter(op => op.operatorName)?.length && operators?.filter(op => op.operatorName)?.length ? `
+        <tr style="background:#f5f5f5;">
+          <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Previous Operator(s)</td>
+        </tr>
+        ${operators.filter(op => op.operatorName).map((op, i) => `
+        <tr>
+          <td style="color:#666;">Operator ${operators.filter(o => o.operatorName).length > 1 ? i + 1 : ''}</td>
+          <td><strong>${op.operatorName}</strong>${op.shiftName ? ` &nbsp;<span style="color:#888;">${op.shiftName}</span>` : op.shiftStart ? ` &nbsp;<span style="color:#888;">${formatTime(op.shiftStart)}${op.shiftEnd ? ' – ' + formatTime(op.shiftEnd) : ''}</span>` : ''}</td>
+        </tr>`).join('')}` : ''}` : ''}
         ${withOperator && operators?.filter(op => op.operatorName)?.length ? `
         <tr style="background:#f5f5f5;">
           <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Operators</td>
@@ -371,6 +392,15 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
           <td style="color:#666;">Time</td>
           <td>${time}</td>
         </tr>
+        ${action === 'demobilized' ? `
+        <tr>
+          <td style="color:#666;">Last Mobilized Date</td>
+          <td>${lastMobilizedDate || 'N/A'}</td>
+        </tr>
+        <tr>
+          <td style="color:#666;">Last Mobilized Time</td>
+          <td>${lastMobilizedTime || 'N/A'}</td>
+        </tr>` : ''}
         ${action === 'one_day_mob' ? `
         <tr style="background:#f5f5f5;">
           <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Demobilization Details</td>

@@ -678,6 +678,8 @@ const mobilizeEquipment = async (data) => {
     const deployLocation  = isCompanyDeploy ? clientCompany : site;
     const newStatus       = isCompanyDeploy ? 'leased' : 'active';
 
+    const currentEquipment = await equipmentModel.findById(equipmentId);
+
     const mobilization = await mobilizationModel.create({
       equipmentId, regNo, machine,
       action:        'mobilized',
@@ -693,10 +695,11 @@ const mobilizeEquipment = async (data) => {
       demobDate:     isOneDayMob && demobDate ? new Date(demobDate) : null,
       demobTime:     isOneDayMob ? demobTime  : '',
       demobRemarks:  isOneDayMob ? demobRemarks : '',
+      hired:         currentEquipment?.hired     || false,
+      hiredFrom:     currentEquipment?.hiredFrom || '',
+      rentRate:      rentRate?.basis || rentRate?.rate ? { basis: rentRate.basis || 'daily', rate: Number(rentRate.rate) || 0, currency: rentRate.currency || 'QAR' } : currentEquipment?.rentRate || null,
+      location:      location || currentEquipment?.location || '',
     });
-
-    const currentEquipment = await equipmentModel.findById(equipmentId);
-
     const updateOperation = {
       $set: { status: newStatus, site: deployLocation, updatedAt: new Date(), mobDate: new Date() }
     };
@@ -797,6 +800,11 @@ const mobilizeEquipment = async (data) => {
         status:       'idle',
         isOneDayMob:  true,
         linkedMobId:  mobilization._id,
+        hired:        updatedEquipment?.hired || false,
+        hiredFrom:    updatedEquipment?.hiredFrom || '',
+        rentRate:     updatedEquipment?.rentRate || null,
+        location:     updatedEquipment?.location ? [updatedEquipment.location] : [],
+        previousOperators: withOperator ? operators : [],
       });
 
       await mobilizationModel.findByIdAndUpdate(mobilization._id, { linkedMobId: demobilization._id });
@@ -864,6 +872,17 @@ const demobilizeEquipment = async (data) => {
     const currentSite         = currentEquipment?.site || null;
     const currentOperatorName = currentEquipment?.certificationBody?.map(cb => cb.operatorName).filter(Boolean).join(', ') || '';
 
+    const lastMobilization = await mobilizationModel.findOne({ equipmentId, action: 'mobilized' })
+      .sort({ date: -1 })
+      .lean();
+
+    const lastMobilizedDate = lastMobilization?.date
+      ? lastMobilization.date.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
+      : 'The record is not existing in system or did manualy before the system implementation';
+    const lastMobilizedTime = lastMobilization?.time
+      ? lastMobilization.time
+      : 'The record is not existing in system or did manualy before the system implementation';
+
     const pushFields = {
       ...(currentSite                    && { lastSite:     currentSite                    }),
       ...(currentEquipment?.demobDate    && { lastDemobDate: currentEquipment.demobDate    }),
@@ -873,8 +892,17 @@ const demobilizeEquipment = async (data) => {
     const [demobilization, updatedEquipment] = await Promise.all([
       mobilizationModel.create({
         equipmentId, regNo, machine,
-        action: 'demobilized', withOperator: false,
+        action: 'demobilized',
+        withOperator: false,
         operator: currentOperatorName,
+        previousOperators: currentEquipment?.certificationBody || [],
+        hired: currentEquipment?.hired || false,
+        hiredFrom: currentEquipment?.hiredFrom || '',
+        rentRate: currentEquipment?.rentRate || null,
+        location: currentEquipment?.location || '',
+        site: currentSite,
+        lastMobilizedDate,
+        lastMobilizedTime,
         month, year, date: selectedDate ? new Date(selectedDate) : new Date(),
         time, remarks, status: 'idle'
       }),
@@ -1186,7 +1214,13 @@ const replaceOperator = async (data) => {
       shiftEnd:        shiftEnd   || '',
       remarks,
       replaceAll,
-      previousOperators: replaceAll ? existingShifts : [], 
+      previousOperators: replaceAll ? existingShifts : [],
+      site:               Array.isArray(currentEquipment?.site) ? currentEquipment.site.at(-1) : currentEquipment?.site || '',
+      hired:              currentEquipment?.hired || false,
+      hiredFrom:          currentEquipment?.hiredFrom || '',
+      rentRate:           currentEquipment?.rentRate || null,
+      location:           currentEquipment?.location ? [currentEquipment.location] : [],
+      remainingShifts:    [],
     });
 
     const replaceOp = {
@@ -1201,6 +1235,17 @@ const replaceOperator = async (data) => {
     );
 
     if (!updatedEquipment) return { status: 404, ok: false, message: 'Equipment not found' };
+
+    await replacementsModel.findByIdAndUpdate(replacement._id, {
+      $set: {
+        remainingShifts: updatedEquipment?.certificationBody || [],
+        site:            Array.isArray(updatedEquipment?.site) ? updatedEquipment.site.at(-1) : updatedEquipment?.site || '',
+        hired:           updatedEquipment?.hired || false,
+        hiredFrom:       updatedEquipment?.hiredFrom || '',
+        rentRate:        updatedEquipment?.rentRate || null,
+        location:        updatedEquipment?.location ? [updatedEquipment.location] : [],
+      }
+    }).catch(() => null);
 
     // unassign operators
     if (replaceAll) {
@@ -1283,7 +1328,16 @@ const replaceEquipment = async (data) => {
       date: selectedDate ? new Date(selectedDate) : new Date(),
       month, year, time, status: 'active',
       type: REPLACEMENT_TYPES.EQUIPMENT,
-      replacedEquipmentId, remarks,
+      replacedEquipmentId,
+      replacedEquipmentRegNo,
+      replacedEquipmentMachine,
+      newSiteForReplaced,
+      site:               Array.isArray(currentSite) ? currentSite.at(-1) : currentSite || '',
+      hired:              currentEquipment?.hired || false,
+      hiredFrom:          currentEquipment?.hiredFrom || '',
+      rentRate:           currentEquipment?.rentRate || null,
+      location:           currentEquipment?.location ? [currentEquipment.location] : [],
+      remarks,
       currentOperator:   finalOperatorName,
       currentOperatorId: finalOperatorId,
     });
