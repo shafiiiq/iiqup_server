@@ -64,12 +64,13 @@ const sendMessage = async (messageData) => {
     const {
       chatId, senderId, senderType, senderName, senderAvatar,
       messageType, content, recieverId,
-      fileName, fileSize, duration, thumbnail, replyTo
+      fileName, fileSize, duration, thumbnail, replyTo, caption
     } = messageData;
 
     const message = await Message.create({
       chatId, senderId, senderType, senderName, senderAvatar,
-      messageType, content, fileName, fileSize, duration, thumbnail, replyTo,
+      messageType, content, fileName, fileSize, duration, thumbnail,
+      caption, replyTo,
       status: 'sent', readBy: [], deliveredTo: []
     });
 
@@ -178,6 +179,73 @@ const deleteMessage = async (messageId, userId, deleteForEveryone = false) => {
     return true;
   } catch (error) {
     console.error('[MessageService] deleteMessage:', error);
+    throw error;
+  }
+};
+
+const editMessage = async (messageId, userId, content) => {
+  try {
+    const message = await Message.findOne({ _id: messageId, senderId: userId });
+    if (!message) throw new Error('Unauthorized to edit this message');
+
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    if (message.createdAt < oneHourAgo) throw new Error('Cannot edit messages older than 1 hour');
+
+    message.content = content;
+    message.isEdited = true;
+    await message.save();
+    return message.toObject();
+  } catch (error) {
+    console.error('[MessageService] editMessage:', error);
+    throw error;
+  }
+};
+
+const updateMessageCaption = async (messageId, userId, caption) => {
+  try {
+    const message = await Message.findOne({ _id: messageId, senderId: userId });
+    if (!message) throw new Error('Unauthorized to update message caption');
+
+    message.caption = caption;
+    await message.save();
+    return message.toObject();
+  } catch (error) {
+    console.error('[MessageService] updateMessageCaption:', error);
+    throw error;
+  }
+};
+
+const forwardMessage = async (messageId, targetChatId, senderId, senderType, senderName, senderAvatar) => {
+  try {
+    const original = await Message.findById(messageId).lean();
+    if (!original) throw new Error('Original message not found');
+
+    const forwarded = await Message.create({
+      chatId:      targetChatId,
+      senderId,
+      senderType,
+      senderName,
+      senderAvatar,
+      messageType: original.messageType,
+      content:     original.content,
+      fileName:    original.fileName,
+      fileSize:    original.fileSize,
+      duration:    original.duration,
+      thumbnail:   original.thumbnail,
+      caption:     original.caption,
+      replyTo:     original.replyTo,
+      status:      'sent',
+      readBy:      [],
+      deliveredTo: [],
+    });
+
+    const lastMessageContent = forwarded.messageType === 'text' ? forwarded.content : `${forwarded.messageType} message`;
+    await chatService.updateLastMessage(targetChatId, lastMessageContent, senderId, senderName);
+    await chatService.incrementUnreadCount(targetChatId, senderId);
+
+    return forwarded.toObject();
+  } catch (error) {
+    console.error('[MessageService] forwardMessage:', error);
     throw error;
   }
 };
@@ -379,6 +447,9 @@ module.exports = {
   markMessagesAsDelivered,
   markMessagesAsRead,
   deleteMessage,
+  editMessage,
+  updateMessageCaption,
+  forwardMessage,
   searchMessages,
   uploadFile,
   getFileUrl,

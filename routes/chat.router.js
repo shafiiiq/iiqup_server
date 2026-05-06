@@ -21,6 +21,9 @@ router.get   ('/chats/:chatId/messages', controller.getMessages);
 router.post  ('/chats/:chatId/read',     controller.markAsRead);
 router.post  ('/messages/text',          controller.sendTextMessage);
 router.delete('/messages/:messageId',    controller.deleteMessage);
+router.put   ('/messages/:messageId/edit',    controller.editMessage);
+router.put   ('/messages/:messageId/caption', controller.updateCaption);
+router.post  ('/messages/:messageId/forward', controller.forwardMessage);
 
 // ── Uploads ───────────────────────────────────────────────────────────────────
 router.post('/upload/audio',             controller.uploadVoiceMessage);

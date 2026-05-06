@@ -117,7 +117,7 @@ const setupWebSocket = (io) => {
     socket.on('send_message', async (data) => {
       console.log('[WebSocket] Received send_message:', data)
       try {
-        const { chatId, senderId, senderType, senderName, senderAvatar, content, messageType, participants, tempId } = data;
+        const { chatId, senderId, senderType, senderName, senderAvatar, content, messageType, participants, tempId, caption, replyTo } = data;
     
         const message = await messageService.sendMessage({
           chatId,
@@ -127,7 +127,9 @@ const setupWebSocket = (io) => {
           senderAvatar,
           messageType: messageType || 'text',
           content,
-          recieverId: participants[0].userId,
+          caption,
+          replyTo,
+          recieverId: participants[0]?.userId,
         });
     
         console.log('[WebSocket] Message saved:', message)

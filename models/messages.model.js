@@ -55,8 +55,10 @@ const messageSchema = new mongoose.Schema(
     content:   { type: String, required: true }, // text | file URL | location JSON
     fileName:  { type: String },                 // Documents only
     fileSize:  { type: Number },                 // Bytes
-    duration:  { type: Number },                 // Seconds — audio/voice/video
-    thumbnail: { type: String },                 // Videos only
+    duration:   { type: Number },                 // Seconds — audio/voice/video
+    thumbnail:  { type: String },                 // Videos only
+    caption:    { type: String },
+    isEdited:   { type: Boolean, default: false },
 
     // Delivery State
     status:      { type: String, enum: ['sent', 'delivered', 'read'], default: 'sent' },

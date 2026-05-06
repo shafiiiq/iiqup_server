@@ -377,6 +377,87 @@ const deleteMessage = async (req, res) => {
   }
 };
 
+const editMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { content }   = req.body;
+    const userId        = req.user.id;
+
+    if (!content) {
+      return res.status(400).json({ success: false, message: 'Content is required' });
+    }
+
+    const updatedMessage = await messageService.editMessage(messageId, userId, content);
+
+    res.status(200).json({
+      success: true,
+      message: 'Message edited successfully',
+      data:    updatedMessage,
+    });
+  } catch (error) {
+    console.error('[Chat] editMessage:', error);
+    res.status(500).json({ success: false, message: 'Failed to edit message', error: error.message });
+  }
+};
+
+const updateCaption = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { caption }   = req.body;
+    const userId        = req.user.id;
+
+    if (caption === undefined) {
+      return res.status(400).json({ success: false, message: 'Caption is required' });
+    }
+
+    const updatedMessage = await messageService.updateMessageCaption(messageId, userId, caption);
+
+    res.status(200).json({
+      success: true,
+      message: 'Caption updated successfully',
+      data:    updatedMessage,
+    });
+  } catch (error) {
+    console.error('[Chat] updateCaption:', error);
+    res.status(500).json({ success: false, message: 'Failed to update caption', error: error.message });
+  }
+};
+
+const forwardMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { targetChatId } = req.body;
+    const userId = req.user.id || req.userId;
+
+    if (!targetChatId) {
+      return res.status(400).json({ success: false, message: 'Target chat ID is required' });
+    }
+
+    const sender = await User.findById(userId).select('name userType avatar').lean();
+    if (!sender) {
+      return res.status(404).json({ success: false, message: 'Authenticated user not found' });
+    }
+
+    const forwardedMessage = await messageService.forwardMessage(
+      messageId,
+      targetChatId,
+      sender._id,
+      sender.userType,
+      sender.name,
+      sender.avatar
+    );
+
+    res.status(201).json({
+      success: true,
+      message: 'Message forwarded successfully',
+      data:    forwardedMessage,
+    });
+  } catch (error) {
+    console.error('[Chat] forwardMessage:', error);
+    res.status(500).json({ success: false, message: 'Failed to forward message', error: error.message });
+  }
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // File Upload Controllers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -578,6 +659,9 @@ module.exports = {
   sendTextMessage,
   markAsRead,
   deleteMessage,
+  editMessage,
+  updateCaption,
+  forwardMessage,
   // Uploads
   uploadVoiceMessage,
   uploadImage,
