@@ -37,18 +37,23 @@ const enrichParticipants = async (participants) => {
 const getUserChats = async (userId, userType, teamType = null) => {
   try {
     console.log('getUserChats called for userId:', userId, 'userType:', userType, 'teamType:', teamType)
+    const userIdString = String(userId || '')
+    const participantMatch = mongoose.Types.ObjectId.isValid(userIdString)
+      ? { userId: new mongoose.Types.ObjectId(userIdString) }
+      : { $or: [{ userId: userIdString }, { uniqueCode: userIdString }] }
+
+    if (userType) {
+      participantMatch.userType = userType
+    }
+
     const query = {
       $and: [
         {
           participants: {
-            $elemMatch: { userId: new mongoose.Types.ObjectId(userId.toString()) }
-          }
-        }
-      ]
-    };
-
-    if (userType) {
-      query.$and[0].participants.$elemMatch.userType = userType;
+            $elemMatch: participantMatch,
+          },
+        },
+      ],
     }
 
     if (teamType && teamType !== 'all') {
