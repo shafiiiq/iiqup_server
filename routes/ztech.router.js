@@ -32,11 +32,17 @@ const parseZKTecoAttendanceData = (dataString) => {
       const parts = line.split('\t');
 
       if (parts.length >= 4) {
-        const timestamp = parts[1] ? parts[1].trim() : new Date().toISOString().replace('T', ' ').substring(0, 19);
-        const workCode  = parts[4] ? parts[4].trim() : '0';
+        const pinStr     = parts[0].trim();
+        const timestamp  = parts[1] ? parts[1].trim() : new Date().toISOString().replace('T', ' ').substring(0, 19);
+        const workCode   = parts[4] ? parts[4].trim() : '0';
+        const timestampMs = Date.parse(timestamp);
+        const pinNumber  = parseInt(pinStr, 10) || 0;
+        const stableId   = Number.isFinite(timestampMs)
+          ? timestampMs * 1000 + pinNumber
+          : Date.now() * 1000 + pinNumber;
 
         records.push({
-          pin:        parts[0].trim(),
+          pin:        pinStr,
           timestamp,
           punchType:  parts[2].trim(),
           verifyMode: parts[3].trim(),
@@ -44,7 +50,7 @@ const parseZKTecoAttendanceData = (dataString) => {
           state:      parts[2].trim(),
           work_code:  workCode,
           raw:        line,
-          id:         `${parts[0].trim()}_${timestamp}_${parts[2].trim()}_${workCode}`,
+          id:         stableId,
         });
       }
     }
@@ -67,7 +73,7 @@ const processAttendanceRecord = async (record) => {
   const currentTime = timestampParts.length > 1 ? timestampParts[1] : now.toTimeString().split(' ')[0];
 
   const formattedRecord = {
-    id:         record.id || `${Date.now()}_${Math.random()}`,
+    id:         Number.isFinite(record.id) ? record.id : Date.now() * 1000,
     pin:        record.pin,
     emp_name:   `Employee ${record.pin}`,
     punch_time: currentTime,
