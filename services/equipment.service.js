@@ -698,7 +698,7 @@ const mobilizeEquipment = async (data) => {
       hired:         currentEquipment?.hired     || false,
       hiredFrom:     currentEquipment?.hiredFrom || '',
       rentRate:      rentRate?.basis || rentRate?.rate ? { basis: rentRate.basis || 'daily', rate: Number(rentRate.rate) || 0, currency: rentRate.currency || 'QAR' } : currentEquipment?.rentRate || null,
-      location:      location || currentEquipment?.location || '',
+      location:      Array.isArray(location) ? location.join(', ') : (location || currentEquipment?.location || ''),
     });
     const updateOperation = {
       $set: { status: newStatus, site: deployLocation, updatedAt: new Date(), mobDate: new Date() }
@@ -717,7 +717,7 @@ const mobilizeEquipment = async (data) => {
       if (currentEquipment?.location) {
         updateOperation.$push = { ...(updateOperation.$push || {}), lastLocation: currentEquipment.location };
       }
-      updateOperation.$set.location = location;
+      updateOperation.$set.location = Array.isArray(location) ? location.join(', ') : location;
     }
 
     // ── rentRate update + history ─────────────────────────────────────────────
@@ -778,7 +778,7 @@ const mobilizeEquipment = async (data) => {
       hired:         updatedEquipment?.hired     || false,
       hiredFrom:     updatedEquipment?.hiredFrom || '',
       rentRate:      updatedEquipment?.rentRate  || null,
-      location:      updatedEquipment?.location  ? [updatedEquipment.location] : [],
+      location:      updatedEquipment?.location  || '',
     };
 
     // ── One Day Mobilization ──────────────────────────────────────────────────
@@ -803,7 +803,7 @@ const mobilizeEquipment = async (data) => {
         hired:        updatedEquipment?.hired || false,
         hiredFrom:    updatedEquipment?.hiredFrom || '',
         rentRate:     updatedEquipment?.rentRate || null,
-        location:     updatedEquipment?.location ? [updatedEquipment.location] : [],
+        location:     updatedEquipment?.location || '',
         previousOperators: withOperator ? operators : [],
       });
 
@@ -1243,7 +1243,7 @@ const replaceOperator = async (data) => {
         hired:           updatedEquipment?.hired || false,
         hiredFrom:       updatedEquipment?.hiredFrom || '',
         rentRate:        updatedEquipment?.rentRate || null,
-        location:        updatedEquipment?.location ? [updatedEquipment.location] : [],
+        location:        updatedEquipment?.location || '',
       }
     }).catch(() => null);
 
@@ -1286,7 +1286,7 @@ const replaceOperator = async (data) => {
       hired:     updatedEquipment?.hired     || false,
       hiredFrom: updatedEquipment?.hiredFrom || '',
       rentRate:  updatedEquipment?.rentRate  || null,
-      location:  updatedEquipment?.location  ? [updatedEquipment.location] : [],
+      location:  updatedEquipment?.location || '',
     }).catch(e => console.error('Replace operator email failed:', e));
 
     analyser.clearCache();
