@@ -38,9 +38,10 @@ const getUserChats = async (userId, userType, teamType = null) => {
   try {
     console.log('getUserChats called for userId:', userId, 'userType:', userType, 'teamType:', teamType)
     const userIdString = String(userId || '')
-    const participantMatch = mongoose.Types.ObjectId.isValid(userIdString)
+    const isObjectId = mongoose.Types.ObjectId.isValid(userIdString)
+    const participantMatch = isObjectId
       ? { userId: new mongoose.Types.ObjectId(userIdString) }
-      : { $or: [{ userId: userIdString }, { uniqueCode: userIdString }] }
+      : { uniqueCode: userIdString }
 
     if (userType) {
       participantMatch.userType = userType
@@ -66,7 +67,10 @@ const getUserChats = async (userId, userType, teamType = null) => {
     return chats.map(chat => ({
       ...chat,
       unreadCount:  chat.unreadCount?.[userId.toString()] || 0,
-      participants: chat.participants.filter(p => p.userId.toString() !== userId.toString()),
+      participants: chat.participants.filter(p => isObjectId
+        ? p.userId.toString() !== userId.toString()
+        : p.uniqueCode !== userIdString
+      ),
     }));
   } catch (error) {
     console.error('[ChatService] getUserChats:', error);
