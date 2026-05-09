@@ -32,18 +32,19 @@ const parseZKTecoAttendanceData = (dataString) => {
       const parts = line.split('\t');
 
       if (parts.length >= 4) {
-        const now              = new Date();
-        const currentTimestamp = now.toISOString().replace('T', ' ').substring(0, 19);
+        const timestamp = parts[1] ? parts[1].trim() : new Date().toISOString().replace('T', ' ').substring(0, 19);
+        const workCode  = parts[4] ? parts[4].trim() : '0';
 
         records.push({
-          pin:        parts[0],
-          timestamp:  currentTimestamp,
-          punchType:  parts[2],
-          verifyMode: parts[3],
-          workCode:   parts[4] || '0',
-          state:      parts[2],
-          work_code:  parts[4] || '0',
+          pin:        parts[0].trim(),
+          timestamp,
+          punchType:  parts[2].trim(),
+          verifyMode: parts[3].trim(),
+          workCode,
+          state:      parts[2].trim(),
+          work_code:  workCode,
           raw:        line,
+          id:         `${parts[0].trim()}_${timestamp}_${parts[2].trim()}_${workCode}`,
         });
       }
     }
@@ -61,11 +62,12 @@ const parseZKTecoAttendanceData = (dataString) => {
  * @param {Object} record - Single parsed attendance record.
  */
 const processAttendanceRecord = async (record) => {
-  const now         = new Date();
-  const currentTime = now.toTimeString().split(' ')[0];
+  const now = new Date();
+  const timestampParts = record.timestamp ? record.timestamp.split(' ') : [];
+  const currentTime = timestampParts.length > 1 ? timestampParts[1] : now.toTimeString().split(' ')[0];
 
   const formattedRecord = {
-    id:         Date.now() + Math.random(),
+    id:         record.id || `${Date.now()}_${Math.random()}`,
     pin:        record.pin,
     emp_name:   `Employee ${record.pin}`,
     punch_time: currentTime,
