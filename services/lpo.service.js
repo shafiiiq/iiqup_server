@@ -738,18 +738,11 @@ const signLPO = async (lpoRef, signData) => {
      throw { status: 403, message: 'LPO_NOT_UPLOADED' }; 
   }
 
-  // ── CEO vs MD guard ────────────────────────────────────────────────────────
-  if (matched.role === 'CEO' || matched.role === 'MANAGING_DIRECTOR') {
-    const savedTitle   = lpo.signatures?.authorizedSignatoryTitle || 'CEO';
-    const expectedRole = savedTitle === 'MANAGING DIRECTOR' ? 'MANAGING_DIRECTOR' : 'CEO';
-    if (matched.role !== expectedRole) {
-      throw { status: 403, message: `This document requires ${savedTitle} signature, not ${matched.role}` };
-    }
-  }
-
   // ── Already signed guard ───────────────────────────────────────────────────
+  // Note: CEO and MD both use the same 'ceoSigned' field, making them interchangeable.
+  // Either can sign regardless of which was originally designated. Same for PM/Workshop Manager.
   if (lpo[matched.field] === true) {
-    throw { status: 409, message: `This position (${matched.role}) has already been signed` };
+    throw { status: 409, message: `The authorized signatory role has already been signed` };
   }
 
   // ── Out-of-order detection ─────────────────────────────────────────────────
