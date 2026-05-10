@@ -95,16 +95,16 @@ const _sendNotification = async ({ title, description, priority, sourceId, recip
  * @param {number} [maxAttempts=10]
  * @returns {Promise<number>}
  */
-const _resolveNextId = async (baseId, maxAttempts = 10) => {
-  const existing = new Set(
-    (await equipmentModel.find({}, { id: 1 }).lean()).map(e => e.id)
-  );
+const _resolveNextId = async () => {
+  const existingIds = await equipmentModel.distinct('id');
+  const existingSet = new Set(existingIds.filter(Number.isFinite));
 
-  for (let i = 0; i < maxAttempts; i++) {
-    if (!existing.has(baseId + i)) return baseId + i;
+  let nextId = 1;
+  while (existingSet.has(nextId)) {
+    nextId += 1;
   }
 
-  throw new Error('Unable to find available ID after multiple attempts');
+  return nextId;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -127,8 +127,7 @@ const insertEquipment = async (data) => {
       return { status: 400, ok: false, message: 'hiredFrom is required when company is HIRED' };
     }
 
-    const count  = await equipmentModel.countDocuments();
-    data.id      = await _resolveNextId(count + 1);
+    data.id = await _resolveNextId();
 
     const equipment = await equipmentModel.create(data);
 
