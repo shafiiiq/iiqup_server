@@ -936,15 +936,16 @@ const demobilizeEquipment = async (data) => {
     });
 
     await alertMobilizationViaEmail({
-      action:           'demobilized', regNo, machine,
+      action:             'demobilized', regNo, machine,
       month, year, time, date: selectedDate ? new Date(selectedDate) : new Date(), remarks,
-      site:             Array.isArray(currentSite) ? currentSite.at(-1) || '' : currentSite || '',
-      hired:            currentEquipment?.hired     || false,
-      hiredFrom:        currentEquipment?.hiredFrom || '',
-      rentRate:         currentEquipment?.rentRate  || null,
-      location:         currentEquipment?.location  ? [currentEquipment.location] : [],
-      operator:         currentOperatorName,
-      withOperator:     !!currentOperatorName,
+      site:               Array.isArray(currentSite) ? currentSite.at(-1) || '' : currentSite || '',
+      hired:              currentEquipment?.hired     || false,
+      hiredFrom:          currentEquipment?.hiredFrom || '',
+      rentRate:           currentEquipment?.rentRate  || null,
+      location:           currentEquipment?.location  ? [currentEquipment.location] : [],
+      operator:           currentOperatorName,
+      withOperator:       !!currentOperatorName,
+      previousOperators:  currentEquipment?.certificationBody || [],
       lastMobilizedDate,
       lastMobilizedTime,
     }).catch(e => console.error('Demobilization email failed:', e));
