@@ -247,6 +247,12 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
   const sigInstagram  = loadImageAsBase64('sig-instagram.png');
   const sigLinkedin   = loadImageAsBase64('sig-linkedin.png');
 
+  const renderLocation = () => {
+    if (Array.isArray(location)) return location.at(-1) || '';
+    if (typeof location === 'string') return location;
+    return '';
+  };
+
   // ── Build "Active Operators After Replacement" rows ──────────────────────
   const validShifts = remainingShifts.filter(s => s.operatorName);
 
@@ -359,7 +365,7 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
         <tr><td style="color:#666;">Month / Year</td><td>${MONTH_NAMES[month] ?? month} ${year}</td></tr>
         <tr><td style="color:#666;">Time</td><td>${time}</td></tr>
         ${remarks  ? `<tr><td style="color:#666;">Remarks</td><td>${remarks}</td></tr>` : ''}
-        ${location?.length ? `<tr><td style="color:#666;">Location</td><td>${location[location.length - 1]}</td></tr>` : ''}
+        ${renderLocation() ? `<tr><td style="color:#666;">Location</td><td>${renderLocation()}</td></tr>` : ''}
         ${hired && rentRate ? `
         <tr style="background:#f5f5f5;">
           <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Hire Rate</td>

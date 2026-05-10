@@ -262,6 +262,12 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
   const sigInstagram  = loadImageAsBase64('sig-instagram.png');
   const sigLinkedin   = loadImageAsBase64('sig-linkedin.png');
 
+  const renderLocation = () => {
+    if (Array.isArray(location)) return location.at(-1) || '';
+    if (typeof location === 'string') return location;
+    return '';
+  };
+
   return `
     <!DOCTYPE html>
     <html>
@@ -427,10 +433,10 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
           <td style="color:#666;">Remarks</td>
           <td>${remarks}</td>
         </tr>` : ''}
-        ${location?.length ? `
+        ${renderLocation() ? `
         <tr>
           <td style="color:#666;">Location</td>
-          <td>${location[location.length - 1]}</td>
+          <td>${renderLocation()}</td>
         </tr>` : ''}
         ${rentRate ? `
         <tr style="background:#f5f5f5;">

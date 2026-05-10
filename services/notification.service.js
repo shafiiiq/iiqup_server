@@ -152,20 +152,38 @@ const quickNotification = async (title, sourceId, options = {}) => {
 // Read Operations
 // ─────────────────────────────────────────────────────────────────────────────
 
+const buildVisibilityQuery = (uniqueCode) => ({
+  $or: [
+    { isBroadcast: true },
+    { targetUsers: uniqueCode },
+    { forYou: uniqueCode },
+    { visibleTo: uniqueCode },
+    {
+      $and: [
+        { isBroadcast: false },
+        { targetUsers: { $size: 0 } },
+        { forYou: { $size: 0 } },
+        { visibleTo: { $size: 0 } },
+      ],
+    },
+  ],
+});
+
+const buildUserSpecificQuery = (uniqueCode) => ({
+  $or: [
+    { targetUsers: uniqueCode },
+    { visibleTo: uniqueCode },
+  ],
+});
+
 const getNotificationStatsService = async (uniqueCode) => {
   try {
-    const visibleToFilter = {
-      $or: [
-        { visibleTo: { $exists: false } },
-        { visibleTo: { $size: 0 } },
-        { visibleTo: uniqueCode },
-      ],
-    }
+    const visibilityQuery = buildVisibilityQuery(uniqueCode)
 
     const [total, unread, forYouUnread] = await Promise.all([
-      Notification.countDocuments({ ...visibleToFilter }),
-      Notification.countDocuments({ ...visibleToFilter, 'readBy.uniqueCode': { $ne: uniqueCode } }),
-      Notification.countDocuments({ forYou: uniqueCode, 'readBy.uniqueCode': { $ne: uniqueCode } }),
+      Notification.countDocuments(visibilityQuery),
+      Notification.countDocuments({ ...visibilityQuery, 'readBy.uniqueCode': { $ne: uniqueCode } }),
+      Notification.countDocuments({ ...visibilityQuery, forYou: uniqueCode, 'readBy.uniqueCode': { $ne: uniqueCode } }),
     ])
 
     return { total, unread, forYouUnread }
@@ -186,13 +204,7 @@ const getNotificationStatsService = async (uniqueCode) => {
  */
 const getAllNotificationsService = async (uniqueCode, page = 1, limit = 200) => {
   try {
-    const query = {
-      $or: [
-        { visibleTo: { $exists: false } },
-        { visibleTo: { $size: 0 } },
-        { visibleTo: uniqueCode },
-      ],
-    }
+    const query = buildVisibilityQuery(uniqueCode)
 
     const skip       = (page - 1) * limit
     const totalCount = await Notification.countDocuments(query)
@@ -222,10 +234,8 @@ const getUnreadNotificationsService = async (uniqueCode, page = 1, limit = 100) 
     const skip = (page - 1) * limit
     const query = {
       'readBy.uniqueCode': { $ne: uniqueCode },
-      $and: [
-        { $or: [{ visibleTo: { $exists: false } }, { visibleTo: { $size: 0 } }, { visibleTo: uniqueCode }] },
-      ],
-    }    
+      $and: [buildVisibilityQuery(uniqueCode)],
+    }
     const totalCount = await Notification.countDocuments(query)
     const notifications = await Notification.find(query)
       .sort({ createdAt: -1 })
@@ -248,12 +258,7 @@ const getUnreadNotificationsService = async (uniqueCode, page = 1, limit = 100) 
 const getForYouNotificationsService = async (uniqueCode, page = 1, limit = 100) => {
   try {
     const skip = (page - 1) * limit
-    const query = {
-      forYou: uniqueCode,
-      $and: [
-        { $or: [{ visibleTo: { $exists: false } }, { visibleTo: { $size: 0 } }, { visibleTo: uniqueCode }] },
-      ],
-    }
+    const query = { forYou: uniqueCode }
     const totalCount = await Notification.countDocuments(query)
     const notifications = await Notification.find(query)
       .sort({ createdAt: -1 })
@@ -278,9 +283,7 @@ const getNormalNotificationsService = async (uniqueCode, page = 1, limit = 100) 
     const skip = (page - 1) * limit
     const query = {
       priority: 'high',
-      $and: [
-        { $or: [{ visibleTo: { $exists: false } }, { visibleTo: { $size: 0 } }, { visibleTo: uniqueCode }] },
-      ],
+      $and: [buildVisibilityQuery(uniqueCode)],
     }
     const totalCount = await Notification.countDocuments(query)
     const notifications = await Notification.find(query)
@@ -307,10 +310,7 @@ const getHighPriorityNotificationsService = async (uniqueCode, page = 1, limit =
     const query = {
       sourceId: { $ne: 'attendance' },
       priority: 'high',
-      $or: [{ isBroadcast: true }, { targetUsers: uniqueCode }],
-      $and: [
-        { $or: [{ visibleTo: { $exists: false } }, { visibleTo: { $size: 0 } }, { visibleTo: uniqueCode }] },
-      ],
+      $and: [buildVisibilityQuery(uniqueCode)],
     }
     const totalCount = await Notification.countDocuments(query)
     const notifications = await Notification.find(query)
@@ -334,7 +334,7 @@ const getHighPriorityNotificationsService = async (uniqueCode, page = 1, limit =
 const getUserSpecificNotificationsService = async (uniqueCode, sourceId, page = 1, limit = 100) => {
   try {
     const skip = (page - 1) * limit
-    const query = { visibleTo: uniqueCode }
+    const query = buildUserSpecificQuery(uniqueCode)
     if (sourceId) query.sourceId = sourceId
     const totalCount = await Notification.countDocuments(query)
     const notifications = await Notification.find(query)
@@ -360,10 +360,7 @@ const getCategoryNotificationsService = async (uniqueCode, category, page = 1, l
     const skip = (page - 1) * limit
     const query = {
       category,
-      $or: [{ isBroadcast: true }, { targetUsers: uniqueCode }],
-      $and: [
-        { $or: [{ visibleTo: { $exists: false } }, { visibleTo: { $size: 0 } }, { visibleTo: uniqueCode }] },
-      ],
+      $and: [buildVisibilityQuery(uniqueCode)],
     }
     const totalCount = await Notification.countDocuments(query)
     const notifications = await Notification.find(query)
@@ -384,14 +381,40 @@ const getCategoryNotificationsService = async (uniqueCode, category, page = 1, l
   }
 }
 
+const formatUserSpecificTabLabel = (sourceId) => {
+  if (!sourceId) return 'General'
+  if (mongoose.Types.ObjectId.isValid(sourceId)) return 'Related Item'
+
+  const knownLabels = {
+    lpo_approval:         'LPO Approval',
+    manager_approval:     'Manager Approval',
+    accounts_approval:    'Accounts Approval',
+    work_completed:       'Work Completed',
+    mechanic_request:     'Mechanic Request',
+    backcharge_approval:  'Backcharge Approval',
+    attendance:           'Attendance',
+    chat:                 'Chat',
+    'from applications':  'Application',
+  }
+
+  if (knownLabels[sourceId]) return knownLabels[sourceId]
+
+  return sourceId
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, char => char.toUpperCase())
+}
+
 const getUserSpecificTabsService = async (uniqueCode) => {
   try {
     const groups = await Notification.aggregate([
       { $match: { visibleTo: uniqueCode } },
-      { $group: { _id: '$sourceId', label: { $first: '$sourceId' } } },
+      { $group: { _id: '$sourceId' } },
       { $project: { sourceId: '$_id', _id: 0 } },
     ])
-    return groups.map(g => g.sourceId).filter(Boolean)
+
+    return groups
+      .map(g => ({ id: g.sourceId, label: formatUserSpecificTabLabel(g.sourceId) }))
+      .filter(tab => tab.id)
   } catch (error) {
     console.error('[NotificationService] getUserSpecificTabsService:', error)
     throw error
@@ -400,15 +423,8 @@ const getUserSpecificTabsService = async (uniqueCode) => {
 
 const getModelCategoriesService = async (uniqueCode) => {
   try {
-    const visibleToFilter = {
-      $or: [
-        { visibleTo: { $exists: false } },
-        { visibleTo: { $size: 0 } },
-        { visibleTo: uniqueCode },
-      ],
-    }
     const groups = await Notification.aggregate([
-      { $match: { ...visibleToFilter, category: { $nin: ['general', null, ''] } } },
+      { $match: { $and: [buildVisibilityQuery(uniqueCode), { category: { $nin: ['general', null, ''] } }] } },
       { $group: { _id: '$category' } },
       { $project: { category: '$_id', _id: 0 } },
     ])
@@ -422,7 +438,6 @@ const getModelCategoriesService = async (uniqueCode) => {
 const searchNotificationsService = async (uniqueCode, searchTerm, filter = 'all', category = 'all', page = 1, limit = 50) => {
   try {
     const skip = (page - 1) * limit
-    const visibleToFilter = { $or: [{ visibleTo: { $exists: false } }, { visibleTo: { $size: 0 } }, { visibleTo: uniqueCode }] }
     const textMatch = {
       $or: [
         { title: { $regex: searchTerm, $options: 'i' } },
@@ -434,19 +449,19 @@ const searchNotificationsService = async (uniqueCode, searchTerm, filter = 'all'
     let scopeQuery = {}
     switch (filter) {
       case 'unread':
-        scopeQuery = { 'readBy.uniqueCode': { $ne: uniqueCode }, $and: [visibleToFilter] }
+        scopeQuery = { 'readBy.uniqueCode': { $ne: uniqueCode }, $and: [buildVisibilityQuery(uniqueCode)] }
         break
       case 'foryou':
-        scopeQuery = { forYou: uniqueCode, $and: [visibleToFilter] }
+        scopeQuery = { forYou: uniqueCode }
         break
       case 'high':
-        scopeQuery = { priority: 'high', $and: [visibleToFilter] }
+        scopeQuery = { priority: 'high', $and: [buildVisibilityQuery(uniqueCode)] }
         break
       case 'user_specific':
-        scopeQuery = { visibleTo: uniqueCode }
+        scopeQuery = buildUserSpecificQuery(uniqueCode)
         break
       default:
-        scopeQuery = { $and: [visibleToFilter] }
+        scopeQuery = { $and: [buildVisibilityQuery(uniqueCode)] }
     }
 
     if (category !== 'all') {
