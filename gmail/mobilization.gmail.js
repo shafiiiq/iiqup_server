@@ -293,12 +293,12 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
           <td style="color:#666;">Hired From</td>
           <td>${hiredFrom}</td>
         </tr>` : ''}
-        ${action === 'mobilized' && deployType === 'company' ? `
+        ${(action === 'mobilized' || action === 'one_day_mob' || action === 'add_shifts') && deployType === 'company' ? `
         <tr>
           <td style="color:#666;">Leased to Company</td>
           <td><strong>${clientCompany}</strong></td>
         </tr>` : ''}
-        ${action === 'mobilized' && deployType !== 'company' ? `
+        ${(action === 'mobilized' || action === 'one_day_mob' || action === 'add_shifts') && deployType !== 'company' ? `
         <tr>
           <td style="color:#666;">Deployed to Site</td>
           <td><strong>${site}</strong></td>
