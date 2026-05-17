@@ -124,7 +124,7 @@ const insertServiceReport = async (data) => {
     // ── Notification ──────────────────────────────────────────────────────────
     const officeMain = JSON.parse(process.env.OFFICE_MAIN);
     const title      = `${data.machine} - ${data.regNo} serviced`;
-    const body       = `At ${data.location}\nServiced Hours: ${data.serviceHrs}\nNext Service: ${data.nextServiceHrs}\n${data.remarks}\nMechanics: ${data.mechanics}`;
+    const body       = `${data.date}\nAt ${data.location}\nServiced Hours: ${data.serviceHrs}\nNext Service: ${data.nextServiceHrs}\n${data.remarks}\nMechanics: ${data.mechanics}`;
 
     await createNotification({ title, description: body, priority: 'high', sourceId: 'from applications', recipient: officeMain, time: new Date() });
     await PushNotificationService.sendGeneralNotification(officeMain, title, body, 'high', 'normal');
