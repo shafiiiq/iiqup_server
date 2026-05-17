@@ -234,6 +234,7 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
     hiredFrom             = '',
     rentRate              = null,
     location              = [],
+    incomingHiredFrom     = '',
     replaceAll            = false,
   } = data;
 
@@ -253,7 +254,8 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
     return '';
   };
 
-  // ── Build "Active Operators After Replacement" rows ──────────────────────
+  // ─────────────────────────────────────────────────────────────────────
+  // Build "Active Operators After Replacement" rows
   const validShifts = remainingShifts.filter(s => s.operatorName);
 
   const shiftsHtml = validShifts.map((s, i) => {
@@ -351,10 +353,12 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
           <td style="color:#666;">Outgoing Equipment</td>
           <td>${machine} (${regNo})</td>
         </tr>
+        ${hired ? `<tr><td style="color:#666;">Outgoing Hired From</td><td>${hiredFrom}</td></tr>` : ''}
         <tr>
           <td style="color:#666;">Incoming Equipment</td>
           <td><strong>${replacedEquipmentMachine} (${replacedEquipmentRegNo})</strong></td>
         </tr>
+        ${incomingHiredFrom ? `<tr><td style="color:#666;">Incoming Hired From</td><td>${incomingHiredFrom}</td></tr>` : ''}
         ${(operator || currentOperator) ? `<tr><td style="color:#666;">Operator</td><td>${operator || currentOperator}</td></tr>` : ''}
         ${newSiteForReplaced ? `<tr><td style="color:#666;">New Site for Outgoing</td><td>${newSiteForReplaced}</td></tr>` : ''}` : ''}
 
@@ -368,7 +372,7 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
         ${renderLocation() ? `<tr><td style="color:#666;">Location</td><td>${renderLocation()}</td></tr>` : ''}
         ${hired && rentRate ? `
         <tr style="background:#f5f5f5;">
-          <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Hire Rate</td>
+          <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Outgoing Hire Details</td>
         </tr>
         <tr><td style="color:#666;">Basis</td><td>${rentRate.basis ? rentRate.basis.charAt(0).toUpperCase() + rentRate.basis.slice(1) : 'N/A'}</td></tr>
         <tr><td style="color:#666;">Rate</td><td><strong>${rentRate.rate} ${rentRate.currency || 'QAR'}</strong></td></tr>` : ''}

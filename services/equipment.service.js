@@ -1346,6 +1346,8 @@ const replaceEquipment = async (data) => {
 
     const replacedEquipment = await equipmentModel.findById(replacedEquipmentId);
 
+    const incomingHiredFrom = replacedEquipment?.hiredFrom || '';
+
     // Build operator update for incoming equipment
     const incomingEquipmentUpdate = {
       $set:  { site: currentSite, status: 'active', updatedAt: new Date() },
@@ -1411,6 +1413,7 @@ const replaceEquipment = async (data) => {
       hiredFrom:       currentEquipment?.hiredFrom || '',
       rentRate:        currentEquipment?.rentRate || null,
       location:        currentEquipment?.location ? [currentEquipment.location] : [],
+      incomingHiredFrom,
       currentOperator: finalOperatorName,
     }).catch(e => console.error('Replace equipment email failed:', e));
 
