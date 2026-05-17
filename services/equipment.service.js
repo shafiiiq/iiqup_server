@@ -1404,6 +1404,9 @@ const replaceEquipment = async (data) => {
       recipient:   officeMain
     });
  
+    const outgoingOperator = currentEquipment?.certificationBody?.at(-1)?.operatorName || '';
+    const incomingOperator = operator || replacedEquipment?.certificationBody?.at(-1)?.operatorName || '';
+
     await alertReplacementViaEmail({
       type: 'equipment', regNo, machine,
       replacedEquipmentRegNo, replacedEquipmentMachine,
@@ -1414,6 +1417,8 @@ const replaceEquipment = async (data) => {
       rentRate:        currentEquipment?.rentRate || null,
       location:        currentEquipment?.location ? [currentEquipment.location] : [],
       incomingHiredFrom,
+      outgoingOperator,
+      incomingOperator,
       currentOperator: finalOperatorName,
     }).catch(e => console.error('Replace equipment email failed:', e));
 

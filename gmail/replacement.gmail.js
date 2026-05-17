@@ -235,6 +235,8 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
     rentRate              = null,
     location              = [],
     incomingHiredFrom     = '',
+    outgoingOperator      = '',
+    incomingOperator      = '',
     replaceAll            = false,
   } = data;
 
@@ -359,7 +361,17 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
           <td><strong>${replacedEquipmentMachine} (${replacedEquipmentRegNo})</strong></td>
         </tr>
         ${incomingHiredFrom ? `<tr><td style="color:#666;">Incoming Hired From</td><td>${incomingHiredFrom}</td></tr>` : ''}
-        ${(operator || currentOperator) ? `<tr><td style="color:#666;">Operator</td><td>${operator || currentOperator}</td></tr>` : ''}
+        ${outgoingOperator && incomingOperator && outgoingOperator !== incomingOperator ? `
+        <tr>
+          <td style="color:#666;">Outgoing Operator</td>
+          <td>${outgoingOperator}</td>
+        </tr>
+        <tr>
+          <td style="color:#666;">Incoming Operator</td>
+          <td><strong>${incomingOperator}</strong></td>
+        </tr>` : ''}
+        ${(!outgoingOperator && incomingOperator) ? `<tr><td style="color:#666;">Operator</td><td><strong>${incomingOperator}</strong></td></tr>` : ''}
+        ${(outgoingOperator && !incomingOperator) ? `<tr><td style="color:#666;">Operator</td><td>${outgoingOperator}</td></tr>` : ''}
         ${newSiteForReplaced ? `<tr><td style="color:#666;">New Site for Outgoing</td><td>${newSiteForReplaced}</td></tr>` : ''}` : ''}
 
         <tr style="background:#f5f5f5;">
