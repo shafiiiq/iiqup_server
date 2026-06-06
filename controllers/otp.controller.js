@@ -20,7 +20,7 @@ const resolveEmail = (email) =>
  */
 const requestOTP = async (req, res) => {
   try {
-    console.log("emailllllllllllll hereeeeeeeeeeeeeee" , email)
+    console.log("emailllllllllllll hereeeeeeeeeeeeeee" , req.body.email)
     const email = resolveEmail(req.body.email);
     console.log("emailllllllllllll therreeeeeeeeeeeee" , email)
 
