@@ -8,7 +8,7 @@ const otpServices = require('../services/otp.service');
 const DOCUMENT_VERIFIER_ALIAS = 'DOCUMENT_VERIFIER_AUTH_MAIL';
 
 const resolveEmail = (email) =>
-  email === DOCUMENT_VERIFIER_ALIAS ? process.env.AUTH_OTP_USER_EMAIL : email;
+  email === DOCUMENT_VERIFIER_ALIAS ? "service@ansarigroup.co" : email;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // OTP Controllers
