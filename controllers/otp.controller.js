@@ -20,7 +20,9 @@ const resolveEmail = (email) =>
  */
 const requestOTP = async (req, res) => {
   try {
+    console.log("emailllllllllllll hereeeeeeeeeeeeeee" , email)
     const email = resolveEmail(req.body.email);
+    console.log("emailllllllllllll therreeeeeeeeeeeee" , email)
 
     if (!email) {
       return res.status(400).json({ success: false, message: 'Email address is required' });

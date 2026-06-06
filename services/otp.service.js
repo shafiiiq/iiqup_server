@@ -53,7 +53,7 @@ const generateAndSendOTP = async (email, demo_opr = false, name) => {
     const otp       = generateSecureOTP();
     const hashedOTP = await hashOTP(otp);
 
-    console.log(`Generated OTP for ${email}: ${otp} (hashed: ${hashedOTP})`); // Debug log
+    console.log(`Generated OTP forrrrrrrrrrrr ${email}: ${otp} (hashed: ${hashedOTP})`); // Debug log
 
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + OTP_EXPIRY_MINUTES);
