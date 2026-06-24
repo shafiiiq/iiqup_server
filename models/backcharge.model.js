@@ -86,6 +86,8 @@ const backchargeSchema = new mongoose.Schema(
     reportNo: { type: String, required: true, unique: true, trim: true         },
     refNo:    { type: String, default: 'ATE193-09-25',      trim: true         },
     date:     { type: String, required: true                                   },
+    // Work date (date when the work was performed) — distinct from document date
+    workDate: { type: String, default: ''                                       },
 
     // Equipment Details
     equipmentType: { type: String, required: true, trim: true },
@@ -190,6 +192,10 @@ backchargeSchema.virtual('formattedDate').get(function () {
   return this.date ? new Date(this.date).toLocaleDateString('en-GB') : '';
 });
 
+backchargeSchema.virtual('formattedWorkDate').get(function () {
+  return this.workDate ? new Date(this.workDate).toLocaleDateString('en-GB') : '';
+});
+
 backchargeSchema.virtual('deductionPercentage').get(function () {
   if (!this.costSummary?.totalCost) return 0;
   return ((this.costSummary.approvedDeduction / this.costSummary.totalCost) * 100).toFixed(2);
@@ -261,6 +267,7 @@ backchargeSchema.index({ supplierName:            1  });
 backchargeSchema.index({ status:                  1  });
 backchargeSchema.index({ createdAt:               -1 });
 backchargeSchema.index({ date:                    1  });
+backchargeSchema.index({ workDate:                1  });
 backchargeSchema.index({ 'costSummary.totalCost': 1  });
 
 // ─────────────────────────────────────────────────────────────────────────────

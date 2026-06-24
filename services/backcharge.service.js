@@ -332,6 +332,7 @@ const addBackcharge = async (data) => {
       scopeOfWork: buildTextLines(data.scopeOfWork, data.scopeLine2Text),
       workshopComments: buildTextLines(data.workshopComments, data.workSummaryLine2),
       sparePartsTable: data.tableRows || [],
+      workDate: data.workDate || '',
       costSummary: {
         sparePartsCost: parseFloat(data.sparePartsCost) || 0,
         labourCharges: parseFloat(data.labourCharges) || 0,

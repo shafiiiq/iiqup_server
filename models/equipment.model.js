@@ -19,7 +19,7 @@ const certificationBodySchema = new mongoose.Schema(
 
 const rentRateSchema = new mongoose.Schema(
   {
-    basis:    { type: String, enum: ['daily', 'hourly', 'weekly', 'monthly'], default: 'daily' },
+    basis:    { type: String, enum: ['daily', 'hourly', 'weekly', 'monthly', 'trip'], default: 'daily' },
     rate:     { type: Number, default: 0 },
     currency: { type: String, default: 'QAR' },
   },
