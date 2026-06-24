@@ -53,19 +53,28 @@ const generateOTPTemplate = (otp, username = 'Valued Customer') => `
 // Transporters
 // ─────────────────────────────────────────────────────────────────────────────
 
+const normalizeEnvValue = (value = '') => String(value).replace(/"/g, '').trim();
+const normalizeAppPassword = (value = '') => normalizeEnvValue(value).replace(/\s+/g, '');
+const boolEnv = (value) => String(value || '').trim().toLowerCase() === 'true';
+
 const createGmailTransporter = () => {
-  if (!process.env.GMAIL_APP_PASSWORD || !process.env.OTP_MAILER) {
-    throw new Error('Missing GMAIL_APP_PASSWORD or OTP_MAILER');
+  const user = normalizeEnvValue(process.env.OTP_MAILER);
+  const pass = normalizeAppPassword(process.env.GMAIL_APP_PASSWORD);
+
+  if (!user || !pass) {
+    throw new Error('Missing or invalid GMAIL_APP_PASSWORD or OTP_MAILER');
   }
 
   return nodemailer.createTransport({
     service: 'gmail',
     auth: {
-      user: process.env.OTP_MAILER.replace(/"/g, ''),
-      pass: process.env.GMAIL_APP_PASSWORD,
+      user,
+      pass,
     },
   });
 };
+
+const getFromEmail = () => normalizeEnvValue(process.env.OTP_MAILER) || 'noreply@alansari.com';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Public API
@@ -88,23 +97,36 @@ const sendOTPEmail = async (email, otp, username = '', demo_opr = false) => {
     },
   ];
 
-  const fromEmail = process.env.OTP_MAILER?.replace(/"/g, '') || 'noreply@alansari.com';
-  const errors    = [];
+  const errors = [];
 
   for (const method of methods) {
     if (!method.enabled) continue;
+
+    console.log(`[OTP Email] Trying method: ${method.name} for ${email}`);
 
     try {
       const transporter = await method.create();
       await transporter.verify();
 
+      const includeOtpInSubject = boolEnv(process.env.OTP_INCLUDE_IN_SUBJECT);
+      const subjectBase = demo_opr ? `${username} Trying to login` : 'Your One-Time Password';
+      const subject = includeOtpInSubject ? `${subjectBase}: ${otp}` : subjectBase;
+
       const info = await transporter.sendMail({
-        from:    `"Al Ansari" <${fromEmail}>`,
+        from:    `"Al Ansari" <${getFromEmail()}>`,
         to:      email,
-        subject: demo_opr ? `${username} Trying to login: ${otp}` : `Your One Time Password: ${otp}`,
+        subject,
         html:    generateOTPTemplate(otp, username),
-        text:    `OTP: ${otp}. will expires in 5 minutes.`,
+        text:    `Your OTP is ${otp}. It expires in 5 minutes.`,
+        // Improve deliverability by setting explicit envelope (MAIL FROM) and reply-to
+        replyTo: getFromEmail(),
+        envelope: { from: getFromEmail(), to: email },
+        headers: {
+          'List-Unsubscribe': `<mailto:${getFromEmail()}>`,
+        },
       });
+
+      console.log(`[OTP Email] Sent via ${method.name}; messageId=${info.messageId}; accepted=${info.accepted?.join(',')}; rejected=${info.rejected?.join(',')}`);
 
       transporter.close();
 
@@ -112,9 +134,13 @@ const sendOTPEmail = async (email, otp, username = '', demo_opr = false) => {
         success:   true,
         message:   `OTP sent via ${method.name}`,
         messageId: info.messageId,
+        accepted:  info.accepted,
+        rejected:  info.rejected,
       };
     } catch (error) {
-      errors.push(`${method.name}: ${error.message}`);
+      const message = error?.message || String(error);
+      console.error(`[OTP Email] ${method.name} failed:`, message);
+      errors.push(`${method.name}: ${message}`);
     }
   }
 
@@ -129,3 +155,11 @@ module.exports = {
   sendOTPEmail,
   generateOTPTemplate,
 };
+
+// Recommendations for improving deliverability (DNS records):
+// - Add SPF TXT for your domain (example):
+//   "v=spf1 include:_spf.google.com include:sendgrid.net ~all"
+// - Configure DKIM for your sending provider (add provided TXT record to DNS)
+// - Add a DMARC policy (example):
+//   "v=DMARC1; p=quarantine; rua=mailto:postmaster@yourdomain.com; pct=100"
+// Also ensure the envelope MAIL FROM matches a verified sender (SERVICE_OTP_MAILER).

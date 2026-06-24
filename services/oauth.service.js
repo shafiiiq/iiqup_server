@@ -61,7 +61,7 @@ const createSecureOAuthTransporter = async () => {
       service: 'gmail',
       auth: {
         type:         'OAuth2',
-        user:         process.env.OTP_MAILER.replace(/"/g, ''),
+        user:         process.env.OTP_MAILER?.replace(/"/g, ''),
         clientId:     tokens.client_id,
         clientSecret: tokens.client_secret,
         refreshToken: tokens.refresh_token,
