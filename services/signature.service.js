@@ -182,7 +182,7 @@ const getAuthorizedAuthSignKey = async (userId, deviceInfo, authRole) => {
   // Determine the S3 key based on whether it's CEO or MD
   const baseKey = process.env.AUTHORIZED_SIGN_KEY || '';
   const signKey = authRole === 'MANAGING_DIRECTOR' 
-    ? baseKey.replace(/authorized/gi, 'md').replace(/CEO/gi, 'MD')
+    ? baseKey.replace(/ceo/gi, 'md')
     : baseKey;
   
   return { status: 200, data: { sign_key: signKey, expiresIn: 30 } };
