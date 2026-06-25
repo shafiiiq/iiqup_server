@@ -644,8 +644,8 @@ const getSignManagerKey = async (req, res) => {
  */
 const getSignAuthorizedKey = async (req, res) => {
   try {
-    const { deviceInfo } = req.body;
-    const result = await signatureService.getAuthorizedAuthSignKey(deviceInfo.userId, deviceInfo);
+    const { deviceInfo, authRole } = req.body;
+    const result = await signatureService.getAuthorizedAuthSignKey(deviceInfo.userId, deviceInfo, authRole);
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] getSignAuthorizedKey:', error);

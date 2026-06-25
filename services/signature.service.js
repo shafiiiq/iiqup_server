@@ -175,7 +175,18 @@ const getWmAuthSignKey         = (userId, deviceInfo) => getSignKey(userId, 'wm'
 const getPmAuthSignKey         = (userId, deviceInfo) => getSignKey(userId, 'pm',         'PM_SIGN_KEY',         deviceInfo);
 const getAccountsAuthSignKey   = (userId, deviceInfo) => getSignKey(userId, 'accounts',   'ACCOUNTS_SIGN_KEY',   deviceInfo);
 const getManagerAuthSignKey    = (userId, deviceInfo) => getSignKey(userId, 'manager',    'MANAGER_SIGN_KEY',    deviceInfo);
-const getAuthorizedAuthSignKey = (userId, deviceInfo) => getSignKey(userId, 'authorized', 'AUTHORIZED_SIGN_KEY', deviceInfo);
+const getAuthorizedAuthSignKey = async (userId, deviceInfo, authRole) => {
+  const result = await verifyTrustedDevice(userId, 'authorized', deviceInfo);
+  if (!result.data.isTrusted) throw { status: 403, message: 'Device not trusted. Please activate signature access first.' };
+  
+  // Determine the S3 key based on whether it's CEO or MD
+  const baseKey = process.env.AUTHORIZED_SIGN_KEY || '';
+  const signKey = authRole === 'MANAGING_DIRECTOR' 
+    ? baseKey.replace(/authorized/gi, 'md').replace(/CEO/gi, 'MD')
+    : baseKey;
+  
+  return { status: 200, data: { sign_key: signKey, expiresIn: 30 } };
+};
 const getAuthSealKey           = (userId, deviceInfo) => getSignKey(userId, 'seal',       'SEAL_KEY',            deviceInfo);
 
 // ─────────────────────────────────────────────────────────────────────────────
