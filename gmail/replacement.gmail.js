@@ -190,7 +190,7 @@ class OAuth2GmailClient {
 
       if (isAuthError) {
         await this.oauth2Client.refreshAccessToken();
-        return this.sendEmail(to, subject, htmlContent, textContent, attachments, cc);
+        return this.sendEmail(to, subject, htmlContent, textContent, attachments, cc);  
       }
 
       throw new Error(`[Gmail] Send failed: ${error.message}`);
@@ -216,6 +216,8 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
     currentOperator       = '',
     replacedOperator      = '',
     operator              = '',
+    outgoingOperator      = '',
+    incomingOperator      = '',
     targetShiftName       = '',
     shiftName             = '',
     shiftStart            = '',
@@ -235,8 +237,6 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
     rentRate              = null,
     location              = [],
     incomingHiredFrom     = '',
-    outgoingOperator      = '',
-    incomingOperator      = '',
     replaceAll            = false,
   } = data;
 
@@ -249,6 +249,9 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
   const sigFacebook   = loadImageAsBase64('sig-facebook.png');
   const sigInstagram  = loadImageAsBase64('sig-instagram.png');
   const sigLinkedin   = loadImageAsBase64('sig-linkedin.png');
+
+  const resolvedOutgoingOperator = outgoingOperator || currentOperator || operator || '';
+  const resolvedIncomingOperator = incomingOperator || replacedOperator || operator || '';
 
   const renderLocation = () => {
     if (Array.isArray(location)) return location.at(-1) || '';
@@ -361,17 +364,15 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
           <td><strong>${replacedEquipmentMachine} (${replacedEquipmentRegNo})</strong></td>
         </tr>
         ${incomingHiredFrom ? `<tr><td style="color:#666;">Incoming Hired From</td><td>${incomingHiredFrom}</td></tr>` : ''}
-        ${outgoingOperator && incomingOperator && outgoingOperator !== incomingOperator ? `
+        ${resolvedOutgoingOperator || resolvedIncomingOperator ? `
         <tr>
           <td style="color:#666;">Outgoing Operator</td>
-          <td>${outgoingOperator}</td>
+          <td>${resolvedOutgoingOperator || 'N/A'}</td>
         </tr>
         <tr>
           <td style="color:#666;">Incoming Operator</td>
-          <td><strong>${incomingOperator}</strong></td>
+          <td><strong>${resolvedIncomingOperator || 'N/A'}</strong></td>
         </tr>` : ''}
-        ${(!outgoingOperator && incomingOperator) ? `<tr><td style="color:#666;">Operator</td><td><strong>${incomingOperator}</strong></td></tr>` : ''}
-        ${(outgoingOperator && !incomingOperator) ? `<tr><td style="color:#666;">Operator</td><td>${outgoingOperator}</td></tr>` : ''}
         ${newSiteForReplaced ? `<tr><td style="color:#666;">New Site for Outgoing</td><td>${newSiteForReplaced}</td></tr>` : ''}` : ''}
 
         <tr style="background:#f5f5f5;">

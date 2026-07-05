@@ -1325,6 +1325,9 @@ const replaceEquipment = async (data) => {
     const finalOperatorName = operator || currentEquipment?.certificationBody?.at(-1)?.operatorName || '';
     const finalOperatorId   = operatorId || currentEquipment?.certificationBody?.at(-1)?.operatorId || '';
 
+    const replacedEquipment = await equipmentModel.findById(replacedEquipmentId);
+    if (!replacedEquipment) return { status: 404, ok: false, message: 'Replacement equipment not found' };
+
     const replacement = await replacementsModel.create({
       equipmentId, regNo, machine,
       date: selectedDate ? new Date(selectedDate) : new Date(),
@@ -1342,9 +1345,11 @@ const replaceEquipment = async (data) => {
       remarks,
       currentOperator:   finalOperatorName,
       currentOperatorId: finalOperatorId,
+      outgoingOperator:  currentEquipment?.certificationBody?.at(-1)?.operatorName || '',
+      outgoingOperatorId: currentEquipment?.certificationBody?.at(-1)?.operatorId || '',
+      incomingOperator:  operator || replacedEquipment?.certificationBody?.at(-1)?.operatorName || '',
+      incomingOperatorId: operatorId || replacedEquipment?.certificationBody?.at(-1)?.operatorId || '',
     });
-
-    const replacedEquipment = await equipmentModel.findById(replacedEquipmentId);
 
     const incomingHiredFrom = replacedEquipment?.hiredFrom || '';
 
@@ -1417,8 +1422,8 @@ const replaceEquipment = async (data) => {
       rentRate:        currentEquipment?.rentRate || null,
       location:        currentEquipment?.location ? [currentEquipment.location] : [],
       incomingHiredFrom,
-      outgoingOperator,
-      incomingOperator,
+      outgoingOperator: outgoingOperator || currentEquipment?.certificationBody?.at(-1)?.operatorName || '',
+      incomingOperator: incomingOperator || operator || replacedEquipment?.certificationBody?.at(-1)?.operatorName || '',
       currentOperator: finalOperatorName,
     }).catch(e => console.error('Replace equipment email failed:', e));
 

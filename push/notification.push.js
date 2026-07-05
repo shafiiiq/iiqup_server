@@ -283,7 +283,7 @@ const _storeSpecialNotification = async (uniqueCode, notificationData) => {
   await user.save();
 };
 
-const _dispatchToUser = async (uniqueCode, notificationData) => {
+const _dispatchToUser = async (uniqueCode, notificationData) => { 
   const results = { websocket: { success: false }, pushNotification: { success: false } };
 
   try {
@@ -404,6 +404,7 @@ const _dispatchToUsers = async (uniqueCodes, notificationData) => {
   }));
 
   const overallSuccess = results.websocket.success > 0 || results.pushNotification.success > 0;
+  console.log(`Dispatched notification to ${uniqueCodes.length} users. WebSocket success: ${results.websocket.success}, Push success: ${results.pushNotification.success}`);
   return { success: overallSuccess, message: overallSuccess ? 'Notifications sent' : 'Failed to send notifications', data: results };
 };
 
@@ -430,6 +431,7 @@ class PushNotificationService {
       notificationId,
       ...extraData,
     };
+    console.log(`Sending general notification to ${uniqueCode || 'broadcast'}:`, notification);
     if (Array.isArray(uniqueCode)) return _dispatchToUsers(uniqueCode, notification);
     if (uniqueCode)                return _dispatchToUser(uniqueCode, notification);
     return _dispatchBroadcast(notification);
