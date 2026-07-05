@@ -62,6 +62,7 @@ const insertVoipToken = async (uniqueCode, voipToken) => {
       { new: true }
     )
     if (!user) return { success: false, message: 'User not found' }
+    console.log(`VoIP token for user ${uniqueCode} updated to: ${voipToken}`)
     return { success: true, message: 'VoIP token registered successfully' }
   } catch (error) {
     console.error('[TokenService] insertVoipToken:', error)

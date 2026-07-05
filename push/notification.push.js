@@ -6,7 +6,7 @@ const User     = require('../models/user.model');
 const Operator = require('../models/operator.model');
 const Mechanic = require('../models/mechanic.model');
 const { default: mongoose } = require('mongoose');
-const webpush = require('web-push');
+const webpush = require('web-push'); 
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Setup Web Push
@@ -93,23 +93,26 @@ const sendVoipSyncPush = async (uniqueCode, notificationId) => {
     const user = await User.findOne({ uniqueCode }).select('voipPushToken')
     if (!user?.voipPushToken) return { success: false }
 
-    const https  = require('https')
+    const http2  = require('http2')
     const jwt    = require('jsonwebtoken')
     const fs     = require('fs')
 
-    const teamId  = process.env.APNS_TEAM_ID
-    const keyId   = process.env.APNS_KEY_ID
-    const keyPath = process.env.APNS_KEY_PATH
+    const teamId   = process.env.APNS_TEAM_ID
+    const keyId    = process.env.APNS_KEY_ID
+    const keyPath  = process.env.APNS_KEY_PATH
     const bundleId = process.env.APNS_BUNDLE_ID
 
     const privateKey = fs.readFileSync(keyPath)
-    const token = jwt.sign({}, privateKey, {
-      algorithm:  'ES256',
-      keyid:      keyId,
-      issuer:     teamId,
-      audience:   'https://api.push.apple.com',
-      expiresIn:  '1h',
+    const jwtToken = jwt.sign({}, privateKey, {
+      algorithm: 'ES256',
+      keyid:     keyId,
+      issuer:    teamId,
+      audience:  'https://api.push.apple.com',
+      expiresIn: '1h',
     })
+
+    const isProd = process.env.NODE_ENV === 'production'
+    const host   = isProd ? 'https://api.push.apple.com' : 'https://api.sandbox.push.apple.com'
 
     const payload = JSON.stringify({
       aps: { 'content-available': 1 },
@@ -117,32 +120,40 @@ const sendVoipSyncPush = async (uniqueCode, notificationId) => {
       type: 'sync',
     })
 
-    const isProd = process.env.NODE_ENV === 'production'
-    const host   = isProd ? 'api.push.apple.com' : 'api.sandbox.push.apple.com'
-
     return new Promise((resolve) => {
-      const req = https.request({
-        hostname: host,
-        path:     `/3/device/${user.voipPushToken}`,
-        method:   'POST',
-        headers: {
-          'authorization':  `bearer ${token}`,
-          'apns-topic':     `${bundleId}.voip`,
-          'apns-push-type': 'voip',
-          'apns-priority':  '10',
-          'content-type':   'application/json',
-          'content-length': Buffer.byteLength(payload),
-        },
-        protocol: 'https:',
-      }, (res) => {
-        resolve({ success: res.statusCode === 200 })
-      })
-      req.on('error', (e) => {
-        console.error('[NotificationPush] sendVoipSyncPush:', e)
+      const client = http2.connect(host)
+
+      client.on('error', (err) => {
+        console.error('[NotificationPush] sendVoipSyncPush http2 error:', err)
         resolve({ success: false })
       })
+
+      const req = client.request({
+        ':method':        'POST',
+        ':path':          `/3/device/${user.voipPushToken}`,
+        'authorization':  `bearer ${jwtToken}`,
+        'apns-topic':     `${bundleId}.voip`,
+        'apns-push-type': 'voip',
+        'apns-priority':  '10',
+        'content-type':   'application/json',
+        'content-length': Buffer.byteLength(payload),
+      })
+
       req.write(payload)
       req.end()
+
+      req.on('response', (headers) => {
+        const status = headers[':status']
+        console.log('[NotificationPush] sendVoipSyncPush status:', status)
+        client.close()
+        resolve({ success: status === 200 })
+      })
+
+      req.on('error', (err) => {
+        console.error('[NotificationPush] sendVoipSyncPush req error:', err)
+        client.close()
+        resolve({ success: false })
+      })
     })
   } catch (error) {
     console.error('[NotificationPush] sendVoipSyncPush:', error)
@@ -479,3 +490,4 @@ module.exports = PushNotificationService;
 module.exports.pushSpecialNotification  = pushSpecialNotification;
 module.exports.fetchSpecialNotification = fetchSpecialNotification;
 module.exports.deleteNotification       = deleteNotification;
+module.exports.sendVoipSyncPush         = sendVoipSyncPush;

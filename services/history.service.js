@@ -105,10 +105,12 @@ const buildHistoryDocument = (type, record, shared) => {
     mechanics:   shared.mechanics    || record.mechanics  || null,
     remarks:     shared.remarks      || record.remarks    || record.workRemarks || null,
 
+    // ── Unified Service Hours ────────────────────────────────────────────────
+    serviceHrs:     record.serviceHrs     || record.runningHours || null,
+    nextServiceHrs: record.nextServiceHrs || null,
+    fullService:    isOil  ? (record.fullService ?? false) : false,
+
     // ── Oil / Normal ──────────────────────────────────────────────────────────
-    serviceHrs:     isOil  ? (record.serviceHrs     || null) : null,
-    nextServiceHrs: isOil  ? (record.nextServiceHrs || null) : null,
-    fullService:    isOil  ? (record.fullService     ?? false) : false,
     oil:            isOil  ? (shared.oil            || 'Check') : null,
     oilFilter:      isOil  ? (shared.oilFilter      || 'Check') : null,
     fuelFilter:     isOil  ? (shared.fuelFilter     || 'Check') : null,

@@ -353,7 +353,11 @@ const addPushToken = async (req, res) => {
  */
 const registerVoipToken = async (req, res) => {
   try {
+    
+    
     const { uniqueCode, voipToken } = req.body
+    console.log("uniqueCode :", uniqueCode);
+    console.log("voipToken :", voipToken); 
     if (!uniqueCode || !voipToken) return res.status(400).json({ success: false, message: 'uniqueCode and voipToken are required' })
     const result = await tokenService.insertVoipToken(uniqueCode, voipToken)
     res.status(result.success ? 200 : 404).json(result)

@@ -1,15 +1,6 @@
-// models/user.model.js
 const mongoose = require('mongoose');
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────────────────────
-
 const { USER_ROLES } = require('../constants/user.constants');
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-schemas
-// ─────────────────────────────────────────────────────────────────────────────
 
 const pushTokenSchema = new mongoose.Schema(
   {
@@ -64,7 +55,7 @@ const trustedDeviceSchema = new mongoose.Schema(
 const signatureActivationSchema = new mongoose.Schema(
   {
     signType:      { type: String, required: true, enum: ['pm', 'wm', 'accounts', 'manager', 'authorized', 'seal'] },
-    activationKey: { type: String, required: true }, // bcrypt hashed 20-digit key
+    activationKey: { type: String, required: true },
     isActivated:   { type: Boolean, default: false },
     activatedAt:   { type: Date    },
     activatedBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -101,73 +92,57 @@ const exploredFeatureSchema = new mongoose.Schema(
   { _id: false },
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Main Schema
-// ─────────────────────────────────────────────────────────────────────────────
-
 const userSchema = new mongoose.Schema(
   {
     // Identity
-    name:                { type: String, required: [true, 'Name is required'      ], trim: true                                                                                                                   },
-    email:               { type: String, required: [true, 'Email is required'     ], trim: true, lowercase: true,  match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email address']                                },
-    uniqueCode:          { type: String, required: [true, 'UniqueCode is required']                                                                                                                               },
-    userType:            { type: String, required: [true, 'UserType is required'  ],                                                                                                default: 'office'             },
-    tag:                 { type: String, required: [true, 'tag is required'       ],                                                                                                default: process.env.TAG_CODE },
-    department:          { type: String,                                             trim: true                                                                                                                   },
+    name:                { type: String, required: [true, 'Name is required'      ], trim: true },
+    email:               { type: String, required: [true, 'Email is required'     ], trim: true, lowercase: true, match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email address'] },
+    uniqueCode:          { type: String, required: [true, 'UniqueCode is required'] },
+    userType:            { type: String, required: [true, 'UserType is required'  ], default: 'office' },
+    tag:                 { type: String, required: [true, 'tag is required'       ], default: process.env.TAG_CODE },
+    department:          { type: String, trim: true },
 
     // Auth
-    password:            { type: String, required: [true, 'Password is required'],                                 minlength: [6, 'Password should be at least 6 characters long']                                },
-    authMail:            { type: String,                                             trim: true, lowercase: true,  match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email address'], default: ''                   },                                               
-    docAuthPasw:         { type: String                                                                                                                                                                           },
-                
+    password:            { type: String, required: [true, 'Password is required'], minlength: [6, 'Password should be at least 6 characters long'] },
+    authMail:            { type: String, trim: true, lowercase: true, match: [/^\S+@\S+\.\S+$/, 'Please enter a valid email address'], default: '' },
+    docAuthPasw:         { type: String },
+
     // Role & Access
-    role:                { type: String, enum: Object.values(USER_ROLES),                                                                                                           default: 'USER'               },
-    permissions:         { type: [Object],                                                                                                                                          default: []                   },
-    grantAccess:         { type: [grantAccessSchema],                                                                                                                               default: []                   },
+    role:                { type: String, enum: Object.values(USER_ROLES), default: 'USER' },
+    permissions:         { type: [Object], default: [] },
+    grantAccess:         { type: [grantAccessSchema], default: [] },
 
     // Lifecycle
-    isActive:            { type: Boolean,                                                                                                                                           default: true                 },
-    joiningDate:         { type: Date                                                                                                                                                                             },
-    lastLogin:           { type: Date                                                                                                                                                                             },
+    isActive:            { type: Boolean, default: true },
+    joiningDate:         { type: Date },
+    lastLogin:           { type: Date },
 
     // Notifications
-    specialNotification: { type: [specialNotificationSchema],                                                                                                                       default: []                   },
+    specialNotification: { type: [specialNotificationSchema], default: [] },
 
     // Devices & Tokens
-    pushTokens:          { type: [pushTokenSchema],   
+    pushTokens:          { type: [pushTokenSchema], default: [] },
     voipPushToken:       { type: String, default: null },
-    webPushSubscription: { type: Object, default: null },                                                                                                                              default: []                   },
-    biometricTokens:     { type: [biometricTokenSchema],                                                                                                                            default: []                   },
-    signatureActivation: { type: [signatureActivationSchema],                                                                                                                       default: []                   },
+    webPushSubscription: { type: Object, default: null },
+    biometricTokens:     { type: [biometricTokenSchema], default: [] },
+    signatureActivation: { type: [signatureActivationSchema], default: [] },
 
     // Feature Discovery
     exploredFeatures:    { type: [exploredFeatureSchema], default: [] },
-    lastExploredVersion: { type: String,   default: null },
-    tutorialsSeen:       { type: [String], default: []   },
+    lastExploredVersion: { type: String, default: null },
+    tutorialsSeen:       { type: [String], default: [] },
   },
   {
     timestamps: true,
   },
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Indexes
-// ─────────────────────────────────────────────────────────────────────────────
-
 userSchema.index({ email:      1 }, { unique: true });
 userSchema.index({ uniqueCode: 1 }, { unique: true });
 userSchema.index({ role:       1 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Instance Methods
-// ─────────────────────────────────────────────────────────────────────────────
-
 userSchema.methods.hasPermission = function (permission) {
   return this.permissions.includes(permission);
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Export
-// ─────────────────────────────────────────────────────────────────────────────
 
 module.exports = mongoose.model('User', userSchema);

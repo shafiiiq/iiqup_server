@@ -156,7 +156,11 @@ const updateServiceReportWith = async (id, updateData) => {
     let updatedHistory = null;
 
     if (updated.historyId) {
-      const historyUpdate = { date: updated.date };
+      const historyUpdate = {
+        date:           updated.date,
+        serviceHrs:     updated.serviceHrs     || null,
+        nextServiceHrs: updated.nextServiceHrs || null,
+      };
 
       // Only oil/normal records carry filter flags
       if (updated.serviceType === 'oil' || updated.serviceType === 'normal') {
@@ -165,8 +169,6 @@ const updateServiceReportWith = async (id, updateData) => {
         historyUpdate.fuelFilter     = getFilterStatus(updated.checklistItems, [2]);
         historyUpdate.airFilter      = getFilterStatus(updated.checklistItems, [3]);
         historyUpdate.waterSeparator = 'Check';
-        historyUpdate.serviceHrs     = updated.serviceHrs     || null;
-        historyUpdate.nextServiceHrs = updated.nextServiceHrs || null;
       }
 
       updatedHistory = await ServiceHistoryModel.findByIdAndUpdate(
