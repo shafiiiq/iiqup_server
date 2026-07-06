@@ -187,7 +187,7 @@ class OAuth2GmailClient {
       };
     } catch (error) {
       const isAuthError = error.message.includes('invalid_grant') || error.message.includes('unauthorized');
-
+ 
       if (isAuthError) {
         await this.oauth2Client.refreshAccessToken();
         return this.sendEmail(to, subject, htmlContent, textContent, attachments, cc);  

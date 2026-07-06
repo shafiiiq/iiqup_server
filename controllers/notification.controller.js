@@ -264,6 +264,7 @@ const searchNotifications = async (req, res) => {
 const getPendingNotifications = async (req, res) => {
   try {
     const { uniqueCode, since, limit = 100 } = req.body;
+    console.log('[Notification] getPendingNotifications request body:', req.body);
 
     if (!uniqueCode) {
       return res.status(400).json({ success: false, error: 'uniqueCode is required' });

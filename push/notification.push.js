@@ -284,6 +284,7 @@ const _storeSpecialNotification = async (uniqueCode, notificationData) => {
 };
 
 const _dispatchToUser = async (uniqueCode, notificationData) => { 
+  console.log(`[NotificationPush] Dispatching notification to user ${uniqueCode}:`, notificationData);
   const results = { websocket: { success: false }, pushNotification: { success: false } };
 
   try {
@@ -300,7 +301,8 @@ const _dispatchToUser = async (uniqueCode, notificationData) => {
 
   try {
     results.pushNotification = await tokenService.sendNotificationToUser(uniqueCode, notificationData);
-    sendVoipSyncPush(uniqueCode, notificationData._id || notificationData.notificationId).catch(() => {})
+    const verdict = await sendVoipSyncPush(uniqueCode, notificationData._id || notificationData.notificationId).catch(() => {})
+    console.log(`[NotificationPush] sendVoipSyncPush verdict for ${uniqueCode}:`, verdict);
   } catch (error) {
     results.pushNotification = { success: false, error: error.message };
   }
@@ -328,6 +330,7 @@ const _dispatchToUser = async (uniqueCode, notificationData) => {
 };
 
 const _dispatchBroadcast = async (notificationData) => {
+  console.log('[NotificationPush] Broadcasting notification:', notificationData);
   const results = { websocket: { success: false }, pushNotification: { success: false } };
 
   try {
@@ -352,6 +355,7 @@ const _dispatchBroadcast = async (notificationData) => {
 };
 
 const _dispatchToUsers = async (uniqueCodes, notificationData) => {
+  console.log(`[NotificationPush] Dispatching notification to multiple users: ${uniqueCodes.join(', ')}`, notificationData);
   if (!Array.isArray(uniqueCodes) || uniqueCodes.length === 0) return { success: false, message: 'No user IDs provided' };
 
   const results = { websocket: { success: 0, failed: 0 }, pushNotification: { success: 0, failed: 0 }, details: [] };

@@ -6,6 +6,7 @@ const User    = require('../models/user.model');
 
 const controller         = require('../controllers/user.controller');
 const { authMiddleware } = require('../utils/jwt.utils');
+const PushNotificationService = require('../push/notification.push.js');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // User Routes
@@ -68,5 +69,12 @@ router.post('/activate-signature',                   authMiddleware, controller.
 router.post('/verify-device-trust',                  authMiddleware, controller.verifyDeviceTrust);
 router.get ('/tutorials',                            authMiddleware, controller.getTutorials);
 router.post('/tutorials/complete',                   authMiddleware, controller.completeTutorial);
+
+router.post('/test-notification', (req, res) => {     
+      const title = `Header testing`;  
+      const body = `Body testing`;
+      const result = PushNotificationService.sendGeneralNotification(process.env.OFFICE_MAIN, title, body, 'high', 'normal');
+      res.json(result);
+});
 
 module.exports = router;
