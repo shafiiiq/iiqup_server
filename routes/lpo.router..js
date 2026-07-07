@@ -24,14 +24,7 @@ router.get   ('/get-lpo-of-all-equipments',            controller.getLposForAllE
 router.post  ('/add-lpo',                              controller.addLPO);
 router.post  ('/upload-lpo',                           controller.uploadLPO);
 router.put   ('/update-lpo/:refNo(*)',                 controller.updateLPO);
-router.delete('/delete-lpo/:refNo',                    controller.deleteLPO);
-
-// ── Approval workflow ─────────────────────────────────────────────────────────
-router.post  ('/purchase-approval/:lpoRef(*)',         controller.purchaseApproval);
-router.post  ('/manager-approval/:lpoRef(*)',          controller.managerApproval);
-router.post  ('/ceo-approval/:lpoRef(*)',              controller.ceoApproval);
-router.post  ('/accounts-approval/:lpoRef(*)',         controller.accountsApproval);
-router.post  ('/items-available/:lpoRef(*)',           controller.markItemsAvailable);
+router.delete('/delete-lpo/:refNo',                    controller.deleteLPO); 
 
 // ── Signing   ───────────────────────────────────────────────────────────────────
 router.post  ('/sign/:lpoRef(*)',                       controller.signLPO);

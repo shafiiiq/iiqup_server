@@ -363,6 +363,75 @@ const uploadLPOForComplaint = async (req, res) => {
 };
 
 /**
+ * POST /complaints/sign/:complaintId
+ * Unified sign endpoint used by the mobile app for all LPO approval roles.
+ */
+const signComplaint = async (req, res) => {
+  try {
+    const { complaintId } = req.params;
+    const {
+      uniqueCode, signedDate, signedFrom, role,
+      signedIP, signedDevice, signedLocation,
+    } = req.body;
+
+    if (!uniqueCode || !signedDate || !signedFrom || !role) {
+      return res.status(400).json({ success: false, message: 'uniqueCode, signedDate, signedFrom, and role are required' });
+    }
+
+    const normalizedRole = String(role).trim().toUpperCase();
+    const allowedCodes = {
+      PURCHASE_MANAGER: [process.env.PURCHASE_MANAGER],
+      MANAGER: [process.env.MANAGER],
+      ACCOUNTS: [process.env.ACCOUNTS],
+      CEO: [process.env.CEO],
+      MANAGING_DIRECTOR: [process.env.MD],
+    };
+
+    const allowed = allowedCodes[normalizedRole] || [];
+    if (!allowed.includes(uniqueCode)) {
+      return res.status(403).json({ success: false, message: 'Unauthorised: your account is not recognised as an authorised signatory for this document' });
+    }
+
+    const approvedCreds = {
+      signed: true,
+      authorised: true,
+      approvedBy: uniqueCode,
+      approvedDate: signedDate,
+      approvedFrom: signedFrom,
+      approvedIP: signedIP,
+      approvedBDevice: signedDevice,
+      approvedLocation: signedLocation,
+    };
+
+    let result;
+    switch (normalizedRole) {
+      case 'PURCHASE_MANAGER':
+        result = await ComplaintService.purchaseApproval(complaintId, { ...approvedCreds, comments: 'Signed via mobile app' });
+        break;
+      case 'MANAGER':
+        result = await ComplaintService.managerApproval(complaintId, uniqueCode, 'Signed via mobile app', approvedCreds);
+        break;
+      case 'CEO':
+        result = await ComplaintService.ceoApproval(complaintId, uniqueCode, 'Signed via mobile app', approvedCreds, 'CEO');
+        break;
+      case 'MANAGING_DIRECTOR':
+        result = await ComplaintService.ceoApproval(complaintId, uniqueCode, 'Signed via mobile app', approvedCreds, 'MD');
+        break;
+      case 'ACCOUNTS':
+        result = await ComplaintService.accountsApproval(complaintId, uniqueCode, 'Signed via mobile app', approvedCreds);
+        break;
+      default:
+        return res.status(403).json({ success: false, message: 'Unsupported role for signing' });
+    }
+
+    res.status(200).json({ success: true, message: 'Document signed successfully', data: result.data || result });
+  } catch (error) {
+    console.error('[Complaint] signComplaint:', error);
+    res.status(error.status || 500).json({ success: false, message: error.message || 'Signing failed' });
+  }
+};
+
+/**
  * PUT /complaints/:complaintId/purchase-approval
  * Step 6 — PURCHASE_MANAGER approves or signs off on the complaint.
  */
@@ -669,7 +738,7 @@ const getComplaintsByStatus = async (req, res) => {
     const complaints  = await ComplaintService.getComplaintsByStatus(status);
 
     res.status(200).json({
-      success: true,
+      success: true, 
       message: 'Complaints retrieved successfully',
       data:    complaints,
     });
@@ -680,22 +749,27 @@ const getComplaintsByStatus = async (req, res) => {
 };
 
 /**
- * POST /complaints/mechanic
+ * POST /complaints/mechanic-jobs
  * Returns all complaints assigned to a mechanic by email.
  */
 const getMechanicComplaints = async (req, res) => {
   try {
-    const { email }  = req.body;
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Mechanic email is required' });
+    }
+
     const complaints = await ComplaintService.getComplaintsByMechanic(email);
 
     res.status(200).json({
       success: true,
       message: 'Mechanic complaints retrieved successfully',
-      data:    complaints,
+      data: complaints,
     });
   } catch (error) {
     console.error('[Complaint] getMechanicComplaints:', error);
-    res.status(500).json({ success: false, message: 'Failed to retrieve mechanic complaints', error: error.message });
+    res.status(error.status || 500).json({ success: false, message: error.message || 'Failed to retrieve mechanic complaints', error: error.message });
   }
 };
 
@@ -713,6 +787,7 @@ module.exports = {
   approveItemWithoutLPO,
   createLPOForComplaint,
   uploadLPOForComplaint,
+  signComplaint,
   purchaseApproval,
   managerApproval,
   ceoApproval,

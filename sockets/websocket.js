@@ -284,7 +284,10 @@ const setupWebSocket = (io) => {
 
         if (senderUniqueCode) {
           global.io.to(`user_${senderUniqueCode}`).emit('message_status_update', {
-            messageIds, status: 'delivered', userId,
+            messageIds,
+            chatId: data.chatId,
+            status: 'delivered',
+            userId,
           });
         }
       } catch (error) {

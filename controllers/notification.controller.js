@@ -271,7 +271,7 @@ const getPendingNotifications = async (req, res) => {
       return res.status(400).json({ success: false, error: 'uniqueCode is required' });
     }
 
-    const result = await notificationsService.getPendingNotifications(uniqueCode, since, limit);
+    const result = await notificationsService.getPendingNotifications(uniqueCode, since, limit); 
 
     // Dispatch fetched notifications to devices (websocket + FCM + VoIP sync)
     try {

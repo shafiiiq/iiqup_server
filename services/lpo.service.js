@@ -96,14 +96,14 @@ const buildSignedFields = (prefix, creds) => {
 const notify = async (notifPayload, recipient, title, description, priority = 'high') => {
   const notification = await createNotification({ ...notifPayload, category: 'lpo', recipient, time: new Date() });
 
-  await PushNotificationService.sendGeneralNotification(
-    recipient,
-    title,
-    description,
-    priority,
-    'normal',
-    notification.data._id.toString()
-  );
+  // await PushNotificationService.sendGeneralNotification(
+  //   recipient,
+  //   title,
+  //   description,
+  //   priority,
+  //   'normal',
+  //   notification.data._id.toString()
+  // );
 };
 
 const roleScreenMap = (role, isMD) => {
@@ -185,7 +185,7 @@ const createLPO = async (lpoData) => {
       ...lpoData,
       totalAmount,
       signatures,
-      vendorCode,
+      vendorCode, 
       vendorMail,
       isAmendmented: false,
       amendments:    []
@@ -280,13 +280,13 @@ const uploadLPO = async (lpoFileData, uploadedBy, lpoRef, description, isAmendme
 
     const title       = isAmendment ? `LPO Amendment Approval Needed - ${lpoRef}` : `LPO Approval Needed - ${lpoRef}`;
     const description2 = isAmendment
-      ? `LPO has been amended. LPO Ref: ${lpoRef}. Purchase Manager Approval Needed! Please review and approve the amendment.`
-      : `New LPO created. LPO Ref: ${lpoRef}. Purchase Manager Approval Needed! Please review and approve.`;
+      ? `LPO has been amended. LPO Ref: ${lpoRef}. Manager Approval Needed! Please review and approve the amendment.`
+      : `New LPO created. LPO Ref: ${lpoRef}. Manager Approval Needed! Please review and approve.`;
 
     await notify(
       {
         title, description: description2, priority: 'high', sourceId: 'lpo_approval',
-        navigateTo: `/(signature)/pm/${lpoRef}`,
+        navigateTo: `/(signature)/op/${lpoRef}`,
         navigateText: 'View and Sign', navigteToId: lpoRef, hasButton: true
       },
       JSON.parse(process.env.OFFICE_HERO),
@@ -717,17 +717,37 @@ const signLPO = async (lpoRef, signData) => {
   } = signData;
 
   // ── Role resolution ────────────────────────────────────────────────────────
-  const roleMap = [
-    { envKey: process.env.MANAGER,          field: 'managerSigned',  detailsPrefix: 'MANAGER',  role: 'MANAGER',           order: 1 },
-    { envKey: process.env.PURCHASE_MANAGER, field: 'pmSigned',       detailsPrefix: 'PMR',      role: 'PURCHASE_MANAGER',  order: 2 },
-    { envKey: process.env.WORKSHOP_MANAGER, field: 'pmSigned',       detailsPrefix: 'PMR',      role: 'PURCHASE_MANAGER',  order: 2 },  // shares same field
-    { envKey: process.env.CEO,              field: 'ceoSigned',      detailsPrefix: 'CEO',      role: 'CEO',               order: 4 },
-    { envKey: process.env.MD,               field: 'ceoSigned',      detailsPrefix: 'MD',       role: 'MANAGING_DIRECTOR', order: 4 },
-    { envKey: process.env.ACCOUNTS,         field: 'accountsSigned', detailsPrefix: 'ACCOUNTS', role: 'ACCOUNTS',          order: 3 },
-  ];
+  const normalizeRole = (value) => {
+    if (!value) return null;
+    const normalized = String(value).trim().toUpperCase();
+    const aliases = {
+      PURCHASE_MANAGER: 'PURCHASE_MANAGER',
+      PURCHASEMANAGER: 'PURCHASE_MANAGER',
+      PM: 'PURCHASE_MANAGER',
+      MANAGER: 'MANAGER',
+      ACCOUNTS: 'ACCOUNTS',
+      ACCOUNTANT: 'ACCOUNTS',
+      CEO: 'CEO',
+      MD: 'MANAGING_DIRECTOR',
+      MANAGING_DIRECTOR: 'MANAGING_DIRECTOR',
+    };
+    return aliases[normalized] || normalized;
+  };
 
-  const matched = roleMap.find(r => r.envKey === uniqueCode);
-  if (!matched) {
+  const roleConfig = {
+    MANAGER:            { envKey: process.env.MANAGER,          field: 'managerSigned',  detailsPrefix: 'MANAGER',  role: 'MANAGER',            order: 1 },
+    PURCHASE_MANAGER:   { envKey: process.env.PURCHASE_MANAGER, field: 'pmSigned',       detailsPrefix: 'PMR',      role: 'PURCHASE_MANAGER',  order: 2 },
+    ACCOUNTS:           { envKey: process.env.ACCOUNTS,         field: 'accountsSigned', detailsPrefix: 'ACCOUNTS', role: 'ACCOUNTS',          order: 3 },
+    CEO:                { envKey: process.env.CEO,              field: 'ceoSigned',      detailsPrefix: 'CEO',      role: 'CEO',               order: 4 },
+    MANAGING_DIRECTOR: { envKey: process.env.MD,               field: 'ceoSigned',      detailsPrefix: 'MD',       role: 'MANAGING_DIRECTOR', order: 4 },
+  };
+
+  const requestedRole = normalizeRole(signData.role);
+  const matched = requestedRole
+    ? roleConfig[requestedRole]
+    : Object.values(roleConfig).find(r => r.envKey === uniqueCode);
+
+  if (!matched || matched.envKey !== uniqueCode) {
     throw { status: 403, message: 'Unauthorised: your account is not recognised as an authorised signatory for LPO documents' };
   }
 
@@ -738,9 +758,16 @@ const signLPO = async (lpoRef, signData) => {
      throw { status: 403, message: 'LPO_NOT_UPLOADED' }; 
   }
 
+  // ── Role-specific restrictions ─────────────────────────────────────────────
+  if (matched.role === 'CEO' && lpo.signatures?.authorizedSignatoryTitle !== 'CEO') {
+    throw { status: 403, message: 'Only the designated CEO is authorised to sign this LPO' };
+  }
+
+  if (matched.role === 'MANAGING_DIRECTOR' && lpo.signatures?.authorizedSignatoryTitle !== 'MANAGING DIRECTOR') {
+    throw { status: 403, message: 'Only the designated Managing Director is authorised to sign this LPO' };
+  }
+
   // ── Already signed guard ───────────────────────────────────────────────────
-  // Note: CEO and MD both use the same 'ceoSigned' field, making them interchangeable.
-  // Either can sign regardless of which was originally designated. Same for PM/Workshop Manager.
   if (lpo[matched.field] === true) {
     throw { status: 409, message: `The authorized signatory role has already been signed` };
   }
@@ -770,6 +797,14 @@ const signLPO = async (lpoRef, signData) => {
 
   // ── Write the signature ────────────────────────────────────────────────────
   const p            = matched.detailsPrefix;
+  const workflowProgressMap = {
+    MANAGER:            'manager_approved',
+    PURCHASE_MANAGER:   'purchase_approved',
+    ACCOUNTS:           'accounts_approved',
+    CEO:                'ceo_approved',
+    MANAGING_DIRECTOR:  'md_approved',
+  };
+
   const updateFields = {
     [matched.field]:                     true,
     [`lpoDetails.${p}signed`]:           true,
@@ -780,6 +815,7 @@ const signLPO = async (lpoRef, signData) => {
     [`lpoDetails.${p}approvedIP`]:       signedIP,
     [`lpoDetails.${p}approvedBDevice`]:  signedDevice,
     [`lpoDetails.${p}approvedLocation`]: signedLocation,
+    workflowStatus:                      workflowProgressMap[matched.role],
     $push: {
       approvalTrail: {
         approvedBy:   uniqueCode,
@@ -787,7 +823,7 @@ const signLPO = async (lpoRef, signData) => {
         action:       override && unsignedAbove.length > 0 ? 'override_signed' : 'signed',
         comments:     override && unsignedAbove.length > 0
           ? `Override signed by ${matched.role} — predecessors not yet signed`
-          : `Signed via web by ${matched.role}`,
+          : `Signed via mobile app by ${matched.role}`,
         approvalDate: new Date(),
       }
     }
@@ -931,7 +967,7 @@ const getPendingSignatures = async (uniqueCode) => {
         query: {
           managerSigned:  true,
            pmSigned:       { $ne: true },
-           workflowStatus: { $in: ['lpo_uploaded', 'lpo_amended'] },
+           workflowStatus: { $in: ['manager_approved'] },
         },
       },
       {
@@ -940,7 +976,7 @@ const getPendingSignatures = async (uniqueCode) => {
          query: {
            managerSigned:  true,
            pmSigned:       { $ne: true },
-           workflowStatus: { $in: ['lpo_uploaded', 'lpo_amended'] },
+           workflowStatus: { $in: ['manager_approved'] },
         },
        },
        {
@@ -950,7 +986,7 @@ const getPendingSignatures = async (uniqueCode) => {
            managerSigned:  true,
           pmSigned:       true,
            accountsSigned: { $ne: true },
-          workflowStatus: { $in: ['lpo_uploaded', 'lpo_amended'] },
+          workflowStatus: { $in: ['purchase_approved'] },
          },
       },
       {
@@ -961,7 +997,7 @@ const getPendingSignatures = async (uniqueCode) => {
            pmSigned:       true,
            accountsSigned: true,
            ceoSigned:      { $ne: true },
-           workflowStatus: { $in: ['lpo_uploaded', 'lpo_amended'] },
+           workflowStatus: { $in: ['accounts_approved'] },
            'signatures.authorizedSignatoryTitle': { $nin: ['MANAGING DIRECTOR'] },
          },
        },
@@ -973,7 +1009,7 @@ const getPendingSignatures = async (uniqueCode) => {
           pmSigned:       true,
           accountsSigned: true,
            ceoSigned:      { $ne: true },
-           workflowStatus: { $in: ['lpo_uploaded', 'lpo_amended'] },
+           workflowStatus: { $in: ['accounts_approved'] },
            'signatures.authorizedSignatoryTitle': 'MANAGING DIRECTOR',
          },
        },

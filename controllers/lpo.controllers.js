@@ -440,7 +440,7 @@ const uploadLPO = async (req, res) => {
     }
 
     const amendmentSuffix = isAmendment ? '-amendment' : '';
-    const finalFilename   = fileName || `lpo-${lpoRef}${amendmentSuffix}-${Date.now()}.pdf`;
+    const finalFilename   = fileName || `lpo-${lpoRef}${amendmentSuffix}-${Date.now()}.pdf`;  
     const s3Key           = `lpos/${lpoRef}/${finalFilename}`;
     const uploadUrl       = await putObject(finalFilename, s3Key, 'application/pdf');
 
@@ -609,7 +609,7 @@ const signLPO = async (req, res) => {
   try {
     const { lpoRef } = req.params;
     const {
-      uniqueCode, signedDate, signedFrom,
+      uniqueCode, signedDate, signedFrom, role,
       signedIP, signedDevice, signedLocation,
       override = false,        
     } = req.body;
@@ -619,7 +619,7 @@ const signLPO = async (req, res) => {
     }
 
     const result = await lpoService.signLPO(lpoRef, {
-      uniqueCode, signedDate, signedFrom,
+      uniqueCode, signedDate, signedFrom, role,
       signedIP, signedDevice, signedLocation,
       override,                
     });

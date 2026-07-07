@@ -444,21 +444,22 @@ class PushNotificationService {
   static sendVoIPCallNotification = sendVoIPCallNotification;
 
   static async sendGeneralNotification(uniqueCode, title, description, priority = 'medium', type = 'normal', notificationId, extraData = {}) {
-    const notification = {
-      _id: notificationId,
-      type,
-      title,
-      description,
-      message: description,
-      priority,
-      time: new Date().toISOString(),
-      notificationId,
-      ...extraData,
-    };
-    console.log(`Sending general notification to ${uniqueCode || 'broadcast'}:`, notification);
-    if (Array.isArray(uniqueCode)) return _dispatchToUsers(uniqueCode, notification);
-    if (uniqueCode)                return _dispatchToUser(uniqueCode, notification);
-    return _dispatchBroadcast(notification);
+    return 0;
+    // const notification = {
+    //   _id: notificationId,
+    //   type,
+    //   title,
+    //   description,
+    //   message: description,
+    //   priority,
+    //   time: new Date().toISOString(),
+    //   notificationId,
+    //   ...extraData,
+    // };
+    // console.log(`Sending general notification to ${uniqueCode || 'broadcast'}:`, notification);
+    // if (Array.isArray(uniqueCode)) return _dispatchToUsers(uniqueCode, notification);
+    // if (uniqueCode)                return _dispatchToUser(uniqueCode, notification);
+    // return _dispatchBroadcast(notification);
   }
 
   static async sendStockAlert(uniqueCode, stockInfo, message) {

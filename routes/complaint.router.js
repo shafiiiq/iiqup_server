@@ -32,13 +32,7 @@ router.post('/create-lpo/:complaintId', ComplaintController.createLPOForComplain
 
 router.post('/upload-lpo/:complaintId', ComplaintController.uploadLPOForComplaint);
 
-router.post('/purchase-approval/:complaintId', ComplaintController.purchaseApproval);
-
-router.post('/manager-approval/:complaintId', ComplaintController.managerApproval);
-
-router.post('/ceo-approval/:complaintId', ComplaintController.ceoApproval);
-
-router.post('/accounts-approval/:complaintId', ComplaintController.accountsApproval);
+router.post('/sign/:complaintId', ComplaintController.signComplaint);
 
 // Step 8: Mark items as available (by JALEEL_KA or MAINTENANCE_HEAD)
 router.post('/items-available/:complaintId', ComplaintController.markItemsAvailable);
