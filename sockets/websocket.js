@@ -288,6 +288,7 @@ const setupWebSocket = (io) => {
             chatId: data.chatId,
             status: 'delivered',
             userId,
+            deliveredAt: new Date().toISOString(),
           });
         }
       } catch (error) {
@@ -302,7 +303,11 @@ const setupWebSocket = (io) => {
 
         if (senderUniqueCode) {
           global.io.to(`user_${senderUniqueCode}`).emit('message_status_update', {
-            messageIds, chatId, status: 'read', userId,
+            messageIds,
+            chatId,
+            status: 'read',
+            userId,
+            readAt: new Date().toISOString(),
           });
         }
       } catch (error) {
