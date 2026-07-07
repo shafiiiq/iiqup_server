@@ -76,7 +76,7 @@ const sendMessage = async (messageData) => {
 
     const lastMessageContent = messageType === 'text' ? content : `${messageType} message`;
 
-    await chatService.updateLastMessage(chatId, lastMessageContent, senderId, senderName);
+    await chatService.updateLastMessage(chatId, lastMessageContent, senderId, senderName, messageType);
     await chatService.incrementUnreadCount(chatId, senderId);
 
     const PushNotificationService = require('../push/notification.push');
@@ -240,7 +240,7 @@ const forwardMessage = async (messageId, targetChatId, senderId, senderType, sen
     });
 
     const lastMessageContent = forwarded.messageType === 'text' ? forwarded.content : `${forwarded.messageType} message`;
-    await chatService.updateLastMessage(targetChatId, lastMessageContent, senderId, senderName);
+    await chatService.updateLastMessage(targetChatId, lastMessageContent, senderId, senderName, messageType);
     await chatService.incrementUnreadCount(targetChatId, senderId);
 
     return forwarded.toObject();

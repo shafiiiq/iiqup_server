@@ -248,10 +248,11 @@ const verifyUserAccess = async (chatId, userId) => {
 /**
  * Updates the last message preview and sender on a chat.
  */
-const updateLastMessage = async (chatId, messageContent, senderId, senderName) => {
+const updateLastMessage = async (chatId, messageContent, senderId, senderName, messageType) => {
   try {
     await Chat.findByIdAndUpdate(chatId, {
       lastMessage:       messageContent,
+      lastMessageType:   messageType || 'text',
       lastMessageTime:   new Date(),
       lastMessageSender: { userId: senderId, name: senderName },
     });
