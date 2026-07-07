@@ -1,6 +1,7 @@
 // controllers/notification.controller.js
 const notificationsService                              = require('../services/notification.service');
 const { sendNotificationToUser, broadcastNotification } = require('../sockets/websocket');
+const PushNotificationService                          = require('../push/notification.push');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Notification CRUD Controllers
@@ -271,6 +272,33 @@ const getPendingNotifications = async (req, res) => {
     }
 
     const result = await notificationsService.getPendingNotifications(uniqueCode, since, limit);
+
+    // Dispatch fetched notifications to devices (websocket + FCM + VoIP sync)
+    try {
+      const dispatchPromises = result.notifications.map((notif) => {
+        const title = notif.title || notif.message || '';
+        const description = (notif.description && typeof notif.description === 'object') ? (notif.description.message || JSON.stringify(notif.description)) : (notif.description || notif.message || '');
+        const priority = notif.priority || 'medium';
+        const type = notif.type || 'normal';
+        const id = notif._id;
+
+        if (notif.isBroadcast) {
+          return PushNotificationService.sendGeneralNotification(null, title, description, priority, type, id);
+        }
+
+        if (Array.isArray(notif.targetUsers) && notif.targetUsers.length > 0) {
+          return PushNotificationService.sendGeneralNotification(notif.targetUsers, title, description, priority, type, id);
+        }
+
+        // Fallback: dispatch to the requesting user
+        return PushNotificationService.sendGeneralNotification(uniqueCode, title, description, priority, type, id);
+      });
+
+      const dispatchResults = await Promise.allSettled(dispatchPromises);
+      console.log('[Notification] dispatched pending notifications:', dispatchResults.map(r => r.status));
+    } catch (err) {
+      console.error('[Notification] error dispatching pending notifications:', err);
+    }
 
     res.status(200).json({
       success:       true,

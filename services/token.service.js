@@ -30,6 +30,7 @@ const insertPushToken = async (uniqueCode, pushToken, platform = null) => {
   try {
     const tokenString = String(pushToken || '');
     if (!tokenString || tokenString.length < 100) return { success: false, message: 'Invalid push token format' };
+    console.log(`[TokenService] register-push-token platform=${platform || 'unknown'} tokenLength=${tokenString.length}`);
 
     const user = await findUserByUniqueCode(uniqueCode, 'uniqueCode pushTokens');
     if (!user) return { success: false, message: 'User not found' };
@@ -148,6 +149,63 @@ const getUserPushTokens = async (uniqueCode) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Builds an FCM payload that works reliably for both Android and iOS.
+ * The APNs block is explicit so Apple devices show the alert instead of
+ * silently dropping it.
+ */
+const buildNotificationMessage = (notificationData = {}) => {
+  const title = String(notificationData.title || 'New Notification');
+  const body = String(notificationData.description || notificationData.message || '');
+  const notificationId = String(notificationData.notificationId || notificationData._id?.toString() || '');
+  const type = String(notificationData.type || 'normal');
+  const priority = String(notificationData.priority || 'medium');
+  const isCall = type === 'call';
+
+  const message = {
+    notification: {
+      title,
+      body,
+    },
+    data: {
+      notificationId,
+      type,
+      priority,
+      click_action: 'FLUTTER_NOTIFICATION_CLICK',
+    },
+    apns: {
+      headers: {
+        'apns-priority': '10',
+        'apns-push-type': 'alert',
+        'apns-topic': process.env.APNS_BUNDLE_ID || 'com.iiqup.ansarigroup',
+      },
+      payload: {
+        aps: {
+          alert: { title, body },
+          sound: 'default',
+          badge: 1,
+          'content-available': 1,
+          'mutable-content': 1,
+        },
+      },
+    },
+    android: {
+      priority: isCall ? 'max' : 'high',
+      notification: { title, body, sound: 'default' },
+    },
+  };
+
+  if (isCall) {
+    message.data.callAction = 'incoming';
+    message.data.callerId = String(notificationData.callerId || '');
+    message.data.callerName = String(notificationData.callerName || '');
+    message.apns.payload.aps['content-available'] = 1;
+    message.apns.payload.aps.category = 'CALL_INVITATION';
+  }
+
+  return message;
+};
+
+/**
  * Sends a push notification to a single user via FCM.
  * @param {string} uniqueCode
  * @param {object} notificationData
@@ -162,33 +220,7 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
     const activeTokens = user.pushTokens.filter(t => t.isActive && t.token).map(t => t.token);
     if (activeTokens.length === 0) return { success: false, message: 'No valid push tokens found for this user' };
 
-    const message = {
-      notification: {
-        title: String(notificationData.title || 'New Notification'),
-        body:  String(notificationData.description || notificationData.message || '')
-      },
-      data: {
-        notificationId: String(notificationData.notificationId || notificationData._id?.toString() || ''),
-        type:           String(notificationData.type || 'normal'),
-        priority:       String(notificationData.priority || 'medium')
-      },
-      apns: {
-        headers: { 'apns-priority': '10' },
-        payload: { aps: { alert: { title: String(notificationData.title || 'New Notification'), body: String(notificationData.description || notificationData.message || '') }, sound: 'default' } }
-      },
-      android: {
-        priority: 'high',
-        notification: { title: String(notificationData.title || 'New Notification'), body: String(notificationData.description || notificationData.message || ''), sound: 'default' }
-      }
-    };
-
-    if (notificationData.type === 'call') {
-      message.data.callAction  = 'incoming';
-      message.data.callerId    = String(notificationData.callerId || '');
-      message.data.callerName  = String(notificationData.callerName || '');
-      message.android.priority = 'max';
-      message.apns.payload.aps['content-available'] = 1;
-    }
+    const message = buildNotificationMessage(notificationData);
 
     const results    = await Promise.allSettled(activeTokens.map(token => admin.messaging().send({ ...message, token })));
     const successful = results.filter(r => r.status === 'fulfilled').length;
@@ -215,11 +247,11 @@ const sendBulkNotifications = async (uniqueCodes, notificationData) => {
     const activeTokens = user.pushTokens.filter(t => t.isActive && t.token && t.token.length > 100).map(t => t.token);
     if (activeTokens.length === 0) return { success: false, message: 'No valid tokens' };
 
-    const message = {
-      notification: { title: String(notificationData.title || 'Test'), body: String(notificationData.description || notificationData.message || 'Test') },
-      apns: { headers: { 'apns-priority': '10' }, payload: { aps: { alert: { title: String(notificationData.title || 'Test'), body: String(notificationData.description || notificationData.message || 'Test') }, sound: 'default' } } },
-      android: { priority: 'high', notification: { title: String(notificationData.title || 'Test'), body: String(notificationData.description || notificationData.message || 'Test'), sound: 'default' } }
-    };
+    const message = buildNotificationMessage({
+      ...notificationData,
+      title: notificationData.title || 'Test',
+      description: notificationData.description || notificationData.message || 'Test',
+    });
 
     const results    = await Promise.allSettled(activeTokens.map(token => admin.messaging().send({ ...message, token })));
     const successful = results.filter(r => r.status === 'fulfilled').length;
@@ -262,4 +294,4 @@ const sendNetworkReconnectPush = async (uniqueCode) => {
 // Exports
 // ─────────────────────────────────────────────────────────────────────────────
 
-module.exports = { insertPushToken, removePushToken, cleanupInvalidTokens, getUserPushTokens, sendNotificationToUser, sendBulkNotifications, sendNetworkReconnectPush, insertVoipToken };
+module.exports = { insertPushToken, removePushToken, cleanupInvalidTokens, getUserPushTokens, sendNotificationToUser, sendBulkNotifications, sendNetworkReconnectPush, insertVoipToken, buildNotificationMessage };

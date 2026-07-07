@@ -345,7 +345,14 @@ const _dispatchBroadcast = async (notificationData) => {
   try {
     const allUsers = await User.find({ isActive: true }).select('uniqueCode');
     const uniqueCodes = allUsers.map(u => u.uniqueCode);
-    if (uniqueCodes.length > 0) results.pushNotification = await tokenService.sendBulkNotifications(uniqueCodes, notificationData);
+    if (uniqueCodes.length > 0) {
+      // Dispatch per-user so each user receives websocket + FCM + VoIP sync
+      const perUserDispatch = await _dispatchToUsers(uniqueCodes, notificationData);
+      // Merge per-user results into broadcast results
+      results.pushNotification = perUserDispatch.data ? perUserDispatch.data.pushNotification : { success: false };
+      results.details = perUserDispatch.data ? perUserDispatch.data.details : [];
+      results.voip = perUserDispatch.data ? perUserDispatch.data.details.map(d => ({ uniqueCode: d.uniqueCode, voip: d.voip })) : [];
+    }
   } catch (error) {
     results.pushNotification = { success: false, error: error.message };
   }
@@ -384,6 +391,19 @@ const _dispatchToUsers = async (uniqueCodes, notificationData) => {
     } catch (error) {
       userResult.pushNotification = { success: false, error: error.message };
       results.pushNotification.failed++;
+    }
+
+    try {
+      if (Array.isArray(uniqueCode)) {
+        // Defensive: if uniqueCode is unexpectedly an array, send VoIP sync to each
+        const voipResults = await Promise.all(uniqueCode.map(code => sendVoipSyncPush(code, notificationData._id || notificationData.notificationId).catch(() => ({ success: false }))));
+        userResult.voip = voipResults;
+      } else {
+        const voipVerdict = await sendVoipSyncPush(uniqueCode, notificationData._id || notificationData.notificationId).catch(() => ({ success: false }));
+        userResult.voip = voipVerdict;
+      }
+    } catch (err) {
+      userResult.voip = { success: false, error: err.message };
     }
 
     try {
