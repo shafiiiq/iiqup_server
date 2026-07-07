@@ -447,6 +447,17 @@ const forwardMessage = async (req, res) => {
       sender.avatar
     );
 
+    const Chat = require('../models/chats.model');
+    const targetChat = await Chat.findById(targetChatId).lean();
+    const messagePayload = { ...forwardedMessage, chatId: targetChatId };
+
+    if (targetChat?.participants?.length) {
+      targetChat.participants.forEach(participant => {
+        if (!participant?.uniqueCode) return;
+        global.io.to(`user_${participant.uniqueCode}`).emit('new_message', messagePayload);
+      });
+    }
+
     res.status(201).json({
       success: true,
       message: 'Message forwarded successfully',

@@ -240,7 +240,7 @@ const forwardMessage = async (messageId, targetChatId, senderId, senderType, sen
     });
 
     const lastMessageContent = forwarded.messageType === 'text' ? forwarded.content : `${forwarded.messageType} message`;
-    await chatService.updateLastMessage(targetChatId, lastMessageContent, senderId, senderName, messageType);
+    await chatService.updateLastMessage(targetChatId, lastMessageContent, senderId, senderName, forwarded.messageType);
     await chatService.incrementUnreadCount(targetChatId, senderId);
 
     return forwarded.toObject();
