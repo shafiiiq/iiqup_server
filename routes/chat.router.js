@@ -14,6 +14,7 @@ router.get   ('/chats/:chatId/presence',    controller.getChatPresence);
 router.post  ('/chats/individual',       controller.getOrCreateIndividualChat);
 router.post  ('/chats/group',            controller.createGroupChat);
 router.put   ('/chats/:chatId',          controller.updateGroupChat);
+router.post  ('/chats/:chatId/leave',     controller.leaveGroupChat);
 router.delete('/chats/:chatId',          controller.deleteChat);
 
 // ── Messages ──────────────────────────────────────────────────────────────────

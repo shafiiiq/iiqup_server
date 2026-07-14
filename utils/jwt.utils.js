@@ -11,10 +11,12 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const generateToken = (user) => {
   return jwt.sign(
     {
-      id: user._id,        // Using 'id' here
+      id: user._id,
       email: user.email,
       role: user.role,
-      uniqueCode: user.uniqueCode
+      uniqueCode: user.uniqueCode,
+      userType: user.userType,
+      name: user.name,
     },
     JWT_SECRET,
     { expiresIn: '24h' }
@@ -28,6 +30,8 @@ const generateTokens = (user) => {
       email: user.email,
       role: user.role,
       uniqueCode: user.uniqueCode,
+      userType: user.userType,
+      name: user.name,
       type: 'access'
     },
     JWT_SECRET,
@@ -40,6 +44,8 @@ const generateTokens = (user) => {
       email: user.email,
       role: user.role,
       uniqueCode: user.uniqueCode,
+      userType: user.userType,
+      name: user.name,
       type: 'refresh'
     },
     JWT_SECRET,
@@ -132,7 +138,9 @@ const refreshToken = (refreshToken) => {
       _id: decoded.id,
       email: decoded.email,
       role: decoded.role,
-      uniqueCode: decoded.uniqueCode
+      uniqueCode: decoded.uniqueCode,
+      userType: decoded.userType,
+      name: decoded.name,
     };
 
     // Generate BOTH new access and refresh tokens

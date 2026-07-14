@@ -15,7 +15,7 @@ const s3Client = new S3Client({
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const getExpiresIn = (isLong, isAuthSign) => {
-  if (isAuthSign) return 10;         // 10 seconds
+  if (isAuthSign) return 100;         // 10 seconds
   if (isLong)     return 86400;      // 24 hours
   return 3600;                       // 1 hour
 };

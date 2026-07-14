@@ -12,6 +12,7 @@ const participantSchema = new mongoose.Schema(
     uniqueCode: { type: String, required: true },
     name:       { type: String },
     avatar:     { type: String },
+    isAdmin:    { type: Boolean, default: false },
   },
   { _id: false },
 );

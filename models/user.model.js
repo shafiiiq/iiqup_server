@@ -22,16 +22,7 @@ const grantAccessSchema = new mongoose.Schema(
   { _id: false },
 );
 
-const specialNotificationSchema = new mongoose.Schema(
-  {
-    title:       { type: String },
-    description: { type: Object },
-    time:        { type: Date   },
-    priority:    { type: String },
-    stockId:     { type: mongoose.Schema.Types.ObjectId, ref: 'Stock', required: true },
-  },
-  { _id: false },
-);
+// specialNotification removed: no longer used
 
 const trustedDeviceSchema = new mongoose.Schema(
   {
@@ -118,7 +109,7 @@ const userSchema = new mongoose.Schema(
     lastLogin:           { type: Date },
 
     // Notifications
-    specialNotification: { type: [specialNotificationSchema], default: [] },
+    // specialNotification removed
 
     // Devices & Tokens
     pushTokens:          { type: [pushTokenSchema], default: [] },

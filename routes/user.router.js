@@ -46,12 +46,10 @@ router.post('/remove-push-token',                                    controller.
 router.post('/get-push-tokens',                                      controller.getUserPushTokens);
 router.post('/send-test-notification',                               controller.sendTestNotification);
 
-// ── Special notifications ─────────────────────────────────────────────────────
-router.post  ('/get-special-notification',                           controller.getSpecialNotification);
-router.delete('/delete-special-notification/:id',    authMiddleware, controller.deleteSpecialNotification);
+// Special notifications removed
 
 // ── Permissions ───────────────────────────────────────────────────────────────
-router.post('/grant-access',                         authMiddleware, controller.grantAccess);
+router.post('/grant-access',                         authMiddleware, controller.grantAccess); 
 router.post('/get-grantaccess-data',                 authMiddleware, controller.getGrantAccessData);
 router.post('/request-grant/:mechanicId/overtime',   authMiddleware, controller.requestGrant);
 router.post('/request-service',                                      controller.requestService);
@@ -69,12 +67,5 @@ router.post('/activate-signature',                   authMiddleware, controller.
 router.post('/verify-device-trust',                  authMiddleware, controller.verifyDeviceTrust);
 router.get ('/tutorials',                            authMiddleware, controller.getTutorials);
 router.post('/tutorials/complete',                   authMiddleware, controller.completeTutorial);
-
-router.post('/test-notification', (req, res) => {     
-      const title = `Header testing`;  
-      const body = `Body testing`;
-      const result = PushNotificationService.sendGeneralNotification(process.env.OFFICE_MAIN, title, body, 'high', 'normal');
-      res.json(result);
-});
 
 module.exports = router;

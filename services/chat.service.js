@@ -10,6 +10,35 @@ const mongoose = require('mongoose');
 
 const toAvatar = (name) => name?.substring(0, 2).toUpperCase() || 'UN';
 
+const buildGroupSystemMessage = ({ event, actorName, targetNames = [], groupName }) => {
+  const actor = actorName || 'Someone';
+  const targets = (targetNames || []).filter(Boolean);
+
+  switch (event) {
+    case 'created':
+      return `${actor} created the group${groupName ? ` “${groupName}”` : ''}`;
+    case 'added':
+      if (targets.length === 0) return `${actor} added members`;
+      if (targets.length === 1) return `${actor} added ${targets[0]}`;
+      if (targets.length === 2) return `${actor} added ${targets[0]} and ${targets[1]}`;
+      return `${actor} added ${targets.slice(0, -1).join(', ')} and ${targets[targets.length - 1]}`;
+    case 'removed':
+      if (targets.length === 0) return `${actor} removed a member`;
+      if (targets.length === 1) return `${actor} removed ${targets[0]}`;
+      if (targets.length === 2) return `${actor} removed ${targets[0]} and ${targets[1]}`;
+      return `${actor} removed ${targets.slice(0, -1).join(', ')} and ${targets[targets.length - 1]}`;
+    case 'left':
+      return `${actor} left the group`;
+    case 'promoted':
+      if (targets.length === 0) return `${actor} promoted a member to admin`;
+      if (targets.length === 1) return `${actor} promoted ${targets[0]} to admin`;
+      if (targets.length === 2) return `${actor} promoted ${targets[0]} and ${targets[1]} to admin`;
+      return `${actor} promoted ${targets.slice(0, -1).join(', ')} and ${targets[targets.length - 1]} to admin`;
+    default:
+      return `${actor} updated the group`;
+  }
+};
+
 const enrichParticipants = async (participants) => {
   const ids         = participants.map(p => p.userId);
   const userDetails = await User.find({ _id: { $in: ids } }).select('name email').lean();
@@ -18,10 +47,11 @@ const enrichParticipants = async (participants) => {
     const user = userDetails.find(u => u._id.toString() === p.userId.toString());
     return {
       userId:     p.userId,
-      userType:   p.userType,
+      userType:   p.userType || 'office',
       uniqueCode: p.uniqueCode,
       name:       user?.name || 'Unknown',
       avatar:     toAvatar(user?.name),
+      isAdmin:    Boolean(p.isAdmin),
     };
   });
 };
@@ -184,18 +214,39 @@ const updateGroupChat = async (chatId, userId, updates) => {
 
     if (!chat) return null;
 
+    const currentUserParticipant = chat.participants.find(p => p.userId.toString() === userId.toString());
+    const isAdmin = currentUserParticipant?.isAdmin;
+
+    if (!isAdmin) {
+      throw new Error('Only group admins can manage members');
+    }
+
     if (updates.name)   chat.name   = updates.name;
     if (updates.avatar) chat.avatar = updates.avatar;
 
     if (updates.addParticipants?.length > 0) {
-      const newParticipants = await enrichParticipants(updates.addParticipants);
+      const existingIds = new Set(chat.participants.map(p => p.userId.toString()));
+      const newParticipants = await enrichParticipants(
+        updates.addParticipants
+          .filter(participant => !existingIds.has(String(participant.userId || participant._id)))
+          .map(participant => ({ ...participant, isAdmin: false }))
+      );
       chat.participants.push(...newParticipants);
     }
 
     if (updates.removeParticipants?.length > 0) {
       chat.participants = chat.participants.filter(
-        p => !updates.removeParticipants.includes(p.userId.toString())
+        p => !updates.removeParticipants.some(id => String(id) === String(p.userId))
       );
+    }
+
+    if (updates.promoteParticipants?.length > 0) {
+      chat.participants = chat.participants.map(participant => {
+        if (updates.promoteParticipants.some(id => String(id) === String(participant.userId))) {
+          return { ...participant, isAdmin: true };
+        }
+        return participant;
+      });
     }
 
     await chat.save();
@@ -209,6 +260,36 @@ const updateGroupChat = async (chatId, userId, updates) => {
 /**
  * Soft-deletes all messages in a chat for a specific user.
  */
+const leaveGroupChat = async (chatId, userId) => {
+  try {
+    const chat = await Chat.findOne({
+      _id: chatId,
+      type: 'group',
+      'participants.userId': userId,
+    });
+
+    if (!chat) return null;
+
+    const currentParticipant = chat.participants.find(p => p.userId.toString() === userId.toString());
+    if (!currentParticipant) return null;
+
+    chat.participants = chat.participants.filter(p => p.userId.toString() !== userId.toString());
+
+    if (chat.participants.length > 0) {
+      const hasAdmin = chat.participants.some(p => p.isAdmin);
+      if (!hasAdmin) {
+        chat.participants[0].isAdmin = true;
+      }
+    }
+
+    await chat.save();
+    return chat;
+  } catch (error) {
+    console.error('[ChatService] leaveGroupChat:', error);
+    throw error;
+  }
+};
+
 const deleteChatForUser = async (chatId, userId) => {
   try {
     const chat = await Chat.findById(chatId);
@@ -310,8 +391,10 @@ module.exports = {
   createGroupChat,
   getChatById,
   updateGroupChat,
+  leaveGroupChat,
   deleteChatForUser,
   verifyUserAccess,
+  buildGroupSystemMessage,
   // Message Tracking
   updateLastMessage,
   incrementUnreadCount,

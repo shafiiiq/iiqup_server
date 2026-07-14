@@ -146,7 +146,14 @@ const authRefresh = async (refreshToken) => {
       return { status: 403, success: false, message: 'Invalid token type (must be refresh)' };
     }
 
-    const tokens = generateTokens({ _id: decoded.id, email: decoded.email, role: decoded.role });
+    const tokens = generateTokens({
+      _id: decoded.id,
+      email: decoded.email,
+      role: decoded.role,
+      uniqueCode: decoded.uniqueCode,
+      userType: decoded.userType,
+      name: decoded.name,
+    });
 
     return {
       status:       200,

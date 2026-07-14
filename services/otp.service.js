@@ -150,6 +150,8 @@ const verifyOTP = async (email, otp, type, qatarId = null) => {
       email: type === 'operator' ? qatarId : user.email,
       role: user.role,
       uniqueCode: user.uniqueCode,
+      userType: user.userType,
+      name: user.name,
     });
 
     const { createSession } = require('./session.service.js');

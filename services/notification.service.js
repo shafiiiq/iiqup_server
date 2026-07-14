@@ -255,7 +255,7 @@ const getUnreadNotificationsService = async (uniqueCode, page = 1, limit = 100) 
   }
 }
 
-const getForYouNotificationsService = async (uniqueCode, page = 1, limit = 100) => {
+const    getForYouNotificationsService = async (uniqueCode, page = 1, limit = 100) => {
   try {
     const skip = (page - 1) * limit
     const query = { forYou: uniqueCode }
@@ -519,11 +519,8 @@ const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
 
     console.log(`[NotificationService] getPendingNotifications — found ${normalNotifications.length} undelivered for ${uniqueCode}`);
 
-    const user = await User.findOne({ uniqueCode }).select('specialNotification');
-
-    const specialNotifications = (user?.specialNotification || []).filter(notif => {
-      return new Date(notif.time || notif.createdAt) >= fetchFromDate;
-    });
+    // specialNotification removed from user model; no user-stored special notifications
+    const specialNotifications = [];
 
     const allNotifications = [
       ...normalNotifications.map(n => ({
@@ -552,7 +549,7 @@ const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
         total:         limitedNotifications.length,
         since:         fetchFromDate.toISOString(),
         normalCount:   normalNotifications.length,
-        specialCount:  specialNotifications.length,
+        specialCount:  0,
       },
     };
   } catch (error) {

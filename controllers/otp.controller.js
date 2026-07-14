@@ -44,6 +44,7 @@ const requestOTP = async (req, res) => {
  */
 const verifyOTP = async (req, res) => {
   try {
+    console.log("otp verify req.body", req.body.otp);
     const { otp, qatarId } = req.body;
 
     const isVerifier = req.body.email === DOCUMENT_VERIFIER_ALIAS;
@@ -60,6 +61,8 @@ const verifyOTP = async (req, res) => {
       type,
       type === 'operator' ? qatarId : null
     );
+
+    console.log("otp verify result", result);
 
     res.status(result.status).json(result);
   } catch (error) {

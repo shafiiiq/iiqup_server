@@ -10,6 +10,14 @@ const { putObject, getObjectUrl } = require('../aws/s3.aws');
 
 const { FILE_MESSAGE_TYPES } = require('../constants/message.contants');
 
+const shouldMarkMessageAsRead = (chat, message, userId) => {
+  const otherParticipantCount = (chat?.participants || []).filter((participant) => String(participant.userId) !== String(message?.senderId)).length;
+  if (otherParticipantCount === 0) return true;
+
+  const readByUserIds = new Set((message?.readBy || []).map((entry) => String(entry.userId)));
+  return readByUserIds.has(String(userId)) && readByUserIds.size >= otherParticipantCount;
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Messages
 // ─────────────────────────────────────────────────────────────────────────────
@@ -59,6 +67,64 @@ const getMessages = async (chatId, page = 1, limit = 50, userId) => {
  * @param {object} messageData
  * @returns {Promise<object>}
  */
+const createGroupSystemMessage = async ({ chatId, actorId, actorName, event, updates, targetNames = [], groupName, chat }) => {
+  try {
+    if (!event) return null;
+
+    const actorProfile = actorId ? await User.findById(actorId).select('name').lean() : null;
+    const resolvedActorName = actorName || actorProfile?.name || 'Someone';
+
+    let resolvedTargetNames = [...(targetNames || [])];
+
+    if (event === 'added' && updates?.addParticipants?.length > 0) {
+      const ids = updates.addParticipants.map((participant) => participant.userId || participant._id).filter(Boolean);
+      const users = await User.find({ _id: { $in: ids } }).select('name').lean();
+      resolvedTargetNames = users.map((user) => user.name || 'a member');
+    }
+
+    if (event === 'removed' && updates?.removeParticipants?.length > 0) {
+      const ids = updates.removeParticipants.filter(Boolean);
+      const users = await User.find({ _id: { $in: ids } }).select('name').lean();
+      resolvedTargetNames = users.map((user) => user.name || 'a member');
+    }
+
+    if (event === 'promoted' && updates?.promoteParticipants?.length > 0) {
+      const ids = updates.promoteParticipants.filter(Boolean);
+      const users = await User.find({ _id: { $in: ids } }).select('name').lean();
+      resolvedTargetNames = users.map((user) => user.name || 'a member');
+    }
+
+    if (event === 'removed' && resolvedTargetNames.length === 0) {
+      const removedMembers = await User.find({ _id: { $in: chat?.participants?.map((participant) => participant.userId) || [] } }).select('name').lean();
+      resolvedTargetNames.push(...removedMembers.map((member) => member.name || 'a member'));
+    }
+
+    const content = chatService.buildGroupSystemMessage({
+      event,
+      actorName: resolvedActorName,
+      targetNames: resolvedTargetNames,
+      groupName: groupName || chat?.name,
+    });
+
+    const systemMessage = await Message.create({
+      chatId,
+      senderId: actorId,
+      senderType: 'office',
+      senderName: actorName || 'System',
+      messageType: 'system',
+      content,
+      status: 'sent',
+      readBy: [],
+      deliveredTo: [],
+    });
+
+    return systemMessage;
+  } catch (error) {
+    console.error('[MessageService] createGroupSystemMessage:', error);
+    return null;
+  }
+};
+
 const sendMessage = async (messageData) => {
   try {
     const {
@@ -138,13 +204,22 @@ const markMessagesAsDelivered = async (messageIds, userId) => {
  */
 const markMessagesAsRead = async (chatId, messageIds, userId) => {
   try {
-    await Message.updateMany(
-      { _id: { $in: messageIds }, chatId, 'readBy.userId': { $ne: userId } },
-      {
-        $push: { readBy: { userId, readAt: new Date() } },
-        $set:  { status: 'read' }
-      }
-    );
+    const chat = await Chat.findById(chatId).lean();
+    const messages = await Message.find({ _id: { $in: messageIds }, chatId }).lean();
+
+    await Promise.all(messages.map(async (message) => {
+      const existingReads = message.readBy || [];
+      const alreadyRead = existingReads.some(entry => entry.userId?.toString() === userId.toString());
+      const nextReadBy = alreadyRead ? existingReads : [...existingReads, { userId, readAt: new Date() }];
+      const shouldMarkRead = shouldMarkMessageAsRead(chat, { ...message, readBy: nextReadBy }, userId);
+
+      await Message.findByIdAndUpdate(message._id, {
+        $set: {
+          readBy: nextReadBy,
+          status: shouldMarkRead ? 'read' : message.status,
+        },
+      });
+    }));
 
     await chatService.resetUnreadCount(chatId, userId);
 
@@ -443,6 +518,7 @@ const getUnreadCount = async (userId) => {
 
 module.exports = {
   getMessages,
+  createGroupSystemMessage,
   sendMessage,
   markMessagesAsDelivered,
   markMessagesAsRead,
@@ -451,6 +527,7 @@ module.exports = {
   updateMessageCaption,
   forwardMessage,
   searchMessages,
+  shouldMarkMessageAsRead,
   uploadFile,
   getFileUrl,
   generateThumbnail,

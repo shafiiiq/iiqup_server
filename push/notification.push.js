@@ -8,6 +8,13 @@ const Mechanic = require('../models/mechanic.model');
 const { default: mongoose } = require('mongoose');
 const webpush = require('web-push'); 
 
+const findVoipTokenOwner = async (uniqueCode) => {
+  let user = await User.findOne({ uniqueCode }).select('uniqueCode voipPushToken');
+  if (!user) user = await Operator.findOne({ uniqueCode }).select('uniqueCode voipPushToken');
+  if (!user) user = await Mechanic.findOne({ uniqueCode }).select('uniqueCode voipPushToken');
+  return user;
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Setup Web Push
 // ─────────────────────────────────────────────────────────────────────────────
@@ -75,7 +82,15 @@ const sendVoIPCallNotification = async (uniqueCode, callerName, callerId, chatId
       notification: { title: `Incoming call from ${callerName}`, body: 'Tap to answer' },
       android: { priority: 'max', notification: { channelId: 'call_channel', sound: 'call_ringtone', priority: 'max', visibility: 'public' } },
       apns: {
-        headers: { 'apns-priority': '10', 'apns-push-type': 'alert' },
+        headers: {
+          'apns-priority': '10',
+          'apns-push-type': 'alert',
+          'apns-topic': process.env.APNS_BUNDLE_ID || 'com.iiqup.ansarigroup',
+          // Keep message available for 30 days by default
+          'apns-expiration': String(Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60),
+          // Unique collapse id so APNs doesn't overwrite call notifications
+          'apns-collapse-id': `call_${callerId}_${Date.now()}_${Math.floor(Math.random() * 100000)}`,
+        },
         payload: { aps: { alert: { title: `Incoming call from ${callerName}`, body: 'Tap to answer' }, sound: 'default', 'content-available': 1, category: 'CALL_INVITATION' } }
       }
     };
@@ -90,19 +105,46 @@ const sendVoIPCallNotification = async (uniqueCode, callerName, callerId, chatId
 
 const sendVoipSyncPush = async (uniqueCode, notificationId) => {
   try {
-    const user = await User.findOne({ uniqueCode }).select('voipPushToken')
+    const user = await findVoipTokenOwner(uniqueCode)
     if (!user?.voipPushToken) return { success: false }
 
     const http2  = require('http2')
     const jwt    = require('jsonwebtoken')
     const fs     = require('fs')
+    const path   = require('path')
 
     const teamId   = process.env.APNS_TEAM_ID
     const keyId    = process.env.APNS_KEY_ID
     const keyPath  = process.env.APNS_KEY_PATH
     const bundleId = process.env.APNS_BUNDLE_ID
 
-    const privateKey = fs.readFileSync(keyPath)
+    if (!teamId || !keyId || !bundleId) {
+      console.error('[NotificationPush] APNS env not fully configured', { teamId: !!teamId, keyId: !!keyId, bundleId: !!bundleId })
+      return { success: false, error: 'APNS configuration incomplete' }
+    }
+
+    if (!keyPath) {
+      console.error('[NotificationPush] APNS_KEY_PATH is not configured')
+      return { success: false, error: 'APNS key path not configured' }
+    }
+
+    let resolvedKeyPath = path.isAbsolute(keyPath)
+      ? keyPath
+      : path.resolve(__dirname, keyPath)
+
+    if (!fs.existsSync(resolvedKeyPath)) {
+      const altPath = path.resolve(process.cwd(), keyPath)
+      if (fs.existsSync(altPath)) {
+        resolvedKeyPath = altPath
+      }
+    }
+
+    if (!fs.existsSync(resolvedKeyPath)) {
+      console.error('[NotificationPush] APNS key missing at path:', resolvedKeyPath)
+      return { success: false, error: 'APNS key missing' }
+    }
+
+    const privateKey = fs.readFileSync(resolvedKeyPath)
     const jwtToken = jwt.sign({}, privateKey, {
       algorithm: 'ES256',
       keyid:     keyId,
@@ -111,7 +153,9 @@ const sendVoipSyncPush = async (uniqueCode, notificationId) => {
       expiresIn: '1h',
     })
 
-    const isProd = process.env.NODE_ENV === 'production'
+    // Allow forcing production APNs via env var when testing with TestFlight
+    const forceProd = String(process.env.APNS_FORCE_PROD || '').toLowerCase() === 'true'
+    const isProd = forceProd || process.env.NODE_ENV === 'production'
     const host   = isProd ? 'https://api.push.apple.com' : 'https://api.sandbox.push.apple.com'
 
     const payload = JSON.stringify({
@@ -135,6 +179,10 @@ const sendVoipSyncPush = async (uniqueCode, notificationId) => {
         'apns-topic':     `${bundleId}.voip`,
         'apns-push-type': 'voip',
         'apns-priority':  '10',
+        // Default expiration: 30 days from now
+        'apns-expiration': String(Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60),
+        // Unique collapse id to avoid collapsing queued voip sync notifications
+        'apns-collapse-id': String(notificationId ? `${notificationId}_${Date.now()}_${Math.floor(Math.random() * 100000)}` : `sync_${Date.now()}_${Math.floor(Math.random() * 100000)}`),
         'content-type':   'application/json',
         'content-length': Buffer.byteLength(payload),
       })
@@ -161,127 +209,16 @@ const sendVoipSyncPush = async (uniqueCode, notificationId) => {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Special Notifications (user DB storage)
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Stores or updates a special (stock/equipment) notification in the user's record.
- * @param {string} uniqueCode
- * @param {number} stockCount
- * @param {string} stockId
- * @param {string} message
- * @returns {Promise}
- */
-const pushSpecialNotification = async (uniqueCode, stockCount, stockId, message) => {
-  try {
-    const user = await User.findOne({ uniqueCode });
-    if (!user) return { status: 404, message: 'User not found', data: null };
-
-    const notification = {
-      title:       'Low stock',
-      description: { message, stockCount, status: 'low_stock' },
-      time:        new Date(),
-      priority:    'high',
-      stockId,
-    };
-
-    const existingIndex = user.specialNotification.findIndex(n => n.stockId.toString() === stockId.toString());
-
-    if (existingIndex !== -1) {
-      user.specialNotification[existingIndex] = notification;
-    } else {
-      user.specialNotification.push(notification);
-    }
-
-    user.updatedAt = new Date();
-    await user.save();
-
-    return {
-      status: 200,
-      message: existingIndex !== -1 ? 'Special notification updated successfully' : 'Special notification added successfully',
-      data: { notification, totalNotifications: user.specialNotification.length, isUpdate: existingIndex !== -1 }
-    };
-  } catch (error) {
-    console.error('[NotificationPush] pushSpecialNotification:', error);
-    return { status: 500, message: 'Error adding/updating special notification', data: null };
-  }
-};
-
-/**
- * Fetches special notifications for a user with joined stock data.
- * @param {string} uniqueCode
- * @returns {Promise}
- */
-const fetchSpecialNotification = async (uniqueCode) => {
-  try {
-    const result = await User.aggregate([
-      { $match: { uniqueCode } },
-      { $lookup: { from: 'stocks', localField: 'specialNotification.stockId', foreignField: '_id', as: 'stockData' } },
-      { $project: { _id: 1, name: 1, email: 1, uniqueCode: 1, specialNotification: 1, stockData: 1 } }
-    ]);
-
-    if (!result || result.length === 0) return { status: 404, message: 'User not found', data: null };
-
-    const userData = result[0];
-    const notificationsWithStockData = userData.specialNotification.map(notification => ({
-      ...notification,
-      stockInfo: userData.stockData.find(s => s._id.toString() === notification.stockId.toString()) || null
-    }));
-
-    return {
-      status: 200, message: 'Special notifications fetched successfully',
-      data: { user: { _id: userData._id, name: userData.name, email: userData.email, uniqueCode: userData.uniqueCode }, notifications: notificationsWithStockData, totalNotifications: notificationsWithStockData.length }
-    };
-  } catch (error) {
-    console.error('[NotificationPush] fetchSpecialNotification:', error);
-    return { status: 500, message: 'Error fetching push notifications', data: null };
-  }
-};
-
-/**
- * Deletes a special notification from a user's record.
- * @param {string} notificationId
- * @returns {Promise}
- */
-const deleteNotification = async (notificationId) => {
-  try {
-    if (!mongoose.Types.ObjectId.isValid(notificationId)) return { status: 400, success: false, message: 'Invalid notification ID format' };
-
-    const result = await User.updateOne(
-      { 'specialNotification._id': notificationId },
-      { $pull: { specialNotification: { _id: notificationId } } }
-    );
-
-    if (result.modifiedCount === 0) return { status: 404, success: false, message: 'Notification not found' };
-
-    return { status: 200, success: true, message: 'Notification deleted successfully' };
-  } catch (error) {
-    console.error('[NotificationPush] deleteNotification:', error);
-    return { status: 500, success: false, message: 'Internal server error', error: error.message };
-  }
-};
+// Special notifications removed from server storage; functions deprecated
+const pushSpecialNotification = async () => ({ status: 410, message: 'Special notifications removed' });
+const fetchSpecialNotification = async () => ({ status: 410, message: 'Special notifications removed', data: { notifications: [] } });
+const deleteNotification = async () => ({ status: 410, success: false, message: 'Special notifications removed' });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Dispatch (WebSocket + FCM)
 // ─────────────────────────────────────────────────────────────────────────────
 
-const _storeSpecialNotification = async (uniqueCode, notificationData) => {
-  const user = await User.findOne({ uniqueCode });
-  if (!user) throw new Error('User not found');
-
-  user.specialNotification.push({
-    title:       notificationData.title,
-    description: notificationData.description || notificationData.message,
-    time:        new Date(notificationData.time || Date.now()),
-    priority:    notificationData.priority || 'medium',
-    stockId:     notificationData.stockId,
-  });
-
-  if (user.specialNotification.length > 100) user.specialNotification = user.specialNotification.slice(-100);
-  user.updatedAt = new Date();
-  await user.save();
-};
+const _storeSpecialNotification = async () => { /* no-op: special notifications removed */ };
 
 const _dispatchToUser = async (uniqueCode, notificationData) => { 
   console.log(`[NotificationPush] Dispatching notification to user ${uniqueCode}:`, notificationData);
@@ -321,9 +258,7 @@ const _dispatchToUser = async (uniqueCode, notificationData) => {
     }
   }
 
-  if (notificationData.type === 'special') {
-    try { await _storeSpecialNotification(uniqueCode, notificationData); } catch (_) {}
-  }
+  // special notifications removed: no server-side storage
 
   const overallSuccess = results.websocket.success || results.pushNotification.success;
   return { success: overallSuccess, message: overallSuccess ? 'Notification sent successfully' : 'Failed to send notification', data: results };
@@ -444,22 +379,22 @@ class PushNotificationService {
   static sendVoIPCallNotification = sendVoIPCallNotification;
 
   static async sendGeneralNotification(uniqueCode, title, description, priority = 'medium', type = 'normal', notificationId, extraData = {}) {
-    return 0;
-    // const notification = {
-    //   _id: notificationId,
-    //   type,
-    //   title,
-    //   description,
-    //   message: description,
-    //   priority,
-    //   time: new Date().toISOString(),
-    //   notificationId,
-    //   ...extraData,
-    // };
-    // console.log(`Sending general notification to ${uniqueCode || 'broadcast'}:`, notification);
-    // if (Array.isArray(uniqueCode)) return _dispatchToUsers(uniqueCode, notification);
-    // if (uniqueCode)                return _dispatchToUser(uniqueCode, notification);
-    // return _dispatchBroadcast(notification);
+    // return 0;
+    const notification = {
+      _id: notificationId,
+      type,
+      title,
+      description,
+      message: description,
+      priority,
+      time: new Date().toISOString(),
+      notificationId,
+      ...extraData,
+    };
+    console.log(`Sending general notification to ${uniqueCode || 'broadcast'}:`, notification);
+    if (Array.isArray(uniqueCode)) return _dispatchToUsers(uniqueCode, notification);
+    if (uniqueCode)                return _dispatchToUser(uniqueCode, notification);
+    return _dispatchBroadcast(notification);
   }
 
   static async sendStockAlert(uniqueCode, stockInfo, message) {
@@ -514,6 +449,7 @@ class PushNotificationService {
 // ─────────────────────────────────────────────────────────────────────────────
 
 module.exports = PushNotificationService;
+// Special notifications removed: keep stub exports for compatibility
 module.exports.pushSpecialNotification  = pushSpecialNotification;
 module.exports.fetchSpecialNotification = fetchSpecialNotification;
 module.exports.deleteNotification       = deleteNotification;

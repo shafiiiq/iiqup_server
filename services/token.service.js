@@ -57,14 +57,23 @@ const insertPushToken = async (uniqueCode, pushToken, platform = null) => {
 
 const insertVoipToken = async (uniqueCode, voipToken) => {
   try {
-    const user = await User.findOneAndUpdate(
-      { uniqueCode },
-      { voipPushToken: voipToken, updatedAt: new Date() },
-      { new: true }
-    )
-    if (!user) return { success: false, message: 'User not found' }
-    console.log(`VoIP token for user ${uniqueCode} updated to: ${voipToken}`)
-    return { success: true, message: 'VoIP token registered successfully' }
+    const tokenString = String(voipToken || '')
+    if (!tokenString) return { success: false, message: 'Invalid VoIP token' }
+
+    const models = [User, Operator, Mechanic]
+    for (const Model of models) {
+      const updated = await Model.findOneAndUpdate(
+        { uniqueCode },
+        { voipPushToken: tokenString, updatedAt: new Date() },
+        { new: true }
+      )
+      if (updated) {
+        console.log(`VoIP token for ${Model.modelName} ${uniqueCode} updated to: ${tokenString}`)
+        return { success: true, message: 'VoIP token registered successfully' }
+      }
+    }
+
+    return { success: false, message: 'User not found' }
   } catch (error) {
     console.error('[TokenService] insertVoipToken:', error)
     return { success: false, message: 'Failed to register VoIP token', error: error.message }
@@ -177,6 +186,10 @@ const buildNotificationMessage = (notificationData = {}) => {
         'apns-priority': '10',
         'apns-push-type': 'alert',
         'apns-topic': process.env.APNS_BUNDLE_ID || 'com.iiqup.ansarigroup',
+        // Default apns-expiration: 30 days from now (in seconds since epoch)
+        'apns-expiration': String(notificationData.apnsExpiration || Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60),
+        // apns-collapse-id: ensure uniqueness per notification to avoid collapsing
+        'apns-collapse-id': String(notificationData.apnsCollapseId || `${notificationId || 'notif'}_${Date.now()}_${Math.floor(Math.random() * 100000)}`),
       },
       payload: {
         aps: {
@@ -225,6 +238,24 @@ const sendNotificationToUser = async (uniqueCode, notificationData) => {
     const results    = await Promise.allSettled(activeTokens.map(token => admin.messaging().send({ ...message, token })));
     const successful = results.filter(r => r.status === 'fulfilled').length;
     const failed     = results.filter(r => r.status === 'rejected').length;
+
+    // If some tokens failed, mark them inactive to avoid repeated failures
+    try {
+      for (let i = 0; i < results.length; i++) {
+        const res = results[i];
+        if (res.status === 'rejected') {
+          const failedToken = activeTokens[i];
+          // console.error('[TokenService] token send failed for token:', failedToken, 'error:', res.reason && (res.reason.message || res.reason));
+          try {
+            await User.updateOne({ 'pushTokens.token': failedToken }, { $set: { 'pushTokens.$.isActive': false, updatedAt: new Date() } });
+          } catch (e) {
+            console.error('[TokenService] failed to mark token inactive:', e.message || e);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[TokenService] error processing send results:', e.message || e);
+    }
 
     return { success: successful > 0, message: `Sent: ${successful} successful, ${failed} failed`, data: { successful, failed, total: activeTokens.length } };
   } catch (error) {
@@ -279,7 +310,16 @@ const sendNetworkReconnectPush = async (uniqueCode) => {
 
     const silentMessage = {
       data: { type: 'network-reconnect', action: 'sync', timestamp: Date.now().toString() },
-      apns: { headers: { 'apns-push-type': 'background', 'apns-priority': '5' }, payload: { aps: { 'content-available': 1 } } }
+      apns: {
+        headers: {
+          'apns-push-type': 'background',
+          'apns-priority': '5',
+          'apns-topic': process.env.APNS_BUNDLE_ID || 'com.iiqup.ansarigroup',
+          'apns-expiration': String(Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60),
+          'apns-collapse-id': `reconnect_${Date.now()}_${Math.floor(Math.random() * 100000)}`,
+        },
+        payload: { aps: { 'content-available': 1 } }
+      }
     };
 
     await Promise.allSettled(iosTokens.map(token => admin.messaging().send({ ...silentMessage, token })));

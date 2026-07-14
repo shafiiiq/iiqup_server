@@ -68,33 +68,66 @@ const getOrCreateIndividualChat = async (req, res) => {
  */
 const createGroupChat = async (req, res) => {
   try {
-    const { userId, userType, uniqueCode } = req.user;
+    const { id: userId, userType, uniqueCode, name: userName } = req.user;
     const { name, teamType, participants, avatar } = req.body;
+    const creatorName = userName || (await User.findById(userId).select('name').lean())?.name || 'Someone';
 
-    if (!name || !teamType || !participants || participants.length < 2) {
+    if (!teamType || !participants || participants.length < 2) {
       return res.status(400).json({
         success: false,
-        message: 'Group name, team type, and at least 2 participants are required',
+        message: 'Team type and at least 2 participants are required',
       });
     }
 
-    const allParticipants = [{ userId, userType, uniqueCode }, ...participants];
+    const resolvedName = (name || '').trim() || 'New Group'
+
+    const normalizedParticipants = (participants || [])
+      .filter(Boolean)
+      .map((participant) => ({
+        userId: participant.userId || participant._id,
+        userType: participant.userType || 'office',
+        uniqueCode: participant.uniqueCode,
+        isAdmin: false,
+      }));
+
+    const allParticipants = [{ userId, userType: userType || 'office', uniqueCode, isAdmin: true }, ...normalizedParticipants];
 
     const groupChat = await chatService.createGroupChat({
-      name,
+      name: resolvedName,
       teamType,
       participants: allParticipants,
       avatar,
       creatorId: userId,
     });
 
+    const systemMessage = await messageService.createGroupSystemMessage({
+      chatId: groupChat._id,
+      actorId: userId,
+      actorName: creatorName,
+      event: 'created',
+      groupName: resolvedName,
+      chat: groupChat,
+    });
+
+    if (systemMessage) {
+      const payload = {
+        ...systemMessage.toObject(),
+        chatId: groupChat._id,
+        chatType: 'group',
+        chatName: groupChat.name || resolvedName,
+        participants: groupChat.participants,
+        avatar: groupChat.avatar,
+      };
+      websocket.default.sendMessageToChat(groupChat.participants, payload);
+    }
+
     allParticipants.forEach(participant => {
-      if (participant.uniqueCode !== uniqueCode) {
-        websocket.sendNotificationToUser(participant.uniqueCode, {
+      if (participant.uniqueCode && participant.uniqueCode !== uniqueCode) {
+        websocket.default.sendNotificationToUser(participant.uniqueCode, {
           type:        'new_group_chat',
           chatId:      groupChat._id,
-          groupName:   name,
-          creatorName: req.user.name,
+          groupName:   resolvedName,
+          creatorName: creatorName || 'Unknown',
         });
       }
     });
@@ -187,13 +220,59 @@ const updateGroupChat = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Chat not found or unauthorized' });
     }
 
-    updatedChat.participants.forEach(participant => {
-      websocket.sendNotificationToUser(participant.uniqueCode, {
-        type:   'group_updated',
-        chatId: updatedChat._id,
-        updates,
-      });
+    const event = updates?.addParticipants?.length > 0
+      ? 'added'
+      : updates?.removeParticipants?.length > 0
+        ? 'removed'
+        : updates?.promoteParticipants?.length > 0
+          ? 'promoted'
+          : null;
+
+    const targetNames = [];
+    if (updates?.addParticipants?.length > 0) {
+      targetNames.push(...(updates.addParticipants || []).map((participant) => participant.name || participant.userName || 'a member'));
+    }
+    if (updates?.removeParticipants?.length > 0) {
+      const removedMembers = await User.find({ _id: { $in: updates.removeParticipants } }).select('name').lean();
+      targetNames.push(...removedMembers.map((member) => member.name || 'a member'));
+    }
+    if (updates?.promoteParticipants?.length > 0) {
+      const promotedMembers = await User.find({ _id: { $in: updates.promoteParticipants } }).select('name').lean();
+      targetNames.push(...promotedMembers.map((member) => member.name || 'a member'));
+    }
+
+    const systemMessage = await messageService.createGroupSystemMessage({
+      chatId,
+      actorId: userId,
+      actorName: req.user.name,
+      event,
+      updates,
+      targetNames,
+      groupName: updates?.name || updatedChat?.name,
+      chat: updatedChat,
     });
+
+    updatedChat.participants.forEach(participant => {
+      if (participant.uniqueCode) {
+        websocket.default.sendNotificationToUser(participant.uniqueCode, {
+          type:   'group_updated',
+          chatId: updatedChat._id,
+          updates,
+        });
+      }
+    });
+
+    if (systemMessage) {
+      const messagePayload = {
+        ...systemMessage.toObject(),
+        chatId,
+        chatType: 'group',
+        chatName: updatedChat.name,
+        participants: updatedChat.participants,
+        avatar: updatedChat.avatar,
+      };
+      websocket.default.sendMessageToChat(updatedChat.participants, messagePayload);
+    }
 
     res.status(200).json({
       success: true,
@@ -202,6 +281,9 @@ const updateGroupChat = async (req, res) => {
     });
   } catch (error) {
     console.error('[Chat] updateGroupChat:', error);
+    if (error.message?.includes('Only group admins')) {
+      return res.status(403).json({ success: false, message: error.message });
+    }
     res.status(500).json({ success: false, message: 'Failed to update group chat', error: error.message });
   }
 };
@@ -210,6 +292,49 @@ const updateGroupChat = async (req, res) => {
  * DELETE /chats/:chatId
  * Soft-deletes a chat for the authenticated user.
  */
+const leaveGroupChat = async (req, res) => {
+  try {
+    const { chatId } = req.params;
+    const userId     = req.user.id;
+
+    const updatedChat = await chatService.leaveGroupChat(chatId, userId);
+
+    if (!updatedChat) {
+      return res.status(404).json({ success: false, message: 'Chat not found or unauthorized' });
+    }
+
+    const systemMessage = await messageService.createGroupSystemMessage({
+      chatId,
+      actorId: userId,
+      actorName: req.user.name,
+      event: 'left',
+      groupName: updatedChat.name,
+      chat: updatedChat,
+    });
+
+    if (systemMessage) {
+      const messagePayload = {
+        ...systemMessage.toObject(),
+        chatId,
+        chatType: 'group',
+        chatName: updatedChat.name,
+        participants: updatedChat.participants,
+        avatar: updatedChat.avatar,
+      };
+      websocket.default.sendMessageToChat(updatedChat.participants, messagePayload);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Left group successfully',
+      data: updatedChat,
+    });
+  } catch (error) {
+    console.error('[Chat] leaveGroupChat:', error);
+    res.status(500).json({ success: false, message: 'Failed to leave group', error: error.message });
+  }
+};
+
 const deleteChat = async (req, res) => {
   try {
     const { chatId } = req.params;
@@ -664,6 +789,7 @@ module.exports = {
   getChatDetails,
   getChatPresence,
   updateGroupChat,
+  leaveGroupChat,
   deleteChat,
   // Messages
   getMessages,

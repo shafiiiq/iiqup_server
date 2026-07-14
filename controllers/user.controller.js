@@ -433,43 +433,7 @@ const sendTestNotification = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Special Notifications
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * POST /user/get-special-notification
- * Returns special notifications for a user.
- */
-const getSpecialNotification = async (req, res) => {
-  try {
-    const { uniqueCode } = req.body;
-    if (!uniqueCode) return res.status(400).json({ success: false, message: 'uniqueCode is required' });
-
-    const result = await PushNotification.fetchSpecialNotification(uniqueCode);
-    res.status(result.status).json(result);
-  } catch (error) {
-    console.error('[User] getSpecialNotification:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
-  }
-};
-
-/**
- * DELETE /user/delete-special-notification/:id
- * Deletes a special notification by ID.
- */
-const deleteSpecialNotification = async (req, res) => {
-  try {
-    const { id } = req.params;
-    if (!id) return res.status(400).json({ success: false, message: 'Notification ID is required' });
-
-    const result = await PushNotification.deleteNotification(id);
-    res.status(result.status).json(result);
-  } catch (error) {
-    console.error('[User] deleteSpecialNotification:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
-  }
-};
+// Special notifications removed - endpoints deprecated
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Permissions (access requests)
@@ -823,8 +787,7 @@ module.exports = {
   getUserSessions, logoutSession, logoutAllSessions, blockDevice,
   // Push tokens
   addPushToken, removePushToken, getUserPushTokens, sendTestNotification, registerVoipToken,
-  // Special notifications
-  getSpecialNotification, deleteSpecialNotification,
+  // Special notifications (removed)
   // Permissions
   requestGrant, requestService, grantAccess, getGrantAccessData,
   // Signatures & sign keys
