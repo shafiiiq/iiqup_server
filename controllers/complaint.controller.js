@@ -44,10 +44,15 @@ const uploadWithRetry = async (file, attempt = 1) => {
  */
 const registerComplaint = async (req, res) => {
   try {
+    console.log('[Complaint] /register body keys', Object.keys(req.body), 'content-type', req.headers['content-type'])
+    console.log('[Complaint] /register files count', req.files?.length)
+    console.log('[Complaint] /register auth header present', !!req.headers.authorization)
+
     const { regNo, name, uniqueCode, remarks } = req.body;
     const files = req.files;
 
     if (!files || files.length === 0) {
+      console.warn('[Complaint] /register missing files or invalid multipart upload', { body: req.body })
       return res.status(400).json({ success: false, message: 'At least one media file is required' });
     }
 
@@ -80,6 +85,8 @@ const registerComplaint = async (req, res) => {
     };
 
     const result = await ComplaintService.createComplaint(complaintData);
+
+    console.log("registerComplaint result:", result);
 
     res.status(201).json({
       success: true,
