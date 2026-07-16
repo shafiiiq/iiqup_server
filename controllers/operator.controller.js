@@ -86,7 +86,7 @@ const verifyOperator = async (req, res) => {
     res.json({
       success:  true,
       data:     operator,
-      authMail: process.env.ADMIN_OTP_USER_EMAIL,
+      authMail: operator?.authMail || process.env.ADMIN_OTP_USER_EMAIL,
       message:  'Operator verified successfully',
     });
   } catch (error) {

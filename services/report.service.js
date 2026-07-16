@@ -1,6 +1,7 @@
 // services/report.service.js
 const ServiceHistoryModel    = require('../models/history.model.js');
 const ServiceReportModel     = require('../models/report.model.js');
+const ComplaintModel         = require('../models/complaint.model.js');
 const { createNotification } = require('./notification.service.js');
 const PushNotificationService = require('../push/notification.push.js');
 const { default: wsUtils }   = require('../sockets/websocket.js');
@@ -116,6 +117,32 @@ const insertServiceReport = async (data) => {
       ...data,
       historyId: history._id.toString(),
     });
+
+    if (data.complaintId) {
+      const complaint = await ComplaintModel.findById(data.complaintId);
+      if (complaint) {
+        await ComplaintModel.findByIdAndUpdate(
+          data.complaintId,
+          {
+            $set: {
+              workflowStatus: 'fulfilled',
+              status: 'resolved',
+              updatedAt: new Date(),
+            },
+            $push: {
+              approvalTrail: {
+                approvedBy: 'SYSTEM',
+                role: 'SYSTEM',
+                action: 'approved',
+                comments: 'Complaint fulfilled after service report submission',
+                approvalDate: new Date(),
+              },
+            },
+          },
+          { new: true }
+        );
+      }
+    }
 
     // ── Back-link on history ──────────────────────────────────────────────────
     history.reportId = report._id.toString();

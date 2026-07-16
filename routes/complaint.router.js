@@ -11,6 +11,10 @@ const upload = multer({
         files: 10
     }
 });
+const mechanicUpload = upload.fields([
+    { name: 'audioFile', maxCount: 1 },
+    { name: 'files', maxCount: 10 },
+]);
 
 router.post('/register', upload.array('files', 10), ComplaintController.registerComplaint);
 
@@ -18,7 +22,7 @@ router.post('/register', upload.array('files', 10), ComplaintController.register
 router.post('/assign-mechanic/:complaintId', ComplaintController.assignMechanic);
 
 // Step 3: Mechanic requests items/tools
-router.post('/mechanic-request/:complaintId', ComplaintController.mechanicRequestItems);
+router.post('/mechanic-request/:complaintId', mechanicUpload, ComplaintController.mechanicRequestItems);
 
 // Step 4: MAINTENANCE_HEAD forwards to WORKSHOP_MANAGER
 router.post('/forward-to-workshop/:complaintId', ComplaintController.forwardToWorkshop);
@@ -38,7 +42,7 @@ router.post('/sign/:complaintId', ComplaintController.signComplaint);
 router.post('/items-available/:complaintId', ComplaintController.markItemsAvailable);
 
 // Step 9: Mechanic completes work (updated)
-router.post('/rectified/:complaintId', ComplaintController.addSolution);
+router.post('/rectified/:complaintId', mechanicUpload, ComplaintController.addSolution);
 
 // Existing routes (unchanged)
 router.get('/user/:uniqueCode', ComplaintController.getUserComplaints);

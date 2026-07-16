@@ -33,6 +33,7 @@ const serviceReportSchema = new mongoose.Schema(
 
     // ── Reference ─────────────────────────────────────────────────────────────
     historyId: { type: mongoose.Schema.Types.ObjectId, ref: 'ServiceHistory', default: null },
+    complaintId: { type: String, default: null },
   },
   {
     timestamps: true,

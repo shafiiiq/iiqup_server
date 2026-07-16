@@ -46,9 +46,10 @@ const verifyOTP = async (req, res) => {
   try {
     console.log("otp verify req.body", req.body.otp);
     const { otp, qatarId } = req.body;
+    const emailInput = req.body.email || req.body.authMail || req.body.authMailAddress;
 
-    const isVerifier = req.body.email === DOCUMENT_VERIFIER_ALIAS;
-    const email      = resolveEmail(req.body.email);
+    const isVerifier = emailInput === DOCUMENT_VERIFIER_ALIAS;
+    const email      = resolveEmail(emailInput);
     const type       = isVerifier ? 'office' : req.body.type;
 
     if (!email || !otp) {

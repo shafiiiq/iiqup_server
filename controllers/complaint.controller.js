@@ -137,23 +137,25 @@ const assignMechanic = async (req, res) => {
  */
 const mechanicRequestItems = async (req, res) => {
   try {
-    const { complaintId }                    = req.params;
-    const { requestText, audioFile, mechanicId } = req.body;
+    const { complaintId } = req.params;
+    const { requestText, mechanicId, duration } = req.body;
+    const audioFilePayload = req.files?.audioFile?.[0] || req.body.audioFile;
 
-    if (!requestText && !audioFile) {
+    if (!requestText && !audioFilePayload) {
       return res.status(400).json({ success: false, message: 'Either requestText or audioFile is required' });
     }
 
     let audioFileData = null;
-    if (audioFile) {
-      const ext           = path.extname(audioFile.fileName);
-      const finalFilename = `audio-${complaintId}-${Date.now()}${ext}`;
+    if (audioFilePayload) {
+      const file = req.files?.audioFile?.[0] || null;
+      const ext = file ? path.extname(file.originalname || 'audio.m4a') : path.extname(audioFilePayload.fileName || 'audio.m4a');
+      const finalFilename = `audio-${complaintId}-${Date.now()}${ext || '.m4a'}`;
       audioFileData = {
         fileName:   finalFilename,
         filePath:   `complaint-audio/${complaintId}/${finalFilename}`,
-        duration:   audioFile.duration || 0,
-        fileBuffer: audioFile.fileBuffer,
-        mimeType:   audioFile.mimeType,
+        duration:   duration || audioFilePayload.duration || 0,
+        fileBuffer: file ? file.buffer.toString('base64') : audioFilePayload.fileBuffer,
+        mimeType:   file ? file.mimetype : audioFilePayload.mimeType,
       };
     }
 
@@ -606,23 +608,33 @@ const markItemsAvailable = async (req, res) => {
  */
 const addSolution = async (req, res) => {
   try {
-    const { complaintId }                 = req.params;
-    const { regNo, mechanic, files, remarks } = req.body;
+    const { complaintId } = req.params;
+    const { regNo, mechanic, remarks } = req.body;
+    const uploadedFiles = req.files?.files || [];
+    const legacyFiles = req.body.files || [];
 
-    if (!files || files.length === 0) {
+    const filesToProcess = uploadedFiles.length > 0
+      ? uploadedFiles
+      : Array.isArray(legacyFiles)
+        ? legacyFiles
+        : [];
+
+    if (filesToProcess.length === 0) {
       return res.status(400).json({ success: false, message: 'At least one solution file is required' });
     }
 
-    const filesData = files.map(file => {
-      const ext           = path.extname(file.fileName);
+    const filesData = filesToProcess.map(file => {
+      const fileName = file.originalname || file.fileName || file.name || `solution-${Date.now()}`;
+      const mimeType = file.mimetype || file.mimeType || 'application/octet-stream';
+      const ext = path.extname(fileName);
       const finalFilename = `${complaintId}-${Date.now()}${ext}`;
       return {
         fileName:     finalFilename,
-        originalName: file.fileName,
+        originalName: fileName,
         filePath:     `complaint-solutions/${complaintId}/${finalFilename}`,
-        mimeType:     file.mimeType,
-        type:         file.mimeType.startsWith('video/') ? 'video' : 'photo',
-        fileBuffer:   file.fileBuffer,
+        mimeType,
+        type:         mimeType.startsWith('video/') ? 'video' : 'photo',
+        fileBuffer: file.buffer ? file.buffer.toString('base64') : file.fileBuffer,
         uploadDate:   new Date(),
       };
     });

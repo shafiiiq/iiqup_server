@@ -61,6 +61,9 @@ const verifyOperator = async (qatarId) => {
   if (!validOperator) throw Object.assign(new Error('Operator not found'), { status: 404 });
 
   const authUser = await getAuthUser();
+  if (!authUser?.authMail) {
+    throw Object.assign(new Error('Authorization email not found'), { status: 500 });
+  }
 
   let OTP;
   try {
@@ -78,6 +81,7 @@ const verifyOperator = async (qatarId) => {
   if (!updatedOperator) throw Object.assign(new Error('Failed to update operator verification status'), { status: 500 });
 
   const response = updatedOperator.toObject();
+  response.authMail = authUser.authMail;
   if (qatarId == process.env.DEMO_OPERATOR_QID || validOperator) {
     response.otp_for_demo_opr = OTP.otp;
   }
