@@ -125,7 +125,7 @@ app.use('/toolkits',        authMiddleware, toolkitsRouter);
 app.use('/notification',    authMiddleware, notificationRouter);
 app.use('/lpo',             authMiddleware, lpoRouter);
 app.use('/hire-order',      authMiddleware, hireOrderRouter);
-app.use('/s3',              authMiddleware, s3Router);
+app.use('/s3',              s3Router);
 app.use('/chat',            authMiddleware, chatRouter);
 app.use('/explorer',        authMiddleware, explorerRouter);
 

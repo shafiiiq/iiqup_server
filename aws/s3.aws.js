@@ -1,4 +1,4 @@
-const { S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 require('dotenv').config();
 
@@ -46,13 +46,27 @@ const putObject = async (fileName, key, contentType) => {
 const deleteObject = async (key) => {
   const command = new DeleteObjectCommand({
     Bucket: process.env.BUCKET_NAME,
-    Key:    key,
+    Key:         key,
   });
 
   await s3Client.send(command);
   return { success: true, message: `Object ${key} deleted successfully` };
 };
 
+const objectExists = async (key) => {
+  try {
+    const command = new HeadObjectCommand({
+      Bucket: process.env.BUCKET_NAME,
+      Key:    key,
+    });
+    await s3Client.send(command);
+    return true;
+  } catch (error) {
+    if (error?.$metadata?.httpStatusCode === 404) return false;
+    throw error;
+  }
+};
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
-module.exports = { getObjectUrl, putObject, deleteObject };
+module.exports = { getObjectUrl, putObject, deleteObject, objectExists };

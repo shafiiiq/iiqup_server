@@ -26,11 +26,12 @@ const uploadWithRetry = async (file, attempt = 1) => {
   try {
     await uploadToS3(file.buffer, file.filePath, file.mimeType);
   } catch (error) {
+    console.error('[Complaint] uploadWithRetry failed', { filePath: file.filePath, fileName: file.fileName, attempt, error: error.message });
     if (attempt < MAX_RETRIES) {
       await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
       return uploadWithRetry(file, attempt + 1);
     }
-    throw new Error(`Failed to upload file after ${MAX_RETRIES} attempts: ${file.fileName}`);
+    throw new Error(`Failed to upload file after ${MAX_RETRIES} attempts: ${file.fileName}. ${error.message}`);
   }
 };
 
