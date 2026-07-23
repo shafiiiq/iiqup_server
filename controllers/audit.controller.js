@@ -1,7 +1,7 @@
-// controllers/dashboard.controller.js 
-const mongoose            = require('mongoose');
-const dashboardServices   = require('../services/dashboard-services');
-const AuditLog            = require('../models/audit-log.model');
+// controllers/dashboard.controller.js
+const mongoose = require('mongoose');
+const dashboardServices = require('../services/dashboard-services');
+const AuditLog = require('../models/audit-log.model');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -9,8 +9,8 @@ const AuditLog            = require('../models/audit-log.model');
 
 const EMPTY_PERIOD = (period) => ({
   period,
-  activities:  [],
-  summary:     { total: 0, creates: 0, updates: 0, deletes: 0 },
+  activities: [],
+  summary: { total: 0, creates: 0, updates: 0, deletes: 0 },
   byCollection: [],
 });
 
@@ -29,7 +29,11 @@ const getDailyUpdates = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Dashboard] getDailyUpdates:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch daily updates', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch daily updates',
+      error: error.message,
+    });
   }
 };
 
@@ -44,7 +48,11 @@ const getWeeklyUpdates = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Dashboard] getWeeklyUpdates:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch weekly updates', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch weekly updates',
+      error: error.message,
+    });
   }
 };
 
@@ -59,7 +67,11 @@ const getMonthlyUpdates = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Dashboard] getMonthlyUpdates:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch monthly updates', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch monthly updates',
+      error: error.message,
+    });
   }
 };
 
@@ -74,7 +86,11 @@ const getYearlyUpdates = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Dashboard] getYearlyUpdates:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch yearly updates', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch yearly updates',
+      error: error.message,
+    });
   }
 };
 
@@ -89,12 +105,13 @@ const getAllUpdates = async (req, res) => {
     if (totalAuditLogs === 0) {
       return res.status(200).json({
         success: true,
-        message: 'No audit logs found. Create or update some records to populate this data.',
-        data:    {
-          daily:   EMPTY_PERIOD('daily'),
-          weekly:  EMPTY_PERIOD('weekly'),
+        message:
+          'No audit logs found. Create or update some records to populate this data.',
+        data: {
+          daily: EMPTY_PERIOD('daily'),
+          weekly: EMPTY_PERIOD('weekly'),
           monthly: EMPTY_PERIOD('monthly'),
-          yearly:  EMPTY_PERIOD('yearly'),
+          yearly: EMPTY_PERIOD('yearly'),
         },
       });
     }
@@ -109,16 +126,20 @@ const getAllUpdates = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'All updates retrieved successfully',
-      data:    {
-        daily:   daily.data,
-        weekly:  weekly.data,
+      data: {
+        daily: daily.data,
+        weekly: weekly.data,
         monthly: monthly.data,
-        yearly:  yearly.data,
+        yearly: yearly.data,
       },
     });
   } catch (error) {
     console.error('[Dashboard] getAllUpdates:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch all updates', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch all updates',
+      error: error.message,
+    });
   }
 };
 
@@ -133,12 +154,19 @@ const getAllUpdates = async (req, res) => {
 const getDocumentAuditHistory = async (req, res) => {
   try {
     const { documentId, collectionName } = req.params;
-    const result = await dashboardServices.getDocumentHistory(documentId, collectionName);
+    const result = await dashboardServices.getDocumentHistory(
+      documentId,
+      collectionName
+    );
 
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Dashboard] getDocumentAuditHistory:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch document history', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch document history',
+      error: error.message,
+    });
   }
 };
 
@@ -153,7 +181,11 @@ const getActivityAnalytics = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Dashboard] getActivityAnalytics:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch analytics', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch analytics',
+      error: error.message,
+    });
   }
 };
 
@@ -163,20 +195,25 @@ const getActivityAnalytics = async (req, res) => {
  */
 const getRealtimeActivity = async (req, res) => {
   try {
-    const recentActivity = await AuditLog.find().sort({ timestamp: -1 }).limit(20).lean();
-    const oneHourAgo     = new Date(Date.now() - 60 * 60 * 1000);
-    const recentCount    = await AuditLog.countDocuments({ timestamp: { $gte: oneHourAgo } });
+    const recentActivity = await AuditLog.find()
+      .sort({ timestamp: -1 })
+      .limit(20)
+      .lean();
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const recentCount = await AuditLog.countDocuments({
+      timestamp: { $gte: oneHourAgo },
+    });
 
     res.status(200).json({
       success: true,
       message: 'Realtime activity retrieved successfully',
-      data:    {
-        recentActivity: recentActivity.map(log => ({
-          id:           log._id,
-          collection:   log.collectionName,
-          action:       log.action,
-          documentId:   log.documentId,
-          timestamp:    log.timestamp,
+      data: {
+        recentActivity: recentActivity.map((log) => ({
+          id: log._id,
+          collection: log.collectionName,
+          action: log.action,
+          documentId: log.documentId,
+          timestamp: log.timestamp,
           changesCount: log.changes?.length ?? 0,
         })),
         recentCount,
@@ -185,7 +222,11 @@ const getRealtimeActivity = async (req, res) => {
     });
   } catch (error) {
     console.error('[Dashboard] getRealtimeActivity:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch realtime activity', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch realtime activity',
+      error: error.message,
+    });
   }
 };
 
@@ -195,38 +236,43 @@ const getRealtimeActivity = async (req, res) => {
  */
 const debugAuditLogs = async (req, res) => {
   try {
-    const [totalLogs, recentLogs, collections, actions, collectionCounts] = await Promise.all([
-      AuditLog.countDocuments(),
-      AuditLog.find().sort({ timestamp: -1 }).limit(10),
-      AuditLog.distinct('collectionName'),
-      AuditLog.distinct('action'),
-      AuditLog.aggregate([
-        { $group: { _id: '$collectionName', count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
-      ]),
-    ]);
+    const [totalLogs, recentLogs, collections, actions, collectionCounts] =
+      await Promise.all([
+        AuditLog.countDocuments(),
+        AuditLog.find().sort({ timestamp: -1 }).limit(10),
+        AuditLog.distinct('collectionName'),
+        AuditLog.distinct('action'),
+        AuditLog.aggregate([
+          { $group: { _id: '$collectionName', count: { $sum: 1 } } },
+          { $sort: { count: -1 } },
+        ]),
+      ]);
 
     res.status(200).json({
       success: true,
       message: 'Audit log diagnostics retrieved successfully',
-      data:    {
+      data: {
         totalLogs,
         collections,
         actions,
         collectionCounts,
-        recentLogs: recentLogs.map(log => ({
-          id:           log._id,
-          collection:   log.collectionName,
-          action:       log.action,
-          timestamp:    log.timestamp,
-          documentId:   log.documentId,
+        recentLogs: recentLogs.map((log) => ({
+          id: log._id,
+          collection: log.collectionName,
+          action: log.action,
+          timestamp: log.timestamp,
+          documentId: log.documentId,
           changesCount: log.changes?.length ?? 0,
         })),
       },
     });
   } catch (error) {
     console.error('[Dashboard] debugAuditLogs:', error);
-    res.status(500).json({ success: false, message: 'Failed to retrieve audit log diagnostics', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve audit log diagnostics',
+      error: error.message,
+    });
   }
 };
 
@@ -240,68 +286,90 @@ const debugAuditLogs = async (req, res) => {
  */
 const createTestData = async (req, res) => {
   try {
-    const Equipment     = require('../models/equip.model');
+    const Equipment = require('../models/equip.model');
     const ServiceReport = require('../models/service-report.model');
-    const Document      = require('../models/document.model');
+    const Document = require('../models/document.model');
 
     const testDataCreated = [];
 
     try {
       const saved = await new Equipment({
-        name:         `Test Equipment ${Date.now()}`,
-        type:         'Test Type',
-        model:        'Test Model',
+        name: `Test Equipment ${Date.now()}`,
+        type: 'Test Type',
+        model: 'Test Model',
         serialNumber: `TEST-${Date.now()}`,
-        status:       'active',
+        status: 'active',
         purchaseDate: new Date(),
-        vendor:       'Test Vendor',
+        vendor: 'Test Vendor',
       }).save();
-      testDataCreated.push({ type: 'equipment', id: saved._id, name: saved.name });
-    } catch (_) { /* model may not exist in all environments */ }
+      testDataCreated.push({
+        type: 'equipment',
+        id: saved._id,
+        name: saved.name,
+      });
+    } catch (_) {
+      /* model may not exist in all environments */
+    }
 
     try {
       const saved = await new ServiceReport({
-        equipmentId:  new mongoose.Types.ObjectId(),
-        title:        `Test Service Report ${Date.now()}`,
-        description:  'Test service report',
-        status:       'pending',
-        reportDate:   new Date(),
+        equipmentId: new mongoose.Types.ObjectId(),
+        title: `Test Service Report ${Date.now()}`,
+        description: 'Test service report',
+        status: 'pending',
+        reportDate: new Date(),
       }).save();
-      testDataCreated.push({ type: 'service-report', id: saved._id, title: saved.title });
-    } catch (_) { /* model may not exist in all environments */ }
+      testDataCreated.push({
+        type: 'service-report',
+        id: saved._id,
+        title: saved.title,
+      });
+    } catch (_) {
+      /* model may not exist in all environments */
+    }
 
     try {
       const saved = await new Document({
-        name:        `Test Document ${Date.now()}`,
-        type:        'manual',
+        name: `Test Document ${Date.now()}`,
+        type: 'manual',
         description: 'Test document',
-        uploadedBy:  new mongoose.Types.ObjectId(),
+        uploadedBy: new mongoose.Types.ObjectId(),
       }).save();
-      testDataCreated.push({ type: 'document', id: saved._id, name: saved.name });
-    } catch (_) { /* model may not exist in all environments */ }
+      testDataCreated.push({
+        type: 'document',
+        id: saved._id,
+        name: saved.name,
+      });
+    } catch (_) {
+      /* model may not exist in all environments */
+    }
 
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     const totalAuditLogs = await AuditLog.countDocuments();
-    const recentLogs     = await AuditLog.find().sort({ timestamp: -1 }).limit(5);
+    const recentLogs = await AuditLog.find().sort({ timestamp: -1 }).limit(5);
 
     res.status(200).json({
       success: true,
       message: `Created ${testDataCreated.length} test item(s)`,
-      data:    {
+      data: {
         testDataCreated,
         auditLogsCount: totalAuditLogs,
-        recentAuditLogs: recentLogs.map(log => ({
+        recentAuditLogs: recentLogs.map((log) => ({
           collection: log.collectionName,
-          action:     log.action,
+          action: log.action,
           documentId: log.documentId,
-          timestamp:  log.timestamp,
+          timestamp: log.timestamp,
         })),
       },
     });
   } catch (error) {
     console.error('[Dashboard] createTestData:', error);
-    res.status(500).json({ success: false, message: 'Failed to create test data', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create test data',
+      error: error.message,
+    });
   }
 };
 
@@ -312,7 +380,7 @@ const createTestData = async (req, res) => {
 const updateTestData = async (req, res) => {
   try {
     const Equipment = require('../models/equip.model');
-    const updates   = [];
+    const updates = [];
 
     try {
       const equipments = await Equipment.find().limit(3);
@@ -320,25 +388,39 @@ const updateTestData = async (req, res) => {
       for (const equipment of equipments) {
         const updated = await Equipment.findByIdAndUpdate(
           equipment._id,
-          { name: `Updated ${equipment.name} - ${Date.now()}`, updatedAt: new Date() },
-          { new: true },
+          {
+            name: `Updated ${equipment.name} - ${Date.now()}`,
+            updatedAt: new Date(),
+          },
+          { new: true }
         );
-        if (updated) updates.push({ type: 'equipment', id: updated._id, action: 'updated' });
+        if (updated)
+          updates.push({
+            type: 'equipment',
+            id: updated._id,
+            action: 'updated',
+          });
       }
-    } catch (_) { /* model may not exist in all environments */ }
+    } catch (_) {
+      /* model may not exist in all environments */
+    }
 
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     const totalAuditLogs = await AuditLog.countDocuments();
 
     res.status(200).json({
       success: true,
       message: `Updated ${updates.length} item(s)`,
-      data:    { updates, auditLogsCount: totalAuditLogs },
+      data: { updates, auditLogsCount: totalAuditLogs },
     });
   } catch (error) {
     console.error('[Dashboard] updateTestData:', error);
-    res.status(500).json({ success: false, message: 'Failed to update test data', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update test data',
+      error: error.message,
+    });
   }
 };
 
@@ -348,41 +430,63 @@ const updateTestData = async (req, res) => {
  */
 const createTestAuditLogs = async (req, res) => {
   try {
-    const collections = ['equipments', 'documents', 'toolkits', 'servicereports'];
-    const actions     = ['CREATE', 'UPDATE', 'DELETE'];
+    const collections = [
+      'equipments',
+      'documents',
+      'toolkits',
+      'servicereports',
+    ];
+    const actions = ['CREATE', 'UPDATE', 'DELETE'];
 
     const testLogs = await Promise.all(
       Array.from({ length: 10 }, (_, i) => {
-        const collection = collections[Math.floor(Math.random() * collections.length)];
-        const action     = actions[Math.floor(Math.random() * actions.length)];
+        const collection =
+          collections[Math.floor(Math.random() * collections.length)];
+        const action = actions[Math.floor(Math.random() * actions.length)];
 
         return AuditLog.create({
-          documentId:       new mongoose.Types.ObjectId(),
-          collectionName:   collection,
+          documentId: new mongoose.Types.ObjectId(),
+          collectionName: collection,
           action,
-          documentSnapshot: { testField: `Test data ${i + 1}`, createdAt: new Date() },
-          changes:          action === 'UPDATE'
-            ? [{ field: 'testField', oldValue: `Old value ${i}`, newValue: `New value ${i + 1}` }]
-            : [],
-          source:    'test-creation',
-          timestamp: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000),
+          documentSnapshot: {
+            testField: `Test data ${i + 1}`,
+            createdAt: new Date(),
+          },
+          changes:
+            action === 'UPDATE'
+              ? [
+                  {
+                    field: 'testField',
+                    oldValue: `Old value ${i}`,
+                    newValue: `New value ${i + 1}`,
+                  },
+                ]
+              : [],
+          source: 'test-creation',
+          timestamp: new Date(
+            Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000
+          ),
         });
-      }),
+      })
     );
 
     res.status(200).json({
       success: true,
       message: `Created ${testLogs.length} test audit log(s) successfully`,
-      data:    testLogs.map(log => ({
-        id:         log._id,
+      data: testLogs.map((log) => ({
+        id: log._id,
         collection: log.collectionName,
-        action:     log.action,
-        timestamp:  log.timestamp,
+        action: log.action,
+        timestamp: log.timestamp,
       })),
     });
   } catch (error) {
     console.error('[Dashboard] createTestAuditLogs:', error);
-    res.status(500).json({ success: false, message: 'Failed to create test audit logs', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to create test audit logs',
+      error: error.message,
+    });
   }
 };
 

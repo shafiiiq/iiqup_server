@@ -4,16 +4,16 @@
 // Follows the same conventions as dashboard.service.js.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const equipmentModel      = require('../models/equipment.model');
-const mobilizationModel   = require('../models/mobilizations.model');
-const replacementsModel   = require('../models/replacements.model');
+const equipmentModel = require('../models/equipment.model');
+const mobilizationModel = require('../models/mobilizations.model');
+const replacementsModel = require('../models/replacements.model');
 const EquipmentImageModel = require('../models/images.model');
 
-const { createNotification }       = require('./notification.service');
-const PushNotificationService      = require('../push/notification.push');
-const OperatorService              = require('./operator.service');
+const { createNotification } = require('./notification.service');
+const PushNotificationService = require('../push/notification.push');
+const OperatorService = require('./operator.service');
 const { alertMobilizationViaEmail } = require('../gmail/mobilization.gmail');
-const { alertReplacementViaEmail }  = require('../gmail/replacement.gmail');
+const { alertReplacementViaEmail } = require('../gmail/replacement.gmail');
 
 const { default: wsUtils } = require('../sockets/websocket.js');
 const analyser = require('../analyser/dashboard.analyser');
@@ -22,7 +22,7 @@ const {
   NOTIFICATION_PRIORITY,
   NOTIFICATION_TYPE,
   REPLACEMENT_TYPES,
-  DEFAULT_PAGE_LIMITS
+  DEFAULT_PAGE_LIMITS,
 } = require('../constants/equipment.constants');
 
 const {
@@ -37,7 +37,7 @@ const {
   buildOperatorUpdateData,
   extractEquipmentChanges,
   getCurrentDateTime,
-  getPaginationMeta
+  getPaginationMeta,
 } = require('../helpers/equipment.helper');
 
 const {
@@ -48,7 +48,7 @@ const {
   fetchOperatorMapByName,
   fetchOperatorMapById,
   enrichMobilizations,
-  enrichReplacements
+  enrichReplacements,
 } = require('../utils/equipment.utils');
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -60,15 +60,21 @@ const {
  * Errors are logged but never surfaced to callers.
  * @param {object} params
  */
-const _sendNotification = async ({ title, description, priority, sourceId, recipient = null }) => {
+const _sendNotification = async ({
+  title,
+  description,
+  priority,
+  sourceId,
+  recipient = null,
+}) => {
   try {
     const notification = await createNotification({
       title,
       description,
       priority,
       sourceId,
-      time:      new Date(),
-      recipient
+      time: new Date(),
+      recipient,
     });
 
     await PushNotificationService.sendGeneralNotification(
@@ -124,7 +130,11 @@ const insertEquipment = async (data) => {
     }
 
     if (data.company === 'HIRED' && !data.hiredFrom) {
-      return { status: 400, ok: false, message: 'hiredFrom is required when company is HIRED' };
+      return {
+        status: 400,
+        ok: false,
+        message: 'hiredFrom is required when company is HIRED',
+      };
     }
 
     data.id = await _resolveNextId();
@@ -135,23 +145,32 @@ const insertEquipment = async (data) => {
 
     const officeMain = JSON.parse(process.env.OFFICE_MAIN);
     await _sendNotification({
-      title:       isHired ? 'New Equipment Hired' : 'New Asset Launched',
+      title: isHired ? 'New Equipment Hired' : 'New Asset Launched',
       description: isHired
         ? `We have hired a new ${equipment.machine} (${equipment.brand}) from ${equipment.hiredFrom} today`
         : `Alhamdulillah, We are happy to inform you! We have bought a brand new ${equipment.machine} (${equipment.brand}) today`,
-      priority:    NOTIFICATION_PRIORITY.HIGH,
-      sourceId:    equipment._id,
-      recipient:   officeMain
+      priority: NOTIFICATION_PRIORITY.HIGH,
+      sourceId: equipment._id,
+      recipient: officeMain,
     });
 
     analyser.clearCache();
     wsUtils.sendDashboardUpdate('equipment');
-    
-    return { status: 200, ok: true, message: 'Equipment added successfully', data: equipment };
 
+    return {
+      status: 200,
+      ok: true,
+      message: 'Equipment added successfully',
+      data: equipment,
+    };
   } catch (err) {
     console.error('[EquipmentService] insertEquipment:', err);
-    return { status: 500, ok: false, message: 'Missing data or an error occurred', error: err.message };
+    return {
+      status: 500,
+      ok: false,
+      message: 'Missing data or an error occurred',
+      error: err.message,
+    };
   }
 };
 
@@ -167,29 +186,57 @@ const insertEquipment = async (data) => {
  * @param {string|null} statusFilter
  * @returns {Promise<object>}
  */
-const fetchEquipments = async (page = 1, limit = DEFAULT_PAGE_LIMITS.FETCH, hiredFilter = null, statusFilter = null) => {
+const fetchEquipments = async (
+  page = 1,
+  limit = DEFAULT_PAGE_LIMITS.FETCH,
+  hiredFilter = null,
+  statusFilter = null
+) => {
   try {
-    const skip  = (page - 1) * limit;
+    const skip = (page - 1) * limit;
     const statusQuery = Array.isArray(statusFilter)
       ? { status: { $in: statusFilter } }
-      : statusFilter ? { status: statusFilter } : {};
+      : statusFilter
+        ? { status: statusFilter }
+        : {};
 
     const query = {
       ...buildHiredQuery(hiredFilter),
-      ...statusQuery
+      ...statusQuery,
     };
 
     const [totalCount, equipments] = await Promise.all([
       equipmentModel.countDocuments(query),
-      equipmentModel.find(query).sort({ year: -1, createdAt: -1 }).skip(skip).limit(limit).lean()
+      equipmentModel
+        .find(query)
+        .sort({ year: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
     ]);
 
-    const { totalPages, hasNextPage } = getPaginationMeta(totalCount, page, limit);
+    const { totalPages, hasNextPage } = getPaginationMeta(
+      totalCount,
+      page,
+      limit
+    );
 
-    return { status: 200, ok: true, equipments, currentPage: page, totalPages, totalCount, hasNextPage };
+    return {
+      status: 200,
+      ok: true,
+      equipments,
+      currentPage: page,
+      totalPages,
+      totalCount,
+      hasNextPage,
+    };
   } catch (err) {
     console.error('[EquipmentService] fetchEquipments:', err);
-    return { status: 500, ok: false, message: err.message || 'Error fetching equipments' };
+    return {
+      status: 500,
+      ok: false,
+      message: err.message || 'Error fetching equipments',
+    };
   }
 };
 
@@ -201,25 +248,51 @@ const fetchEquipments = async (page = 1, limit = DEFAULT_PAGE_LIMITS.FETCH, hire
  * @param {string|null} hiredFilter
  * @returns {Promise<object>}
  */
-const fetchEquipmentsByStatus = async (status, page = 1, limit = DEFAULT_PAGE_LIMITS.FETCH, hiredFilter = null) => {
+const fetchEquipmentsByStatus = async (
+  status,
+  page = 1,
+  limit = DEFAULT_PAGE_LIMITS.FETCH,
+  hiredFilter = null
+) => {
   try {
-    const skip  = (page - 1) * limit;
+    const skip = (page - 1) * limit;
     const query = {
       ...buildHiredQuery(hiredFilter),
-      ...(status && status !== 'all' ? buildStatusQuery(status) : {})
+      ...(status && status !== 'all' ? buildStatusQuery(status) : {}),
     };
 
     const [totalCount, equipments] = await Promise.all([
       equipmentModel.countDocuments(query),
-      equipmentModel.find(query).sort({ year: -1, createdAt: -1 }).skip(skip).limit(limit).lean()
+      equipmentModel
+        .find(query)
+        .sort({ year: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
     ]);
 
-    const { totalPages, hasNextPage } = getPaginationMeta(totalCount, page, limit);
+    const { totalPages, hasNextPage } = getPaginationMeta(
+      totalCount,
+      page,
+      limit
+    );
 
-    return { status: 200, ok: true, equipments, currentPage: page, totalPages, totalCount, hasNextPage };
+    return {
+      status: 200,
+      ok: true,
+      equipments,
+      currentPage: page,
+      totalPages,
+      totalCount,
+      hasNextPage,
+    };
   } catch (err) {
     console.error('[EquipmentService] fetchEquipmentsByStatus:', err);
-    return { status: 500, ok: false, message: err.message || 'Error fetching equipments by status' };
+    return {
+      status: 500,
+      ok: false,
+      message: err.message || 'Error fetching equipments by status',
+    };
   }
 };
 
@@ -232,25 +305,52 @@ const fetchEquipmentsByStatus = async (status, page = 1, limit = DEFAULT_PAGE_LI
  * @param {string|null} hiredFilter
  * @returns {Promise<object>}
  */
-const searchEquipments = async (searchTerm, page = 1, limit = DEFAULT_PAGE_LIMITS.FETCH, searchField = 'all', hiredFilter = null) => {
+const searchEquipments = async (
+  searchTerm,
+  page = 1,
+  limit = DEFAULT_PAGE_LIMITS.FETCH,
+  searchField = 'all',
+  hiredFilter = null
+) => {
   try {
-    const skip  = (page - 1) * limit;
+    const skip = (page - 1) * limit;
     const query = {
       ...buildHiredQuery(hiredFilter),
-      ...buildSearchQuery(searchTerm, searchField)
+      ...buildSearchQuery(searchTerm, searchField),
     };
 
     const [totalCount, equipments] = await Promise.all([
       equipmentModel.countDocuments(query),
-      equipmentModel.find(query).sort({ year: -1, createdAt: -1 }).skip(skip).limit(limit).lean()
+      equipmentModel
+        .find(query)
+        .sort({ year: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
     ]);
 
-    const { totalPages, hasNextPage } = getPaginationMeta(totalCount, page, limit);
+    const { totalPages, hasNextPage } = getPaginationMeta(
+      totalCount,
+      page,
+      limit
+    );
 
-    return { status: 200, ok: true, equipments, currentPage: page, totalPages, totalCount, hasNextPage };
+    return {
+      status: 200,
+      ok: true,
+      equipments,
+      currentPage: page,
+      totalPages,
+      totalCount,
+      hasNextPage,
+    };
   } catch (err) {
     console.error('[EquipmentService] searchEquipments:', err);
-    return { status: 500, ok: false, message: err.message || 'Error searching equipments' };
+    return {
+      status: 500,
+      ok: false,
+      message: err.message || 'Error searching equipments',
+    };
   }
 };
 
@@ -265,7 +365,11 @@ const fetchEquipmentByReg = async (regNo) => {
     return { status: 200, ok: true, data };
   } catch (err) {
     console.error('[EquipmentService] fetchEquipmentByReg:', err);
-    return { status: 500, ok: false, message: err.message || 'Error fetching equipment' };
+    return {
+      status: 500,
+      ok: false,
+      message: err.message || 'Error fetching equipment',
+    };
   }
 };
 
@@ -278,25 +382,35 @@ const fetchEquipmentStats = async (hiredFilter = null) => {
   try {
     const query = buildHiredQuery(hiredFilter);
 
-    const [totalCount, statusCounts, companyStats, siteStats] = await Promise.all([
-      equipmentModel.countDocuments(query),
-      equipmentModel.aggregate([
-        { $match: query },
-        { $group: { _id: { $toLower: '$status' }, count: { $sum: 1 } } }
-      ]),
-      equipmentModel.aggregate([
-        { $match: query },
-        { $group: { _id: '$company', count: { $sum: 1 } } }
-      ]),
-      equipmentModel.aggregate([
-        { $match: query },
-        { $match: { site: { $ne: null } } },
-        { $group: { _id: '$site', count: { $sum: 1 } } },
-        { $sort:  { count: -1 } }
-      ])
-    ]);
+    const [totalCount, statusCounts, companyStats, siteStats] =
+      await Promise.all([
+        equipmentModel.countDocuments(query),
+        equipmentModel.aggregate([
+          { $match: query },
+          { $group: { _id: { $toLower: '$status' }, count: { $sum: 1 } } },
+        ]),
+        equipmentModel.aggregate([
+          { $match: query },
+          { $group: { _id: '$company', count: { $sum: 1 } } },
+        ]),
+        equipmentModel.aggregate([
+          { $match: query },
+          { $match: { site: { $ne: null } } },
+          { $group: { _id: '$site', count: { $sum: 1 } } },
+          { $sort: { count: -1 } },
+        ]),
+      ]);
 
-    const statusBreakdown = { total: totalCount, idle: 0, active: 0, maintenance: 0, loading: 0, going: 0, leased: 0, unknown: 0 };
+    const statusBreakdown = {
+      total: totalCount,
+      idle: 0,
+      active: 0,
+      maintenance: 0,
+      loading: 0,
+      going: 0,
+      leased: 0,
+      unknown: 0,
+    };
     statusCounts.forEach(({ _id, count }) => {
       if (statusBreakdown.hasOwnProperty(_id)) statusBreakdown[_id] = count;
       else statusBreakdown.unknown += count;
@@ -304,17 +418,25 @@ const fetchEquipmentStats = async (hiredFilter = null) => {
 
     return {
       status: 200,
-      ok:     true,
+      ok: true,
       stats: {
         statusBreakdown,
-        companyBreakdown: Object.fromEntries(companyStats.map(({ _id, count }) => [_id, count])),
-        siteBreakdown:    Object.fromEntries(siteStats.map(({ _id, count })    => [_id, count])),
-        totalEquipment:   totalCount
-      }
+        companyBreakdown: Object.fromEntries(
+          companyStats.map(({ _id, count }) => [_id, count])
+        ),
+        siteBreakdown: Object.fromEntries(
+          siteStats.map(({ _id, count }) => [_id, count])
+        ),
+        totalEquipment: totalCount,
+      },
     };
   } catch (err) {
     console.error('[EquipmentService] fetchEquipmentStats:', err);
-    return { status: 500, ok: false, message: err.message || 'Error fetching equipment statistics' };
+    return {
+      status: 500,
+      ok: false,
+      message: err.message || 'Error fetching equipment statistics',
+    };
   }
 };
 
@@ -325,7 +447,7 @@ const fetchEquipmentStats = async (hiredFilter = null) => {
 const fetchUniqueSites = async () => {
   try {
     const sites = await equipmentModel.distinct('site');
-    return sites.filter(s => s?.trim()).sort();
+    return sites.filter((s) => s?.trim()).sort();
   } catch (err) {
     console.error('[EquipmentService] fetchUniqueSites:', err);
     throw err;
@@ -346,12 +468,20 @@ const fetchUniqueSites = async () => {
  * @param {string|null} operatorName     - legacy operator-only update path
  * @returns {Promise<object>}
  */
-const updateEquipment = async (regNo, updatedData, equipmentNumber = null, operatorName = null) => {
+const updateEquipment = async (
+  regNo,
+  updatedData,
+  equipmentNumber = null,
+  operatorName = null
+) => {
   try {
     // ── Legacy: operator-only update by equipment number ──────────────────────
     if (equipmentNumber && operatorName) {
-      const equipment = await equipmentModel.findOne({ regNo: equipmentNumber });
-      if (!equipment) return { status: 404, ok: false, message: 'Equipment not found' };
+      const equipment = await equipmentModel.findOne({
+        regNo: equipmentNumber,
+      });
+      if (!equipment)
+        return { status: 404, ok: false, message: 'Equipment not found' };
 
       const result = await equipmentModel.findOneAndUpdate(
         { regNo: equipmentNumber },
@@ -360,30 +490,50 @@ const updateEquipment = async (regNo, updatedData, equipmentNumber = null, opera
       );
 
       await _sendNotification({
-        title:       'Operator Updated',
+        title: 'Operator Updated',
         description: `${equipment.machine} - ${equipment.regNo}'s new operator is ${operatorName}`,
-        priority:    NOTIFICATION_PRIORITY.MEDIUM,
-        sourceId:    equipment._id
+        priority: NOTIFICATION_PRIORITY.MEDIUM,
+        sourceId: equipment._id,
       });
 
-      return { status: 200, ok: true, message: 'Equipment updated successfully', data: result };
+      return {
+        status: 200,
+        ok: true,
+        message: 'Equipment updated successfully',
+        data: result,
+      };
     }
 
     // ── Standard update ───────────────────────────────────────────────────────
     const equipment = await equipmentModel.findOne({ regNo });
-    if (!equipment) return { status: 404, ok: false, message: 'Equipment not found' };
+    if (!equipment)
+      return { status: 404, ok: false, message: 'Equipment not found' };
 
-    if (updatedData.company === 'HIRED' && !updatedData.hiredFrom && !equipment.hiredFrom) {
-      return { status: 400, ok: false, message: 'hiredFrom is required when company is HIRED' };
+    if (
+      updatedData.company === 'HIRED' &&
+      !updatedData.hiredFrom &&
+      !equipment.hiredFrom
+    ) {
+      return {
+        status: 400,
+        ok: false,
+        message: 'hiredFrom is required when company is HIRED',
+      };
     }
 
     const originalEquipment = equipment.toObject();
 
     // Strip fields that must not be overwritten directly
     const {
-      _id, __v, createdAt,
-      operator, operatorId,
-      lastSite, lastLocation, lastCertificationBody, lastRentRate,
+      _id,
+      __v,
+      createdAt,
+      operator,
+      operatorId,
+      lastSite,
+      lastLocation,
+      lastCertificationBody,
+      lastRentRate,
       ...cleanUpdatedData
     } = updatedData;
 
@@ -392,19 +542,26 @@ const updateEquipment = async (regNo, updatedData, equipmentNumber = null, opera
       cleanUpdatedData.hired = cleanUpdatedData.company === 'HIRED';
     }
 
-    const setFields  = { ...cleanUpdatedData, updatedAt: new Date() };
+    const setFields = { ...cleanUpdatedData, updatedAt: new Date() };
     const pushFields = {};
-    let   newOperatorId = null;
+    let newOperatorId = null;
 
     // ── site history ──────────────────────────────────────────────────────────
-    if (cleanUpdatedData.site !== undefined && cleanUpdatedData.site !== originalEquipment.site) {
+    if (
+      cleanUpdatedData.site !== undefined &&
+      cleanUpdatedData.site !== originalEquipment.site
+    ) {
       if (originalEquipment.site) pushFields.lastSite = originalEquipment.site;
       setFields.site = cleanUpdatedData.site || null;
     }
 
     // ── location history ──────────────────────────────────────────────────────
-    if (cleanUpdatedData.location !== undefined && cleanUpdatedData.location !== originalEquipment.location) {
-      if (originalEquipment.location) pushFields.lastLocation = originalEquipment.location;
+    if (
+      cleanUpdatedData.location !== undefined &&
+      cleanUpdatedData.location !== originalEquipment.location
+    ) {
+      if (originalEquipment.location)
+        pushFields.lastLocation = originalEquipment.location;
       setFields.location = cleanUpdatedData.location || null;
     }
 
@@ -412,31 +569,47 @@ const updateEquipment = async (regNo, updatedData, equipmentNumber = null, opera
     if (cleanUpdatedData.rentRate) {
       const oldRate = originalEquipment.rentRate;
       const newRate = cleanUpdatedData.rentRate;
-      const rateChanged = oldRate && (
-        Number(oldRate.rate) !== Number(newRate.rate) ||
-        oldRate.basis !== newRate.basis
-      );
+      const rateChanged =
+        oldRate &&
+        (Number(oldRate.rate) !== Number(newRate.rate) ||
+          oldRate.basis !== newRate.basis);
       if (rateChanged) {
         pushFields.lastRentRate = {
-          basis:     oldRate.basis,
-          rate:      oldRate.rate,
-          currency:  oldRate.currency || 'QAR',
+          basis: oldRate.basis,
+          rate: oldRate.rate,
+          currency: oldRate.currency || 'QAR',
           changedAt: new Date(),
         };
       }
     }
 
     // ── operator ──────────────────────────────────────────────────────────────
-    if (operator !== undefined && operator !== originalEquipment.certificationBody?.operatorName) {
-      if (originalEquipment.certificationBody) pushFields.lastCertificationBody = originalEquipment.certificationBody;
+    if (
+      operator !== undefined &&
+      operator !== originalEquipment.certificationBody?.operatorName
+    ) {
+      if (originalEquipment.certificationBody)
+        pushFields.lastCertificationBody = originalEquipment.certificationBody;
       newOperatorId = operatorId || null;
-      setFields.certificationBody = [{ operatorName: operator, operatorId: operatorId || '', shiftName: updatedData.operatorShift || '', shiftStart: '', shiftEnd: '', assignedAt: new Date() }];
+      setFields.certificationBody = [
+        {
+          operatorName: operator,
+          operatorId: operatorId || '',
+          shiftName: updatedData.operatorShift || '',
+          shiftStart: '',
+          shiftEnd: '',
+          assignedAt: new Date(),
+        },
+      ];
     }
 
     const updateOp = { $set: setFields };
     if (Object.keys(pushFields).length) updateOp.$push = pushFields;
 
-    const result = await equipmentModel.findOneAndUpdate({ regNo }, updateOp, { new: true, runValidators: true });
+    const result = await equipmentModel.findOneAndUpdate({ regNo }, updateOp, {
+      new: true,
+      runValidators: true,
+    });
 
     // ── operator assignment records ───────────────────────────────────────────
     if (newOperatorId) {
@@ -451,36 +624,47 @@ const updateEquipment = async (regNo, updatedData, equipmentNumber = null, opera
     if (updatedData.status && originalEquipment.status !== updatedData.status) {
       const { month, year, time } = getCurrentDateTime();
       await mobilizationModel.create({
-        equipmentId:    equipment._id,
-        regNo:          equipment.regNo,
-        machine:        equipment.machine,
-        action:         'status_changed',
+        equipmentId: equipment._id,
+        regNo: equipment.regNo,
+        machine: equipment.machine,
+        action: 'status_changed',
         previousStatus: originalEquipment.status?.toLowerCase(),
-        newStatus:      updatedData.status?.toLowerCase(),
-        withOperator:   false,
-        month, year, date: new Date(), time,
-        remarks:        'Status updated via edit modal',
-        status:         updatedData.status?.toLowerCase()
+        newStatus: updatedData.status?.toLowerCase(),
+        withOperator: false,
+        month,
+        year,
+        date: new Date(),
+        time,
+        remarks: 'Status updated via edit modal',
+        status: updatedData.status?.toLowerCase(),
       });
     }
 
     // ── notification ──────────────────────────────────────────────────────────
-    const changes = extractEquipmentChanges(originalEquipment, result, updatedData);
+    const changes = extractEquipmentChanges(
+      originalEquipment,
+      result,
+      updatedData
+    );
     if (changes.length) {
       const description = `${equipment.machine} - ${equipment.regNo}'s new ${changes.join(', ')}`;
       await _sendNotification({
-        title:       'Equipment Updated',
+        title: 'Equipment Updated',
         description,
-        priority:    NOTIFICATION_PRIORITY.MEDIUM,
-        sourceId:    equipment._id
+        priority: NOTIFICATION_PRIORITY.MEDIUM,
+        sourceId: equipment._id,
       });
     }
 
     analyser.clearCache();
     wsUtils.sendDashboardUpdate('equipment');
 
-    return { status: 200, ok: true, message: 'Equipment updated successfully', data: result };
-
+    return {
+      status: 200,
+      ok: true,
+      message: 'Equipment updated successfully',
+      data: result,
+    };
   } catch (err) {
     console.error('[EquipmentService] updateEquipment:', err);
     return { status: 500, ok: false, message: 'Unable to update equipment' };
@@ -494,28 +678,50 @@ const updateEquipment = async (regNo, updatedData, equipmentNumber = null, opera
  */
 const changeEquipmentStatus = async (data) => {
   try {
-    const { equipmentId, regNo, machine, previousStatus, newStatus, month, year, time, remarks } = data;
+    const {
+      equipmentId,
+      regNo,
+      machine,
+      previousStatus,
+      newStatus,
+      month,
+      year,
+      time,
+      remarks,
+    } = data;
 
     const [statusChange, updatedEquipment] = await Promise.all([
       mobilizationModel.create({
-        equipmentId, regNo, machine,
-        action: 'status_changed', previousStatus, newStatus,
-        withOperator: false, month, year,
-        date: new Date(), time,
+        equipmentId,
+        regNo,
+        machine,
+        action: 'status_changed',
+        previousStatus,
+        newStatus,
+        withOperator: false,
+        month,
+        year,
+        date: new Date(),
+        time,
         remarks: remarks || '',
-        status: newStatus
+        status: newStatus,
       }),
       equipmentModel.findOneAndUpdate(
         { _id: equipmentId },
         { $set: { status: newStatus, updatedAt: new Date() } },
         { new: true }
-      )
+      ),
     ]);
 
-    if (!updatedEquipment) return { status: 404, ok: false, message: 'Equipment not found' };
+    if (!updatedEquipment)
+      return { status: 404, ok: false, message: 'Equipment not found' };
 
-    return { status: 200, ok: true, message: 'Equipment status changed successfully', data: { statusChange, updatedEquipment } };
-
+    return {
+      status: 200,
+      ok: true,
+      message: 'Equipment status changed successfully',
+      data: { statusChange, updatedEquipment },
+    };
   } catch (err) {
     console.error('[EquipmentService] changeEquipmentStatus:', err);
     throw err;
@@ -530,19 +736,26 @@ const changeEquipmentStatus = async (data) => {
 const deleteEquipment = async (regNo) => {
   try {
     const equipment = await equipmentModel.findOne({ regNo });
-    if (!equipment) return { status: 404, ok: false, message: 'Equipment not found' };
+    if (!equipment)
+      return { status: 404, ok: false, message: 'Equipment not found' };
 
-    const deleted = await equipmentModel.findOneAndDelete({ regNo: equipment.regNo });
-
-    await _sendNotification({
-      title:       'Equipment Removed',
-      description: `Equipment ${deleted.machine} - ${deleted.regNo} has been removed from the system or sold`,
-      priority:    NOTIFICATION_PRIORITY.MEDIUM,
-      sourceId:    deleted._id
+    const deleted = await equipmentModel.findOneAndDelete({
+      regNo: equipment.regNo,
     });
 
-    return { status: 200, ok: true, message: 'Equipment deleted successfully', data: deleted };
+    await _sendNotification({
+      title: 'Equipment Removed',
+      description: `Equipment ${deleted.machine} - ${deleted.regNo} has been removed from the system or sold`,
+      priority: NOTIFICATION_PRIORITY.MEDIUM,
+      sourceId: deleted._id,
+    });
 
+    return {
+      status: 200,
+      ok: true,
+      message: 'Equipment deleted successfully',
+      data: deleted,
+    };
   } catch (err) {
     console.error('[EquipmentService] deleteEquipment:', err);
     return { status: 500, ok: false, message: 'Unable to delete equipment' };
@@ -562,10 +775,20 @@ const deleteEquipment = async (regNo) => {
  * @param {string} mimeType
  * @returns {Promise<object>}
  */
-const addEquipmentImage = async (equipmentNo, imagePath, imageLabel, fileName, mimeType) => {
+const addEquipmentImage = async (
+  equipmentNo,
+  imagePath,
+  imageLabel,
+  fileName,
+  mimeType
+) => {
   try {
     if (!imagePath || !imageLabel) {
-      return { status: 400, success: false, message: 'Image path and label are required' };
+      return {
+        status: 400,
+        success: false,
+        message: 'Image path and label are required',
+      };
     }
 
     const equipmentNoStr = String(equipmentNo);
@@ -573,32 +796,42 @@ const addEquipmentImage = async (equipmentNo, imagePath, imageLabel, fileName, m
     const equipment = await EquipmentImageModel.findOneAndUpdate(
       { equipmentNo: equipmentNoStr },
       {
-        $push:        { images: { path: imagePath, label: imageLabel, fileName, mimeType } },
-        $set:         { updatedAt: new Date() },
-        $setOnInsert: { equipmentName: `Equipment ${equipmentNoStr}`, createdAt: new Date() }
+        $push: {
+          images: { path: imagePath, label: imageLabel, fileName, mimeType },
+        },
+        $set: { updatedAt: new Date() },
+        $setOnInsert: {
+          equipmentName: `Equipment ${equipmentNoStr}`,
+          createdAt: new Date(),
+        },
       },
       { upsert: true, new: true, runValidators: true }
     );
 
     return {
-      status:  200,
+      status: 200,
       success: true,
-      message: equipment.images.length === 1 ? 'Equipment created with image successfully' : 'Image added to existing equipment successfully',
+      message:
+        equipment.images.length === 1
+          ? 'Equipment created with image successfully'
+          : 'Image added to existing equipment successfully',
       data: {
-        equipmentNo:   equipmentNoStr,
+        equipmentNo: equipmentNoStr,
         equipmentName: equipment.equipmentName,
-        totalImages:   equipment.images.length,
+        totalImages: equipment.images.length,
         imagePath,
         imageLabel,
         fileName,
-        isNewEquipment: equipment.images.length === 1
-      }
+        isNewEquipment: equipment.images.length === 1,
+      },
     };
-
   } catch (err) {
     console.error('[EquipmentService] addEquipmentImage:', err);
-    const status  = err.name === 'ValidationError' ? 400 : 500;
-    const message = err.name === 'ValidationError' ? `Validation error: ${err.message}` : 'Failed to add equipment image';
+    const status = err.name === 'ValidationError' ? 400 : 500;
+    const message =
+      err.name === 'ValidationError'
+        ? `Validation error: ${err.message}`
+        : 'Failed to add equipment image';
     return { status, success: false, message, error: err.message };
   }
 };
@@ -611,16 +844,26 @@ const addEquipmentImage = async (equipmentNo, imagePath, imageLabel, fileName, m
 const getEquipmentImages = async (regNo) => {
   try {
     const equipment = await EquipmentImageModel.findOne({ equipmentNo: regNo });
-    if (!equipment) return { status: 404, success: false, message: 'Equipment not found' };
+    if (!equipment)
+      return { status: 404, success: false, message: 'Equipment not found' };
 
     const result = equipment.toObject();
     result.images = normaliseImages(result.images || []);
 
-    return { status: 200, success: true, message: 'Equipment details retrieved successfully', data: result };
-
+    return {
+      status: 200,
+      success: true,
+      message: 'Equipment details retrieved successfully',
+      data: result,
+    };
   } catch (err) {
     console.error('[EquipmentService] getEquipmentImages:', err);
-    return { status: 500, success: false, message: 'Failed to retrieve equipment details', error: err.message };
+    return {
+      status: 500,
+      success: false,
+      message: 'Failed to retrieve equipment details',
+      error: err.message,
+    };
   }
 };
 
@@ -634,23 +877,29 @@ const getBulkEquipmentImages = async (regNos) => {
     const imageMap = await fetchImageMap(regNos);
 
     // Initialise all requested regNos with empty arrays
-    const result = Object.fromEntries(regNos.map(r => [r, { success: false, images: [] }]));
-    Object.keys(imageMap).forEach(regNo => {
+    const result = Object.fromEntries(
+      regNos.map((r) => [r, { success: false, images: [] }])
+    );
+    Object.keys(imageMap).forEach((regNo) => {
       result[regNo] = { success: true, images: imageMap[regNo] };
     });
 
     return {
-      status:         200,
-      success:        true,
-      message:        'Bulk equipment images retrieved successfully',
-      data:           result,
+      status: 200,
+      success: true,
+      message: 'Bulk equipment images retrieved successfully',
+      data: result,
       totalRequested: regNos.length,
-      totalFound:     Object.values(result).filter(r => r.success).length
+      totalFound: Object.values(result).filter((r) => r.success).length,
     };
-
   } catch (err) {
     console.error('[EquipmentService] getBulkEquipmentImages:', err);
-    return { status: 500, success: false, message: 'Failed to retrieve bulk equipment images', error: err.message };
+    return {
+      status: 500,
+      success: false,
+      message: 'Failed to retrieve bulk equipment images',
+      error: err.message,
+    };
   }
 };
 
@@ -666,41 +915,76 @@ const getBulkEquipmentImages = async (regNos) => {
 const mobilizeEquipment = async (data) => {
   try {
     const {
-      equipmentId, regNo, machine, site, operators,
-      withOperator, deployType, clientCompany,
-      month, year, time, selectedDate, remarks,
-      isOneDayMob, demobDate, demobTime, demobRemarks,
-      location, rentRate,
+      equipmentId,
+      regNo,
+      machine,
+      site,
+      operators,
+      withOperator,
+      deployType,
+      clientCompany,
+      month,
+      year,
+      time,
+      selectedDate,
+      remarks,
+      isOneDayMob,
+      demobDate,
+      demobTime,
+      demobRemarks,
+      location,
+      rentRate,
     } = data;
 
     const isCompanyDeploy = deployType === 'company';
-    const deployLocation  = isCompanyDeploy ? clientCompany : site;
-    const newStatus       = isCompanyDeploy ? 'leased' : 'active';
+    const deployLocation = isCompanyDeploy ? clientCompany : site;
+    const newStatus = isCompanyDeploy ? 'leased' : 'active';
 
     const currentEquipment = await equipmentModel.findById(equipmentId);
 
     const mobilization = await mobilizationModel.create({
-      equipmentId, regNo, machine,
-      action:        'mobilized',
-      deployType:    deployType || 'site',
+      equipmentId,
+      regNo,
+      machine,
+      action: 'mobilized',
+      deployType: deployType || 'site',
       clientCompany: clientCompany || '',
-      site:          Array.isArray(deployLocation) ? deployLocation.join(', ') : deployLocation || '',
-      operators:     withOperator ? operators : [],
-      withOperator, month, year,
-      date:          selectedDate ? new Date(selectedDate) : new Date(),
-      time, remarks,
-      status:        newStatus,
-      isOneDayMob:   isOneDayMob || false,
-      demobDate:     isOneDayMob && demobDate ? new Date(demobDate) : null,
-      demobTime:     isOneDayMob ? demobTime  : '',
-      demobRemarks:  isOneDayMob ? demobRemarks : '',
-      hired:         currentEquipment?.hired     || false,
-      hiredFrom:     currentEquipment?.hiredFrom || '',
-      rentRate:      rentRate?.basis || rentRate?.rate ? { basis: rentRate.basis || 'daily', rate: Number(rentRate.rate) || 0, currency: rentRate.currency || 'QAR' } : currentEquipment?.rentRate || null,
-      location:      Array.isArray(location) ? location.join(', ') : (location || currentEquipment?.location || ''),
+      site: Array.isArray(deployLocation)
+        ? deployLocation.join(', ')
+        : deployLocation || '',
+      operators: withOperator ? operators : [],
+      withOperator,
+      month,
+      year,
+      date: selectedDate ? new Date(selectedDate) : new Date(),
+      time,
+      remarks,
+      status: newStatus,
+      isOneDayMob: isOneDayMob || false,
+      demobDate: isOneDayMob && demobDate ? new Date(demobDate) : null,
+      demobTime: isOneDayMob ? demobTime : '',
+      demobRemarks: isOneDayMob ? demobRemarks : '',
+      hired: currentEquipment?.hired || false,
+      hiredFrom: currentEquipment?.hiredFrom || '',
+      rentRate:
+        rentRate?.basis || rentRate?.rate
+          ? {
+              basis: rentRate.basis || 'daily',
+              rate: Number(rentRate.rate) || 0,
+              currency: rentRate.currency || 'QAR',
+            }
+          : currentEquipment?.rentRate || null,
+      location: Array.isArray(location)
+        ? location.join(', ')
+        : location || currentEquipment?.location || '',
     });
     const updateOperation = {
-      $set: { status: newStatus, site: deployLocation, updatedAt: new Date(), mobDate: new Date() }
+      $set: {
+        status: newStatus,
+        site: deployLocation,
+        updatedAt: new Date(),
+        mobDate: new Date(),
+      },
     };
 
     if (currentEquipment?.site) {
@@ -708,24 +992,42 @@ const mobilizeEquipment = async (data) => {
     }
 
     if (currentEquipment?.mobDate) {
-      updateOperation.$push = { ...(updateOperation.$push || {}), lastMobDate: currentEquipment.mobDate };
+      updateOperation.$push = {
+        ...(updateOperation.$push || {}),
+        lastMobDate: currentEquipment.mobDate,
+      };
     }
 
     // ── location update ───────────────────────────────────────────────────────
     if (location) {
       if (currentEquipment?.location) {
-        updateOperation.$push = { ...(updateOperation.$push || {}), lastLocation: currentEquipment.location };
+        updateOperation.$push = {
+          ...(updateOperation.$push || {}),
+          lastLocation: currentEquipment.location,
+        };
       }
-      updateOperation.$set.location = Array.isArray(location) ? location.join(', ') : location;
+      updateOperation.$set.location = Array.isArray(location)
+        ? location.join(', ')
+        : location;
     }
 
     // ── rentRate update + history ─────────────────────────────────────────────
     if (rentRate?.basis || rentRate?.rate) {
-      const newRentRate = { basis: rentRate.basis || 'daily', rate: Number(rentRate.rate) || 0, currency: rentRate.currency || 'QAR' };
-      if (currentEquipment?.rentRate?.rate || currentEquipment?.rentRate?.basis) {
+      const newRentRate = {
+        basis: rentRate.basis || 'daily',
+        rate: Number(rentRate.rate) || 0,
+        currency: rentRate.currency || 'QAR',
+      };
+      if (
+        currentEquipment?.rentRate?.rate ||
+        currentEquipment?.rentRate?.basis
+      ) {
         updateOperation.$push = {
           ...(updateOperation.$push || {}),
-          lastRentRate: { ...currentEquipment.rentRate.toObject(), changedAt: new Date() }
+          lastRentRate: {
+            ...currentEquipment.rentRate.toObject(),
+            changedAt: new Date(),
+          },
         };
       }
       updateOperation.$set.rentRate = newRentRate;
@@ -735,16 +1037,16 @@ const mobilizeEquipment = async (data) => {
       if (currentEquipment?.certificationBody?.length) {
         updateOperation.$push = {
           ...(updateOperation.$push || {}),
-          lastCertificationBody: { $each: currentEquipment.certificationBody }
+          lastCertificationBody: { $each: currentEquipment.certificationBody },
         };
       }
-      updateOperation.$set.certificationBody = operators.map(op => ({
+      updateOperation.$set.certificationBody = operators.map((op) => ({
         operatorName: op.operatorName,
-        operatorId:   op.operatorId,
-        shiftName:    op.shiftName  || '',
-        shiftStart:   op.shiftStart || '',
-        shiftEnd:     op.shiftEnd   || '',
-        assignedAt:   new Date(),
+        operatorId: op.operatorId,
+        shiftName: op.shiftName || '',
+        shiftStart: op.shiftStart || '',
+        shiftEnd: op.shiftEnd || '',
+        assignedAt: new Date(),
       }));
     }
 
@@ -754,103 +1056,121 @@ const mobilizeEquipment = async (data) => {
       { new: true }
     );
 
-    if (!updatedEquipment) return { status: 404, ok: false, message: 'Equipment not found' };
+    if (!updatedEquipment)
+      return { status: 404, ok: false, message: 'Equipment not found' };
 
     if (withOperator && operators?.length) {
-      await Promise.all(operators.map(op =>
-        op.operatorId ? safeUpdateOperator(op.operatorId, { equipmentNumber: regNo }) : Promise.resolve()
-      ));
+      await Promise.all(
+        operators.map((op) =>
+          op.operatorId
+            ? safeUpdateOperator(op.operatorId, { equipmentNumber: regNo })
+            : Promise.resolve()
+        )
+      );
     }
 
     const officeMain = JSON.parse(process.env.OFFICE_MAIN);
 
     const emailBase = {
-      regNo, machine,
-      site:          Array.isArray(deployLocation) ? deployLocation.at(-1) || '' : deployLocation || '',
-      deployType:    deployType    || 'site',
+      regNo,
+      machine,
+      site: Array.isArray(deployLocation)
+        ? deployLocation.at(-1) || ''
+        : deployLocation || '',
+      deployType: deployType || 'site',
       clientCompany: clientCompany || '',
-      operators:     withOperator ? operators : [],
+      operators: withOperator ? operators : [],
       withOperator,
-      month, year, time,
-      date:          selectedDate ? new Date(selectedDate) : new Date(),
+      month,
+      year,
+      time,
+      date: selectedDate ? new Date(selectedDate) : new Date(),
       remarks,
-      hired:         updatedEquipment?.hired     || false,
-      hiredFrom:     updatedEquipment?.hiredFrom || '',
-      rentRate:      updatedEquipment?.rentRate  || null,
-      location:      updatedEquipment?.location  || '',
+      hired: updatedEquipment?.hired || false,
+      hiredFrom: updatedEquipment?.hiredFrom || '',
+      rentRate: updatedEquipment?.rentRate || null,
+      location: updatedEquipment?.location || '',
     };
 
     // ── One Day Mobilization ──────────────────────────────────────────────────
     if (isOneDayMob && demobDate) {
       const demobDateTime = new Date(demobDate);
-      const demobMonth    = demobDateTime.getMonth() + 1;
-      const demobYear     = demobDateTime.getFullYear();
+      const demobMonth = demobDateTime.getMonth() + 1;
+      const demobYear = demobDateTime.getFullYear();
 
       const demobilization = await mobilizationModel.create({
-        equipmentId, regNo, machine,
-        action:       'demobilized',
+        equipmentId,
+        regNo,
+        machine,
+        action: 'demobilized',
         withOperator: false,
-        site:         Array.isArray(deployLocation) ? deployLocation.join(', ') : deployLocation || '',
-        month:        demobMonth,
-        year:         demobYear,
-        date:         demobDateTime,
-        time:         demobTime || time,
-        remarks:      demobRemarks || '',
-        status:       'idle',
-        isOneDayMob:  true,
-        linkedMobId:  mobilization._id,
-        hired:        updatedEquipment?.hired || false,
-        hiredFrom:    updatedEquipment?.hiredFrom || '',
-        rentRate:     updatedEquipment?.rentRate || null,
-        location:     updatedEquipment?.location || '',
+        site: Array.isArray(deployLocation)
+          ? deployLocation.join(', ')
+          : deployLocation || '',
+        month: demobMonth,
+        year: demobYear,
+        date: demobDateTime,
+        time: demobTime || time,
+        remarks: demobRemarks || '',
+        status: 'idle',
+        isOneDayMob: true,
+        linkedMobId: mobilization._id,
+        hired: updatedEquipment?.hired || false,
+        hiredFrom: updatedEquipment?.hiredFrom || '',
+        rentRate: updatedEquipment?.rentRate || null,
+        location: updatedEquipment?.location || '',
         previousOperators: withOperator ? operators : [],
       });
 
-      await mobilizationModel.findByIdAndUpdate(mobilization._id, { linkedMobId: demobilization._id });
+      await mobilizationModel.findByIdAndUpdate(mobilization._id, {
+        linkedMobId: demobilization._id,
+      });
 
       await _sendNotification({
-        title:       `${machine} (${regNo}) Mobilization`,
+        title: `${machine} (${regNo}) Mobilization`,
         description: isCompanyDeploy
           ? `${machine} (${regNo}) leased to ${clientCompany} and will be demobilized on ${demobDateTime.toLocaleDateString('en-GB')}`
           : `${machine} (${regNo}) mobilized to site: ${deployLocation} and will be demobilized on ${demobDateTime.toLocaleDateString('en-GB')}`,
-        priority:  NOTIFICATION_PRIORITY.HIGH,
-        sourceId:  updatedEquipment._id,
+        priority: NOTIFICATION_PRIORITY.HIGH,
+        sourceId: updatedEquipment._id,
         recipient: officeMain,
       });
 
       await alertMobilizationViaEmail({
         ...emailBase,
-        action:       'one_day_mob',
-        demobDate:    demobDateTime,
+        action: 'one_day_mob',
+        demobDate: demobDateTime,
         demobMonth,
         demobYear,
-        demobTime:    demobTime || time,
+        demobTime: demobTime || time,
         demobRemarks: demobRemarks || '',
-      }).catch(e => console.error('One day mob email failed:', e));
-
+      }).catch((e) => console.error('One day mob email failed:', e));
     } else {
-
       await _sendNotification({
-        title:       `${machine} (${regNo}) Mobilized`,
+        title: `${machine} (${regNo}) Mobilized`,
         description: isCompanyDeploy
           ? `${machine} (${regNo}) has been leased to company: ${clientCompany}`
           : `${machine} (${regNo}) has been mobilized to site: ${deployLocation}`,
-        priority:  NOTIFICATION_PRIORITY.HIGH,
-        sourceId:  updatedEquipment._id,
+        priority: NOTIFICATION_PRIORITY.HIGH,
+        sourceId: updatedEquipment._id,
         recipient: officeMain,
       });
 
       await alertMobilizationViaEmail({
         ...emailBase,
         action: 'mobilized',
-      }).catch(e => console.error('Mobilization email failed:', e));
+      }).catch((e) => console.error('Mobilization email failed:', e));
     }
 
     analyser.clearCache();
     wsUtils.sendDashboardUpdate('mobilization');
 
-    return { status: 201, ok: true, message: 'Equipment mobilized successfully', data: { mobilization, updatedEquipment } };
-
+    return {
+      status: 201,
+      ok: true,
+      message: 'Equipment mobilized successfully',
+      data: { mobilization, updatedEquipment },
+    };
   } catch (err) {
     console.error('[EquipmentService] mobilizeEquipment:', err);
     throw err;
@@ -864,33 +1184,60 @@ const mobilizeEquipment = async (data) => {
  */
 const demobilizeEquipment = async (data) => {
   try {
-    const { equipmentId, regNo, machine, month, year, time, selectedDate, remarks } = data;
+    const {
+      equipmentId,
+      regNo,
+      machine,
+      month,
+      year,
+      time,
+      selectedDate,
+      remarks,
+    } = data;
 
-    const currentEquipment    = await equipmentModel.findById(equipmentId);
-    const currentOperatorIds  = currentEquipment?.certificationBody?.map(cb => cb.operatorId).filter(Boolean) || [];
-    const currentSite         = currentEquipment?.site || null;
-    const currentOperatorName = currentEquipment?.certificationBody?.map(cb => cb.operatorName).filter(Boolean).join(', ') || '';
+    const currentEquipment = await equipmentModel.findById(equipmentId);
+    const currentOperatorIds =
+      currentEquipment?.certificationBody
+        ?.map((cb) => cb.operatorId)
+        .filter(Boolean) || [];
+    const currentSite = currentEquipment?.site || null;
+    const currentOperatorName =
+      currentEquipment?.certificationBody
+        ?.map((cb) => cb.operatorName)
+        .filter(Boolean)
+        .join(', ') || '';
 
-    const lastMobilization = await mobilizationModel.findOne({ equipmentId, action: 'mobilized' })
+    const lastMobilization = await mobilizationModel
+      .findOne({ equipmentId, action: 'mobilized' })
       .sort({ date: -1 })
       .lean();
 
     const lastMobilizedDate = lastMobilization?.date
-      ? lastMobilization.date.toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
+      ? lastMobilization.date.toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: 'long',
+          year: 'numeric',
+        })
       : 'The record is not existing in system or did manualy before the system implementation';
     const lastMobilizedTime = lastMobilization?.time
       ? lastMobilization.time
       : 'The record is not existing in system or did manualy before the system implementation';
 
     const pushFields = {
-      ...(currentSite                    && { lastSite:     currentSite                    }),
-      ...(currentEquipment?.demobDate    && { lastDemobDate: currentEquipment.demobDate    }),
-      ...(currentEquipment?.certificationBody?.length && { lastCertificationBody: { $each: currentEquipment.certificationBody } }),
+      ...(currentSite && { lastSite: currentSite }),
+      ...(currentEquipment?.demobDate && {
+        lastDemobDate: currentEquipment.demobDate,
+      }),
+      ...(currentEquipment?.certificationBody?.length && {
+        lastCertificationBody: { $each: currentEquipment.certificationBody },
+      }),
     };
 
     const [demobilization, updatedEquipment] = await Promise.all([
       mobilizationModel.create({
-        equipmentId, regNo, machine,
+        equipmentId,
+        regNo,
+        machine,
         action: 'demobilized',
         withOperator: false,
         operator: currentOperatorName,
@@ -899,62 +1246,85 @@ const demobilizeEquipment = async (data) => {
         hiredFrom: currentEquipment?.hiredFrom || '',
         rentRate: currentEquipment?.rentRate || null,
         location: currentEquipment?.location || '',
-        site: Array.isArray(currentSite) ? currentSite.at(-1) || '' : currentSite || '',
+        site: Array.isArray(currentSite)
+          ? currentSite.at(-1) || ''
+          : currentSite || '',
         lastMobilizedDate,
         lastMobilizedTime,
-        month, year, date: selectedDate ? new Date(selectedDate) : new Date(),
-        time, remarks, status: 'idle'
+        month,
+        year,
+        date: selectedDate ? new Date(selectedDate) : new Date(),
+        time,
+        remarks,
+        status: 'idle',
       }),
       equipmentModel.findOneAndUpdate(
         { _id: equipmentId },
         {
-          $set:  { 
-            status:            'idle',
-            site:              null,
-            updatedAt:         new Date(),
-            demobDate:         new Date(),
-            certificationBody: [],       // ← clear operators on demob
+          $set: {
+            status: 'idle',
+            site: null,
+            updatedAt: new Date(),
+            demobDate: new Date(),
+            certificationBody: [], // ← clear operators on demob
           },
           ...(Object.keys(pushFields).length && { $push: pushFields }),
         },
         { new: true }
-      )
+      ),
     ]);
 
-    if (!updatedEquipment) return { status: 404, ok: false, message: 'Equipment not found' };
+    if (!updatedEquipment)
+      return { status: 404, ok: false, message: 'Equipment not found' };
 
     // Unassign ALL operators
-    await Promise.all(currentOperatorIds.map(id => safeUpdateOperator(id, { equipmentNumber: '' })));
+    await Promise.all(
+      currentOperatorIds.map((id) =>
+        safeUpdateOperator(id, { equipmentNumber: '' })
+      )
+    );
 
     const officeMain = JSON.parse(process.env.OFFICE_MAIN);
     await _sendNotification({
-      title:       `${machine} (${regNo}) Demobilized`,
+      title: `${machine} (${regNo}) Demobilized`,
       description: `${machine} (${regNo}) has been demobilized`,
-      priority:    NOTIFICATION_PRIORITY.HIGH,
-      sourceId:    updatedEquipment._id,
-      recipient:   officeMain
+      priority: NOTIFICATION_PRIORITY.HIGH,
+      sourceId: updatedEquipment._id,
+      recipient: officeMain,
     });
 
     await alertMobilizationViaEmail({
-      action:             'demobilized', regNo, machine,
-      month, year, time, date: selectedDate ? new Date(selectedDate) : new Date(), remarks,
-      site:               Array.isArray(currentSite) ? currentSite.at(-1) || '' : currentSite || '',
-      hired:              currentEquipment?.hired     || false,
-      hiredFrom:          currentEquipment?.hiredFrom || '',
-      rentRate:           currentEquipment?.rentRate  || null,
-      location:           currentEquipment?.location  ? [currentEquipment.location] : [],
-      operator:           currentOperatorName,
-      withOperator:       !!currentOperatorName,
-      previousOperators:  currentEquipment?.certificationBody || [],
+      action: 'demobilized',
+      regNo,
+      machine,
+      month,
+      year,
+      time,
+      date: selectedDate ? new Date(selectedDate) : new Date(),
+      remarks,
+      site: Array.isArray(currentSite)
+        ? currentSite.at(-1) || ''
+        : currentSite || '',
+      hired: currentEquipment?.hired || false,
+      hiredFrom: currentEquipment?.hiredFrom || '',
+      rentRate: currentEquipment?.rentRate || null,
+      location: currentEquipment?.location ? [currentEquipment.location] : [],
+      operator: currentOperatorName,
+      withOperator: !!currentOperatorName,
+      previousOperators: currentEquipment?.certificationBody || [],
       lastMobilizedDate,
       lastMobilizedTime,
-    }).catch(e => console.error('Demobilization email failed:', e));
+    }).catch((e) => console.error('Demobilization email failed:', e));
 
     analyser.clearCache();
     wsUtils.sendDashboardUpdate('mobilization');
 
-    return { status: 201, ok: true, message: 'Equipment demobilized successfully', data: { demobilization, updatedEquipment } };
-
+    return {
+      status: 201,
+      ok: true,
+      message: 'Equipment demobilized successfully',
+      data: { demobilization, updatedEquipment },
+    };
   } catch (err) {
     console.error('[EquipmentService] demobilizeEquipment:', err);
     throw err;
@@ -963,30 +1333,43 @@ const demobilizeEquipment = async (data) => {
 
 const addShifts = async (data) => {
   try {
-    const { equipmentId, regNo, machine, operators, month, year, time, selectedDate, remarks } = data;
+    const {
+      equipmentId,
+      regNo,
+      machine,
+      operators,
+      month,
+      year,
+      time,
+      selectedDate,
+      remarks,
+    } = data;
 
     const currentEquipment = await equipmentModel.findById(equipmentId);
-    if (!currentEquipment) return { status: 404, ok: false, message: 'Equipment not found' };
+    if (!currentEquipment)
+      return { status: 404, ok: false, message: 'Equipment not found' };
 
     const existingShifts = currentEquipment.certificationBody || [];
 
-    const newShifts = operators.map(op => ({
+    const newShifts = operators.map((op) => ({
       operatorName: op.operatorName,
-      operatorId:   op.operatorId,
-      shiftName:    op.shiftName  || '',
-      shiftStart:   op.shiftStart || '',
-      shiftEnd:     op.shiftEnd   || '',
-      assignedAt:   new Date(),
+      operatorId: op.operatorId,
+      shiftName: op.shiftName || '',
+      shiftStart: op.shiftStart || '',
+      shiftEnd: op.shiftEnd || '',
+      assignedAt: new Date(),
     }));
 
     const updatedShifts = [...existingShifts, ...newShifts];
 
-    const mobilizationRecord = await mobilizationModel.findOne({ equipmentId, action: 'mobilized' }).sort({ date: -1 });
+    const mobilizationRecord = await mobilizationModel
+      .findOne({ equipmentId, action: 'mobilized' })
+      .sort({ date: -1 });
 
     if (mobilizationRecord) {
       await mobilizationModel.findByIdAndUpdate(mobilizationRecord._id, {
         $push: { operators: { $each: newShifts } },
-        $set:  { withOperator: true },
+        $set: { withOperator: true },
       });
     }
 
@@ -996,41 +1379,54 @@ const addShifts = async (data) => {
       { new: true }
     );
 
-    await Promise.all(operators.map(op =>
-      op.operatorId ? safeUpdateOperator(op.operatorId, { equipmentNumber: regNo }) : Promise.resolve()
-    ));
+    await Promise.all(
+      operators.map((op) =>
+        op.operatorId
+          ? safeUpdateOperator(op.operatorId, { equipmentNumber: regNo })
+          : Promise.resolve()
+      )
+    );
 
     const officeMain = JSON.parse(process.env.OFFICE_MAIN);
     await _sendNotification({
-      title:       `Shifts Added — ${machine} (${regNo})`,
+      title: `Shifts Added — ${machine} (${regNo})`,
       description: `${operators.length} new shift(s) added to ${machine} (${regNo})`,
-      priority:    NOTIFICATION_PRIORITY.MEDIUM,
-      sourceId:    updatedEquipment._id,
-      recipient:   officeMain,
+      priority: NOTIFICATION_PRIORITY.MEDIUM,
+      sourceId: updatedEquipment._id,
+      recipient: officeMain,
     });
 
     await alertMobilizationViaEmail({
-      action:       'add_shifts',
-      regNo,  machine,
-      site:         Array.isArray(currentEquipment.site) ? currentEquipment.site.at(-1) || '' : currentEquipment.site || '',
-      operators:    newShifts,
+      action: 'add_shifts',
+      regNo,
+      machine,
+      site: Array.isArray(currentEquipment.site)
+        ? currentEquipment.site.at(-1) || ''
+        : currentEquipment.site || '',
+      operators: newShifts,
       allOperators: updatedShifts,
       withOperator: true,
-      deployType:   'site',
-      month, year, time,
-      date:         selectedDate ? new Date(selectedDate) : new Date(),
-      remarks:      remarks || '',
-      hired:        currentEquipment.hired     || false,
-      hiredFrom:    currentEquipment.hiredFrom || '',
-      rentRate:     currentEquipment.rentRate  || null,
-      location:     currentEquipment.location  ? [currentEquipment.location] : [],
-    }).catch(e => console.error('Add shifts email failed:', e));
+      deployType: 'site',
+      month,
+      year,
+      time,
+      date: selectedDate ? new Date(selectedDate) : new Date(),
+      remarks: remarks || '',
+      hired: currentEquipment.hired || false,
+      hiredFrom: currentEquipment.hiredFrom || '',
+      rentRate: currentEquipment.rentRate || null,
+      location: currentEquipment.location ? [currentEquipment.location] : [],
+    }).catch((e) => console.error('Add shifts email failed:', e));
 
     analyser.clearCache();
     wsUtils.sendDashboardUpdate('equipment');
 
-    return { status: 200, ok: true, message: 'Shifts added successfully', data: updatedEquipment };
-
+    return {
+      status: 200,
+      ok: true,
+      message: 'Shifts added successfully',
+      data: updatedEquipment,
+    };
   } catch (err) {
     console.error('[EquipmentService] addShifts:', err);
     throw err;
@@ -1049,11 +1445,19 @@ const getMobilizationHistory = async (equipmentId, page, limit) => {
     const skip = (page - 1) * limit;
 
     const [history, totalCount] = await Promise.all([
-      mobilizationModel.find({ equipmentId }).sort({ date: -1, createdAt: -1 }).skip(skip).limit(limit),
-      mobilizationModel.countDocuments({ equipmentId })
+      mobilizationModel
+        .find({ equipmentId })
+        .sort({ date: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      mobilizationModel.countDocuments({ equipmentId }),
     ]);
 
-    const { totalPages, hasNextPage } = getPaginationMeta(totalCount, page, limit);
+    const { totalPages, hasNextPage } = getPaginationMeta(
+      totalCount,
+      page,
+      limit
+    );
 
     return { history, currentPage: page, totalPages, totalCount, hasNextPage };
   } catch (err) {
@@ -1068,21 +1472,31 @@ const getMobilizationHistory = async (equipmentId, page, limit) => {
  */
 const fetchAllMobilizations = async () => {
   try {
-    const mobilizations = await mobilizationModel.find({})
+    const mobilizations = await mobilizationModel
+      .find({})
       .sort({ date: -1, createdAt: -1 })
       .limit(DEFAULT_PAGE_LIMITS.MOBILIZATION)
       .lean();
 
-    const regNos        = [...new Set(mobilizations.map(m => m.regNo))];
-    const operatorNames = [...new Set(mobilizations.filter(m => m.operator).map(m => m.operator))];
+    const regNos = [...new Set(mobilizations.map((m) => m.regNo))];
+    const operatorNames = [
+      ...new Set(
+        mobilizations.filter((m) => m.operator).map((m) => m.operator)
+      ),
+    ];
 
     const [equipmentMap, imageMap, operatorMap] = await Promise.all([
       fetchEquipmentMapByRegNo(regNos),
       fetchImageMap(regNos),
-      fetchOperatorMapByName(operatorNames)
+      fetchOperatorMapByName(operatorNames),
     ]);
 
-    return enrichMobilizations(mobilizations, equipmentMap, imageMap, operatorMap);
+    return enrichMobilizations(
+      mobilizations,
+      equipmentMap,
+      imageMap,
+      operatorMap
+    );
   } catch (err) {
     console.error('[EquipmentService] fetchAllMobilizations:', err);
     throw err;
@@ -1100,29 +1514,53 @@ const fetchAllMobilizations = async () => {
  * @param {string|null} endTime
  * @returns {Promise<object[]>}
  */
-const fetchFilteredMobilizations = async (filterType, startDate = null, endDate = null, months = null, specificTime = null, startTime = null, endTime = null) => {
+const fetchFilteredMobilizations = async (
+  filterType,
+  startDate = null,
+  endDate = null,
+  months = null,
+  specificTime = null,
+  startTime = null,
+  endTime = null
+) => {
   try {
-    const { startDateTime, endDateTime } = resolveDateRange(filterType, startDate, endDate, months);
+    const { startDateTime, endDateTime } = resolveDateRange(
+      filterType,
+      startDate,
+      endDate,
+      months
+    );
     const query = buildDateRangeQuery(startDateTime, endDateTime);
 
-    if (specificTime)            query.time = specificTime;
-    else if (startTime && endTime) query.time = { $gte: startTime, $lte: endTime };
+    if (specificTime) query.time = specificTime;
+    else if (startTime && endTime)
+      query.time = { $gte: startTime, $lte: endTime };
 
-    const mobilizations = await mobilizationModel.find(query)
+    const mobilizations = await mobilizationModel
+      .find(query)
       .sort({ date: -1, createdAt: -1 })
       .limit(DEFAULT_PAGE_LIMITS.FILTERED)
       .lean();
 
-    const regNos        = [...new Set(mobilizations.map(m => m.regNo))];
-    const operatorNames = [...new Set(mobilizations.filter(m => m.operator).map(m => m.operator))];
+    const regNos = [...new Set(mobilizations.map((m) => m.regNo))];
+    const operatorNames = [
+      ...new Set(
+        mobilizations.filter((m) => m.operator).map((m) => m.operator)
+      ),
+    ];
 
     const [equipmentMap, imageMap, operatorMap] = await Promise.all([
       fetchEquipmentMapByRegNo(regNos),
       fetchImageMap(regNos),
-      fetchOperatorMapByName(operatorNames)
+      fetchOperatorMapByName(operatorNames),
     ]);
 
-    return enrichMobilizations(mobilizations, equipmentMap, imageMap, operatorMap);
+    return enrichMobilizations(
+      mobilizations,
+      equipmentMap,
+      imageMap,
+      operatorMap
+    );
   } catch (err) {
     console.error('[EquipmentService] fetchFilteredMobilizations:', err);
     throw err;
@@ -1141,37 +1579,52 @@ const fetchFilteredMobilizations = async (filterType, startDate = null, endDate 
 const replaceOperator = async (data) => {
   try {
     const {
-      equipmentId, regNo, machine,
-      currentOperator, currentOperatorId,
-      replacedOperator, replacedOperatorId,
-      targetShiftName, shiftName, shiftStart, shiftEnd,
-      month, year, time, selectedDate, remarks,
+      equipmentId,
+      regNo,
+      machine,
+      currentOperator,
+      currentOperatorId,
+      replacedOperator,
+      replacedOperatorId,
+      targetShiftName,
+      shiftName,
+      shiftStart,
+      shiftEnd,
+      month,
+      year,
+      time,
+      selectedDate,
+      remarks,
       replaceAll = false,
     } = data;
 
     const currentEquipment = await equipmentModel.findById(equipmentId);
-    const existingShifts   = currentEquipment?.certificationBody || [];
+    const existingShifts = currentEquipment?.certificationBody || [];
 
     let updatedShifts;
     let allPreviousOperatorIds = [];
 
     if (replaceAll) {
       // collect all previous operator ids to unassign them all
-      allPreviousOperatorIds = existingShifts.map(s => s.operatorId).filter(Boolean);
+      allPreviousOperatorIds = existingShifts
+        .map((s) => s.operatorId)
+        .filter(Boolean);
 
       // collapse to a single operator with no shift info
-      updatedShifts = [{
-        operatorName: replacedOperator,
-        operatorId:   replacedOperatorId,
-        shiftName:    '',
-        shiftStart:   '',
-        shiftEnd:     '',
-        assignedAt:   new Date(),
-      }];
+      updatedShifts = [
+        {
+          operatorName: replacedOperator,
+          operatorId: replacedOperatorId,
+          shiftName: '',
+          shiftStart: '',
+          shiftEnd: '',
+          assignedAt: new Date(),
+        },
+      ];
     } else {
       // single shift replacement — find the target slot
       const targetIndex = targetShiftName
-        ? existingShifts.findIndex(s => s.shiftName === targetShiftName)
+        ? existingShifts.findIndex((s) => s.shiftName === targetShiftName)
         : 0;
 
       updatedShifts = [...existingShifts];
@@ -1179,50 +1632,60 @@ const replaceOperator = async (data) => {
       if (targetIndex >= 0) {
         updatedShifts[targetIndex] = {
           operatorName: replacedOperator,
-          operatorId:   replacedOperatorId,
-          shiftName:    shiftName  || existingShifts[targetIndex]?.shiftName  || '',
-          shiftStart:   shiftStart || existingShifts[targetIndex]?.shiftStart || '',
-          shiftEnd:     shiftEnd   || existingShifts[targetIndex]?.shiftEnd   || '',
-          assignedAt:   new Date(),
+          operatorId: replacedOperatorId,
+          shiftName: shiftName || existingShifts[targetIndex]?.shiftName || '',
+          shiftStart:
+            shiftStart || existingShifts[targetIndex]?.shiftStart || '',
+          shiftEnd: shiftEnd || existingShifts[targetIndex]?.shiftEnd || '',
+          assignedAt: new Date(),
         };
       } else {
         // shift not found — add as new entry
         updatedShifts.push({
           operatorName: replacedOperator,
-          operatorId:   replacedOperatorId,
-          shiftName:    shiftName  || '',
-          shiftStart:   shiftStart || '',
-          shiftEnd:     shiftEnd   || '',
-          assignedAt:   new Date(),
+          operatorId: replacedOperatorId,
+          shiftName: shiftName || '',
+          shiftStart: shiftStart || '',
+          shiftEnd: shiftEnd || '',
+          assignedAt: new Date(),
         });
       }
     }
 
     const replacement = await replacementsModel.create({
-      equipmentId, regNo, machine,
-      date:     selectedDate ? new Date(selectedDate) : new Date(),
-      month, year, time,
-      status:   'active',
-      type:     REPLACEMENT_TYPES.OPERATOR,
-      currentOperator:    replaceAll 
-        ? existingShifts.map(s => s.operatorName).filter(Boolean).join(', ')   
+      equipmentId,
+      regNo,
+      machine,
+      date: selectedDate ? new Date(selectedDate) : new Date(),
+      month,
+      year,
+      time,
+      status: 'active',
+      type: REPLACEMENT_TYPES.OPERATOR,
+      currentOperator: replaceAll
+        ? existingShifts
+            .map((s) => s.operatorName)
+            .filter(Boolean)
+            .join(', ')
         : currentOperator,
-      currentOperatorId:  currentOperatorId || undefined,
+      currentOperatorId: currentOperatorId || undefined,
       replacedOperator,
       replacedOperatorId,
-      targetShiftName: replaceAll ? 'ALL' : (targetShiftName || ''),
-      shiftName:       shiftName  || '',
-      shiftStart:      shiftStart || '',
-      shiftEnd:        shiftEnd   || '',
+      targetShiftName: replaceAll ? 'ALL' : targetShiftName || '',
+      shiftName: shiftName || '',
+      shiftStart: shiftStart || '',
+      shiftEnd: shiftEnd || '',
       remarks,
       replaceAll,
       previousOperators: replaceAll ? existingShifts : [],
-      site:               Array.isArray(currentEquipment?.site) ? currentEquipment.site.at(-1) : currentEquipment?.site || '',
-      hired:              currentEquipment?.hired || false,
-      hiredFrom:          currentEquipment?.hiredFrom || '',
-      rentRate:           currentEquipment?.rentRate || null,
-      location:           currentEquipment?.location ? [currentEquipment.location] : [],
-      remainingShifts:    [],
+      site: Array.isArray(currentEquipment?.site)
+        ? currentEquipment.site.at(-1)
+        : currentEquipment?.site || '',
+      hired: currentEquipment?.hired || false,
+      hiredFrom: currentEquipment?.hiredFrom || '',
+      rentRate: currentEquipment?.rentRate || null,
+      location: currentEquipment?.location ? [currentEquipment.location] : [],
+      remainingShifts: [],
     });
 
     const replaceOp = {
@@ -1233,69 +1696,88 @@ const replaceOperator = async (data) => {
     }
 
     const updatedEquipment = await equipmentModel.findOneAndUpdate(
-      { _id: equipmentId }, replaceOp, { new: true }
+      { _id: equipmentId },
+      replaceOp,
+      { new: true }
     );
 
-    if (!updatedEquipment) return { status: 404, ok: false, message: 'Equipment not found' };
+    if (!updatedEquipment)
+      return { status: 404, ok: false, message: 'Equipment not found' };
 
-    await replacementsModel.findByIdAndUpdate(replacement._id, {
-      $set: {
-        remainingShifts: updatedEquipment?.certificationBody || [],
-        site:            Array.isArray(updatedEquipment?.site) ? updatedEquipment.site.at(-1) : updatedEquipment?.site || '',
-        hired:           updatedEquipment?.hired || false,
-        hiredFrom:       updatedEquipment?.hiredFrom || '',
-        rentRate:        updatedEquipment?.rentRate || null,
-        location:        updatedEquipment?.location || '',
-      }
-    }).catch(() => null);
+    await replacementsModel
+      .findByIdAndUpdate(replacement._id, {
+        $set: {
+          remainingShifts: updatedEquipment?.certificationBody || [],
+          site: Array.isArray(updatedEquipment?.site)
+            ? updatedEquipment.site.at(-1)
+            : updatedEquipment?.site || '',
+          hired: updatedEquipment?.hired || false,
+          hiredFrom: updatedEquipment?.hiredFrom || '',
+          rentRate: updatedEquipment?.rentRate || null,
+          location: updatedEquipment?.location || '',
+        },
+      })
+      .catch(() => null);
 
     // unassign operators
     if (replaceAll) {
-      await Promise.all(allPreviousOperatorIds.map(id =>
-        safeUpdateOperator(id, { equipmentNumber: '' })
-      ));
+      await Promise.all(
+        allPreviousOperatorIds.map((id) =>
+          safeUpdateOperator(id, { equipmentNumber: '' })
+        )
+      );
     } else {
-      if (currentOperatorId) await safeUpdateOperator(currentOperatorId, { equipmentNumber: '' });
+      if (currentOperatorId)
+        await safeUpdateOperator(currentOperatorId, { equipmentNumber: '' });
     }
-    if (replacedOperatorId) await safeUpdateOperator(replacedOperatorId, { equipmentNumber: regNo });
+    if (replacedOperatorId)
+      await safeUpdateOperator(replacedOperatorId, { equipmentNumber: regNo });
 
     const officeMain = JSON.parse(process.env.OFFICE_MAIN);
     await _sendNotification({
-      title:       `Operator Replaced on ${machine} (${regNo})`,
+      title: `Operator Replaced on ${machine} (${regNo})`,
       description: replaceAll
         ? `All operators replaced by ${replacedOperator} on ${machine} (${regNo})`
         : `Operator changed from ${currentOperator} to ${replacedOperator} on ${machine} (${regNo})`,
-      priority:  NOTIFICATION_PRIORITY.MEDIUM,
-      sourceId:  updatedEquipment._id,
-      recipient: officeMain
+      priority: NOTIFICATION_PRIORITY.MEDIUM,
+      sourceId: updatedEquipment._id,
+      recipient: officeMain,
     });
 
     await alertReplacementViaEmail({
-      type: 'operator', regNo, machine,
+      type: 'operator',
+      regNo,
+      machine,
       currentOperator,
       replacedOperator,
       replaceAll,
       previousOperators: replaceAll ? existingShifts : [],
-      targetShiftName: replaceAll ? 'ALL' : (targetShiftName || ''),
-      shiftName:       shiftName  || '',
-      shiftStart:      shiftStart || '',
-      shiftEnd:        shiftEnd   || '',
+      targetShiftName: replaceAll ? 'ALL' : targetShiftName || '',
+      shiftName: shiftName || '',
+      shiftStart: shiftStart || '',
+      shiftEnd: shiftEnd || '',
       remainingShifts: updatedEquipment?.certificationBody || [],
-      site:            updatedEquipment.site || '',
-      month, year, time,
-      date:      selectedDate ? new Date(selectedDate) : new Date(),
+      site: updatedEquipment.site || '',
+      month,
+      year,
+      time,
+      date: selectedDate ? new Date(selectedDate) : new Date(),
       remarks,
-      hired:     updatedEquipment?.hired     || false,
+      hired: updatedEquipment?.hired || false,
       hiredFrom: updatedEquipment?.hiredFrom || '',
-      rentRate:  updatedEquipment?.rentRate  || null,
-      location:  updatedEquipment?.location || '',
-    }).catch(e => console.error('Replace operator email failed:', e));
+      rentRate: updatedEquipment?.rentRate || null,
+      location: updatedEquipment?.location || '',
+    }).catch((e) => console.error('Replace operator email failed:', e));
 
     analyser.clearCache();
     wsUtils.sendDashboardUpdate('replacement');
 
-    return { status: 201, ok: true, message: 'Operator replaced successfully', data: { replacement, updatedEquipment } };
-
+    return {
+      status: 201,
+      ok: true,
+      message: 'Operator replaced successfully',
+      data: { replacement, updatedEquipment },
+    };
   } catch (err) {
     console.error('[EquipmentService] replaceOperator:', err);
     throw err;
@@ -1310,53 +1792,96 @@ const replaceOperator = async (data) => {
 const replaceEquipment = async (data) => {
   try {
     const {
-      equipmentId, regNo, machine,
-      replacedEquipmentId, replacedEquipmentRegNo, replacedEquipmentMachine,
-      newSiteForReplaced, month, year, time, selectedDate, remarks,
-      operator, operatorId,
+      equipmentId,
+      regNo,
+      machine,
+      replacedEquipmentId,
+      replacedEquipmentRegNo,
+      replacedEquipmentMachine,
+      newSiteForReplaced,
+      month,
+      year,
+      time,
+      selectedDate,
+      remarks,
+      operator,
+      operatorId,
     } = data;
 
     const currentEquipment = await equipmentModel.findById(equipmentId);
-    if (!currentEquipment) return { status: 404, ok: false, message: 'Current equipment not found' };
+    if (!currentEquipment)
+      return { status: 404, ok: false, message: 'Current equipment not found' };
 
     const currentSite = currentEquipment.site;
-    if (!currentSite) return { status: 400, ok: false, message: 'Current equipment has no site assigned' };
+    if (!currentSite)
+      return {
+        status: 400,
+        ok: false,
+        message: 'Current equipment has no site assigned',
+      };
 
-    const finalOperatorName = operator || currentEquipment?.certificationBody?.at(-1)?.operatorName || '';
-    const finalOperatorId   = operatorId || currentEquipment?.certificationBody?.at(-1)?.operatorId || '';
+    const finalOperatorName =
+      operator ||
+      currentEquipment?.certificationBody?.at(-1)?.operatorName ||
+      '';
+    const finalOperatorId =
+      operatorId ||
+      currentEquipment?.certificationBody?.at(-1)?.operatorId ||
+      '';
 
-    const replacedEquipment = await equipmentModel.findById(replacedEquipmentId);
-    if (!replacedEquipment) return { status: 404, ok: false, message: 'Replacement equipment not found' };
+    const replacedEquipment =
+      await equipmentModel.findById(replacedEquipmentId);
+    if (!replacedEquipment)
+      return {
+        status: 404,
+        ok: false,
+        message: 'Replacement equipment not found',
+      };
 
     const replacement = await replacementsModel.create({
-      equipmentId, regNo, machine,
+      equipmentId,
+      regNo,
+      machine,
       date: selectedDate ? new Date(selectedDate) : new Date(),
-      month, year, time, status: 'active',
+      month,
+      year,
+      time,
+      status: 'active',
       type: REPLACEMENT_TYPES.EQUIPMENT,
       replacedEquipmentId,
       replacedEquipmentRegNo,
       replacedEquipmentMachine,
       newSiteForReplaced,
-      site:               Array.isArray(currentSite) ? currentSite.at(-1) : currentSite || '',
-      hired:              currentEquipment?.hired || false,
-      hiredFrom:          currentEquipment?.hiredFrom || '',
-      rentRate:           currentEquipment?.rentRate || null,
-      location:           currentEquipment?.location ? [currentEquipment.location] : [],
+      site: Array.isArray(currentSite) ? currentSite.at(-1) : currentSite || '',
+      hired: currentEquipment?.hired || false,
+      hiredFrom: currentEquipment?.hiredFrom || '',
+      rentRate: currentEquipment?.rentRate || null,
+      location: currentEquipment?.location ? [currentEquipment.location] : [],
       remarks,
-      currentOperator:   finalOperatorName,
+      currentOperator: finalOperatorName,
       currentOperatorId: finalOperatorId,
-      outgoingOperator:  currentEquipment?.certificationBody?.at(-1)?.operatorName || '',
-      outgoingOperatorId: currentEquipment?.certificationBody?.at(-1)?.operatorId || '',
-      incomingOperator:  operator || replacedEquipment?.certificationBody?.at(-1)?.operatorName || '',
-      incomingOperatorId: operatorId || replacedEquipment?.certificationBody?.at(-1)?.operatorId || '',
+      outgoingOperator:
+        currentEquipment?.certificationBody?.at(-1)?.operatorName || '',
+      outgoingOperatorId:
+        currentEquipment?.certificationBody?.at(-1)?.operatorId || '',
+      incomingOperator:
+        operator ||
+        replacedEquipment?.certificationBody?.at(-1)?.operatorName ||
+        '',
+      incomingOperatorId:
+        operatorId ||
+        replacedEquipment?.certificationBody?.at(-1)?.operatorId ||
+        '',
     });
 
     const incomingHiredFrom = replacedEquipment?.hiredFrom || '';
 
     // Build operator update for incoming equipment
     const incomingEquipmentUpdate = {
-      $set:  { site: currentSite, status: 'active', updatedAt: new Date() },
-      ...(replacedEquipment?.site && { $push: { lastSite: replacedEquipment.site } })
+      $set: { site: currentSite, status: 'active', updatedAt: new Date() },
+      ...(replacedEquipment?.site && {
+        $push: { lastSite: replacedEquipment.site },
+      }),
     };
 
     if (finalOperatorName && finalOperatorId) {
@@ -1368,70 +1893,107 @@ const replaceEquipment = async (data) => {
       }
       incomingEquipmentUpdate.$set.certificationBody = {
         operatorName: finalOperatorName,
-        operatorId:   finalOperatorId,
-        assignedAt:   new Date(),
+        operatorId: finalOperatorId,
+        assignedAt: new Date(),
       };
     }
 
-    const [updatedReplacedEquipment, updatedCurrentEquipment] = await Promise.all([
-      equipmentModel.findOneAndUpdate(
-        { _id: replacedEquipmentId },
-        incomingEquipmentUpdate,
-        { new: true }
-      ),
-      equipmentModel.findOneAndUpdate(
-        { _id: equipmentId },
-        {
-          $set:  { site: newSiteForReplaced || null, status: newSiteForReplaced ? 'active' : 'idle', updatedAt: new Date() },
-          $push: { lastSite: currentSite }
-        },
-        { new: true }
-      )
-    ]);
+    const [updatedReplacedEquipment, updatedCurrentEquipment] =
+      await Promise.all([
+        equipmentModel.findOneAndUpdate(
+          { _id: replacedEquipmentId },
+          incomingEquipmentUpdate,
+          { new: true }
+        ),
+        equipmentModel.findOneAndUpdate(
+          { _id: equipmentId },
+          {
+            $set: {
+              site: newSiteForReplaced || null,
+              status: newSiteForReplaced ? 'active' : 'idle',
+              updatedAt: new Date(),
+            },
+            $push: { lastSite: currentSite },
+          },
+          { new: true }
+        ),
+      ]);
 
-    if (!updatedReplacedEquipment) return { status: 404, ok: false, message: 'Replacement equipment not found' };
+    if (!updatedReplacedEquipment)
+      return {
+        status: 404,
+        ok: false,
+        message: 'Replacement equipment not found',
+      };
 
     // Update operator assignment — assign to incoming equipment
     if (finalOperatorId) {
-      const prevOperatorId = replacedEquipment?.certificationBody?.at(-1)?.operatorId;
+      const prevOperatorId =
+        replacedEquipment?.certificationBody?.at(-1)?.operatorId;
       if (prevOperatorId && prevOperatorId !== finalOperatorId) {
         await safeUpdateOperator(prevOperatorId, { equipmentNumber: '' });
       }
-      await safeUpdateOperator(finalOperatorId, { equipmentNumber: replacedEquipmentRegNo });
+      await safeUpdateOperator(finalOperatorId, {
+        equipmentNumber: replacedEquipmentRegNo,
+      });
     }
 
     const officeMain = JSON.parse(process.env.OFFICE_MAIN);
     await _sendNotification({
-      title:       `Equipment Replaced at ${currentSite}`,
+      title: `Equipment Replaced at ${currentSite}`,
       description: `${machine} (${regNo}) replaced by ${replacedEquipmentMachine} (${replacedEquipmentRegNo}) at site: ${currentSite}`,
-      priority:    NOTIFICATION_PRIORITY.HIGH,
-      sourceId:    updatedCurrentEquipment._id,
-      recipient:   officeMain
+      priority: NOTIFICATION_PRIORITY.HIGH,
+      sourceId: updatedCurrentEquipment._id,
+      recipient: officeMain,
     });
- 
-    const outgoingOperator = currentEquipment?.certificationBody?.at(-1)?.operatorName || '';
-    const incomingOperator = operator || replacedEquipment?.certificationBody?.at(-1)?.operatorName || '';
+
+    const outgoingOperator =
+      currentEquipment?.certificationBody?.at(-1)?.operatorName || '';
+    const incomingOperator =
+      operator ||
+      replacedEquipment?.certificationBody?.at(-1)?.operatorName ||
+      '';
 
     await alertReplacementViaEmail({
-      type: 'equipment', regNo, machine,
-      replacedEquipmentRegNo, replacedEquipmentMachine,
-      site: currentSite, newSiteForReplaced,
-      month, year, time, date: selectedDate ? new Date(selectedDate) : new Date(), remarks,
-      hired:           currentEquipment?.hired    || false,
-      hiredFrom:       currentEquipment?.hiredFrom || '',
-      rentRate:        currentEquipment?.rentRate || null,
-      location:        currentEquipment?.location ? [currentEquipment.location] : [],
+      type: 'equipment',
+      regNo,
+      machine,
+      replacedEquipmentRegNo,
+      replacedEquipmentMachine,
+      site: currentSite,
+      newSiteForReplaced,
+      month,
+      year,
+      time,
+      date: selectedDate ? new Date(selectedDate) : new Date(),
+      remarks,
+      hired: currentEquipment?.hired || false,
+      hiredFrom: currentEquipment?.hiredFrom || '',
+      rentRate: currentEquipment?.rentRate || null,
+      location: currentEquipment?.location ? [currentEquipment.location] : [],
       incomingHiredFrom,
-      outgoingOperator: outgoingOperator || currentEquipment?.certificationBody?.at(-1)?.operatorName || '',
-      incomingOperator: incomingOperator || operator || replacedEquipment?.certificationBody?.at(-1)?.operatorName || '',
+      outgoingOperator:
+        outgoingOperator ||
+        currentEquipment?.certificationBody?.at(-1)?.operatorName ||
+        '',
+      incomingOperator:
+        incomingOperator ||
+        operator ||
+        replacedEquipment?.certificationBody?.at(-1)?.operatorName ||
+        '',
       currentOperator: finalOperatorName,
-    }).catch(e => console.error('Replace equipment email failed:', e));
+    }).catch((e) => console.error('Replace equipment email failed:', e));
 
     return {
-      status: 201, ok: true, message: 'Equipment replaced successfully',
-      data: { replacement, currentEquipment: updatedCurrentEquipment, replacedEquipment: updatedReplacedEquipment }
+      status: 201,
+      ok: true,
+      message: 'Equipment replaced successfully',
+      data: {
+        replacement,
+        currentEquipment: updatedCurrentEquipment,
+        replacedEquipment: updatedReplacedEquipment,
+      },
     };
-
   } catch (err) {
     console.error('[EquipmentService] replaceEquipment:', err);
     throw err;
@@ -1448,15 +2010,23 @@ const replaceEquipment = async (data) => {
  */
 const getReplacementHistory = async (equipmentId, page, limit, type = null) => {
   try {
-    const skip  = (page - 1) * limit;
+    const skip = (page - 1) * limit;
     const query = { equipmentId, ...(type ? { type } : {}) };
 
     const [history, totalCount] = await Promise.all([
-      replacementsModel.find(query).sort({ date: -1, createdAt: -1 }).skip(skip).limit(limit),
-      replacementsModel.countDocuments(query)
+      replacementsModel
+        .find(query)
+        .sort({ date: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      replacementsModel.countDocuments(query),
     ]);
 
-    const { totalPages, hasNextPage } = getPaginationMeta(totalCount, page, limit);
+    const { totalPages, hasNextPage } = getPaginationMeta(
+      totalCount,
+      page,
+      limit
+    );
 
     return { history, currentPage: page, totalPages, totalCount, hasNextPage };
   } catch (err) {
@@ -1471,30 +2041,48 @@ const getReplacementHistory = async (equipmentId, page, limit, type = null) => {
  */
 const fetchAllReplacements = async () => {
   try {
-    const replacements = await replacementsModel.find({})
+    const replacements = await replacementsModel
+      .find({})
       .sort({ date: -1, createdAt: -1 })
       .limit(DEFAULT_PAGE_LIMITS.REPLACEMENT)
       .lean();
 
-    const equipmentIds = [...new Set([
-      ...replacements.map(r => r.equipmentId.toString()),
-      ...replacements.filter(r => r.type === 'equipment' && r.replacedEquipmentId).map(r => r.replacedEquipmentId.toString())
-    ])];
+    const equipmentIds = [
+      ...new Set([
+        ...replacements.map((r) => r.equipmentId.toString()),
+        ...replacements
+          .filter((r) => r.type === 'equipment' && r.replacedEquipmentId)
+          .map((r) => r.replacedEquipmentId.toString()),
+      ]),
+    ];
 
-    const operatorIds = [...new Set([
-      ...replacements.filter(r => r.currentOperatorId).map(r => r.currentOperatorId),
-      ...replacements.filter(r => r.replacedOperatorId).map(r => r.replacedOperatorId)
-    ])];
+    const operatorIds = [
+      ...new Set([
+        ...replacements
+          .filter((r) => r.currentOperatorId)
+          .map((r) => r.currentOperatorId),
+        ...replacements
+          .filter((r) => r.replacedOperatorId)
+          .map((r) => r.replacedOperatorId),
+      ]),
+    ];
 
     const equipmentMapById = await fetchEquipmentMapById(equipmentIds);
-    const allRegNos        = [...new Set(Object.values(equipmentMapById).map(eq => eq.regNo))];
+    const allRegNos = [
+      ...new Set(Object.values(equipmentMapById).map((eq) => eq.regNo)),
+    ];
 
     const [imageMap, operatorMap] = await Promise.all([
       fetchImageMap(allRegNos),
-      fetchOperatorMapById(operatorIds)
+      fetchOperatorMapById(operatorIds),
     ]);
 
-    return enrichReplacements(replacements, equipmentMapById, imageMap, operatorMap);
+    return enrichReplacements(
+      replacements,
+      equipmentMapById,
+      imageMap,
+      operatorMap
+    );
   } catch (err) {
     console.error('[EquipmentService] fetchAllReplacements:', err);
     throw err;
@@ -1509,35 +2097,63 @@ const fetchAllReplacements = async () => {
  * @param {number|null} months
  * @returns {Promise<object[]>}
  */
-const fetchFilteredReplacements = async (filterType, startDate = null, endDate = null, months = null) => {
+const fetchFilteredReplacements = async (
+  filterType,
+  startDate = null,
+  endDate = null,
+  months = null
+) => {
   try {
-    const { startDateTime, endDateTime } = resolveDateRange(filterType, startDate, endDate, months);
+    const { startDateTime, endDateTime } = resolveDateRange(
+      filterType,
+      startDate,
+      endDate,
+      months
+    );
     const query = buildDateRangeQuery(startDateTime, endDateTime);
 
-    const replacements = await replacementsModel.find(query)
+    const replacements = await replacementsModel
+      .find(query)
       .sort({ date: -1, createdAt: -1 })
       .limit(DEFAULT_PAGE_LIMITS.FILTERED)
       .lean();
 
-    const equipmentIds = [...new Set([
-      ...replacements.map(r => r.equipmentId.toString()),
-      ...replacements.filter(r => r.type === 'equipment' && r.replacedEquipmentId).map(r => r.replacedEquipmentId.toString())
-    ])];
+    const equipmentIds = [
+      ...new Set([
+        ...replacements.map((r) => r.equipmentId.toString()),
+        ...replacements
+          .filter((r) => r.type === 'equipment' && r.replacedEquipmentId)
+          .map((r) => r.replacedEquipmentId.toString()),
+      ]),
+    ];
 
-    const operatorIds = [...new Set([
-      ...replacements.filter(r => r.currentOperatorId).map(r => r.currentOperatorId),
-      ...replacements.filter(r => r.replacedOperatorId).map(r => r.replacedOperatorId)
-    ])];
+    const operatorIds = [
+      ...new Set([
+        ...replacements
+          .filter((r) => r.currentOperatorId)
+          .map((r) => r.currentOperatorId),
+        ...replacements
+          .filter((r) => r.replacedOperatorId)
+          .map((r) => r.replacedOperatorId),
+      ]),
+    ];
 
     const equipmentMapById = await fetchEquipmentMapById(equipmentIds);
-    const allRegNos        = [...new Set(Object.values(equipmentMapById).map(eq => eq.regNo))];
+    const allRegNos = [
+      ...new Set(Object.values(equipmentMapById).map((eq) => eq.regNo)),
+    ];
 
     const [imageMap, operatorMap] = await Promise.all([
       fetchImageMap(allRegNos),
-      fetchOperatorMapById(operatorIds)
+      fetchOperatorMapById(operatorIds),
     ]);
 
-    return enrichReplacements(replacements, equipmentMapById, imageMap, operatorMap);
+    return enrichReplacements(
+      replacements,
+      equipmentMapById,
+      imageMap,
+      operatorMap
+    );
   } catch (err) {
     console.error('[EquipmentService] fetchFilteredReplacements:', err);
     throw err;
@@ -1578,5 +2194,5 @@ module.exports = {
   replaceEquipment,
   getReplacementHistory,
   fetchAllReplacements,
-  fetchFilteredReplacements
+  fetchFilteredReplacements,
 };

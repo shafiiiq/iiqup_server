@@ -15,6 +15,13 @@ router.post('/pending-signatures', controller.getPendingSignatures);
 router.post('/signed-by-user', controller.getSignedByUser);
 router.put('/update-hire-order/:refNo(*)', controller.updateHireOrder);
 router.delete('/delete-hire-order/:refNo', controller.deleteHireOrder);
-router.post('/send-via-email', upload.fields([{ name: 'pdf', maxCount: 1 }, { name: 'attachments', maxCount: 10 }]), controller.sendHireOrderViaEmail);
+router.post(
+  '/send-via-email',
+  upload.fields([
+    { name: 'pdf', maxCount: 1 },
+    { name: 'attachments', maxCount: 10 },
+  ]),
+  controller.sendHireOrderViaEmail
+);
 
 module.exports = router;

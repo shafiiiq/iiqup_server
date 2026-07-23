@@ -1,5 +1,5 @@
 // services/fuel.service.js
-const fuelsModel     = require('../models/fuel.model');
+const fuelsModel = require('../models/fuel.model');
 const equipmentModel = require('../models/equipment.model');
 
 /**
@@ -9,35 +9,49 @@ const equipmentModel = require('../models/equipment.model');
  */
 const _calculateConsumptionSummary = (transactions) => {
   const summary = {
-    totalLiters:      0,
-    totalAmount:      0,
+    totalLiters: 0,
+    totalAmount: 0,
     productBreakdown: {},
     stationBreakdown: {},
-    monthlyBreakdown: {}
+    monthlyBreakdown: {},
   };
 
-  transactions.forEach(transaction => {
+  transactions.forEach((transaction) => {
     summary.totalLiters += transaction.liter;
     summary.totalAmount += transaction.totalAmount;
 
     // Product breakdown
-    const product = summary.productBreakdown[transaction.productName] ??= { liters: 0, amount: 0, count: 0 };
+    const product = (summary.productBreakdown[transaction.productName] ??= {
+      liters: 0,
+      amount: 0,
+      count: 0,
+    });
     product.liters += transaction.liter;
     product.amount += transaction.totalAmount;
-    product.count  += 1;
+    product.count += 1;
 
     // Station breakdown
-    const station = summary.stationBreakdown[transaction.stationName] ??= { liters: 0, amount: 0, count: 0 };
+    const station = (summary.stationBreakdown[transaction.stationName] ??= {
+      liters: 0,
+      amount: 0,
+      count: 0,
+    });
     station.liters += transaction.liter;
     station.amount += transaction.totalAmount;
-    station.count  += 1;
+    station.count += 1;
 
     // Monthly breakdown (YYYY-MM key)
-    const monthKey = new Date(transaction.invoiceMonth).toISOString().substring(0, 7);
-    const month    = summary.monthlyBreakdown[monthKey] ??= { liters: 0, amount: 0, count: 0 };
+    const monthKey = new Date(transaction.invoiceMonth)
+      .toISOString()
+      .substring(0, 7);
+    const month = (summary.monthlyBreakdown[monthKey] ??= {
+      liters: 0,
+      amount: 0,
+      count: 0,
+    });
     month.liters += transaction.liter;
     month.amount += transaction.totalAmount;
-    month.count  += 1;
+    month.count += 1;
   });
 
   summary.totalLiters = Math.round(summary.totalLiters * 100) / 100;
@@ -76,16 +90,20 @@ const getEquipmentFuelConsumption = async (filters = {}) => {
       if (!equipment.regNo) continue;
 
       // Skip if caller requested a specific equipment and this is not it
-      if (filters.equipmentId && equipment._id.toString() !== filters.equipmentId) continue;
+      if (
+        filters.equipmentId &&
+        equipment._id.toString() !== filters.equipmentId
+      )
+        continue;
 
       const fuelQuery = {
-        licensePlate: { $regex: equipment.regNo, $options: 'i' }
+        licensePlate: { $regex: equipment.regNo, $options: 'i' },
       };
 
       if (filters.startDate && filters.endDate) {
         fuelQuery.transactionDate = {
           $gte: new Date(filters.startDate),
-          $lte: new Date(filters.endDate)
+          $lte: new Date(filters.endDate),
         };
       }
 
@@ -95,36 +113,45 @@ const getEquipmentFuelConsumption = async (filters = {}) => {
       const consumptionSummary = _calculateConsumptionSummary(fuelTransactions);
 
       equipmentConsumption.push({
-        equipmentId:       equipment._id,
-        equipmentName:     equipment.equipmentName || 'N/A',
-        equipmentType:     equipment.type          || 'N/A',
-        regNo:             equipment.regNo,
+        equipmentId: equipment._id,
+        equipmentName: equipment.equipmentName || 'N/A',
+        equipmentType: equipment.type || 'N/A',
+        regNo: equipment.regNo,
         totalTransactions: fuelTransactions.length,
-        totalLiters:       consumptionSummary.totalLiters,
-        totalAmount:       consumptionSummary.totalAmount,
-        productBreakdown:  consumptionSummary.productBreakdown,
-        stationBreakdown:  consumptionSummary.stationBreakdown,
-        monthlyBreakdown:  consumptionSummary.monthlyBreakdown,
-        transactions:      fuelTransactions.map(t => ({
-          stationName:     t.stationName,
-          productName:     t.productName,
-          licensePlate:    t.licensePlate,
+        totalLiters: consumptionSummary.totalLiters,
+        totalAmount: consumptionSummary.totalAmount,
+        productBreakdown: consumptionSummary.productBreakdown,
+        stationBreakdown: consumptionSummary.stationBreakdown,
+        monthlyBreakdown: consumptionSummary.monthlyBreakdown,
+        transactions: fuelTransactions.map((t) => ({
+          stationName: t.stationName,
+          productName: t.productName,
+          licensePlate: t.licensePlate,
           transactionDate: t.transactionDate,
-          invoiceMonth:    t.invoiceMonth,
-          unitPrice:       t.unitPrice,
-          liter:           t.liter,
-          totalAmount:     t.totalAmount
-        }))
+          invoiceMonth: t.invoiceMonth,
+          unitPrice: t.unitPrice,
+          liter: t.liter,
+          totalAmount: t.totalAmount,
+        })),
       });
     }
 
     equipmentConsumption.sort((a, b) => b.totalLiters - a.totalLiters);
 
-    return { status: 200, ok: true, message: 'Fuel consumption retrieved successfully', data: equipmentConsumption };
-
+    return {
+      status: 200,
+      ok: true,
+      message: 'Fuel consumption retrieved successfully',
+      data: equipmentConsumption,
+    };
   } catch (err) {
     console.error('[FuelsService] getEquipmentFuelConsumption:', err);
-    return { status: 500, ok: false, message: 'Error retrieving fuel consumption', error: err.message };
+    return {
+      status: 500,
+      ok: false,
+      message: 'Error retrieving fuel consumption',
+      error: err.message,
+    };
   }
 };
 
@@ -133,5 +160,5 @@ const getEquipmentFuelConsumption = async (filters = {}) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 module.exports = {
-  getEquipmentFuelConsumption
+  getEquipmentFuelConsumption,
 };

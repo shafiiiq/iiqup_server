@@ -1,18 +1,20 @@
 // controllers/quotation.controller.js
-const quotationService          = require('../services/quotation.service');
-const { putObject }       = require('../aws/s3.aws');
-const { sendQuotationViaEmail } = require('../gmail/quotation.gmail');
+const quotationService = require('../services/quotation.service');
+const { putObject } = require('../aws/s3.aws');
+const {
+  sendQuotationViaEmail: sendQuotationEmail,
+} = require('../gmail/quotation.gmail');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DEFAULT_SIGNATURES = {
-  accountsDept:              'ROSHAN SHA',
-  purchasingManager:         'ABDUL MALIK',
-  operationsManager:         'SURESHKANTH',
-  authorizedSignatory:       'AHAMMED KAMAL',
-  authorizedSignatoryTitle:  'CEO',
+  accountsDept: 'ROSHAN SHA',
+  purchasingManager: 'ABDUL MALIK',
+  operationsManager: 'SURESHKANTH',
+  authorizedSignatory: 'AHAMMED KAMAL',
+  authorizedSignatoryTitle: 'CEO',
 };
 
 const DEFAULT_TERMS = [
@@ -21,14 +23,14 @@ const DEFAULT_TERMS = [
 ];
 
 const buildApprovedCreds = (body) => ({
-  signed:          body.signed      || false,
-  authorised:      body.authorised  || false,
-  approvedDate:    body.approvedDate,
-  approvedFrom:    body.approvedFrom,
-  approvedIP:      body.approvedIP,
+  signed: body.signed || false,
+  authorised: body.authorised || false,
+  approvedDate: body.approvedDate,
+  approvedFrom: body.approvedFrom,
+  approvedIP: body.approvedIP,
   approvedBDevice: body.approvedBDevice,
   approvedLocation: body.approvedLocation,
-  approvedBy:      body.approvedBy,
+  approvedBy: body.approvedBy,
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -43,46 +45,74 @@ const addQuotation = async (req, res) => {
   try {
     const quotationData = req.body;
 
-    if (!quotationData.quotationRef || !quotationData.date || !quotationData.equipments || !quotationData.quoteNo) {
+    if (
+      !quotationData.quotationRef ||
+      !quotationData.date ||
+      !quotationData.equipments ||
+      !quotationData.quoteNo
+    ) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: quotationRef, date, equipments, quoteNo',
+        message:
+          'Missing required fields: quotationRef, date, equipments, quoteNo',
       });
     }
 
-    if (!quotationData.company?.vendor || !quotationData.company?.attention || !quotationData.company?.designation) {
+    if (
+      !quotationData.company?.vendor ||
+      !quotationData.company?.attention ||
+      !quotationData.company?.designation
+    ) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required company fields: vendor, attention, designation',
+        message:
+          'Missing required company fields: vendor, attention, designation',
       });
     }
 
-    if (!quotationData.items || !Array.isArray(quotationData.items) || quotationData.items.length === 0) {
-      return res.status(400).json({ success: false, message: 'items array is required and cannot be empty' });
+    if (
+      !quotationData.items ||
+      !Array.isArray(quotationData.items) ||
+      quotationData.items.length === 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'items array is required and cannot be empty',
+      });
     }
 
     if (!quotationData.quotationCounter) {
-      quotationData.quotationCounter = await quotationService.getNextQuotationCounter();
+      quotationData.quotationCounter =
+        await quotationService.getNextQuotationCounter();
     }
 
-    if (quotationData.paymentTerms && Array.isArray(quotationData.paymentTerms)) {
-      const filteredTerms         = quotationData.paymentTerms.filter(term => term.trim() !== '');
-      quotationData.termsAndConditions  = ['Terms & Conditions', ...filteredTerms];
+    if (
+      quotationData.paymentTerms &&
+      Array.isArray(quotationData.paymentTerms)
+    ) {
+      const filteredTerms = quotationData.paymentTerms.filter(
+        (term) => term.trim() !== ''
+      );
+      quotationData.termsAndConditions = [
+        'Terms & Conditions',
+        ...filteredTerms,
+      ];
     } else {
       quotationData.termsAndConditions = DEFAULT_TERMS;
     }
 
-    if (!quotationData.signatures) quotationData.signatures = DEFAULT_SIGNATURES;
+    if (!quotationData.signatures)
+      quotationData.signatures = DEFAULT_SIGNATURES;
 
     quotationData.isAmendmented = false;
-    quotationData.amendments    = [];
+    quotationData.amendments = [];
 
     const quotation = await quotationService.createQuotation(quotationData);
 
     res.status(201).json({
       success: true,
       message: 'Quotation created successfully',
-      data:    quotation,
+      data: quotation,
     });
   } catch (error) {
     console.error('[Quotation] addQuotation:', error);
@@ -101,8 +131,8 @@ const getAllQuotations = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Quotations retrieved successfully',
-      data:    quotations,
-      count:   quotations.length,
+      data: quotations,
+      count: quotations.length,
     });
   } catch (error) {
     console.error('[Quotation] getAllQuotations:', error);
@@ -119,7 +149,9 @@ const getQuotationByRef = async (req, res) => {
     const refNo = req.params[0];
 
     if (!refNo) {
-      return res.status(400).json({ success: false, message: 'Reference number is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Reference number is required' });
     }
 
     const quotation = await quotationService.getQuotationByRef(refNo);
@@ -127,7 +159,7 @@ const getQuotationByRef = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Quotation retrieved successfully',
-      data:    quotation,
+      data: quotation,
     });
   } catch (error) {
     console.error('[Quotation] getQuotationByRef:', error);
@@ -145,19 +177,21 @@ const getPendingSignatures = async (req, res) => {
   try {
     const { uniqueCode } = req.body;
 
-    console.log("uniqueCode", uniqueCode)
+    console.log('uniqueCode', uniqueCode);
 
     if (!uniqueCode) {
-      return res.status(400).json({ success: false, message: 'uniqueCode is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'uniqueCode is required' });
     }
 
-    const pending = await quotationService.getPendingSignatures(uniqueCode);      
+    const pending = await quotationService.getPendingSignatures(uniqueCode);
 
     res.status(200).json({
       success: true,
       message: 'Pending Quotation signatures retrieved successfully',
-      data:    pending,
-      count:   pending.length,
+      data: pending,
+      count: pending.length,
     });
   } catch (error) {
     console.error('[Quotation] getPendingSignatures:', error);
@@ -175,7 +209,9 @@ const getSignedByUser = async (req, res) => {
     const { uniqueCode } = req.body;
 
     if (!uniqueCode) {
-      return res.status(400).json({ success: false, message: 'uniqueCode is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'uniqueCode is required' });
     }
 
     const signed = await quotationService.getSignedByUser(uniqueCode);
@@ -183,8 +219,8 @@ const getSignedByUser = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Signed Quotations retrieved successfully',
-      data:    signed,
-      count:   signed.length,
+      data: signed,
+      count: signed.length,
     });
   } catch (error) {
     console.error('[Quotation] getSignedByUser:', error);
@@ -203,7 +239,7 @@ const getLatestQuotation = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Latest Quotation retrieved successfully',
-      data:    latestQuotation || null,
+      data: latestQuotation || null,
     });
   } catch (error) {
     console.error('[Quotation] getLatestQuotation:', error);
@@ -222,7 +258,7 @@ const getLatestQuotationRef = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Latest Quotation reference retrieved successfully',
-      data:    { latestRef: latestRef || 'No Quotation found' },
+      data: { latestRef: latestRef || 'No Quotation found' },
     });
   } catch (error) {
     console.error('[Quotation] getLatestQuotationRef:', error);
@@ -236,20 +272,27 @@ const getLatestQuotationRef = async (req, res) => {
  */
 const updateQuotation = async (req, res) => {
   try {
-    const { refNo }    = req.params;
-    const updateData   = req.body;
+    const { refNo } = req.params;
+    const updateData = req.body;
 
     if (!refNo) {
-      return res.status(400).json({ success: false, message: 'Reference number is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Reference number is required' });
     }
 
     const decodedRefNo = decodeURIComponent(refNo);
-    const quotation          = await quotationService.updateQuotation(decodedRefNo, updateData);
+    const quotation = await quotationService.updateQuotation(
+      decodedRefNo,
+      updateData
+    );
 
     res.status(200).json({
       success: true,
-      message: updateData.isAmendmented ? 'Quotation amended successfully' : 'Quotation updated successfully',
-      data:    quotation,
+      message: updateData.isAmendmented
+        ? 'Quotation amended successfully'
+        : 'Quotation updated successfully',
+      data: quotation,
     });
   } catch (error) {
     console.error('[Quotation] updateQuotation:', error);
@@ -267,7 +310,9 @@ const deleteQuotation = async (req, res) => {
     const { refNo } = req.params;
 
     if (!refNo) {
-      return res.status(400).json({ success: false, message: 'Reference number is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Reference number is required' });
     }
 
     const quotation = await quotationService.deleteQuotation(refNo);
@@ -275,7 +320,7 @@ const deleteQuotation = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Quotation deleted successfully',
-      data:    quotation,
+      data: quotation,
     });
   } catch (error) {
     console.error('[Quotation] deleteQuotation:', error);
@@ -299,8 +344,8 @@ const getCompanyDetails = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Company details retrieved successfully',
-      data:    companyDetails,
-      count:   companyDetails.length,
+      data: companyDetails,
+      count: companyDetails.length,
     });
   } catch (error) {
     console.error('[Quotation] getCompanyDetails:', error);
@@ -317,16 +362,22 @@ const getQuotationsByDateRange = async (req, res) => {
     const { startDate, endDate } = req.query;
 
     if (!startDate || !endDate) {
-      return res.status(400).json({ success: false, message: 'startDate and endDate are required' });
+      return res.status(400).json({
+        success: false,
+        message: 'startDate and endDate are required',
+      });
     }
 
-    const quotations = await quotationService.getQuotationsByDateRange(startDate, endDate);
+    const quotations = await quotationService.getQuotationsByDateRange(
+      startDate,
+      endDate
+    );
 
     res.status(200).json({
       success: true,
       message: 'Quotations retrieved successfully',
-      data:    quotations,
-      count:   quotations.length,
+      data: quotations,
+      count: quotations.length,
     });
   } catch (error) {
     console.error('[Quotation] getQuotationsByDateRange:', error);
@@ -343,16 +394,19 @@ const getQuotationsByCompany = async (req, res) => {
     const { vendorName } = req.params;
 
     if (!vendorName) {
-      return res.status(400).json({ success: false, message: 'Vendor name is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Vendor name is required' });
     }
 
-    const quotations = await quotationService.getQuotationsByCompany(vendorName);
+    const quotations =
+      await quotationService.getQuotationsByCompany(vendorName);
 
     res.status(200).json({
       success: true,
       message: 'Quotations retrieved successfully',
-      data:    quotations,
-      count:   quotations.length,
+      data: quotations,
+      count: quotations.length,
     });
   } catch (error) {
     console.error('[Quotation] getQuotationsByCompany:', error);
@@ -369,7 +423,9 @@ const getQuotationsByRegNo = async (req, res) => {
     const { regNo } = req.params;
 
     if (!regNo) {
-      return res.status(400).json({ success: false, message: 'Registration number is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Registration number is required' });
     }
 
     const quotations = await quotationService.getQuotationsByRegNo(regNo);
@@ -377,11 +433,15 @@ const getQuotationsByRegNo = async (req, res) => {
     res.status(200).json({
       success: true,
       message: `Quotations for registration number ${regNo} retrieved successfully`,
-      data:    quotations,
+      data: quotations,
     });
   } catch (error) {
     console.error('[Quotation] getQuotationsByRegNo:', error);
-    res.status(500).json({ success: false, message: 'Error retrieving Quotations by registration number', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving Quotations by registration number',
+      error: error.message,
+    });
   }
 };
 
@@ -396,11 +456,15 @@ const getQuotationsForStock = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Stock Quotations retrieved successfully',
-      data:    quotations,
+      data: quotations,
     });
   } catch (error) {
     console.error('[Quotation] getQuotationsForStock:', error);
-    res.status(500).json({ success: false, message: 'Error retrieving stock Quotations', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving stock Quotations',
+      error: error.message,
+    });
   }
 };
 
@@ -415,11 +479,15 @@ const getQuotationsForAllEquipments = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'All equipment Quotations retrieved successfully',
-      data:    quotations,
+      data: quotations,
     });
   } catch (error) {
     console.error('[Quotation] getQuotationsForAllEquipments:', error);
-    res.status(500).json({ success: false, message: 'Error retrieving all equipment Quotations', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving all equipment Quotations',
+      error: error.message,
+    });
   }
 };
 
@@ -433,37 +501,52 @@ const getQuotationsForAllEquipments = async (req, res) => {
  */
 const uploadQuotation = async (req, res) => {
   try {
-    const { uploadedBy, quotationRef, description, fileName, isAmendment } = req.body;
+    const { uploadedBy, quotationRef, description, fileName, isAmendment } =
+      req.body;
 
     if (!uploadedBy || !quotationRef) {
-      return res.status(400).json({ success: false, message: 'uploadedBy and quotationRef are required' });
+      return res.status(400).json({
+        success: false,
+        message: 'uploadedBy and quotationRef are required',
+      });
     }
 
     const amendmentSuffix = isAmendment ? '-amendment' : '';
-    const finalFilename   = fileName || `quotation-${quotationRef}${amendmentSuffix}-${Date.now()}.pdf`;  
-    const s3Key           = `quotations/${quotationRef}/${finalFilename}`;
-    const uploadUrl       = await putObject(finalFilename, s3Key, 'application/pdf');
+    const finalFilename =
+      fileName ||
+      `quotation-${quotationRef}${amendmentSuffix}-${Date.now()}.pdf`;
+    const s3Key = `quotations/${quotationRef}/${finalFilename}`;
+    const uploadUrl = await putObject(finalFilename, s3Key, 'application/pdf');
 
     const quotationFileData = {
-      fileName:     finalFilename,
+      fileName: finalFilename,
       originalName: finalFilename,
-      filePath:     s3Key,
-      mimeType:     'application/pdf',
+      filePath: s3Key,
+      mimeType: 'application/pdf',
       uploadUrl,
-      uploadDate:   new Date(),
+      uploadDate: new Date(),
     };
 
-    const result = await quotationService.uploadQuotation(quotationFileData, uploadedBy, quotationRef, description, isAmendment);
+    const result = await quotationService.uploadQuotation(
+      quotationFileData,
+      uploadedBy,
+      quotationRef,
+      description,
+      isAmendment
+    );
 
     res.status(200).json({
-      success:   true,
-      message:   `Pre-signed URL generated successfully${isAmendment ? ' (Amendment)' : ''}`,
+      success: true,
+      message: `Pre-signed URL generated successfully${isAmendment ? ' (Amendment)' : ''}`,
       uploadUrl,
-      data:      { quotation: result, uploadData: quotationFileData },
+      data: { quotation: result, uploadData: quotationFileData },
     });
   } catch (error) {
     console.error('[Quotation] uploadQuotation:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message || 'Failed to upload Quotation' });
+    res.status(error.status || 500).json({
+      success: false,
+      message: error.message || 'Failed to upload Quotation',
+    });
   }
 };
 
@@ -473,27 +556,39 @@ const uploadQuotation = async (req, res) => {
  */
 const purchaseApproval = async (req, res) => {
   try {
-    const { quotationRef }     = req.params;
-    const { approvedBy, comments, signed, approvedDate, approvedFrom } = req.body;
+    const { quotationRef } = req.params;
+    const { approvedBy, comments, signed, approvedDate, approvedFrom } =
+      req.body;
 
     if (!approvedBy) {
-      return res.status(400).json({ success: false, message: 'approvedBy is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'approvedBy is required' });
     }
 
     if (signed && (!approvedDate || !approvedFrom)) {
-      return res.status(400).json({ success: false, message: 'approvedDate and approvedFrom are required for signing' });
+      return res.status(400).json({
+        success: false,
+        message: 'approvedDate and approvedFrom are required for signing',
+      });
     }
 
-    const result = await quotationService.purchaseApproval(quotationRef, buildApprovedCreds(req.body));
+    const result = await quotationService.purchaseApproval(
+      quotationRef,
+      buildApprovedCreds(req.body)
+    );
 
     res.status(200).json({
       success: true,
       message: 'Purchase approval recorded successfully',
-      data:    result,
+      data: result,
     });
   } catch (error) {
     console.error('[Quotation] purchaseApproval:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message || 'Failed to approve purchase' });
+    res.status(error.status || 500).json({
+      success: false,
+      message: error.message || 'Failed to approve purchase',
+    });
   }
 };
 
@@ -503,23 +598,33 @@ const purchaseApproval = async (req, res) => {
  */
 const managerApproval = async (req, res) => {
   try {
-    const { quotationRef }     = req.params;
+    const { quotationRef } = req.params;
     const { approvedBy, comments } = req.body;
 
     if (!approvedBy) {
-      return res.status(400).json({ success: false, message: 'approvedBy is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'approvedBy is required' });
     }
 
-    const result = await quotationService.managerApproval(quotationRef, approvedBy, comments, buildApprovedCreds(req.body));
+    const result = await quotationService.managerApproval(
+      quotationRef,
+      approvedBy,
+      comments,
+      buildApprovedCreds(req.body)
+    );
 
     res.status(200).json({
       success: true,
       message: 'Manager approval recorded successfully',
-      data:    result,
+      data: result,
     });
   } catch (error) {
     console.error('[Quotation] managerApproval:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message || 'Failed to get manager approval' });
+    res.status(error.status || 500).json({
+      success: false,
+      message: error.message || 'Failed to get manager approval',
+    });
   }
 };
 
@@ -529,23 +634,34 @@ const managerApproval = async (req, res) => {
  */
 const ceoApproval = async (req, res) => {
   try {
-    const { quotationRef }                  = req.params;
+    const { quotationRef } = req.params;
     const { approvedBy, comments, authUser } = req.body;
 
     if (!approvedBy) {
-      return res.status(400).json({ success: false, message: 'approvedBy is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'approvedBy is required' });
     }
 
-    const result = await quotationService.ceoApproval(quotationRef, approvedBy, comments, buildApprovedCreds(req.body), authUser);
+    const result = await quotationService.ceoApproval(
+      quotationRef,
+      approvedBy,
+      comments,
+      buildApprovedCreds(req.body),
+      authUser
+    );
 
     res.status(200).json({
       success: true,
       message: 'CEO approval recorded successfully',
-      data:    result,
+      data: result,
     });
   } catch (error) {
     console.error('[Quotation] ceoApproval:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message || 'Failed to get CEO approval' });
+    res.status(error.status || 500).json({
+      success: false,
+      message: error.message || 'Failed to get CEO approval',
+    });
   }
 };
 
@@ -555,23 +671,33 @@ const ceoApproval = async (req, res) => {
  */
 const accountsApproval = async (req, res) => {
   try {
-    const { quotationRef }               = req.params;
+    const { quotationRef } = req.params;
     const { approvedBy, comments } = req.body;
 
     if (!approvedBy) {
-      return res.status(400).json({ success: false, message: 'approvedBy is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'approvedBy is required' });
     }
 
-    const result = await quotationService.accountsApproval(quotationRef, approvedBy, comments, buildApprovedCreds(req.body));
+    const result = await quotationService.accountsApproval(
+      quotationRef,
+      approvedBy,
+      comments,
+      buildApprovedCreds(req.body)
+    );
 
     res.status(200).json({
       success: true,
       message: 'Accounts approval recorded successfully',
-      data:    result,
+      data: result,
     });
   } catch (error) {
     console.error('[Quotation] accountsApproval:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message || 'Failed to record accounts approval' });
+    res.status(error.status || 500).json({
+      success: false,
+      message: error.message || 'Failed to record accounts approval',
+    });
   }
 };
 
@@ -581,23 +707,31 @@ const accountsApproval = async (req, res) => {
  */
 const markItemsAvailable = async (req, res) => {
   try {
-    const { quotationRef }  = req.params;
+    const { quotationRef } = req.params;
     const { markedBy } = req.body;
 
     if (!markedBy) {
-      return res.status(400).json({ success: false, message: 'markedBy is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'markedBy is required' });
     }
 
-    const result = await quotationService.markItemsAvailable(quotationRef, markedBy);
+    const result = await quotationService.markItemsAvailable(
+      quotationRef,
+      markedBy
+    );
 
     res.status(200).json({
       success: true,
       message: 'Items marked as available successfully',
-      data:    result,
+      data: result,
     });
   } catch (error) {
     console.error('[Quotation] markItemsAvailable:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message || 'Failed to mark items as available' });
+    res.status(error.status || 500).json({
+      success: false,
+      message: error.message || 'Failed to mark items as available',
+    });
   }
 };
 
@@ -605,43 +739,58 @@ const markItemsAvailable = async (req, res) => {
  * POST /quotation/:quotationRef/sign
  * Records a signature on the Quotation identified by uniqueCode server-side.
  */
-const signQuotation = async (req, res) => { 
+const signQuotation = async (req, res) => {
   try {
     const { quotationRef } = req.params;
     const {
-      uniqueCode, signedDate, signedFrom, role,
-      signedIP, signedDevice, signedLocation,
-      override = false,        
+      uniqueCode,
+      signedDate,
+      signedFrom,
+      role,
+      signedIP,
+      signedDevice,
+      signedLocation,
+      override = false,
     } = req.body;
 
     if (!uniqueCode || !signedDate || !signedFrom) {
-      return res.status(400).json({ success: false, message: 'uniqueCode, signedDate, and signedFrom are required' });
+      return res.status(400).json({
+        success: false,
+        message: 'uniqueCode, signedDate, and signedFrom are required',
+      });
     }
 
     const result = await quotationService.signQuotation(quotationRef, {
-      uniqueCode, signedDate, signedFrom, role,
-      signedIP, signedDevice, signedLocation,
-      override,                
+      uniqueCode,
+      signedDate,
+      signedFrom,
+      role,
+      signedIP,
+      signedDevice,
+      signedLocation,
+      override,
     });
 
     // Out-of-order prompt — return 202 so frontend can ask user
     if (result.requireOverride) {
       return res.status(202).json({
-        success:         false,
+        success: false,
         requireOverride: true,
-        message:         result.message,
-        unsignedAbove:   result.unsignedAbove,
+        message: result.message,
+        unsignedAbove: result.unsignedAbove,
       });
     }
 
     res.status(200).json({
       success: true,
       message: result.message,
-      data:    result.data,
+      data: result.data,
     });
   } catch (error) {
     console.error('[Quotation] signQuotation:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message || 'Signing failed' });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message || 'Signing failed' });
   }
 };
 
@@ -655,17 +804,30 @@ const signQuotation = async (req, res) => {
  */
 const sendQuotationViaEmail = async (req, res) => {
   try {
-    const { emails: rawEmails, recipientName, vendorName, equipment, quotationRef } = req.body;
-    const emails = typeof rawEmails === 'string' ? JSON.parse(rawEmails) : rawEmails;
+    const {
+      emails: rawEmails,
+      recipientName,
+      vendorName,
+      equipment,
+      quotationRef,
+    } = req.body;
+    const emails =
+      typeof rawEmails === 'string' ? JSON.parse(rawEmails) : rawEmails;
     const pdfFile = req.files?.pdf?.[0];
     const extraFiles = req.files?.attachments || [];
 
     if (!emails?.length || !pdfFile) {
-      return res.status(400).json({ success: false, message: 'At least one email and PDF are required' });
+      return res.status(400).json({
+        success: false,
+        message: 'At least one email and PDF are required',
+      });
     }
 
     const cleanEquipment = equipment
-      ? equipment.replace(/[^\x20-\x7E]/g, '').replace(/\s+/g, ' ').trim()
+      ? equipment
+          .replace(/[^\x20-\x7E]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim()
       : '';
 
     if (quotationRef) {
@@ -681,14 +843,20 @@ const sendQuotationViaEmail = async (req, res) => {
         filename: pdfFile.originalname || 'quotation.pdf',
         mimeType: 'application/pdf',
       },
-      ...extraFiles.map(f => ({
+      ...extraFiles.map((f) => ({
         content: f.buffer,
         filename: f.originalname || 'attachment',
         mimeType: f.mimetype || 'application/octet-stream',
-      }))
+      })),
     ];
 
-    const result = await sendQuotationViaEmail(emails, vendorName || '', recipientName || '', attachmentsList, cleanEquipment);
+    const result = await sendQuotationEmail(
+      emails,
+      vendorName || '',
+      recipientName || '',
+      attachmentsList,
+      cleanEquipment
+    );
 
     res.status(200).json({ success: true, data: result });
   } catch (error) {
@@ -704,17 +872,19 @@ const sendQuotationViaEmail = async (req, res) => {
 const updateVendorEmail = async (req, res) => {
   try {
     const { vendorCode } = req.params;
-    const { email }      = req.body;
+    const { email } = req.body;
 
     if (!email || !email.includes('@')) {
-      return res.status(400).json({ success: false, message: 'Valid email required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Valid email required' });
     }
 
     const result = await quotationService.saveVendorEmail(vendorCode, email);
 
     res.status(200).json({
-      success:       true,
-      message:       `Email updated for vendor code ${vendorCode}`,
+      success: true,
+      message: `Email updated for vendor code ${vendorCode}`,
       modifiedCount: result.modifiedCount,
     });
   } catch (error) {
@@ -744,7 +914,7 @@ module.exports = {
   getQuotationsForStock,
   getQuotationsForAllEquipments,
   // Approvals
-  uploadQuotation, 
+  uploadQuotation,
   purchaseApproval,
   managerApproval,
   ceoApproval,

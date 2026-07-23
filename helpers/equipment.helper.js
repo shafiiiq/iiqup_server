@@ -3,7 +3,10 @@
 // Pure functions — no side effects, no DB calls, no external dependencies.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const { HIRED_FILTER, INVALID_OPERATOR_VALUES } = require('../constants/equipment.constants');
+const {
+  HIRED_FILTER,
+  INVALID_OPERATOR_VALUES,
+} = require('../constants/equipment.constants');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Query Builders
@@ -15,8 +18,8 @@ const { HIRED_FILTER, INVALID_OPERATOR_VALUES } = require('../constants/equipmen
  * @returns {object}
  */
 const buildHiredQuery = (hiredFilter) => {
-  if (hiredFilter === HIRED_FILTER.HIRED) return { hired: true  };
-  if (hiredFilter === HIRED_FILTER.OWN)   return { hired: false };
+  if (hiredFilter === HIRED_FILTER.HIRED) return { hired: true };
+  if (hiredFilter === HIRED_FILTER.OWN) return { hired: false };
   return {};
 };
 
@@ -26,7 +29,7 @@ const buildHiredQuery = (hiredFilter) => {
  * @returns {object}
  */
 const buildStatusQuery = (status) => ({
-  status: { $regex: new RegExp(`^${status}$`, 'i') }
+  status: { $regex: new RegExp(`^${status}$`, 'i') },
 });
 
 /**
@@ -36,7 +39,7 @@ const buildStatusQuery = (status) => ({
  * @returns {object}
  */
 const buildDateRangeQuery = (startDateTime, endDateTime) => ({
-  date: { $gte: startDateTime, $lte: endDateTime }
+  date: { $gte: startDateTime, $lte: endDateTime },
 });
 
 /**
@@ -55,15 +58,15 @@ const buildSearchQuery = (searchTerm, searchField) => {
   }
 
   const orClauses = [
-    { machine:                          { $regex: searchTerm, $options: 'i' } },
-    { regNo:                            { $regex: searchTerm, $options: 'i' } },
-    { brand:                            { $regex: searchTerm, $options: 'i' } },
-    { company:                          { $regex: searchTerm, $options: 'i' } },
-    { status:                           { $regex: searchTerm, $options: 'i' } },
-    { site:                             { $regex: searchTerm, $options: 'i' } },
-    { coc:                              { $regex: searchTerm, $options: 'i' } },
+    { machine: { $regex: searchTerm, $options: 'i' } },
+    { regNo: { $regex: searchTerm, $options: 'i' } },
+    { brand: { $regex: searchTerm, $options: 'i' } },
+    { company: { $regex: searchTerm, $options: 'i' } },
+    { status: { $regex: searchTerm, $options: 'i' } },
+    { site: { $regex: searchTerm, $options: 'i' } },
+    { coc: { $regex: searchTerm, $options: 'i' } },
     { 'certificationBody.operatorName': { $regex: searchTerm, $options: 'i' } },
-    { 'certificationBody.operatorId':   { $regex: searchTerm, $options: 'i' } }
+    { 'certificationBody.operatorId': { $regex: searchTerm, $options: 'i' } },
   ];
 
   if (!isNaN(searchTerm)) {
@@ -82,10 +85,21 @@ const buildSearchQuery = (searchTerm, searchField) => {
  * @param {number|null} months
  * @returns {{ startDateTime: Date, endDateTime: Date }}
  */
-const resolveDateRange = (filterType, startDate = null, endDate = null, months = null) => {
-  const startOfDay = (d) => { d.setHours(0,  0,  0,   0); return d; };
-  const endOfDay   = (d) => { d.setHours(23, 59, 59, 999); return d; };
-  const today      = ()  => new Date();
+const resolveDateRange = (
+  filterType,
+  startDate = null,
+  endDate = null,
+  months = null
+) => {
+  const startOfDay = (d) => {
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
+  const endOfDay = (d) => {
+    d.setHours(23, 59, 59, 999);
+    return d;
+  };
+  const today = () => new Date();
 
   const parseDMY = (str) => {
     const [d, m, y] = str.split('-');
@@ -94,12 +108,18 @@ const resolveDateRange = (filterType, startDate = null, endDate = null, months =
 
   switch (filterType) {
     case 'daily':
-      return { startDateTime: startOfDay(today()), endDateTime: endOfDay(today()) };
+      return {
+        startDateTime: startOfDay(today()),
+        endDateTime: endOfDay(today()),
+      };
 
     case 'yesterday': {
       const yd = today();
       yd.setDate(yd.getDate() - 1);
-      return { startDateTime: startOfDay(new Date(yd)), endDateTime: endOfDay(new Date(yd)) };
+      return {
+        startDateTime: startOfDay(new Date(yd)),
+        endDateTime: endOfDay(new Date(yd)),
+      };
     }
 
     case 'weekly': {
@@ -128,16 +148,23 @@ const resolveDateRange = (filterType, startDate = null, endDate = null, months =
     }
 
     case 'single': {
-      if (!startDate) throw new Error('Date is required for single date filter');
+      if (!startDate)
+        throw new Error('Date is required for single date filter');
       const d = parseDMY(startDate);
-      return { startDateTime: startOfDay(new Date(d)), endDateTime: endOfDay(new Date(d)) };
+      return {
+        startDateTime: startOfDay(new Date(d)),
+        endDateTime: endOfDay(new Date(d)),
+      };
     }
 
     case 'custom': {
-      if (!startDate || !endDate) throw new Error('Start date and end date are required for custom range');
+      if (!startDate || !endDate)
+        throw new Error(
+          'Start date and end date are required for custom range'
+        );
       return {
         startDateTime: startOfDay(parseDMY(startDate)),
-        endDateTime:   endOfDay(parseDMY(endDate))
+        endDateTime: endOfDay(parseDMY(endDate)),
       };
     }
 
@@ -162,9 +189,9 @@ const resolveDateRange = (filterType, startDate = null, endDate = null, months =
 const normaliseImagePath = (rawPath) => {
   let path = rawPath;
 
-  if      (path.startsWith('public/'))   path = path.substring(7);
-  else if (path.startsWith('/public/'))  path = path.substring(8);
-  else if (path.startsWith('public\\'))  path = path.substring(7);
+  if (path.startsWith('public/')) path = path.substring(7);
+  else if (path.startsWith('/public/')) path = path.substring(8);
+  else if (path.startsWith('public\\')) path = path.substring(7);
   else if (path.startsWith('\\public\\')) path = path.substring(8);
 
   return `/${path.replace(/\\/g, '/')}`;
@@ -176,7 +203,7 @@ const normaliseImagePath = (rawPath) => {
  * @returns {object[]}
  */
 const normaliseImages = (images = []) =>
-  images.map(image => ({ ...image, url: normaliseImagePath(image.path) }));
+  images.map((image) => ({ ...image, url: normaliseImagePath(image.path) }));
 
 /**
  * Coerces certificationBody into the canonical array-of-objects format.
@@ -188,12 +215,19 @@ const normaliseCertificationBody = (certificationBody) => {
   if (!certificationBody) return [];
 
   if (typeof certificationBody === 'string') {
-    if (!certificationBody.trim() || certificationBody === 'No Operator') return [];
-    return [{ operatorName: certificationBody, operatorId: 'Not Assigned', assignedAt: new Date() }];
+    if (!certificationBody.trim() || certificationBody === 'No Operator')
+      return [];
+    return [
+      {
+        operatorName: certificationBody,
+        operatorId: 'Not Assigned',
+        assignedAt: new Date(),
+      },
+    ];
   }
 
   if (Array.isArray(certificationBody)) {
-    return certificationBody.map(item =>
+    return certificationBody.map((item) =>
       typeof item === 'string'
         ? { operatorName: item, operatorId: '', assignedAt: new Date() }
         : item
@@ -211,7 +245,7 @@ const normaliseCertificationBody = (certificationBody) => {
 const normaliseSite = (site) => {
   if (!site) return [];
   if (typeof site === 'string') return site.trim() ? [site] : [];
-  if (Array.isArray(site))     return site;
+  if (Array.isArray(site)) return site;
   return [];
 };
 
@@ -222,29 +256,28 @@ const normaliseSite = (site) => {
  * @returns {{ updateData: object, newOperatorId: string|null }}
  */
 const buildOperatorUpdateData = (cleanData) => {
-  const updateData     = { ...cleanData };
-  let   newOperatorId  = null;
+  const updateData = { ...cleanData };
+  let newOperatorId = null;
 
   if (cleanData.operator && cleanData.operatorId) {
     updateData.$push = {
       certificationBody: {
         operatorName: cleanData.operator,
-        operatorId:   cleanData.operatorId,
-        assignedAt:   new Date()
-      }
+        operatorId: cleanData.operatorId,
+        assignedAt: new Date(),
+      },
     };
     newOperatorId = cleanData.operatorId;
     delete updateData.operator;
     delete updateData.operatorId;
-
   } else if (cleanData.operator) {
     console.warn('Operator provided without operatorId - this is deprecated');
     updateData.$push = {
       certificationBody: {
         operatorName: cleanData.operator,
-        operatorId:   '',
-        assignedAt:   new Date()
-      }
+        operatorId: '',
+        assignedAt: new Date(),
+      },
     };
     delete updateData.operator;
   }
@@ -263,11 +296,18 @@ const extractEquipmentChanges = (original, updated, updatedData) => {
   const changes = [];
 
   if (updatedData.status && original.status !== updatedData.status) {
-    changes.push(`status changed from ${original.status} to ${updatedData.status}`);
+    changes.push(
+      `status changed from ${original.status} to ${updatedData.status}`
+    );
   }
 
-  if (updatedData.site && JSON.stringify(original.site) !== JSON.stringify(updatedData.site)) {
-    const siteText = Array.isArray(updatedData.site) ? updatedData.site.join(', ') : String(updatedData.site);
+  if (
+    updatedData.site &&
+    JSON.stringify(original.site) !== JSON.stringify(updatedData.site)
+  ) {
+    const siteText = Array.isArray(updatedData.site)
+      ? updatedData.site.join(', ')
+      : String(updatedData.site);
     changes.push(`site is: ${siteText}`);
   }
 
@@ -277,9 +317,11 @@ const extractEquipmentChanges = (original, updated, updatedData) => {
 
   if (
     updated.certificationBody &&
-    JSON.stringify(original.certificationBody) !== JSON.stringify(updated.certificationBody)
+    JSON.stringify(original.certificationBody) !==
+      JSON.stringify(updated.certificationBody)
   ) {
-    const last = updated.certificationBody[updated.certificationBody.length - 1];
+    const last =
+      updated.certificationBody[updated.certificationBody.length - 1];
     const name = last?.operatorName || String(last);
     if (name && typeof name === 'string') changes.push(`operator is: ${name}`);
   }
@@ -296,17 +338,22 @@ const extractEquipmentChanges = (original, updated, updatedData) => {
  * @param {*} operatorId
  * @returns {boolean}
  */
-const isValidOperatorId = (operatorId) => !INVALID_OPERATOR_VALUES.has(operatorId);
+const isValidOperatorId = (operatorId) =>
+  !INVALID_OPERATOR_VALUES.has(operatorId);
 
 /**
  * Returns the current month, year, and formatted time string.
  * @returns {{ month: number, year: number, time: string }}
  */
 const getCurrentDateTime = () => {
-  const now   = new Date();
+  const now = new Date();
   const month = now.getMonth() + 1;
-  const year  = now.getFullYear();
-  const time  = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const year = now.getFullYear();
+  const time = now.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
   return { month, year, time };
 };
 
@@ -339,5 +386,5 @@ module.exports = {
   // Misc
   isValidOperatorId,
   getCurrentDateTime,
-  getPaginationMeta
+  getPaginationMeta,
 };

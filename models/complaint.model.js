@@ -1,41 +1,41 @@
 const mongoose = require('mongoose');
 
 const mediaFileSchema = new mongoose.Schema({
-  fileName: { type: String, },
-  originalName: { type: String, },
-  filePath: { type: String, },
-  fileSize: { type: Number, },
-  mimeType: { type: String, },
-  fieldName: { type: String, },
+  fileName: { type: String },
+  originalName: { type: String },
+  filePath: { type: String },
+  fileSize: { type: Number },
+  mimeType: { type: String },
+  fieldName: { type: String },
   uploadDate: { type: Date, default: Date.now },
-  type: { type: String, enum: ['photo', 'video'], },
-  url: { type: String, },
+  type: { type: String, enum: ['photo', 'video'] },
+  url: { type: String },
   duration: { type: Number }, // Only for videos
 });
 
 const solutionFileSchema = new mongoose.Schema({
-  fileName: { type: String, },
-  originalName: { type: String, },
-  filePath: { type: String, },
-  fileSize: { type: Number, },
-  mimeType: { type: String, },
-  fieldName: { type: String, },
+  fileName: { type: String },
+  originalName: { type: String },
+  filePath: { type: String },
+  fileSize: { type: Number },
+  mimeType: { type: String },
+  fieldName: { type: String },
   uploadDate: { type: Date, default: Date.now },
-  type: { type: String, enum: ['photo', 'video'], },
-  url: { type: String, },
+  type: { type: String, enum: ['photo', 'video'] },
+  url: { type: String },
   duration: { type: Number }, // Only for videos
 });
 
 // New schema for document attachments
 const documentFileSchema = new mongoose.Schema({
-  fileName: { type: String, },
-  originalName: { type: String, },
-  filePath: { type: String, },
-  fileSize: { type: Number, },
-  mimeType: { type: String, },
+  fileName: { type: String },
+  originalName: { type: String },
+  filePath: { type: String },
+  fileSize: { type: Number },
+  mimeType: { type: String },
   uploadDate: { type: Date, default: Date.now },
-  type: { type: String, enum: ['image', 'document'], },
-  url: { type: String, },
+  type: { type: String, enum: ['image', 'document'] },
+  url: { type: String },
 });
 
 // New schema for mechanic requests
@@ -44,14 +44,22 @@ const mechanicRequestSchema = new mongoose.Schema({
   audioFile: {
     fileName: { type: String },
     filePath: { type: String },
-    duration: { type: Number }
+    duration: { type: Number },
   },
   requestDate: { type: Date, default: Date.now },
   status: {
     type: String,
-    enum: ['pending', 'approved_by_maintenance', 'sent_to_workshop', 'lpo_created', 'approved_by_purchase', 'approved_by_ceo', 'items_available'],
-    default: 'pending'
-  }
+    enum: [
+      'pending',
+      'approved_by_maintenance',
+      'sent_to_workshop',
+      'lpo_created',
+      'approved_by_purchase',
+      'approved_by_ceo',
+      'items_available',
+    ],
+    default: 'pending',
+  },
 });
 
 // New schema for LPO tracking
@@ -66,11 +74,11 @@ const lpoTrackingSchema = new mongoose.Schema({
 
   isAmendment: {
     type: Boolean,
-    default: false
+    default: false,
   },
   amendmentDate: {
     type: String,
-    default: null
+    default: null,
   },
 
   // Add LPO file information
@@ -79,7 +87,7 @@ const lpoTrackingSchema = new mongoose.Schema({
     originalName: { type: String },
     filePath: { type: String },
     mimeType: { type: String },
-    uploadDate: { type: Date }
+    uploadDate: { type: Date },
   },
   uploadedBy: { type: String }, // Who uploaded the LPO file
   uploadedDate: { type: Date },
@@ -90,17 +98,27 @@ const lpoTrackingSchema = new mongoose.Schema({
   ceoApprovalDate: { type: Date },
   status: {
     type: String,
-    enum: ['created', 'uploaded', 'purchase_approved', 'accounts_approved', 'manager_approved', 'ceo_approved', 'md_approved', 'items_procured', 'amended'],
-    default: 'created'
+    enum: [
+      'created',
+      'uploaded',
+      'purchase_approved',
+      'accounts_approved',
+      'manager_approved',
+      'ceo_approved',
+      'md_approved',
+      'items_procured',
+      'amended',
+    ],
+    default: 'created',
   },
   // PMR fields
   PMRsigned: {
     type: Boolean,
-    default: false
+    default: false,
   },
   PMRauthorised: {
     type: Boolean,
-    default: false
+    default: false,
   },
   PMRapprovedBy: {
     type: String,
@@ -124,11 +142,11 @@ const lpoTrackingSchema = new mongoose.Schema({
   // MANAGER fields
   MANAGERsigned: {
     type: Boolean,
-    default: false
+    default: false,
   },
   MANAGERauthorised: {
     type: Boolean,
-    default: false
+    default: false,
   },
   MANAGERapprovedBy: {
     type: String,
@@ -152,11 +170,11 @@ const lpoTrackingSchema = new mongoose.Schema({
   // ACCOUTNS fields
   ACCOUNTSsigned: {
     type: Boolean,
-    default: false
+    default: false,
   },
   ACCOUNTSauthorised: {
     type: Boolean,
-    default: false
+    default: false,
   },
   ACCOUNTSapprovedBy: {
     type: String,
@@ -180,11 +198,11 @@ const lpoTrackingSchema = new mongoose.Schema({
   // CEO fields
   CEOsigned: {
     type: Boolean,
-    default: false
+    default: false,
   },
   CEOauthorised: {
     type: Boolean,
-    default: false
+    default: false,
   },
   CEOapprovedBy: {
     type: String,
@@ -209,11 +227,11 @@ const lpoTrackingSchema = new mongoose.Schema({
   // MD fields
   MDsigned: {
     type: Boolean,
-    default: false
+    default: false,
   },
   MDauthorised: {
     type: Boolean,
-    default: false
+    default: false,
   },
   MDapprovedBy: {
     type: String,
@@ -249,12 +267,14 @@ const complaintSchema = new mongoose.Schema({
   mediaFiles: [mediaFileSchema],
 
   // Assignment tracking
-  assignedMechanic: [{
-    mechanicId: { type: String },
-    mechanicName: { type: String },
-    assignedBy: { type: String }, // MAINTENANCE_HEAD
-    assignedDate: { type: Date }
-  }],
+  assignedMechanic: [
+    {
+      mechanicId: { type: String },
+      mechanicName: { type: String },
+      assignedBy: { type: String }, // MAINTENANCE_HEAD
+      assignedDate: { type: Date },
+    },
+  ],
 
   // Mechanic requests for items/tools
   mechanicRequests: [mechanicRequestSchema],
@@ -272,44 +292,49 @@ const complaintSchema = new mongoose.Schema({
   workflowStatus: {
     type: String,
     enum: [
-      'registered',           // Initial registration
+      'registered', // Initial registration
       'assigned_to_mechanic', // Assigned to mechanic
-      'mechanic_requested',   // Mechanic requested items
+      'mechanic_requested', // Mechanic requested items
       'maintenance_approved', // Maintenance head approved request
-      'sent_to_workshop',     // Sent to workshop manager
-      'sent_to_workshop_without_lpo',     // Sent to workshop manager without lpo
-      'approved_without_lpo',     // Approved without lpo
-      'lpo_created',          // LPO created by workshop manager
-      'lpo_uploaded',         // LPO uploaded by workshop manager
-      'lpo_amended',          // LPO amended by workshop manager
-      'purchase_approved',    // Approved by purchase manager
-      'accounts_approved',    // Approved by accounts
-      'manager_approved',     // Approved by manager
-      'md_approved',          // Approved by md
-      'ceo_approved',         // Approved by CEO
-      'items_available',      // Items available for mechanic
-      'work_in_progress',     // Mechanic started work
-      'completed'             // Work completed
+      'sent_to_workshop', // Sent to workshop manager
+      'sent_to_workshop_without_lpo', // Sent to workshop manager without lpo
+      'approved_without_lpo', // Approved without lpo
+      'lpo_created', // LPO created by workshop manager
+      'lpo_uploaded', // LPO uploaded by workshop manager
+      'lpo_amended', // LPO amended by workshop manager
+      'purchase_approved', // Approved by purchase manager
+      'accounts_approved', // Approved by accounts
+      'manager_approved', // Approved by manager
+      'md_approved', // Approved by md
+      'ceo_approved', // Approved by CEO
+      'items_available', // Items available for mechanic
+      'work_in_progress', // Mechanic started work
+      'completed', // Work completed
     ],
-    default: 'registered'
+    default: 'registered',
   },
 
   // Legacy status for backward compatibility
   status: {
     type: String,
     enum: ['pending', 'in-progress', 'resolved', 'rejected'],
-    default: 'pending'
+    default: 'pending',
   },
 
   // Approval trail
-  approvalTrail: [{
-    approvedBy: { type: String },
-    role: { type: String },
-    approvalDate: { type: Date, default: Date.now },
-    comments: { type: String },
-    action: { type: String, enum: ['approved', 'rejected', 'forwarded', 'uploaded'] },
-    attachments: [documentFileSchema] // Documents attached with this approval
-  }],
+  approvalTrail: [
+    {
+      approvedBy: { type: String },
+      role: { type: String },
+      approvalDate: { type: Date, default: Date.now },
+      comments: { type: String },
+      action: {
+        type: String,
+        enum: ['approved', 'rejected', 'forwarded', 'uploaded'],
+      },
+      attachments: [documentFileSchema], // Documents attached with this approval
+    },
+  ],
 
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },

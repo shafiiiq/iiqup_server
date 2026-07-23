@@ -7,22 +7,26 @@ const mongoose = require('mongoose');
 
 const participantSchema = new mongoose.Schema(
   {
-    userId:     { type: mongoose.Schema.Types.ObjectId, required: true },
-    userType:   { type: String, enum: ['office', 'mechanic', 'operator'], required: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, required: true },
+    userType: {
+      type: String,
+      enum: ['office', 'mechanic', 'operator'],
+      required: true,
+    },
     uniqueCode: { type: String, required: true },
-    name:       { type: String },
-    avatar:     { type: String },
-    isAdmin:    { type: Boolean, default: false },
+    name: { type: String },
+    avatar: { type: String },
+    isAdmin: { type: Boolean, default: false },
   },
-  { _id: false },
+  { _id: false }
 );
 
 const lastMessageSenderSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId },
-    name:   { type: String },
+    name: { type: String },
   },
-  { _id: false },
+  { _id: false }
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -32,36 +36,40 @@ const lastMessageSenderSchema = new mongoose.Schema(
 const chatSchema = new mongoose.Schema(
   {
     // Identity
-    type:     { type: String, enum: ['individual', 'group'], required: true },
-    teamType: { type: String, enum: ['maintenance', 'operations', 'admin', 'mechanic', 'operators'], required: true },
-    name:     { type: String }, // Required for groups only
-    avatar:   { type: String }, // Group avatar/emoji
+    type: { type: String, enum: ['individual', 'group'], required: true },
+    teamType: {
+      type: String,
+      enum: ['maintenance', 'operations', 'admin', 'mechanic', 'operators'],
+      required: true,
+    },
+    name: { type: String }, // Required for groups only
+    avatar: { type: String }, // Group avatar/emoji
 
     // Participants
     participants: { type: [participantSchema], default: [] },
 
     // Last Message
-    lastMessage:       { type: String, default: ''         },
-    lastMessageType:   { type: String, default: 'text'     },
-    lastMessageTime:   { type: Date,   default: Date.now   },
-    lastMessageSender: { type: lastMessageSenderSchema     },
+    lastMessage: { type: String, default: '' },
+    lastMessageType: { type: String, default: 'text' },
+    lastMessageTime: { type: Date, default: Date.now },
+    lastMessageSender: { type: lastMessageSenderSchema },
 
     // Unread Tracking (key: userId, value: unread count)
     unreadCount: { type: Map, of: Number, default: {} },
   },
   {
     timestamps: true,
-  },
+  }
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Indexes
 // ─────────────────────────────────────────────────────────────────────────────
 
-chatSchema.index({ 'participants.userId':     1  });
-chatSchema.index({ 'participants.uniqueCode': 1  });
-chatSchema.index({ teamType:                  1  });
-chatSchema.index({ lastMessageTime:           -1 });
+chatSchema.index({ 'participants.userId': 1 });
+chatSchema.index({ 'participants.uniqueCode': 1 });
+chatSchema.index({ teamType: 1 });
+chatSchema.index({ lastMessageTime: -1 });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Export

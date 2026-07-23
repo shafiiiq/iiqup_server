@@ -1,5 +1,5 @@
 // controllers/stocks.controller.js
-const stockServices     = require('../services/stock.service.js');
+const stockServices = require('../services/stock.service.js');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Stock CRUD Controllers
@@ -16,7 +16,9 @@ const addStocks = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Stocks] addStocks:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -31,7 +33,9 @@ const getStocks = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Stocks] getStocks:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -44,7 +48,9 @@ const getStocksByType = async (req, res) => {
     const { type } = req.params;
 
     if (!type) {
-      return res.status(400).json({ success: false, message: 'Stock type is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Stock type is required' });
     }
 
     const result = await stockServices.fetchStocksByType(type);
@@ -52,7 +58,9 @@ const getStocksByType = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Stocks] getStocksByType:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -65,7 +73,9 @@ const getStocksByEquipment = async (req, res) => {
     const { equipmentNumber } = req.params;
 
     if (!equipmentNumber) {
-      return res.status(400).json({ success: false, message: 'Equipment number is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Equipment number is required' });
     }
 
     const result = await stockServices.fetchStocksByEquipment(equipmentNumber);
@@ -73,7 +83,9 @@ const getStocksByEquipment = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Stocks] getStocksByEquipment:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -86,7 +98,9 @@ const getStockById = async (req, res) => {
     const { stockId } = req.params;
 
     if (!stockId) {
-      return res.status(400).json({ success: false, message: 'Stock ID is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Stock ID is required' });
     }
 
     const result = await stockServices.getStockById(stockId);
@@ -94,7 +108,9 @@ const getStockById = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Stocks] getStockById:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -107,7 +123,9 @@ const updateProduct = async (req, res) => {
     const { stockId } = req.params;
 
     if (!stockId) {
-      return res.status(400).json({ success: false, message: 'Stock ID is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Stock ID is required' });
     }
 
     const result = await stockServices.updateProduct(stockId, req.body);
@@ -115,7 +133,9 @@ const updateProduct = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Stocks] updateProduct:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -128,12 +148,14 @@ const updateStock = async (req, res) => {
     const { stockId } = req.params;
 
     if (!stockId) {
-      return res.status(400).json({ success: false, message: 'Stock ID is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Stock ID is required' });
     }
 
     if (req.body.type === 'deduct') {
-      const requiredFields  = ['equipmentName', 'mechanicName'];
-      const missingFields   = requiredFields.filter(field => !req.body[field]);
+      const requiredFields = ['equipmentName', 'mechanicName'];
+      const missingFields = requiredFields.filter((field) => !req.body[field]);
 
       if (missingFields.length > 0) {
         return res.status(400).json({
@@ -148,7 +170,9 @@ const updateStock = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Stocks] updateStock:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -161,7 +185,9 @@ const deleteStock = async (req, res) => {
     const { id } = req.params;
 
     if (!id) {
-      return res.status(400).json({ success: false, message: 'Stock ID is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Stock ID is required' });
     }
 
     const result = await stockServices.deleteStock(id);
@@ -169,7 +195,9 @@ const deleteStock = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Stocks] deleteStock:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -183,11 +211,13 @@ const deleteStock = async (req, res) => {
  */
 const addStockQuantity = async (req, res) => {
   try {
-    const { stockId }                        = req.params;
+    const { stockId } = req.params;
     const { quantity, reason, notes, createdBy } = req.body;
 
     if (!quantity || quantity <= 0) {
-      return res.status(400).json({ success: false, message: 'Valid quantity is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Valid quantity is required' });
     }
 
     const currentStock = await stockServices.getStockById(stockId);
@@ -197,11 +227,11 @@ const addStockQuantity = async (req, res) => {
     }
 
     const updateData = {
-      type:       'add',
+      type: 'add',
       stockCount: currentStock.data.stockCount + quantity,
-      reason:     reason    || 'Stock addition',
-      notes:      notes     || '',
-      createdBy:  createdBy || 'System',
+      reason: reason || 'Stock addition',
+      notes: notes || '',
+      createdBy: createdBy || 'System',
     };
 
     const result = await stockServices.updateStock(stockId, updateData);
@@ -209,7 +239,9 @@ const addStockQuantity = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Stocks] addStockQuantity:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -221,18 +253,28 @@ const deductStockQuantity = async (req, res) => {
   try {
     const { stockId } = req.params;
     const {
-      quantity, equipmentId, mechanicId, equipmentName, mechanicName,
-      equipmentNumber, reason, notes, createdBy,
+      quantity,
+      equipmentId,
+      mechanicId,
+      equipmentName,
+      mechanicName,
+      equipmentNumber,
+      reason,
+      notes,
+      createdBy,
     } = req.body;
 
     if (!quantity || quantity <= 0) {
-      return res.status(400).json({ success: false, message: 'Valid quantity is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Valid quantity is required' });
     }
 
     if (!equipmentId || !mechanicId || !equipmentName || !mechanicName) {
       return res.status(400).json({
         success: false,
-        message: 'equipmentId, mechanicId, equipmentName, and mechanicName are required',
+        message:
+          'equipmentId, mechanicId, equipmentName, and mechanicName are required',
       });
     }
 
@@ -243,20 +285,22 @@ const deductStockQuantity = async (req, res) => {
     }
 
     if (currentStock.data.stockCount < quantity) {
-      return res.status(400).json({ success: false, message: 'Insufficient stock quantity' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Insufficient stock quantity' });
     }
 
     const updateData = {
-      type:            'deduct',
-      stockCount:      currentStock.data.stockCount - quantity,
+      type: 'deduct',
+      stockCount: currentStock.data.stockCount - quantity,
       equipmentId,
       mechanicId,
       equipmentName,
       mechanicName,
       equipmentNumber: equipmentNumber || '',
-      reason:          reason    || 'Stock deduction',
-      notes:           notes     || '',
-      createdBy:       createdBy || 'System',
+      reason: reason || 'Stock deduction',
+      notes: notes || '',
+      createdBy: createdBy || 'System',
     };
 
     const result = await stockServices.updateStock(stockId, updateData);
@@ -264,7 +308,9 @@ const deductStockQuantity = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Stocks] deductStockQuantity:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -274,19 +320,21 @@ const deductStockQuantity = async (req, res) => {
  */
 const adjustStockQuantity = async (req, res) => {
   try {
-    const { stockId }                              = req.params;
+    const { stockId } = req.params;
     const { newQuantity, reason, notes, createdBy } = req.body;
 
     if (newQuantity === undefined || newQuantity < 0) {
-      return res.status(400).json({ success: false, message: 'Valid new quantity is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Valid new quantity is required' });
     }
 
     const updateData = {
-      type:       'adjustment',
+      type: 'adjustment',
       stockCount: newQuantity,
-      reason:     reason    || 'Stock adjustment',
-      notes:      notes     || '',
-      createdBy:  createdBy || 'System',
+      reason: reason || 'Stock adjustment',
+      notes: notes || '',
+      createdBy: createdBy || 'System',
     };
 
     const result = await stockServices.updateStock(stockId, updateData);
@@ -294,7 +342,9 @@ const adjustStockQuantity = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Stocks] adjustStockQuantity:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -311,10 +361,10 @@ const getMovementsWithStock = async (req, res) => {
     const filters = Object.fromEntries(
       Object.entries({
         equipmentId: req.query.equipmentId,
-        mechanicId:  req.query.mechanicId,
-        type:        req.query.type,
-        startDate:   req.query.startDate,
-        endDate:     req.query.endDate,
+        mechanicId: req.query.mechanicId,
+        type: req.query.type,
+        startDate: req.query.startDate,
+        endDate: req.query.endDate,
       }).filter(([, v]) => v !== undefined)
     );
 
@@ -323,7 +373,9 @@ const getMovementsWithStock = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Stocks] getMovementsWithStock:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -333,19 +385,27 @@ const getMovementsWithStock = async (req, res) => {
  */
 const getStockMovements = async (req, res) => {
   try {
-    const { stockId }           = req.params;
+    const { stockId } = req.params;
     const { limit = 50, offset = 0 } = req.query;
 
     if (!stockId) {
-      return res.status(400).json({ success: false, message: 'Stock ID is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Stock ID is required' });
     }
 
-    const result = await stockServices.getStockMovements(stockId, parseInt(limit), parseInt(offset));
+    const result = await stockServices.getStockMovements(
+      stockId,
+      parseInt(limit),
+      parseInt(offset)
+    );
 
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Stocks] getStockMovements:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -358,15 +418,20 @@ const getStockMovementsByEquipment = async (req, res) => {
     const { equipmentId } = req.params;
 
     if (!equipmentId) {
-      return res.status(400).json({ success: false, message: 'Equipment ID is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Equipment ID is required' });
     }
 
-    const result = await stockServices.getStockMovementsByEquipment(equipmentId);
+    const result =
+      await stockServices.getStockMovementsByEquipment(equipmentId);
 
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Stocks] getStockMovementsByEquipment:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -379,7 +444,9 @@ const getStockMovementsByMechanic = async (req, res) => {
     const { mechanicId } = req.params;
 
     if (!mechanicId) {
-      return res.status(400).json({ success: false, message: 'Mechanic ID is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Mechanic ID is required' });
     }
 
     const result = await stockServices.getStockMovementsByMechanic(mechanicId);
@@ -387,7 +454,9 @@ const getStockMovementsByMechanic = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Stocks] getStockMovementsByMechanic:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -400,15 +469,23 @@ const getStockAccountabilityReport = async (req, res) => {
     const { startDate, endDate } = req.query;
 
     if (!startDate || !endDate) {
-      return res.status(400).json({ success: false, message: 'startDate and endDate are required' });
+      return res.status(400).json({
+        success: false,
+        message: 'startDate and endDate are required',
+      });
     }
 
-    const result = await stockServices.getStockAccountabilityReport(startDate, endDate);
+    const result = await stockServices.getStockAccountabilityReport(
+      startDate,
+      endDate
+    );
 
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Stocks] getStockAccountabilityReport:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -421,7 +498,9 @@ const scanStockByBarcode = async (req, res) => {
     const { objectId } = req.params;
 
     if (!objectId) {
-      return res.status(400).json({ success: false, message: 'Barcode data is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Barcode data is required' });
     }
 
     const result = await stockServices.scanStockByBarcode(objectId);
@@ -429,7 +508,9 @@ const scanStockByBarcode = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Stocks] scanStockByBarcode:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 

@@ -15,7 +15,9 @@ const handle = (serviceFn) => async (req, res) => {
     const result = await serviceFn();
     res.status(result.status).json(result);
   } catch (err) {
-    res.status(err.status || 500).json({ success: false, message: err.message });
+    res
+      .status(err.status || 500)
+      .json({ success: false, message: err.message });
   }
 };
 
@@ -24,19 +26,25 @@ const handle = (serviceFn) => async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Full updates ──────────────────────────────────────────────────────────────
-const getDailyUpdates          = handle(dashboardServices.fetchDailyUpdates);
-const getWeeklyUpdates         = handle(dashboardServices.fetchWeeklyUpdates);
-const getMonthlyUpdates        = handle(dashboardServices.fetchMonthlyUpdates);
-const getYearlyUpdates         = handle(dashboardServices.fetchYearlyUpdates);
-const getLast5DaysComparison   = handle(dashboardServices.fetchLast5DaysComparison);
-const getLast5MonthsComparison = handle(dashboardServices.fetchLast5MonthsComparison);
-const getLast5YearsComparison  = handle(dashboardServices.fetchLast5YearsComparison);
+const getDailyUpdates = handle(dashboardServices.fetchDailyUpdates);
+const getWeeklyUpdates = handle(dashboardServices.fetchWeeklyUpdates);
+const getMonthlyUpdates = handle(dashboardServices.fetchMonthlyUpdates);
+const getYearlyUpdates = handle(dashboardServices.fetchYearlyUpdates);
+const getLast5DaysComparison = handle(
+  dashboardServices.fetchLast5DaysComparison
+);
+const getLast5MonthsComparison = handle(
+  dashboardServices.fetchLast5MonthsComparison
+);
+const getLast5YearsComparison = handle(
+  dashboardServices.fetchLast5YearsComparison
+);
 
 // ── Counts only ───────────────────────────────────────────────────────────────
-const getDailyCounts           = handle(dashboardServices.fetchDailyCounts);
-const getWeeklyCounts          = handle(dashboardServices.fetchWeeklyCounts);
-const getMonthlyCounts         = handle(dashboardServices.fetchMonthlyCounts);
-const getYearlyCounts          = handle(dashboardServices.fetchYearlyCounts);
+const getDailyCounts = handle(dashboardServices.fetchDailyCounts);
+const getWeeklyCounts = handle(dashboardServices.fetchWeeklyCounts);
+const getMonthlyCounts = handle(dashboardServices.fetchMonthlyCounts);
+const getYearlyCounts = handle(dashboardServices.fetchYearlyCounts);
 
 // ── Cache ─────────────────────────────────────────────────────────────────────
 

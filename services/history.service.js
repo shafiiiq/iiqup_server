@@ -1,21 +1,21 @@
 // services/history.service.js
-const ServiceHistoryModel    = require('../models/history.model.js');
-const NotificationModel      = require('../models/notification.model.js');
-const ServiceReportModel     = require('../models/report.model.js');
-const EquipmentModel         = require('../models/equipment.model.js');
+const ServiceHistoryModel = require('../models/history.model.js');
+const NotificationModel = require('../models/notification.model.js');
+const ServiceReportModel = require('../models/report.model.js');
+const EquipmentModel = require('../models/equipment.model.js');
 const { createNotification } = require('./notification.service.js');
 const PushNotificationService = require('../push/notification.push.js');
-const mongoose               = require('mongoose');
-const { default: wsUtils }   = require('../sockets/websocket.js');
-const analyser               = require('../analyser/dashboard.analyser');
+const mongoose = require('mongoose');
+const { default: wsUtils } = require('../sockets/websocket.js');
+const analyser = require('../analyser/dashboard.analyser');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-const VALID_TYPES    = ['oil', 'normal', 'tyre', 'battery', 'major'];
-const OIL_TYPES      = new Set(['oil', 'normal']);
-const FULL_SVC_STEP  = 3000; // hrs/km boundary that triggers a full-service notification
+const VALID_TYPES = ['oil', 'normal', 'tyre', 'battery', 'major'];
+const OIL_TYPES = new Set(['oil', 'normal']);
+const FULL_SVC_STEP = 3000; // hrs/km boundary that triggers a full-service notification
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -25,7 +25,8 @@ const FULL_SVC_STEP  = 3000; // hrs/km boundary that triggers a full-service not
  * Strips non-numeric characters and parses to integer.
  * Returns NaN if the result is not a valid number.
  */
-const parseHrs = (val) => parseInt(String(val ?? '').replace(/[^0-9]/g, ''), 10);
+const parseHrs = (val) =>
+  parseInt(String(val ?? '').replace(/[^0-9]/g, ''), 10);
 
 /**
  * Checks whether the next service value crosses a FULL_SVC_STEP boundary
@@ -42,7 +43,9 @@ const crossesFullServiceBoundary = (current, next) => {
  * Builds the equipment display label used in notifications.
  */
 const equipmentLabel = (equipment, regNo) =>
-  equipment ? `${equipment.brand} ${equipment.machine} ${regNo}` : String(regNo);
+  equipment
+    ? `${equipment.brand} ${equipment.machine} ${regNo}`
+    : String(regNo);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Notification Helper
@@ -52,24 +55,32 @@ const equipmentLabel = (equipment, regNo) =>
  * Fires a full-service-due notification if the next service hrs/km crosses a
  * 3000-unit boundary. Non-fatal — caller should catch and log on error.
  */
-const maybeFireFullServiceNotification = async (regNo, serviceHrs, nextServiceHrs) => {
+const maybeFireFullServiceNotification = async (
+  regNo,
+  serviceHrs,
+  nextServiceHrs
+) => {
   if (!crossesFullServiceBoundary(serviceHrs, nextServiceHrs)) return;
 
-  const equipment  = await EquipmentModel.findOne({ regNo });
-  const label      = equipmentLabel(equipment, regNo);
-  const title      = `Time to full service - ${label}`;
-  const message    = `${label}'s next service is full service, NEXT SERVICE HR/KM: ${nextServiceHrs}`;
+  const equipment = await EquipmentModel.findOne({ regNo });
+  const label = equipmentLabel(equipment, regNo);
+  const title = `Time to full service - ${label}`;
+  const message = `${label}'s next service is full service, NEXT SERVICE HR/KM: ${nextServiceHrs}`;
 
   const notification = await createNotification({
     title,
     description: message,
-    priority:    'high',
-    sourceId:    'from applications',
-    time:        new Date(),
+    priority: 'high',
+    sourceId: 'from applications',
+    time: new Date(),
   });
 
   await PushNotificationService.sendGeneralNotification(
-    null, title, message, 'high', 'normal',
+    null,
+    title,
+    message,
+    'high',
+    'normal',
     notification.data._id.toString()
   );
 };
@@ -89,42 +100,46 @@ const maybeFireFullServiceNotification = async (regNo, serviceHrs, nextServiceHr
  * @returns {Object}           - Document ready for ServiceHistoryModel.create()
  */
 const buildHistoryDocument = (type, record, shared) => {
-  const isOil   = OIL_TYPES.has(type);
-  const isTyre  = type === 'tyre';
-  const isBatt  = type === 'battery';
+  const isOil = OIL_TYPES.has(type);
+  const isTyre = type === 'tyre';
+  const isBatt = type === 'battery';
   const isMajor = type === 'major';
 
   return {
     // ── Core ──────────────────────────────────────────────────────────────────
-    regNo:       String(shared.regNo ?? record.regNo),
+    regNo: String(shared.regNo ?? record.regNo),
     serviceType: type,
-    date:        record.date,
-    equipment:   shared.machine      || shared.equipment  || null,
-    location:    shared.location     || record.location   || null,
-    operator:    shared.operator     || shared.operatorName || record.operator || null,
-    mechanics:   shared.mechanics    || record.mechanics  || null,
-    remarks:     shared.remarks      || record.remarks    || record.workRemarks || null,
+    date: record.date,
+    equipment: shared.machine || shared.equipment || null,
+    location: shared.location || record.location || null,
+    operator: shared.operator || shared.operatorName || record.operator || null,
+    mechanics: shared.mechanics || record.mechanics || null,
+    remarks: shared.remarks || record.remarks || record.workRemarks || null,
 
     // ── Unified Service Hours ────────────────────────────────────────────────
-    serviceHrs:     record.serviceHrs     || record.runningHours || null,
+    serviceHrs: record.serviceHrs || record.runningHours || null,
     nextServiceHrs: record.nextServiceHrs || null,
-    fullService:    isOil  ? (record.fullService ?? false) : false,
+    fullService: isOil ? (record.fullService ?? false) : false,
 
     // ── Oil / Normal ──────────────────────────────────────────────────────────
-    oil:            isOil  ? (shared.oil            || 'Check') : null,
-    oilFilter:      isOil  ? (shared.oilFilter      || 'Check') : null,
-    fuelFilter:     isOil  ? (shared.fuelFilter     || 'Check') : null,
-    acFilter:       isOil  ? (shared.acFilter       || 'Clean') : null,
-    waterSeparator: isOil  ? (shared.waterSeparator || 'Check') : null,
-    airFilter:      isOil  ? (shared.airFilter      || 'Clean') : null,
+    oil: isOil ? shared.oil || 'Check' : null,
+    oilFilter: isOil ? shared.oilFilter || 'Check' : null,
+    fuelFilter: isOil ? shared.fuelFilter || 'Check' : null,
+    acFilter: isOil ? shared.acFilter || 'Clean' : null,
+    waterSeparator: isOil ? shared.waterSeparator || 'Check' : null,
+    airFilter: isOil ? shared.airFilter || 'Clean' : null,
 
     // ── Tyre ──────────────────────────────────────────────────────────────────
-    tyreModel:    isTyre ? (shared.tyreModel   || record.tyreModel   || null) : null,
-    tyreNumber:   isTyre ? (shared.tyreNumber  || record.tyreNumber  || null) : null,
-    runningHours: isTyre ? (record.runningHours || record.serviceHrs || null) : null,
+    tyreModel: isTyre ? shared.tyreModel || record.tyreModel || null : null,
+    tyreNumber: isTyre ? shared.tyreNumber || record.tyreNumber || null : null,
+    runningHours: isTyre
+      ? record.runningHours || record.serviceHrs || null
+      : null,
 
     // ── Battery ───────────────────────────────────────────────────────────────
-    batteryModel: isBatt ? (shared.batteryModel || record.batteryModel || null) : null,
+    batteryModel: isBatt
+      ? shared.batteryModel || record.batteryModel || null
+      : null,
 
     // reportId injected after report is created
     reportId: null,
@@ -140,16 +155,16 @@ const buildHistoryDocument = (type, record, shared) => {
  * historyId is injected after the history document has been saved.
  */
 const buildReportDocument = (type, record, shared, historyId) => ({
-  regNo:          String(shared.regNo ?? record.regNo),
-  machine:        shared.machine        || shared.equipment || '',
-  date:           record.date,
-  serviceHrs:     record.serviceHrs     || record.runningHours || '',
+  regNo: String(shared.regNo ?? record.regNo),
+  machine: shared.machine || shared.equipment || '',
+  date: record.date,
+  serviceHrs: record.serviceHrs || record.runningHours || '',
   nextServiceHrs: record.nextServiceHrs || '',
-  serviceType:    type,
-  location:       shared.location       || record.location    || '',
-  mechanics:      shared.mechanics      || record.mechanics   || '',
-  operatorName:   shared.operator       || shared.operatorName || record.operator || '',
-  remarks:        shared.remarks        || record.remarks     || record.workRemarks || '',
+  serviceType: type,
+  location: shared.location || record.location || '',
+  mechanics: shared.mechanics || record.mechanics || '',
+  operatorName: shared.operator || shared.operatorName || record.operator || '',
+  remarks: shared.remarks || record.remarks || record.workRemarks || '',
   checklistItems: shared.checklistItems || [],
   historyId,
 });
@@ -168,7 +183,7 @@ const preflightCheck = async (type, records, shared) => {
 
   for (let i = 0; i < records.length; i++) {
     const record = records[i];
-    const label  = `Record #${i + 1} (${record.date || 'no date'})`;
+    const label = `Record #${i + 1} (${record.date || 'no date'})`;
 
     if (!record.date) {
       errors.push(`${label}: date is required`);
@@ -176,9 +191,9 @@ const preflightCheck = async (type, records, shared) => {
     }
 
     const conflict = await ServiceHistoryModel.findOne({
-      regNo:       String(shared.regNo),
+      regNo: String(shared.regNo),
       serviceType: type,
-      date:        record.date,
+      date: record.date,
     });
 
     if (conflict) {
@@ -205,9 +220,9 @@ const insertServiceHistory = async (data) => {
 
     // ── Duplicate check ───────────────────────────────────────────────────────
     const conflict = await ServiceHistoryModel.findOne({
-      regNo:       String(data.regNo ?? data.equipmentNo),
+      regNo: String(data.regNo ?? data.equipmentNo),
       serviceType: type,
-      date:        data.date,
+      date: data.date,
     });
     if (conflict) {
       return { status: 409, ok: false, message: 'data is already added' };
@@ -216,24 +231,34 @@ const insertServiceHistory = async (data) => {
     // ── Build and save history ────────────────────────────────────────────────
     // For single inserts, record = data and shared = data (same object).
     const historyDoc = buildHistoryDocument(type, data, data);
-    const history    = await ServiceHistoryModel.create(historyDoc);
+    const history = await ServiceHistoryModel.create(historyDoc);
 
     // ── Handle full-service notification deletion if applicable ───────────────
     if (OIL_TYPES.has(type) && data.fullService === true) {
-      await NotificationModel.findOneAndDelete({ regNo: data.regNo }); 
+      await NotificationModel.findOneAndDelete({ regNo: data.regNo });
     }
 
     analyser.clearCache();
     wsUtils.sendDashboardUpdate('serviceHistory');
 
-    return { status: 200, ok: true, message: 'Service history added successfully', data: history };
+    return {
+      status: 200,
+      ok: true,
+      message: 'Service history added successfully',
+      data: history,
+    };
   } catch (error) {
     if (error.code === 11000) {
       return { status: 409, ok: false, message: 'data is already added' };
     }
     console.error('[HistoryService] insertServiceHistory:', error);
-    return { status: 500, ok: false, message: 'Failed to insert service history', error: error.message };
-}
+    return {
+      status: 500,
+      ok: false,
+      message: 'Failed to insert service history',
+      error: error.message,
+    };
+  }
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -259,26 +284,45 @@ const insertBatchServiceHistory = async (body) => {
   const { type, sharedData, records } = body;
 
   // ── Input guards ──────────────────────────────────────────────────────────
-  if (!type)                                return { status: 400, ok: false, message: 'type is required' };
-  if (!VALID_TYPES.includes(type))          return { status: 400, ok: false, message: `Invalid type. Must be one of: ${VALID_TYPES.join(', ')}` };
-  if (!sharedData?.regNo)                   return { status: 400, ok: false, message: 'sharedData.regNo is required' };
-  if (!sharedData?.machine)                 return { status: 400, ok: false, message: 'sharedData.machine is required' };
-  if (!Array.isArray(records) || !records.length) return { status: 400, ok: false, message: 'records array is required and must not be empty' };
+  if (!type) return { status: 400, ok: false, message: 'type is required' };
+  if (!VALID_TYPES.includes(type))
+    return {
+      status: 400,
+      ok: false,
+      message: `Invalid type. Must be one of: ${VALID_TYPES.join(', ')}`,
+    };
+  if (!sharedData?.regNo)
+    return { status: 400, ok: false, message: 'sharedData.regNo is required' };
+  if (!sharedData?.machine)
+    return {
+      status: 400,
+      ok: false,
+      message: 'sharedData.machine is required',
+    };
+  if (!Array.isArray(records) || !records.length)
+    return {
+      status: 400,
+      ok: false,
+      message: 'records array is required and must not be empty',
+    };
 
   // ── Pre-flight (no writes) ────────────────────────────────────────────────
   const preflightErrors = await preflightCheck(type, records, sharedData);
   if (preflightErrors.length > 0) {
     return {
-      status:  422,
-      ok:      false,
+      status: 422,
+      ok: false,
       message: `Batch rejected — ${preflightErrors.length} issue${preflightErrors.length > 1 ? 's' : ''} must be fixed before submitting`,
-      errors:  preflightErrors,
-      data:    { succeeded: [], failed: preflightErrors.map((reason, i) => ({ index: i, reason })) },
+      errors: preflightErrors,
+      data: {
+        succeeded: [],
+        failed: preflightErrors.map((reason, i) => ({ index: i, reason })),
+      },
     };
   }
 
   // ── Transaction ───────────────────────────────────────────────────────────
-  const session   = await mongoose.startSession();
+  const session = await mongoose.startSession();
   session.startTransaction();
   const succeeded = [];
 
@@ -288,36 +332,57 @@ const insertBatchServiceHistory = async (body) => {
 
       // History
       const historyDoc = buildHistoryDocument(type, record, sharedData);
-      const [history]  = await ServiceHistoryModel.create([historyDoc], { session });
+      const [history] = await ServiceHistoryModel.create([historyDoc], {
+        session,
+      });
 
       // Report
-      const reportDoc = buildReportDocument(type, record, sharedData, history._id.toString());
-      const [report]  = await ServiceReportModel.create([reportDoc], { session });
+      const reportDoc = buildReportDocument(
+        type,
+        record,
+        sharedData,
+        history._id.toString()
+      );
+      const [report] = await ServiceReportModel.create([reportDoc], {
+        session,
+      });
 
       // Cross-link
       history.reportId = report._id.toString();
       await history.save({ session });
 
-      succeeded.push({ index: i, date: record.date, historyId: history._id, reportId: report._id });
+      succeeded.push({
+        index: i,
+        date: record.date,
+        historyId: history._id,
+        reportId: report._id,
+      });
 
       // Full-service notification (non-fatal, outside transaction)
       if (OIL_TYPES.has(type)) {
-        maybeFireFullServiceNotification(sharedData.regNo, record.serviceHrs, record.nextServiceHrs)
-          .catch(err => console.warn('[HistoryService] notification error (non-fatal):', err.message));
+        maybeFireFullServiceNotification(
+          sharedData.regNo,
+          record.serviceHrs,
+          record.nextServiceHrs
+        ).catch((err) =>
+          console.warn(
+            '[HistoryService] notification error (non-fatal):',
+            err.message
+          )
+        );
       }
     }
 
     await session.commitTransaction();
-
   } catch (err) {
     await session.abortTransaction();
     session.endSession();
     console.error('[HistoryService] batch transaction aborted:', err);
     return {
-      status:  500,
-      ok:      false,
+      status: 500,
+      ok: false,
       message: `Batch failed — all changes rolled back. Error: ${err.message}. Fix the issue and resubmit safely.`,
-      data:    { succeeded: [], failed: [{ index: -1, reason: err.message }] },
+      data: { succeeded: [], failed: [{ index: -1, reason: err.message }] },
     };
   }
 
@@ -327,11 +392,11 @@ const insertBatchServiceHistory = async (body) => {
   wsUtils.sendDashboardUpdate('serviceHistory');
 
   return {
-    status:  200,
-    ok:      true,
+    status: 200,
+    ok: true,
     message: `All ${succeeded.length} record${succeeded.length !== 1 ? 's' : ''} inserted successfully`,
     summary: { total: records.length, succeeded: succeeded.length, failed: 0 },
-    data:    { succeeded, failed: [] },
+    data: { succeeded, failed: [] },
   };
 };
 
@@ -344,7 +409,9 @@ const insertBatchServiceHistory = async (body) => {
  */
 const fetchServiceHistory = async (regNo) => {
   try {
-    const records = await ServiceHistoryModel.find({ regNo: String(regNo) }).sort({ date: -1 });
+    const records = await ServiceHistoryModel.find({
+      regNo: String(regNo),
+    }).sort({ date: -1 });
     return { status: 200, ok: true, data: records };
   } catch (error) {
     console.error('[HistoryService] fetchServiceHistory:', error);
@@ -357,9 +424,10 @@ const fetchServiceHistory = async (regNo) => {
  */
 const fetchServiceHistoryByType = async (regNo, type) => {
   try {
-    const records = await ServiceHistoryModel
-      .find({ regNo: String(regNo), serviceType: type })
-      .sort({ date: -1 });
+    const records = await ServiceHistoryModel.find({
+      regNo: String(regNo),
+      serviceType: type,
+    }).sort({ date: -1 });
     return { status: 200, ok: true, data: records };
   } catch (error) {
     console.error('[HistoryService] fetchServiceHistoryByType:', error);
@@ -377,7 +445,8 @@ const fetchServiceHistoryById = async (id) => {
     }
 
     const record = await ServiceHistoryModel.findById(id);
-    if (!record) return { status: 404, ok: false, message: 'History record not found' };
+    if (!record)
+      return { status: 404, ok: false, message: 'History record not found' };
 
     return { status: 200, ok: true, data: record };
   } catch (error) {
@@ -391,9 +460,10 @@ const fetchServiceHistoryById = async (id) => {
  */
 const fetchLatestFullService = async (regNo) => {
   try {
-    const record = await ServiceHistoryModel
-      .findOne({ regNo: String(regNo), fullService: true })
-      .sort({ date: -1 });
+    const record = await ServiceHistoryModel.findOne({
+      regNo: String(regNo),
+      fullService: true,
+    }).sort({ date: -1 });
 
     return { status: 200, ok: true, data: record || null };
   } catch (error) {
@@ -412,7 +482,12 @@ const fetchLatestFullService = async (regNo) => {
 const deleteServiceHistory = async (id) => {
   try {
     const record = await ServiceHistoryModel.findById(id);
-    if (!record) return { status: 404, ok: false, message: `History record with ID ${id} not found` };
+    if (!record)
+      return {
+        status: 404,
+        ok: false,
+        message: `History record with ID ${id} not found`,
+      };
 
     const { reportId } = record;
 
@@ -424,19 +499,33 @@ const deleteServiceHistory = async (id) => {
     }
 
     return {
-      status:  200,
-      ok:      true,
+      status: 200,
+      ok: true,
       message: 'History record and linked report deleted successfully',
       data: {
-        deletedHistory: { id: record._id, regNo: record.regNo, date: record.date, serviceType: record.serviceType },
-        deletedReport:  deletedReport
-          ? { id: deletedReport._id, regNo: deletedReport.regNo, date: deletedReport.date }
+        deletedHistory: {
+          id: record._id,
+          regNo: record.regNo,
+          date: record.date,
+          serviceType: record.serviceType,
+        },
+        deletedReport: deletedReport
+          ? {
+              id: deletedReport._id,
+              regNo: deletedReport.regNo,
+              date: deletedReport.date,
+            }
           : null,
       },
     };
   } catch (error) {
     console.error('[HistoryService] deleteServiceHistory:', error);
-    return { status: 500, ok: false, message: 'Failed to delete history record', error: error.message };
+    return {
+      status: 500,
+      ok: false,
+      message: 'Failed to delete history record',
+      error: error.message,
+    };
   }
 };
 
@@ -449,26 +538,40 @@ const deleteServiceHistory = async (id) => {
  */
 const insertFullService = async (data) => {
   try {
-    if (!data?.regNo) return { status: 400, ok: false, message: 'Registration number is required' };
+    if (!data?.regNo)
+      return {
+        status: 400,
+        ok: false,
+        message: 'Registration number is required',
+      };
 
     const equipment = await EquipmentModel.findOne({ regNo: data.regNo });
-    const label     = equipmentLabel(equipment, data.regNo);
-    const title     = `Time to full service - ${label}`;
-    const message   = `${label}'s next service is full service, NEXT SERVICE HR/KM: ${data.nextServiceHrs}`;
+    const label = equipmentLabel(equipment, data.regNo);
+    const title = `Time to full service - ${label}`;
+    const message = `${label}'s next service is full service, NEXT SERVICE HR/KM: ${data.nextServiceHrs}`;
 
     const notification = await createNotification({
       title,
       description: message,
-      priority:    'high',
-      sourceId:    'from applications',
-      time:        new Date(),
+      priority: 'high',
+      sourceId: 'from applications',
+      time: new Date(),
     });
 
     await PushNotificationService.sendGeneralNotification(
-      null, title, message, 'high', 'normal', notification.data._id.toString()
+      null,
+      title,
+      message,
+      'high',
+      'normal',
+      notification.data._id.toString()
     );
 
-    return { status: 200, ok: true, message: 'Full service notification sent successfully' };
+    return {
+      status: 200,
+      ok: true,
+      message: 'Full service notification sent successfully',
+    };
   } catch (error) {
     console.error('[HistoryService] insertFullService:', error);
     return { status: 500, ok: false, message: error.message };

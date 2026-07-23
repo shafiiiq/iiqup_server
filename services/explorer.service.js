@@ -80,8 +80,11 @@ const addFeatureToRelease = async (releaseId, featureData) => {
     const release = await Explorer.findById(releaseId);
     if (!release) throw new Error('Release not found');
 
-    const maxOrder       = release.features.reduce((max, f) => f.order > max ? f.order : max, 0);
-    featureData.order        = maxOrder + 1;
+    const maxOrder = release.features.reduce(
+      (max, f) => (f.order > max ? f.order : max),
+      0
+    );
+    featureData.order = maxOrder + 1;
     featureData.uploadStatus = 'uploading';
 
     release.features.push(featureData);
@@ -138,7 +141,9 @@ const updateFeatureStatus = async (releaseId, featureId, status) => {
 
     feature.uploadStatus = status;
 
-    const allActive = release.features.every(f => f.uploadStatus === 'active');
+    const allActive = release.features.every(
+      (f) => f.uploadStatus === 'active'
+    );
     if (allActive) release.isActive = true;
 
     release.updatedAt = new Date();

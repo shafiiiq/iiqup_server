@@ -9,11 +9,11 @@ const checkSessionValidity = async (req, res, next) => {
     }
 
     const token = authHeader.split(' ')[1];
-    
+
     // Check if session exists and is active
     const session = await Session.findOne({
       sessionToken: token,
-      isActive: true
+      isActive: true,
     });
 
     // If session doesn't exist or is inactive, reject the request
@@ -21,7 +21,7 @@ const checkSessionValidity = async (req, res, next) => {
       return res.status(401).json({
         success: false,
         message: 'Session expired or invalidated',
-        sessionInvalid: true
+        sessionInvalid: true,
       });
     }
 

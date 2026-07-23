@@ -1,7 +1,7 @@
 const equipmentModel = require('../models/equipment.model');
-const operatorModel  = require('../models/operator.model');
-const mechanicModel  = require('../models/mechanic.model');
-const userModel      = require('../models/user.model');
+const operatorModel = require('../models/operator.model');
+const mechanicModel = require('../models/mechanic.model');
+const userModel = require('../models/user.model');
 const { putObject, getObjectUrl } = require('../aws/s3.aws');
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -24,9 +24,9 @@ const formatDate = (date) => {
   const dateObj = date instanceof Date ? date : new Date(date + 'T00:00:00');
   if (isNaN(dateObj.getTime())) return null;
 
-  const year  = dateObj.getFullYear();
+  const year = dateObj.getFullYear();
   const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-  const day   = String(dateObj.getDate()).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
 
   return `${day}-${month}-${year}`;
 };
@@ -38,13 +38,13 @@ const formatDate = (date) => {
 const formatDateTime = () => {
   const now = new Date();
 
-  const day   = String(now.getDate()).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
   const month = String(now.getMonth() + 1).padStart(2, '0');
-  const year  = now.getFullYear().toString().slice(-2);
+  const year = now.getFullYear().toString().slice(-2);
 
-  let hours      = now.getHours();
-  const minutes  = String(now.getMinutes()).padStart(2, '0');
-  const ampm     = hours >= 12 ? 'pm' : 'am';
+  let hours = now.getHours();
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const ampm = hours >= 12 ? 'pm' : 'am';
 
   hours = hours % 12 || 12;
   hours = String(hours).padStart(2, '0');
@@ -64,37 +64,42 @@ const formatDateTime = () => {
  * @param {string} finalFilename
  * @returns {Promise<{ sourceData: object, s3Key: string, sourceModel: string }>}
  */
-const getSourceDetailsAndKey = async (sourceId, sourceType, documentType, finalFilename) => {
-  let sourceData  = null;
-  let s3Key       = '';
+const getSourceDetailsAndKey = async (
+  sourceId,
+  sourceType,
+  documentType,
+  finalFilename
+) => {
+  let sourceData = null;
+  let s3Key = '';
   let sourceModel = '';
 
   switch (sourceType) {
     case 'equipment':
       sourceData = await equipmentModel.findById(sourceId);
       if (!sourceData) throw new Error('Equipment not found');
-      s3Key       = `equipment-documents/${sourceData.regNo}/${documentType}/${finalFilename}`;
+      s3Key = `equipment-documents/${sourceData.regNo}/${documentType}/${finalFilename}`;
       sourceModel = 'Equipment Model';
       break;
 
     case 'operator':
       sourceData = await operatorModel.findById(sourceId);
       if (!sourceData) throw new Error('Operator not found');
-      s3Key       = `operator-documents/${sourceData.qatarId}/${documentType}/${finalFilename}`;
+      s3Key = `operator-documents/${sourceData.qatarId}/${documentType}/${finalFilename}`;
       sourceModel = 'Operator Model';
       break;
 
     case 'mechanic':
       sourceData = await mechanicModel.findById(sourceId);
       if (!sourceData) throw new Error('Mechanic not found');
-      s3Key       = `mechanic-documents/${sourceData.email}/${sourceData._id}/${documentType}/${finalFilename}`;
+      s3Key = `mechanic-documents/${sourceData.email}/${sourceData._id}/${documentType}/${finalFilename}`;
       sourceModel = 'Mechanic Model';
       break;
 
     case 'office-staff':
       sourceData = await userModel.findById(sourceId);
       if (!sourceData) throw new Error('Office staff not found');
-      s3Key       = `office-documents/${sourceData.email}/${sourceData._id}/${documentType}/${finalFilename}`;
+      s3Key = `office-documents/${sourceData.email}/${sourceData._id}/${documentType}/${finalFilename}`;
       sourceModel = 'Office Model';
       break;
 
@@ -113,11 +118,14 @@ const getSourceDetailsAndKey = async (sourceId, sourceType, documentType, finalF
  */
 const resolveSourceIdentifier = (sourceType, sourceData) => {
   switch (sourceType) {
-    case 'equipment':  return sourceData.regNo;
+    case 'equipment':
+      return sourceData.regNo;
     case 'operator':
     case 'mechanic':
-    case 'office-staff': return sourceData.name;
-    default:           return '';
+    case 'office-staff':
+      return sourceData.name;
+    default:
+      return '';
   }
 };
 
@@ -132,16 +140,18 @@ const resolveSourceIdentifier = (sourceType, sourceData) => {
  */
 const downloadPDFFromS3 = async (s3Key) => {
   try {
-    const url      = await getObjectUrl(s3Key, false);
+    const url = await getObjectUrl(s3Key, false);
     const response = await fetch(url);
 
-    if (!response.ok) throw new Error(`Failed to fetch PDF: ${response.status}`);
+    if (!response.ok)
+      throw new Error(`Failed to fetch PDF: ${response.status}`);
 
     const arrayBuffer = await response.arrayBuffer();
     return Buffer.from(arrayBuffer);
   } catch (error) {
-    console.error('[DocumentHelper] downloadPDFFromS3:', error);
-    throw new Error(`Failed to download PDF: ${error.message}`);
+    throw new Error(`[DocumentHelper] downloadPDFFromS3:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -154,19 +164,21 @@ const downloadPDFFromS3 = async (s3Key) => {
  */
 const uploadPDFToS3 = async (pdfBytes, s3Key, mimeType = 'application/pdf') => {
   try {
-    const uploadUrl      = await putObject('merged.pdf', s3Key, mimeType);
+    const uploadUrl = await putObject('merged.pdf', s3Key, mimeType);
     const uploadResponse = await fetch(uploadUrl, {
-      method:  'PUT',
-      body:    pdfBytes,
-      headers: { 'Content-Type': mimeType }
+      method: 'PUT',
+      body: pdfBytes,
+      headers: { 'Content-Type': mimeType },
     });
 
-    if (!uploadResponse.ok) throw new Error(`S3 upload failed with status: ${uploadResponse.status}`);
+    if (!uploadResponse.ok)
+      throw new Error(`S3 upload failed with status: ${uploadResponse.status}`);
 
     return uploadUrl;
   } catch (error) {
-    console.error('[DocumentHelper] uploadPDFToS3:', error);
-    throw new Error(`Failed to upload PDF: ${error.message}`);
+    throw new Error(`[DocumentHelper] uploadPDFToS3:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -180,5 +192,5 @@ module.exports = {
   getSourceDetailsAndKey,
   resolveSourceIdentifier,
   downloadPDFFromS3,
-  uploadPDFToS3
+  uploadPDFToS3,
 };

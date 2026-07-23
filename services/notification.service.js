@@ -1,7 +1,7 @@
 // services/notification.service.js
 const Notification = require('../models/notification.model');
-const User         = require('../models/user.model');
-const mongoose     = require('mongoose');
+const User = require('../models/user.model');
+const mongoose = require('mongoose');
 require('dotenv').config();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -68,13 +68,13 @@ const createNotification = async (notificationData) => {
     const notification = new Notification({
       title,
       description,
-      priority:      priority || 'medium',
+      priority: priority || 'medium',
       sourceId,
-      time:          time || new Date(),
+      time: time || new Date(),
       navigateTo,
       navigateText,
       navigteToId,
-      hasButton:     hasButton     || false,
+      hasButton: hasButton || false,
       directApproval: directApproval || false,
       approvalPort,
       type,
@@ -82,8 +82,8 @@ const createNotification = async (notificationData) => {
       targetUsers,
       forYou: forYou || [],
       isBroadcast,
-      createdAt:     new Date(),
-      updatedAt:     new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
 
     await notification.save();
@@ -103,28 +103,28 @@ const createNotification = async (notificationData) => {
  */
 const createBulkNotifications = async (notificationsArray) => {
   try {
-    const notifications = notificationsArray.map(data => ({
-      title:       data.title,
+    const notifications = notificationsArray.map((data) => ({
+      title: data.title,
       description: data.description,
-      time:        data.time || new Date(),
-      priority:    data.priority,
-      sourceId:    data.sourceId,
-      updatedAt:   new Date(),
+      time: data.time || new Date(),
+      priority: data.priority,
+      sourceId: data.sourceId,
+      updatedAt: new Date(),
     }));
 
     const savedNotifications = await Notification.insertMany(notifications);
 
     return {
       success: true,
-      data:    savedNotifications,
-      count:   savedNotifications.length,
+      data: savedNotifications,
+      count: savedNotifications.length,
       message: 'Bulk notifications created successfully',
     };
   } catch (error) {
     console.error('[NotificationService] createBulkNotifications:', error);
     return {
       success: false,
-      error:   error.message,
+      error: error.message,
       message: 'Failed to create bulk notifications',
     };
   }
@@ -143,8 +143,8 @@ const quickNotification = async (title, sourceId, options = {}) => {
     title,
     sourceId,
     description: options.description || { message: title },
-    priority:    options.priority    || 'medium',
-    time:        options.time        || new Date(),
+    priority: options.priority || 'medium',
+    time: options.time || new Date(),
   });
 };
 
@@ -170,28 +170,32 @@ const buildVisibilityQuery = (uniqueCode) => ({
 });
 
 const buildUserSpecificQuery = (uniqueCode) => ({
-  $or: [
-    { targetUsers: uniqueCode },
-    { visibleTo: uniqueCode },
-  ],
+  $or: [{ targetUsers: uniqueCode }, { visibleTo: uniqueCode }],
 });
 
 const getNotificationStatsService = async (uniqueCode) => {
   try {
-    const visibilityQuery = buildVisibilityQuery(uniqueCode)
+    const visibilityQuery = buildVisibilityQuery(uniqueCode);
 
     const [total, unread, forYouUnread] = await Promise.all([
       Notification.countDocuments(visibilityQuery),
-      Notification.countDocuments({ ...visibilityQuery, 'readBy.uniqueCode': { $ne: uniqueCode } }),
-      Notification.countDocuments({ ...visibilityQuery, forYou: uniqueCode, 'readBy.uniqueCode': { $ne: uniqueCode } }),
-    ])
+      Notification.countDocuments({
+        ...visibilityQuery,
+        'readBy.uniqueCode': { $ne: uniqueCode },
+      }),
+      Notification.countDocuments({
+        ...visibilityQuery,
+        forYou: uniqueCode,
+        'readBy.uniqueCode': { $ne: uniqueCode },
+      }),
+    ]);
 
-    return { total, unread, forYouUnread }
+    return { total, unread, forYouUnread };
   } catch (error) {
-    console.error('[NotificationService] getNotificationStatsService:', error)
-    throw error
+    console.error('[NotificationService] getNotificationStatsService:', error);
+    throw error;
   }
-}
+};
 
 /**
  * Returns a paginated list of all notifications.
@@ -202,19 +206,23 @@ const getNotificationStatsService = async (uniqueCode) => {
  * @param {number} [limit=200]
  * @returns {Promise<{ notifications: Object[], currentPage: number, totalPages: number, totalCount: number, hasNextPage: boolean }>}
  */
-const getAllNotificationsService = async (uniqueCode, page = 1, limit = 200) => {
+const getAllNotificationsService = async (
+  uniqueCode,
+  page = 1,
+  limit = 200
+) => {
   try {
-    const query = buildVisibilityQuery(uniqueCode)
+    const query = buildVisibilityQuery(uniqueCode);
 
-    const skip       = (page - 1) * limit
-    const totalCount = await Notification.countDocuments(query)
-    const totalPages = Math.ceil(totalCount / limit)
+    const skip = (page - 1) * limit;
+    const totalCount = await Notification.countDocuments(query);
+    const totalPages = Math.ceil(totalCount / limit);
 
     const notifications = await Notification.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .lean()
+      .lean();
 
     return {
       notifications,
@@ -222,187 +230,231 @@ const getAllNotificationsService = async (uniqueCode, page = 1, limit = 200) => 
       totalPages,
       totalCount,
       hasNextPage: page < totalPages,
-    }
+    };
   } catch (error) {
-    console.error('[NotificationService] getAllNotificationsService:', error)
-    throw new Error('Failed to retrieve notifications from database')
+    console.error('[NotificationService] getAllNotificationsService:', error);
+    throw new Error('Failed to retrieve notifications from database');
   }
-}
+};
 
-const getUnreadNotificationsService = async (uniqueCode, page = 1, limit = 100) => {
+const getUnreadNotificationsService = async (
+  uniqueCode,
+  page = 1,
+  limit = 100
+) => {
   try {
-    const skip = (page - 1) * limit
+    const skip = (page - 1) * limit;
     const query = {
       'readBy.uniqueCode': { $ne: uniqueCode },
       $and: [buildVisibilityQuery(uniqueCode)],
-    }
-    const totalCount = await Notification.countDocuments(query)
+    };
+    const totalCount = await Notification.countDocuments(query);
     const notifications = await Notification.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .lean()
+      .lean();
     return {
       notifications,
       currentPage: page,
       totalPages: Math.ceil(totalCount / limit),
       totalCount,
       hasNextPage: page < Math.ceil(totalCount / limit),
-    }
+    };
   } catch (error) {
-    console.error('[NotificationService] getUnreadNotificationsService:', error)
-    throw error
+    console.error(
+      '[NotificationService] getUnreadNotificationsService:',
+      error
+    );
+    throw error;
   }
-}
+};
 
-const    getForYouNotificationsService = async (uniqueCode, page = 1, limit = 100) => {
+const getForYouNotificationsService = async (
+  uniqueCode,
+  page = 1,
+  limit = 100
+) => {
   try {
-    const skip = (page - 1) * limit
-    const query = { forYou: uniqueCode }
-    const totalCount = await Notification.countDocuments(query)
+    const skip = (page - 1) * limit;
+    const query = { forYou: uniqueCode };
+    const totalCount = await Notification.countDocuments(query);
     const notifications = await Notification.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .lean()
+      .lean();
     return {
       notifications,
       currentPage: page,
       totalPages: Math.ceil(totalCount / limit),
       totalCount,
       hasNextPage: page < Math.ceil(totalCount / limit),
-    }
+    };
   } catch (error) {
-    console.error('[NotificationService] getForYouNotificationsService:', error)
-    throw error
+    console.error(
+      '[NotificationService] getForYouNotificationsService:',
+      error
+    );
+    throw error;
   }
-}
+};
 
-const getNormalNotificationsService = async (uniqueCode, page = 1, limit = 100) => {
+const getNormalNotificationsService = async (
+  uniqueCode,
+  page = 1,
+  limit = 100
+) => {
   try {
-    const skip = (page - 1) * limit
+    const skip = (page - 1) * limit;
     const query = {
       priority: 'high',
       $and: [buildVisibilityQuery(uniqueCode)],
-    }
-    const totalCount = await Notification.countDocuments(query)
+    };
+    const totalCount = await Notification.countDocuments(query);
     const notifications = await Notification.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .lean()
+      .lean();
     return {
       notifications,
       currentPage: page,
       totalPages: Math.ceil(totalCount / limit),
       totalCount,
       hasNextPage: page < Math.ceil(totalCount / limit),
-    }
+    };
   } catch (error) {
-    console.error('[NotificationService] getNormalNotificationsService:', error)
-    throw error
+    console.error(
+      '[NotificationService] getNormalNotificationsService:',
+      error
+    );
+    throw error;
   }
-}
+};
 
-const getHighPriorityNotificationsService = async (uniqueCode, page = 1, limit = 100) => {
+const getHighPriorityNotificationsService = async (
+  uniqueCode,
+  page = 1,
+  limit = 100
+) => {
   try {
-    const skip = (page - 1) * limit
+    const skip = (page - 1) * limit;
     const query = {
       sourceId: { $ne: 'attendance' },
       priority: 'high',
       $and: [buildVisibilityQuery(uniqueCode)],
-    }
-    const totalCount = await Notification.countDocuments(query)
+    };
+    const totalCount = await Notification.countDocuments(query);
     const notifications = await Notification.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .lean()
+      .lean();
     return {
       notifications,
       currentPage: page,
       totalPages: Math.ceil(totalCount / limit),
       totalCount,
       hasNextPage: page < Math.ceil(totalCount / limit),
-    }
+    };
   } catch (error) {
-    console.error('[NotificationService] getHighPriorityNotificationsService:', error)
-    throw error
+    console.error(
+      '[NotificationService] getHighPriorityNotificationsService:',
+      error
+    );
+    throw error;
   }
-}
+};
 
-const getUserSpecificNotificationsService = async (uniqueCode, sourceId, page = 1, limit = 100) => {
+const getUserSpecificNotificationsService = async (
+  uniqueCode,
+  sourceId,
+  page = 1,
+  limit = 100
+) => {
   try {
-    const skip = (page - 1) * limit
-    const query = buildUserSpecificQuery(uniqueCode)
-    if (sourceId) query.sourceId = sourceId
-    const totalCount = await Notification.countDocuments(query)
+    const skip = (page - 1) * limit;
+    const query = buildUserSpecificQuery(uniqueCode);
+    if (sourceId) query.sourceId = sourceId;
+    const totalCount = await Notification.countDocuments(query);
     const notifications = await Notification.find(query)
       .sort({ sourceId: 1, createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .lean()
+      .lean();
     return {
       notifications,
       currentPage: page,
       totalPages: Math.ceil(totalCount / limit),
       totalCount,
       hasNextPage: page < Math.ceil(totalCount / limit),
-    }
+    };
   } catch (error) {
-    console.error('[NotificationService] getUserSpecificNotificationsService:', error)
-    throw error
+    console.error(
+      '[NotificationService] getUserSpecificNotificationsService:',
+      error
+    );
+    throw error;
   }
-}
+};
 
-const getCategoryNotificationsService = async (uniqueCode, category, page = 1, limit = 100) => {
+const getCategoryNotificationsService = async (
+  uniqueCode,
+  category,
+  page = 1,
+  limit = 100
+) => {
   try {
-    const skip = (page - 1) * limit
+    const skip = (page - 1) * limit;
     const query = {
       category,
       $and: [buildVisibilityQuery(uniqueCode)],
-    }
-    const totalCount = await Notification.countDocuments(query)
+    };
+    const totalCount = await Notification.countDocuments(query);
     const notifications = await Notification.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .lean()
+      .lean();
     return {
       notifications,
       currentPage: page,
       totalPages: Math.ceil(totalCount / limit),
       totalCount,
       hasNextPage: page < Math.ceil(totalCount / limit),
-    }
+    };
   } catch (error) {
-    console.error('[NotificationService] getCategoryNotificationsService:', error)
-    throw error
+    console.error(
+      '[NotificationService] getCategoryNotificationsService:',
+      error
+    );
+    throw error;
   }
-}
+};
 
 const formatUserSpecificTabLabel = (sourceId) => {
-  if (!sourceId) return 'General'
-  if (mongoose.Types.ObjectId.isValid(sourceId)) return 'Related Item'
+  if (!sourceId) return 'General';
+  if (mongoose.Types.ObjectId.isValid(sourceId)) return 'Related Item';
 
   const knownLabels = {
-    lpo_approval:         'LPO Approval',
-    manager_approval:     'Manager Approval',
-    accounts_approval:    'Accounts Approval',
-    work_completed:       'Work Completed',
-    mechanic_request:     'Mechanic Request',
-    backcharge_approval:  'Backcharge Approval',
-    attendance:           'Attendance',
-    chat:                 'Chat',
-    'from applications':  'Application',
-  }
+    lpo_approval: 'LPO Approval',
+    manager_approval: 'Manager Approval',
+    accounts_approval: 'Accounts Approval',
+    work_completed: 'Work Completed',
+    mechanic_request: 'Mechanic Request',
+    backcharge_approval: 'Backcharge Approval',
+    attendance: 'Attendance',
+    chat: 'Chat',
+    'from applications': 'Application',
+  };
 
-  if (knownLabels[sourceId]) return knownLabels[sourceId]
+  if (knownLabels[sourceId]) return knownLabels[sourceId];
 
   return sourceId
     .replace(/[_-]+/g, ' ')
-    .replace(/\b\w/g, char => char.toUpperCase())
-}
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
 
 const getUserSpecificTabsService = async (uniqueCode) => {
   try {
@@ -410,71 +462,94 @@ const getUserSpecificTabsService = async (uniqueCode) => {
       { $match: { visibleTo: uniqueCode } },
       { $group: { _id: '$sourceId' } },
       { $project: { sourceId: '$_id', _id: 0 } },
-    ])
+    ]);
 
     return groups
-      .map(g => ({ id: g.sourceId, label: formatUserSpecificTabLabel(g.sourceId) }))
-      .filter(tab => tab.id)
+      .map((g) => ({
+        id: g.sourceId,
+        label: formatUserSpecificTabLabel(g.sourceId),
+      }))
+      .filter((tab) => tab.id);
   } catch (error) {
-    console.error('[NotificationService] getUserSpecificTabsService:', error)
-    throw error
+    console.error('[NotificationService] getUserSpecificTabsService:', error);
+    throw error;
   }
-}
+};
 
 const getModelCategoriesService = async (uniqueCode) => {
   try {
     const groups = await Notification.aggregate([
-      { $match: { $and: [buildVisibilityQuery(uniqueCode), { category: { $nin: ['general', null, ''] } }] } },
+      {
+        $match: {
+          $and: [
+            buildVisibilityQuery(uniqueCode),
+            { category: { $nin: ['general', null, ''] } },
+          ],
+        },
+      },
       { $group: { _id: '$category' } },
       { $project: { category: '$_id', _id: 0 } },
-    ])
-    return groups.map(g => g.category).filter(Boolean)
+    ]);
+    return groups.map((g) => g.category).filter(Boolean);
   } catch (error) {
-    console.error('[NotificationService] getModelCategoriesService:', error)
-    throw error
+    console.error('[NotificationService] getModelCategoriesService:', error);
+    throw error;
   }
-}
+};
 
-const searchNotificationsService = async (uniqueCode, searchTerm, filter = 'all', category = 'all', page = 1, limit = 50) => {
+const searchNotificationsService = async (
+  uniqueCode,
+  searchTerm,
+  filter = 'all',
+  category = 'all',
+  page = 1,
+  limit = 50
+) => {
   try {
-    const skip = (page - 1) * limit
+    const skip = (page - 1) * limit;
     const textMatch = {
       $or: [
         { title: { $regex: searchTerm, $options: 'i' } },
         { 'description.message': { $regex: searchTerm, $options: 'i' } },
         { description: { $regex: searchTerm, $options: 'i' } },
       ],
-    }
+    };
 
-    let scopeQuery = {}
+    let scopeQuery = {};
     switch (filter) {
       case 'unread':
-        scopeQuery = { 'readBy.uniqueCode': { $ne: uniqueCode }, $and: [buildVisibilityQuery(uniqueCode)] }
-        break
+        scopeQuery = {
+          'readBy.uniqueCode': { $ne: uniqueCode },
+          $and: [buildVisibilityQuery(uniqueCode)],
+        };
+        break;
       case 'foryou':
-        scopeQuery = { forYou: uniqueCode }
-        break
+        scopeQuery = { forYou: uniqueCode };
+        break;
       case 'high':
-        scopeQuery = { priority: 'high', $and: [buildVisibilityQuery(uniqueCode)] }
-        break
+        scopeQuery = {
+          priority: 'high',
+          $and: [buildVisibilityQuery(uniqueCode)],
+        };
+        break;
       case 'user_specific':
-        scopeQuery = buildUserSpecificQuery(uniqueCode)
-        break
+        scopeQuery = buildUserSpecificQuery(uniqueCode);
+        break;
       default:
-        scopeQuery = { $and: [buildVisibilityQuery(uniqueCode)] }
+        scopeQuery = { $and: [buildVisibilityQuery(uniqueCode)] };
     }
 
     if (category !== 'all') {
-      scopeQuery.category = category
+      scopeQuery.category = category;
     }
 
-    const query = { $and: [scopeQuery, textMatch] }
-    const totalCount = await Notification.countDocuments(query)
+    const query = { $and: [scopeQuery, textMatch] };
+    const totalCount = await Notification.countDocuments(query);
     const notifications = await Notification.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .lean()
+      .lean();
 
     return {
       notifications,
@@ -482,12 +557,12 @@ const searchNotificationsService = async (uniqueCode, searchTerm, filter = 'all'
       totalPages: Math.ceil(totalCount / limit),
       totalCount,
       hasNextPage: page < Math.ceil(totalCount / limit),
-    }
+    };
   } catch (error) {
-    console.error('[NotificationService] searchNotificationsService:', error)
-    throw error
+    console.error('[NotificationService] searchNotificationsService:', error);
+    throw error;
   }
-}
+};
 
 /**
  * Returns undelivered notifications for a given user from the past 7 days,
@@ -507,49 +582,55 @@ const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
 
     const normalNotifications = await Notification.find({
       createdAt: { $gte: fetchFromDate },
-      $or: [
-        { isBroadcast: true },
-        { targetUsers: uniqueCode },
-      ],
+      $or: [{ isBroadcast: true }, { targetUsers: uniqueCode }],
       'deliveredTo.uniqueCode': { $ne: uniqueCode },
     })
       .sort({ createdAt: -1 })
       .limit(limit)
       .lean();
 
-    console.log(`[NotificationService] getPendingNotifications — found ${normalNotifications.length} undelivered for ${uniqueCode}`);
+    console.log(
+      `[NotificationService] getPendingNotifications — found ${normalNotifications.length} undelivered for ${uniqueCode}`
+    );
 
     // specialNotification removed from user model; no user-stored special notifications
     const specialNotifications = [];
 
     const allNotifications = [
-      ...normalNotifications.map(n => ({
+      ...normalNotifications.map((n) => ({
         ...n,
         type: 'normal',
-        _id:  n._id.toString(),
+        _id: n._id.toString(),
         time: n.createdAt || n.time,
       })),
-      ...specialNotifications.map(n => ({
+      ...specialNotifications.map((n) => ({
         ...n,
         type: 'special',
-        _id:  n._id ? n._id.toString() : `special_${Date.now()}_${Math.random()}`,
+        _id: n._id
+          ? n._id.toString()
+          : `special_${Date.now()}_${Math.random()}`,
         time: n.time || n.createdAt,
       })),
     ];
 
-    allNotifications.sort((a, b) => new Date(b.time || b.createdAt) - new Date(a.time || a.createdAt));
+    allNotifications.sort(
+      (a, b) =>
+        new Date(b.time || b.createdAt) - new Date(a.time || a.createdAt)
+    );
 
     const limitedNotifications = allNotifications.slice(0, limit);
 
-    console.log(`[NotificationService] getPendingNotifications — returning ${limitedNotifications.length} notifications`);
+    console.log(
+      `[NotificationService] getPendingNotifications — returning ${limitedNotifications.length} notifications`
+    );
 
     return {
       notifications: limitedNotifications,
       meta: {
-        total:         limitedNotifications.length,
-        since:         fetchFromDate.toISOString(),
-        normalCount:   normalNotifications.length,
-        specialCount:  0,
+        total: limitedNotifications.length,
+        since: fetchFromDate.toISOString(),
+        normalCount: normalNotifications.length,
+        specialCount: 0,
       },
     };
   } catch (error) {
@@ -565,7 +646,9 @@ const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
 const markNotificationAsRead = async (notificationId, uniqueCode) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(notificationId)) {
-      console.warn(`[NotificationService] markNotificationAsRead — invalid notification id ${notificationId}`);
+      console.warn(
+        `[NotificationService] markNotificationAsRead — invalid notification id ${notificationId}`
+      );
       return { success: false, message: 'Invalid notification ID' };
     }
 
@@ -600,10 +683,14 @@ const markNotificationAsRead = async (notificationId, uniqueCode) => {
  */
 const markNotificationAsDelivered = async (notificationId, uniqueCode) => {
   try {
-    console.log(`[NotificationService] markNotificationAsDelivered — ${notificationId} → ${uniqueCode}`);
+    console.log(
+      `[NotificationService] markNotificationAsDelivered — ${notificationId} → ${uniqueCode}`
+    );
 
     if (!mongoose.Types.ObjectId.isValid(notificationId)) {
-      console.warn(`[NotificationService] markNotificationAsDelivered — invalid notification id ${notificationId}`);
+      console.warn(
+        `[NotificationService] markNotificationAsDelivered — invalid notification id ${notificationId}`
+      );
       return { success: false, message: 'Invalid notification ID' };
     }
 
@@ -621,7 +708,9 @@ const markNotificationAsDelivered = async (notificationId, uniqueCode) => {
     );
 
     if (!result) {
-      console.warn(`[NotificationService] markNotificationAsDelivered — notification ${notificationId} not found`);
+      console.warn(
+        `[NotificationService] markNotificationAsDelivered — notification ${notificationId} not found`
+      );
       return { success: false, message: 'Notification not found' };
     }
 
@@ -656,4 +745,4 @@ module.exports = {
   // Update
   markNotificationAsDelivered,
   markNotificationAsRead,
-}
+};

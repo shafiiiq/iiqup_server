@@ -1,7 +1,7 @@
 // gmail/replacement.gmail.js
 const { google } = require('googleapis');
-const fs         = require('fs');
-const path       = require('path');
+const fs = require('fs');
+const path = require('path');
 
 require('dotenv').config();
 
@@ -9,18 +9,31 @@ require('dotenv').config();
 // Constants & Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-const { GMAIL_SCOPES }                   = require('../constants/email.constants');
+const { GMAIL_SCOPES } = require('../constants/email.constants');
 const { loadImageAsBase64, getMimeType } = require('../helpers/email.helper');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MONTH_NAMES = ['', 'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTH_NAMES = [
+  '',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
 
 const REPLACEMENT_SUBJECT = (machine, regNo, site, clientCompany) => ({
-  operator:  `Operator Replacement - ${machine} (${regNo})${site ? ` - ${site}` : ''}`,
+  operator: `Operator Replacement - ${machine} (${regNo})${site ? ` - ${site}` : ''}`,
   equipment: `Equipment Replacement - ${machine} (${regNo})${clientCompany ? ` - ${clientCompany}` : site ? ` - ${site}` : ''}`,
 });
 // ─────────────────────────────────────────────────────────────────────────────
@@ -30,13 +43,16 @@ const REPLACEMENT_SUBJECT = (machine, regNo, site, clientCompany) => ({
 class OAuth2GmailClient {
   constructor() {
     this.oauth2Client = null;
-    this.gmail        = null;
+    this.gmail = null;
     this.refreshToken = process.env.OPERATIONS_GMAIL_REFRESH_TOKEN;
   }
 
   async initialize() {
-    const clientId     = process.env.OPERATIONS_GOOGLE_CLIENT_ID?.replace(/"/g, '');
-    const clientSecret = process.env.OPERATIONS_GOOGLE_CLEINT_SECRET?.replace(/"/g, '');
+    const clientId = process.env.OPERATIONS_GOOGLE_CLIENT_ID?.replace(/"/g, '');
+    const clientSecret = process.env.OPERATIONS_GOOGLE_CLEINT_SECRET?.replace(
+      /"/g,
+      ''
+    );
 
     if (!clientId || !clientSecret) {
       throw new Error('[Gmail] Missing Google OAuth credentials');
@@ -45,7 +61,7 @@ class OAuth2GmailClient {
     this.oauth2Client = new google.auth.OAuth2(
       clientId,
       clientSecret,
-      `${process.env.BASE_URL}/oauth2callback`,
+      `${process.env.BASE_URL}/oauth2callback`
     );
 
     if (!this.refreshToken) return false;
@@ -58,8 +74,8 @@ class OAuth2GmailClient {
   getAuthUrl() {
     return this.oauth2Client.generateAuthUrl({
       access_type: 'offline',
-      prompt:      'consent',
-      scope:       GMAIL_SCOPES,
+      prompt: 'consent',
+      scope: GMAIL_SCOPES,
     });
   }
 
@@ -70,8 +86,10 @@ class OAuth2GmailClient {
 
   async getSignature() {
     try {
-      const result        = await this.gmail.users.settings.sendAs.list({ userId: 'me' });
-      const defaultSendAs = result.data.sendAs?.find(s => s.isDefault);
+      const result = await this.gmail.users.settings.sendAs.list({
+        userId: 'me',
+      });
+      const defaultSendAs = result.data.sendAs?.find((s) => s.isDefault);
       return defaultSendAs?.signature ?? '';
     } catch {
       return '';
@@ -86,7 +104,11 @@ class OAuth2GmailClient {
           return null;
         }
         const filename = path.basename(attachment);
-        return { fileContent: fs.readFileSync(attachment), filename, mimeType: getMimeType(filename) };
+        return {
+          fileContent: fs.readFileSync(attachment),
+          filename,
+          mimeType: getMimeType(filename),
+        };
       }
 
       if (attachment.path) {
@@ -95,14 +117,20 @@ class OAuth2GmailClient {
           return null;
         }
         const filename = attachment.filename ?? path.basename(attachment.path);
-        return { fileContent: fs.readFileSync(attachment.path), filename, mimeType: attachment.mimeType ?? getMimeType(filename) };
+        return {
+          fileContent: fs.readFileSync(attachment.path),
+          filename,
+          mimeType: attachment.mimeType ?? getMimeType(filename),
+        };
       }
 
       if (attachment.content) {
         return {
-          fileContent: Buffer.isBuffer(attachment.content) ? attachment.content : Buffer.from(attachment.content),
-          filename:    attachment.filename ?? 'attachment',
-          mimeType:    attachment.mimeType ?? 'application/octet-stream',
+          fileContent: Buffer.isBuffer(attachment.content)
+            ? attachment.content
+            : Buffer.from(attachment.content),
+          filename: attachment.filename ?? 'attachment',
+          mimeType: attachment.mimeType ?? 'application/octet-stream',
         };
       }
 
@@ -114,7 +142,14 @@ class OAuth2GmailClient {
     }
   }
 
-  _buildRawEmail(to, subject, htmlContent, textContent, attachments = [], cc = '') {
+  _buildRawEmail(
+    to,
+    subject,
+    htmlContent,
+    textContent,
+    attachments = [],
+    cc = ''
+  ) {
     const boundary = `boundary_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
     const lines = [
@@ -153,7 +188,7 @@ class OAuth2GmailClient {
         'Content-Transfer-Encoding: base64',
         `Content-Disposition: attachment; filename="${filename}"`,
         '',
-        fileContent.toString('base64'),
+        fileContent.toString('base64')
       );
     }
 
@@ -161,36 +196,63 @@ class OAuth2GmailClient {
     return lines.join('\n');
   }
 
-  async sendEmail(to, subject, htmlContent, textContent, attachments = [], cc = '') {
+  async sendEmail(
+    to,
+    subject,
+    htmlContent,
+    textContent,
+    attachments = [],
+    cc = ''
+  ) {
     if (!this.gmail) {
       const initialized = await this.initialize();
-      if (!initialized) throw new Error('[Gmail] Client not initialized — refresh token required');
+      if (!initialized)
+        throw new Error(
+          '[Gmail] Client not initialized — refresh token required'
+        );
     }
 
     try {
-      const raw          = this._buildRawEmail(to, subject, htmlContent, textContent, attachments, cc);
-      const encodedEmail = Buffer.from(raw).toString('base64')
+      const raw = this._buildRawEmail(
+        to,
+        subject,
+        htmlContent,
+        textContent,
+        attachments,
+        cc
+      );
+      const encodedEmail = Buffer.from(raw)
+        .toString('base64')
         .replace(/\+/g, '-')
         .replace(/\//g, '_')
         .replace(/=+$/, '');
 
       const response = await this.gmail.users.messages.send({
-        userId:      'me',
+        userId: 'me',
         requestBody: { raw: encodedEmail },
       });
 
       return {
-        success:          true,
-        messageId:        response.data.id,
-        method:           'Gmail API (OAuth2)',
+        success: true,
+        messageId: response.data.id,
+        method: 'Gmail API (OAuth2)',
         attachmentsCount: attachments.length,
       };
     } catch (error) {
-      const isAuthError = error.message.includes('invalid_grant') || error.message.includes('unauthorized');
- 
+      const isAuthError =
+        error.message.includes('invalid_grant') ||
+        error.message.includes('unauthorized');
+
       if (isAuthError) {
         await this.oauth2Client.refreshAccessToken();
-        return this.sendEmail(to, subject, htmlContent, textContent, attachments, cc);  
+        return this.sendEmail(
+          to,
+          subject,
+          htmlContent,
+          textContent,
+          attachments,
+          cc
+        );
       }
 
       throw new Error(`[Gmail] Send failed: ${error.message}`);
@@ -208,50 +270,60 @@ const gmailClient = new OAuth2GmailClient();
 // Email Templates
 // ─────────────────────────────────────────────────────────────────────────────
 
-const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {}) => {
+const generateReplacementTemplate = (
+  recipientName = 'Valued Customer',
+  data = {}
+) => {
   const {
-    type                  = 'operator',
-    regNo                 = '',
-    machine               = '',
-    currentOperator       = '',
-    replacedOperator      = '',
-    operator              = '',
-    outgoingOperator      = '',
-    incomingOperator      = '',
-    targetShiftName       = '',
-    shiftName             = '',
-    shiftStart            = '',
-    shiftEnd              = '',
-    remainingShifts       = [],
-    replacedEquipmentRegNo   = '',
+    type = 'operator',
+    regNo = '',
+    machine = '',
+    currentOperator = '',
+    replacedOperator = '',
+    operator = '',
+    outgoingOperator = '',
+    incomingOperator = '',
+    targetShiftName = '',
+    shiftName = '',
+    shiftStart = '',
+    shiftEnd = '',
+    remainingShifts = [],
+    replacedEquipmentRegNo = '',
     replacedEquipmentMachine = '',
-    site                  = '',
-    newSiteForReplaced    = '',
-    month                 = '',
-    year                  = '',
-    time                  = '',
-    date                  = '',
-    remarks               = '',
-    hired                 = false,
-    hiredFrom             = '',
-    rentRate              = null,
-    location              = [],
-    incomingHiredFrom     = '',
-    replaceAll            = false,
+    site = '',
+    newSiteForReplaced = '',
+    month = '',
+    year = '',
+    time = '',
+    date = '',
+    remarks = '',
+    hired = false,
+    hiredFrom = '',
+    rentRate = null,
+    location = [],
+    incomingHiredFrom = '',
+    replaceAll = false,
   } = data;
 
-  const formatDate = (d) => d
-    ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
-    : 'N/A';
+  const formatDate = (d) =>
+    d
+      ? new Date(d).toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: 'long',
+          year: 'numeric',
+        })
+      : 'N/A';
 
   const signatureLogo = loadImageAsBase64('signature-logo.png');
-  const sigLogo       = loadImageAsBase64('sig-logo.png');
-  const sigFacebook   = loadImageAsBase64('sig-facebook.png');
-  const sigInstagram  = loadImageAsBase64('sig-instagram.png');
-  const sigLinkedin   = loadImageAsBase64('sig-linkedin.png');
+  const sigLogo = loadImageAsBase64('sig-logo.png');
+  const sigFacebook = loadImageAsBase64('sig-facebook.png');
+  const sigInstagram = loadImageAsBase64('sig-instagram.png');
+  const sigLinkedin = loadImageAsBase64('sig-linkedin.png');
 
-  const resolvedOutgoingOperator = outgoingOperator || currentOperator || operator || '';
-  const resolvedIncomingOperator = incomingOperator || replacedOperator || operator || '';
+  const resolvedOutgoingOperator =
+    outgoingOperator || currentOperator || operator || '';
+  const resolvedIncomingOperator =
+    incomingOperator || replacedOperator || operator || '';
 
   const renderLocation = () => {
     if (Array.isArray(location)) return location.at(-1) || '';
@@ -261,15 +333,18 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
 
   // ─────────────────────────────────────────────────────────────────────
   // Build "Active Operators After Replacement" rows
-  const validShifts = remainingShifts.filter(s => s.operatorName);
+  const validShifts = remainingShifts.filter((s) => s.operatorName);
 
-  const shiftsHtml = validShifts.map((s, i) => {
-    const label    = validShifts.length > 1 ? ` ${i + 1}` : '';
-    const shiftDisplay = s.shiftName
-      ? s.shiftName
-      : (s.shiftStart ? `${s.shiftStart}${s.shiftEnd ? ' – ' + s.shiftEnd : ''}` : 'Full Shift');
+  const shiftsHtml = validShifts
+    .map((s, i) => {
+      const label = validShifts.length > 1 ? ` ${i + 1}` : '';
+      const shiftDisplay = s.shiftName
+        ? s.shiftName
+        : s.shiftStart
+          ? `${s.shiftStart}${s.shiftEnd ? ' – ' + s.shiftEnd : ''}`
+          : 'Full Shift';
 
-    return `
+      return `
       <tr>
         <td style="color:#666;">Operator${label} Name</td>
         <td><strong>${s.operatorName}</strong></td>
@@ -278,13 +353,16 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
         <td style="color:#666;">Operator${label} Shift</td>
         <td>${shiftDisplay}</td>
       </tr>`;
-  }).join('');
+    })
+    .join('');
 
-  const activeOperatorsSection = validShifts.length ? `
+  const activeOperatorsSection = validShifts.length
+    ? `
     <tr style="background:#f5f5f5;">
       <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Active Operators After Replacement</td>
     </tr>
-    ${shiftsHtml}` : '';
+    ${shiftsHtml}`
+    : '';
 
   // ── Operator replacement section rows ─────────────────────────────────────
   const operatorReplacementRows = replaceAll
@@ -293,21 +371,29 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
       <td style="color:#666;">Replacement Type</td>
       <td><strong>All Operators Replaced</strong></td>
    </tr>
-   ${(data.previousOperators?.length ? data.previousOperators : []).map((op, i) => `
+   ${(data.previousOperators?.length ? data.previousOperators : [])
+     .map(
+       (op, i) => `
     <tr>
      <td style="color:#666;">Previous Operator ${data.previousOperators.length > 1 ? i + 1 : ''}</td>
      <td>${op.operatorName}${op.shiftName ? ` (${op.shiftName})` : ''}</td>
-    </tr>`).join('')}
+    </tr>`
+     )
+     .join('')}
     <tr>
       <td style="color:#666;">New Operator</td>
      <td><strong>${replacedOperator}</strong></td>
     </tr>`
-     : `
-      ${targetShiftName ? `
+    : `
+      ${
+        targetShiftName
+          ? `
     <tr>
       <td style="color:#666;">Shift</td>
       <td>${targetShiftName}</td>
-    </tr>` : ''}
+    </tr>`
+          : ''
+      }
     <tr>
       <td style="color:#666;">Outgoing Operator</td>
       <td>${currentOperator}</td>
@@ -343,14 +429,20 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
         </tr>
         ${hiredFrom ? `<tr><td style="color:#666;">Hired From</td><td>${hiredFrom}</td></tr>` : ''}
 
-        ${type === 'operator' ? `
+        ${
+          type === 'operator'
+            ? `
         <tr style="background:#f5f5f5;">
           <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Operator Replacement</td>
         </tr>
         ${operatorReplacementRows}
-        ${activeOperatorsSection}` : ''}
+        ${activeOperatorsSection}`
+            : ''
+        }
 
-        ${type === 'equipment' ? `
+        ${
+          type === 'equipment'
+            ? `
         <tr style="background:#f5f5f5;">
           <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Equipment Replacement</td>
         </tr>
@@ -364,7 +456,9 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
           <td><strong>${replacedEquipmentMachine} (${replacedEquipmentRegNo})</strong></td>
         </tr>
         ${incomingHiredFrom ? `<tr><td style="color:#666;">Incoming Hired From</td><td>${incomingHiredFrom}</td></tr>` : ''}
-        ${resolvedOutgoingOperator || resolvedIncomingOperator ? `
+        ${
+          resolvedOutgoingOperator || resolvedIncomingOperator
+            ? `
         <tr>
           <td style="color:#666;">Outgoing Operator</td>
           <td>${resolvedOutgoingOperator || 'N/A'}</td>
@@ -372,8 +466,12 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
         <tr>
           <td style="color:#666;">Incoming Operator</td>
           <td><strong>${resolvedIncomingOperator || 'N/A'}</strong></td>
-        </tr>` : ''}
-        ${newSiteForReplaced ? `<tr><td style="color:#666;">New Site for Outgoing</td><td>${newSiteForReplaced}</td></tr>` : ''}` : ''}
+        </tr>`
+            : ''
+        }
+        ${newSiteForReplaced ? `<tr><td style="color:#666;">New Site for Outgoing</td><td>${newSiteForReplaced}</td></tr>` : ''}`
+            : ''
+        }
 
         <tr style="background:#f5f5f5;">
           <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Date &amp; Time</td>
@@ -381,14 +479,18 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
         <tr><td style="color:#666;">Date</td><td>${formatDate(date)}</td></tr>
         <tr><td style="color:#666;">Month / Year</td><td>${MONTH_NAMES[month] ?? month} ${year}</td></tr>
         <tr><td style="color:#666;">Time</td><td>${time}</td></tr>
-        ${remarks  ? `<tr><td style="color:#666;">Remarks</td><td>${remarks}</td></tr>` : ''}
+        ${remarks ? `<tr><td style="color:#666;">Remarks</td><td>${remarks}</td></tr>` : ''}
         ${renderLocation() ? `<tr><td style="color:#666;">Location</td><td>${renderLocation()}</td></tr>` : ''}
-        ${hired && rentRate ? `
+        ${
+          hired && rentRate
+            ? `
         <tr style="background:#f5f5f5;">
           <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Outgoing Hire Details</td>
         </tr>
         <tr><td style="color:#666;">Basis</td><td>${rentRate.basis ? rentRate.basis.charAt(0).toUpperCase() + rentRate.basis.slice(1) : 'N/A'}</td></tr>
-        <tr><td style="color:#666;">Rate</td><td><strong>${rentRate.rate} ${rentRate.currency || 'QAR'}</strong></td></tr>` : ''}
+        <tr><td style="color:#666;">Rate</td><td><strong>${rentRate.rate} ${rentRate.currency || 'QAR'}</strong></td></tr>`
+            : ''
+        }
       </table>
 
       <br/>
@@ -406,10 +508,10 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
 
       <table cellpadding="0" cellspacing="0" border="0" style="margin-top:10px;">
         <tr>
-          <td style="padding-right:8px;">${sigLogo      ? `<img src="${sigLogo}"      width="72" height="32" alt="Logo" />`                                                                                                                          : ''}</td>
-          <td style="padding-right:8px;">${sigFacebook  ? `<a href="https://www.facebook.com/profile.php?id=100095544335543"                   target="_blank"><img src="${sigFacebook}"  width="27" height="27" alt="Facebook"  /></a>` : ''}</td>
+          <td style="padding-right:8px;">${sigLogo ? `<img src="${sigLogo}"      width="72" height="32" alt="Logo" />` : ''}</td>
+          <td style="padding-right:8px;">${sigFacebook ? `<a href="https://www.facebook.com/profile.php?id=100095544335543"                   target="_blank"><img src="${sigFacebook}"  width="27" height="27" alt="Facebook"  /></a>` : ''}</td>
           <td style="padding-right:8px;">${sigInstagram ? `<a href="https://www.instagram.com/al_ansari_transport"                             target="_blank"><img src="${sigInstagram}" width="27" height="27" alt="Instagram" /></a>` : ''}</td>
-          <td>                           ${sigLinkedin  ? `<a href="https://www.linkedin.com/in/al-ansari-transport-and-enterprises-455b53253/" target="_blank"><img src="${sigLinkedin}"  width="27" height="27" alt="LinkedIn"  /></a>` : ''}</td>
+          <td>                           ${sigLinkedin ? `<a href="https://www.linkedin.com/in/al-ansari-transport-and-enterprises-455b53253/" target="_blank"><img src="${sigLinkedin}"  width="27" height="27" alt="LinkedIn"  /></a>` : ''}</td>
         </tr>
       </table>
     </body>
@@ -422,11 +524,17 @@ const generateReplacementTemplate = (recipientName = 'Valued Customer', data = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const alertReplacementViaEmail = async (data = {}) => {
-  const toList  = JSON.parse(process.env.REPLACEMENT_TO || '[]');
-  const to      = toList.join(', ');
-  const ccList  = JSON.parse(process.env.REPLACEMENT_CC || '[]');
-  const cc      = ccList.join(', ');
-  const subject = REPLACEMENT_SUBJECT(data.machine, data.regNo, data.site, data.clientCompany)[data.type] ?? `Replacement Update – ${data.machine}`;
+  const toList = JSON.parse(process.env.REPLACEMENT_TO || '[]');
+  const to = toList.join(', ');
+  const ccList = JSON.parse(process.env.REPLACEMENT_CC || '[]');
+  const cc = ccList.join(', ');
+  const subject =
+    REPLACEMENT_SUBJECT(
+      data.machine,
+      data.regNo,
+      data.site,
+      data.clientCompany
+    )[data.type] ?? `Replacement Update – ${data.machine}`;
 
   const htmlContent = generateReplacementTemplate('Team', data);
   const textContent = `${data.type === 'operator' ? 'Operator' : 'Equipment'} Replacement: ${data.machine} (${data.regNo}). Date: ${data.date}. Time: ${data.time}. Remarks: ${data.remarks || 'None'}.`;

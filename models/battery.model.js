@@ -8,21 +8,21 @@ const mongoose = require('mongoose');
 const batteryHistorySchema = new mongoose.Schema(
   {
     // Equipment Details
-    equipment:   { type: String, required: true },
+    equipment: { type: String, required: true },
     equipmentNo: { type: String, required: true },
     batteryModel: { type: String, required: true },
 
     // Deployment
     location: { type: String, required: true },
     operator: { type: String, required: true },
-    date:     { type: Date,   required: true },
+    date: { type: Date, required: true },
 
     // Reference
     reportId: { type: String, default: null },
   },
   {
     timestamps: true,
-  },
+  }
 );
 
 // ─────────────────────────────────────────────────────────────────────────────

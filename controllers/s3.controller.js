@@ -16,16 +16,25 @@ const getS3Config = async (req, res) => {
     console.log('[S3] getS3Config request', { key, isLong, isAuthSign });
 
     if (!key) {
-      return res.status(400).json({ success: false, message: 'key is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'key is required' });
     }
 
     const result = await s3Services.fetchPresignedURL(key, isLong, isAuthSign);
 
-    console.log('[S3] getS3Config result', { key, status: result.status, ok: result.ok, message: result.message });
+    console.log('[S3] getS3Config result', {
+      key,
+      status: result.status,
+      ok: result.ok,
+      message: result.message,
+    });
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[S3] getS3Config:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 

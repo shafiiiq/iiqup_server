@@ -12,7 +12,7 @@ const getEquipmentFuelConsumption = async (req, res) => {
     const filters = {};
     if (startDate && endDate) {
       filters.startDate = startDate;
-      filters.endDate   = endDate;
+      filters.endDate = endDate;
     }
     if (equipmentId) {
       filters.equipmentId = equipmentId;
@@ -32,5 +32,5 @@ const getEquipmentFuelConsumption = async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 module.exports = {
-  getEquipmentFuelConsumption
+  getEquipmentFuelConsumption,
 };

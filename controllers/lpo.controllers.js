@@ -1,6 +1,6 @@
 // controllers/lpo.controller.js
-const lpoService          = require('../services/lpo.service');
-const { putObject }       = require('../aws/s3.aws');
+const lpoService = require('../services/lpo.service');
+const { putObject } = require('../aws/s3.aws');
 const { sendLPOViaEmail } = require('../gmail/lpo.gmail');
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -8,11 +8,11 @@ const { sendLPOViaEmail } = require('../gmail/lpo.gmail');
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DEFAULT_SIGNATURES = {
-  accountsDept:              'ROSHAN SHA',
-  purchasingManager:         'ABDUL MALIK',
-  operationsManager:         'SURESHKANTH',
-  authorizedSignatory:       'AHAMMED KAMAL',
-  authorizedSignatoryTitle:  'CEO',
+  accountsDept: 'ROSHAN SHA',
+  purchasingManager: 'ABDUL MALIK',
+  operationsManager: 'SURESHKANTH',
+  authorizedSignatory: 'AHAMMED KAMAL',
+  authorizedSignatoryTitle: 'CEO',
 };
 
 const DEFAULT_TERMS = [
@@ -21,14 +21,14 @@ const DEFAULT_TERMS = [
 ];
 
 const buildApprovedCreds = (body) => ({
-  signed:          body.signed      || false,
-  authorised:      body.authorised  || false,
-  approvedDate:    body.approvedDate,
-  approvedFrom:    body.approvedFrom,
-  approvedIP:      body.approvedIP,
+  signed: body.signed || false,
+  authorised: body.authorised || false,
+  approvedDate: body.approvedDate,
+  approvedFrom: body.approvedFrom,
+  approvedIP: body.approvedIP,
   approvedBDevice: body.approvedBDevice,
   approvedLocation: body.approvedLocation,
-  approvedBy:      body.approvedBy,
+  approvedBy: body.approvedBy,
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -43,22 +43,39 @@ const addLPO = async (req, res) => {
   try {
     const lpoData = req.body;
 
-    if (!lpoData.lpoRef || !lpoData.date || !lpoData.equipments || !lpoData.quoteNo) {
+    if (
+      !lpoData.lpoRef ||
+      !lpoData.date ||
+      !lpoData.equipments ||
+      !lpoData.quoteNo
+    ) {
       return res.status(400).json({
         success: false,
         message: 'Missing required fields: lpoRef, date, equipments, quoteNo',
       });
     }
 
-    if (!lpoData.company?.vendor || !lpoData.company?.attention || !lpoData.company?.designation) {
+    if (
+      !lpoData.company?.vendor ||
+      !lpoData.company?.attention ||
+      !lpoData.company?.designation
+    ) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required company fields: vendor, attention, designation',
+        message:
+          'Missing required company fields: vendor, attention, designation',
       });
     }
 
-    if (!lpoData.items || !Array.isArray(lpoData.items) || lpoData.items.length === 0) {
-      return res.status(400).json({ success: false, message: 'items array is required and cannot be empty' });
+    if (
+      !lpoData.items ||
+      !Array.isArray(lpoData.items) ||
+      lpoData.items.length === 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: 'items array is required and cannot be empty',
+      });
     }
 
     if (!lpoData.lpoCounter) {
@@ -66,8 +83,10 @@ const addLPO = async (req, res) => {
     }
 
     if (lpoData.paymentTerms && Array.isArray(lpoData.paymentTerms)) {
-      const filteredTerms         = lpoData.paymentTerms.filter(term => term.trim() !== '');
-      lpoData.termsAndConditions  = ['Terms & Conditions', ...filteredTerms];
+      const filteredTerms = lpoData.paymentTerms.filter(
+        (term) => term.trim() !== ''
+      );
+      lpoData.termsAndConditions = ['Terms & Conditions', ...filteredTerms];
     } else {
       lpoData.termsAndConditions = DEFAULT_TERMS;
     }
@@ -75,14 +94,14 @@ const addLPO = async (req, res) => {
     if (!lpoData.signatures) lpoData.signatures = DEFAULT_SIGNATURES;
 
     lpoData.isAmendmented = false;
-    lpoData.amendments    = [];
+    lpoData.amendments = [];
 
     const lpo = await lpoService.createLPO(lpoData);
 
     res.status(201).json({
       success: true,
       message: 'LPO created successfully',
-      data:    lpo,
+      data: lpo,
     });
   } catch (error) {
     console.error('[LPO] addLPO:', error);
@@ -101,8 +120,8 @@ const getAllLPOs = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'LPOs retrieved successfully',
-      data:    lpos,
-      count:   lpos.length,
+      data: lpos,
+      count: lpos.length,
     });
   } catch (error) {
     console.error('[LPO] getAllLPOs:', error);
@@ -119,7 +138,9 @@ const getLPOByRef = async (req, res) => {
     const refNo = req.params[0];
 
     if (!refNo) {
-      return res.status(400).json({ success: false, message: 'Reference number is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Reference number is required' });
     }
 
     const lpo = await lpoService.getLPOByRef(refNo);
@@ -127,7 +148,7 @@ const getLPOByRef = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'LPO retrieved successfully',
-      data:    lpo,
+      data: lpo,
     });
   } catch (error) {
     console.error('[LPO] getLPOByRef:', error);
@@ -145,19 +166,21 @@ const getPendingSignatures = async (req, res) => {
   try {
     const { uniqueCode } = req.body;
 
-    console.log("uniqueCode", uniqueCode)
+    console.log('uniqueCode', uniqueCode);
 
     if (!uniqueCode) {
-      return res.status(400).json({ success: false, message: 'uniqueCode is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'uniqueCode is required' });
     }
 
-    const pending = await lpoService.getPendingSignatures(uniqueCode);      
+    const pending = await lpoService.getPendingSignatures(uniqueCode);
 
     res.status(200).json({
       success: true,
       message: 'Pending LPO signatures retrieved successfully',
-      data:    pending,
-      count:   pending.length,
+      data: pending,
+      count: pending.length,
     });
   } catch (error) {
     console.error('[LPO] getPendingSignatures:', error);
@@ -175,7 +198,9 @@ const getSignedByUser = async (req, res) => {
     const { uniqueCode } = req.body;
 
     if (!uniqueCode) {
-      return res.status(400).json({ success: false, message: 'uniqueCode is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'uniqueCode is required' });
     }
 
     const signed = await lpoService.getSignedByUser(uniqueCode);
@@ -183,8 +208,8 @@ const getSignedByUser = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Signed LPOs retrieved successfully',
-      data:    signed,
-      count:   signed.length,
+      data: signed,
+      count: signed.length,
     });
   } catch (error) {
     console.error('[LPO] getSignedByUser:', error);
@@ -203,7 +228,7 @@ const getLatestLPO = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Latest LPO retrieved successfully',
-      data:    latestLPO || null,
+      data: latestLPO || null,
     });
   } catch (error) {
     console.error('[LPO] getLatestLPO:', error);
@@ -222,7 +247,7 @@ const getLatestLPORef = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Latest LPO reference retrieved successfully',
-      data:    { latestRef: latestRef || 'No LPO found' },
+      data: { latestRef: latestRef || 'No LPO found' },
     });
   } catch (error) {
     console.error('[LPO] getLatestLPORef:', error);
@@ -236,20 +261,24 @@ const getLatestLPORef = async (req, res) => {
  */
 const updateLPO = async (req, res) => {
   try {
-    const { refNo }    = req.params;
-    const updateData   = req.body;
+    const { refNo } = req.params;
+    const updateData = req.body;
 
     if (!refNo) {
-      return res.status(400).json({ success: false, message: 'Reference number is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Reference number is required' });
     }
 
     const decodedRefNo = decodeURIComponent(refNo);
-    const lpo          = await lpoService.updateLPO(decodedRefNo, updateData);
+    const lpo = await lpoService.updateLPO(decodedRefNo, updateData);
 
     res.status(200).json({
       success: true,
-      message: updateData.isAmendmented ? 'LPO amended successfully' : 'LPO updated successfully',
-      data:    lpo,
+      message: updateData.isAmendmented
+        ? 'LPO amended successfully'
+        : 'LPO updated successfully',
+      data: lpo,
     });
   } catch (error) {
     console.error('[LPO] updateLPO:', error);
@@ -267,7 +296,9 @@ const deleteLPO = async (req, res) => {
     const { refNo } = req.params;
 
     if (!refNo) {
-      return res.status(400).json({ success: false, message: 'Reference number is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Reference number is required' });
     }
 
     const lpo = await lpoService.deleteLPO(refNo);
@@ -275,7 +306,7 @@ const deleteLPO = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'LPO deleted successfully',
-      data:    lpo,
+      data: lpo,
     });
   } catch (error) {
     console.error('[LPO] deleteLPO:', error);
@@ -299,8 +330,8 @@ const getCompanyDetails = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Company details retrieved successfully',
-      data:    companyDetails,
-      count:   companyDetails.length,
+      data: companyDetails,
+      count: companyDetails.length,
     });
   } catch (error) {
     console.error('[LPO] getCompanyDetails:', error);
@@ -317,7 +348,10 @@ const getLPOsByDateRange = async (req, res) => {
     const { startDate, endDate } = req.query;
 
     if (!startDate || !endDate) {
-      return res.status(400).json({ success: false, message: 'startDate and endDate are required' });
+      return res.status(400).json({
+        success: false,
+        message: 'startDate and endDate are required',
+      });
     }
 
     const lpos = await lpoService.getLPOsByDateRange(startDate, endDate);
@@ -325,8 +359,8 @@ const getLPOsByDateRange = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'LPOs retrieved successfully',
-      data:    lpos,
-      count:   lpos.length,
+      data: lpos,
+      count: lpos.length,
     });
   } catch (error) {
     console.error('[LPO] getLPOsByDateRange:', error);
@@ -343,7 +377,9 @@ const getLPOsByCompany = async (req, res) => {
     const { vendorName } = req.params;
 
     if (!vendorName) {
-      return res.status(400).json({ success: false, message: 'Vendor name is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Vendor name is required' });
     }
 
     const lpos = await lpoService.getLPOsByCompany(vendorName);
@@ -351,8 +387,8 @@ const getLPOsByCompany = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'LPOs retrieved successfully',
-      data:    lpos,
-      count:   lpos.length,
+      data: lpos,
+      count: lpos.length,
     });
   } catch (error) {
     console.error('[LPO] getLPOsByCompany:', error);
@@ -369,7 +405,9 @@ const getLposByRegNo = async (req, res) => {
     const { regNo } = req.params;
 
     if (!regNo) {
-      return res.status(400).json({ success: false, message: 'Registration number is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Registration number is required' });
     }
 
     const lpos = await lpoService.getLposByRegNo(regNo);
@@ -377,11 +415,15 @@ const getLposByRegNo = async (req, res) => {
     res.status(200).json({
       success: true,
       message: `LPOs for registration number ${regNo} retrieved successfully`,
-      data:    lpos,
+      data: lpos,
     });
   } catch (error) {
     console.error('[LPO] getLposByRegNo:', error);
-    res.status(500).json({ success: false, message: 'Error retrieving LPOs by registration number', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving LPOs by registration number',
+      error: error.message,
+    });
   }
 };
 
@@ -396,11 +438,15 @@ const getLposForStock = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Stock LPOs retrieved successfully',
-      data:    lpos,
+      data: lpos,
     });
   } catch (error) {
     console.error('[LPO] getLposForStock:', error);
-    res.status(500).json({ success: false, message: 'Error retrieving stock LPOs', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving stock LPOs',
+      error: error.message,
+    });
   }
 };
 
@@ -415,11 +461,15 @@ const getLposForAllEquipments = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'All equipment LPOs retrieved successfully',
-      data:    lpos,
+      data: lpos,
     });
   } catch (error) {
     console.error('[LPO] getLposForAllEquipments:', error);
-    res.status(500).json({ success: false, message: 'Error retrieving all equipment LPOs', error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Error retrieving all equipment LPOs',
+      error: error.message,
+    });
   }
 };
 
@@ -436,34 +486,47 @@ const uploadLPO = async (req, res) => {
     const { uploadedBy, lpoRef, description, fileName, isAmendment } = req.body;
 
     if (!uploadedBy || !lpoRef) {
-      return res.status(400).json({ success: false, message: 'uploadedBy and lpoRef are required' });
+      return res.status(400).json({
+        success: false,
+        message: 'uploadedBy and lpoRef are required',
+      });
     }
 
     const amendmentSuffix = isAmendment ? '-amendment' : '';
-    const finalFilename   = fileName || `lpo-${lpoRef}${amendmentSuffix}-${Date.now()}.pdf`;  
-    const s3Key           = `lpos/${lpoRef}/${finalFilename}`;
-    const uploadUrl       = await putObject(finalFilename, s3Key, 'application/pdf');
+    const finalFilename =
+      fileName || `lpo-${lpoRef}${amendmentSuffix}-${Date.now()}.pdf`;
+    const s3Key = `lpos/${lpoRef}/${finalFilename}`;
+    const uploadUrl = await putObject(finalFilename, s3Key, 'application/pdf');
 
     const lpoFileData = {
-      fileName:     finalFilename,
+      fileName: finalFilename,
       originalName: finalFilename,
-      filePath:     s3Key,
-      mimeType:     'application/pdf',
+      filePath: s3Key,
+      mimeType: 'application/pdf',
       uploadUrl,
-      uploadDate:   new Date(),
+      uploadDate: new Date(),
     };
 
-    const result = await lpoService.uploadLPO(lpoFileData, uploadedBy, lpoRef, description, isAmendment);
+    const result = await lpoService.uploadLPO(
+      lpoFileData,
+      uploadedBy,
+      lpoRef,
+      description,
+      isAmendment
+    );
 
     res.status(200).json({
-      success:   true,
-      message:   `Pre-signed URL generated successfully${isAmendment ? ' (Amendment)' : ''}`,
+      success: true,
+      message: `Pre-signed URL generated successfully${isAmendment ? ' (Amendment)' : ''}`,
       uploadUrl,
-      data:      { lpo: result, uploadData: lpoFileData },
+      data: { lpo: result, uploadData: lpoFileData },
     });
   } catch (error) {
     console.error('[LPO] uploadLPO:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message || 'Failed to upload LPO' });
+    res.status(error.status || 500).json({
+      success: false,
+      message: error.message || 'Failed to upload LPO',
+    });
   }
 };
 
@@ -473,27 +536,39 @@ const uploadLPO = async (req, res) => {
  */
 const purchaseApproval = async (req, res) => {
   try {
-    const { lpoRef }     = req.params;
-    const { approvedBy, comments, signed, approvedDate, approvedFrom } = req.body;
+    const { lpoRef } = req.params;
+    const { approvedBy, comments, signed, approvedDate, approvedFrom } =
+      req.body;
 
     if (!approvedBy) {
-      return res.status(400).json({ success: false, message: 'approvedBy is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'approvedBy is required' });
     }
 
     if (signed && (!approvedDate || !approvedFrom)) {
-      return res.status(400).json({ success: false, message: 'approvedDate and approvedFrom are required for signing' });
+      return res.status(400).json({
+        success: false,
+        message: 'approvedDate and approvedFrom are required for signing',
+      });
     }
 
-    const result = await lpoService.purchaseApproval(lpoRef, buildApprovedCreds(req.body));
+    const result = await lpoService.purchaseApproval(
+      lpoRef,
+      buildApprovedCreds(req.body)
+    );
 
     res.status(200).json({
       success: true,
       message: 'Purchase approval recorded successfully',
-      data:    result,
+      data: result,
     });
   } catch (error) {
     console.error('[LPO] purchaseApproval:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message || 'Failed to approve purchase' });
+    res.status(error.status || 500).json({
+      success: false,
+      message: error.message || 'Failed to approve purchase',
+    });
   }
 };
 
@@ -503,23 +578,33 @@ const purchaseApproval = async (req, res) => {
  */
 const managerApproval = async (req, res) => {
   try {
-    const { lpoRef }     = req.params;
+    const { lpoRef } = req.params;
     const { approvedBy, comments } = req.body;
 
     if (!approvedBy) {
-      return res.status(400).json({ success: false, message: 'approvedBy is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'approvedBy is required' });
     }
 
-    const result = await lpoService.managerApproval(lpoRef, approvedBy, comments, buildApprovedCreds(req.body));
+    const result = await lpoService.managerApproval(
+      lpoRef,
+      approvedBy,
+      comments,
+      buildApprovedCreds(req.body)
+    );
 
     res.status(200).json({
       success: true,
       message: 'Manager approval recorded successfully',
-      data:    result,
+      data: result,
     });
   } catch (error) {
     console.error('[LPO] managerApproval:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message || 'Failed to get manager approval' });
+    res.status(error.status || 500).json({
+      success: false,
+      message: error.message || 'Failed to get manager approval',
+    });
   }
 };
 
@@ -529,23 +614,34 @@ const managerApproval = async (req, res) => {
  */
 const ceoApproval = async (req, res) => {
   try {
-    const { lpoRef }                  = req.params;
+    const { lpoRef } = req.params;
     const { approvedBy, comments, authUser } = req.body;
 
     if (!approvedBy) {
-      return res.status(400).json({ success: false, message: 'approvedBy is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'approvedBy is required' });
     }
 
-    const result = await lpoService.ceoApproval(lpoRef, approvedBy, comments, buildApprovedCreds(req.body), authUser);
+    const result = await lpoService.ceoApproval(
+      lpoRef,
+      approvedBy,
+      comments,
+      buildApprovedCreds(req.body),
+      authUser
+    );
 
     res.status(200).json({
       success: true,
       message: 'CEO approval recorded successfully',
-      data:    result,
+      data: result,
     });
   } catch (error) {
     console.error('[LPO] ceoApproval:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message || 'Failed to get CEO approval' });
+    res.status(error.status || 500).json({
+      success: false,
+      message: error.message || 'Failed to get CEO approval',
+    });
   }
 };
 
@@ -555,23 +651,33 @@ const ceoApproval = async (req, res) => {
  */
 const accountsApproval = async (req, res) => {
   try {
-    const { lpoRef }               = req.params;
+    const { lpoRef } = req.params;
     const { approvedBy, comments } = req.body;
 
     if (!approvedBy) {
-      return res.status(400).json({ success: false, message: 'approvedBy is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'approvedBy is required' });
     }
 
-    const result = await lpoService.accountsApproval(lpoRef, approvedBy, comments, buildApprovedCreds(req.body));
+    const result = await lpoService.accountsApproval(
+      lpoRef,
+      approvedBy,
+      comments,
+      buildApprovedCreds(req.body)
+    );
 
     res.status(200).json({
       success: true,
       message: 'Accounts approval recorded successfully',
-      data:    result,
+      data: result,
     });
   } catch (error) {
     console.error('[LPO] accountsApproval:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message || 'Failed to record accounts approval' });
+    res.status(error.status || 500).json({
+      success: false,
+      message: error.message || 'Failed to record accounts approval',
+    });
   }
 };
 
@@ -581,11 +687,13 @@ const accountsApproval = async (req, res) => {
  */
 const markItemsAvailable = async (req, res) => {
   try {
-    const { lpoRef }  = req.params;
+    const { lpoRef } = req.params;
     const { markedBy } = req.body;
 
     if (!markedBy) {
-      return res.status(400).json({ success: false, message: 'markedBy is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'markedBy is required' });
     }
 
     const result = await lpoService.markItemsAvailable(lpoRef, markedBy);
@@ -593,11 +701,14 @@ const markItemsAvailable = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Items marked as available successfully',
-      data:    result,
+      data: result,
     });
   } catch (error) {
     console.error('[LPO] markItemsAvailable:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message || 'Failed to mark items as available' });
+    res.status(error.status || 500).json({
+      success: false,
+      message: error.message || 'Failed to mark items as available',
+    });
   }
 };
 
@@ -605,43 +716,58 @@ const markItemsAvailable = async (req, res) => {
  * POST /lpo/:lpoRef/sign
  * Records a signature on the LPO identified by uniqueCode server-side.
  */
-const signLPO = async (req, res) => { 
+const signLPO = async (req, res) => {
   try {
     const { lpoRef } = req.params;
     const {
-      uniqueCode, signedDate, signedFrom, role,
-      signedIP, signedDevice, signedLocation,
-      override = false,        
+      uniqueCode,
+      signedDate,
+      signedFrom,
+      role,
+      signedIP,
+      signedDevice,
+      signedLocation,
+      override = false,
     } = req.body;
 
     if (!uniqueCode || !signedDate || !signedFrom) {
-      return res.status(400).json({ success: false, message: 'uniqueCode, signedDate, and signedFrom are required' });
+      return res.status(400).json({
+        success: false,
+        message: 'uniqueCode, signedDate, and signedFrom are required',
+      });
     }
 
     const result = await lpoService.signLPO(lpoRef, {
-      uniqueCode, signedDate, signedFrom, role,
-      signedIP, signedDevice, signedLocation,
-      override,                
+      uniqueCode,
+      signedDate,
+      signedFrom,
+      role,
+      signedIP,
+      signedDevice,
+      signedLocation,
+      override,
     });
 
     // Out-of-order prompt — return 202 so frontend can ask user
     if (result.requireOverride) {
       return res.status(202).json({
-        success:         false,
+        success: false,
         requireOverride: true,
-        message:         result.message,
-        unsignedAbove:   result.unsignedAbove,
+        message: result.message,
+        unsignedAbove: result.unsignedAbove,
       });
     }
 
     res.status(200).json({
       success: true,
       message: result.message,
-      data:    result.data,
+      data: result.data,
     });
   } catch (error) {
     console.error('[LPO] signLPO:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message || 'Signing failed' });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message || 'Signing failed' });
   }
 };
 
@@ -655,17 +781,30 @@ const signLPO = async (req, res) => {
  */
 const sendLpoViaEmail = async (req, res) => {
   try {
-    const { emails: rawEmails, recipientName, vendorName, equipment, lpoRef } = req.body;
-    const emails = typeof rawEmails === 'string' ? JSON.parse(rawEmails) : rawEmails;
+    const {
+      emails: rawEmails,
+      recipientName,
+      vendorName,
+      equipment,
+      lpoRef,
+    } = req.body;
+    const emails =
+      typeof rawEmails === 'string' ? JSON.parse(rawEmails) : rawEmails;
     const pdfFile = req.files?.pdf?.[0];
     const extraFiles = req.files?.attachments || [];
 
     if (!emails?.length || !pdfFile) {
-      return res.status(400).json({ success: false, message: 'At least one email and PDF are required' });
+      return res.status(400).json({
+        success: false,
+        message: 'At least one email and PDF are required',
+      });
     }
 
     const cleanEquipment = equipment
-      ? equipment.replace(/[^\x20-\x7E]/g, '').replace(/\s+/g, ' ').trim()
+      ? equipment
+          .replace(/[^\x20-\x7E]/g, '')
+          .replace(/\s+/g, ' ')
+          .trim()
       : '';
 
     if (lpoRef) {
@@ -681,14 +820,20 @@ const sendLpoViaEmail = async (req, res) => {
         filename: pdfFile.originalname || 'lpo.pdf',
         mimeType: 'application/pdf',
       },
-      ...extraFiles.map(f => ({
+      ...extraFiles.map((f) => ({
         content: f.buffer,
         filename: f.originalname || 'attachment',
         mimeType: f.mimetype || 'application/octet-stream',
-      }))
+      })),
     ];
 
-    const result = await sendLPOViaEmail(emails, vendorName || '', recipientName || '', attachmentsList, cleanEquipment);
+    const result = await sendLPOViaEmail(
+      emails,
+      vendorName || '',
+      recipientName || '',
+      attachmentsList,
+      cleanEquipment
+    );
 
     res.status(200).json({ success: true, data: result });
   } catch (error) {
@@ -704,17 +849,19 @@ const sendLpoViaEmail = async (req, res) => {
 const updateVendorEmail = async (req, res) => {
   try {
     const { vendorCode } = req.params;
-    const { email }      = req.body;
+    const { email } = req.body;
 
     if (!email || !email.includes('@')) {
-      return res.status(400).json({ success: false, message: 'Valid email required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Valid email required' });
     }
 
     const result = await lpoService.saveVendorEmail(vendorCode, email);
 
     res.status(200).json({
-      success:       true,
-      message:       `Email updated for vendor code ${vendorCode}`,
+      success: true,
+      message: `Email updated for vendor code ${vendorCode}`,
       modifiedCount: result.modifiedCount,
     });
   } catch (error) {
@@ -744,7 +891,7 @@ module.exports = {
   getLposForStock,
   getLposForAllEquipments,
   // Approvals
-  uploadLPO, 
+  uploadLPO,
   purchaseApproval,
   managerApproval,
   ceoApproval,

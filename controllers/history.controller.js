@@ -9,7 +9,10 @@ const VALID_TYPES = ['oil', 'normal', 'tyre', 'battery', 'major'];
 
 const validateType = (type, res) => {
   if (!type || !VALID_TYPES.includes(type)) {
-    res.status(400).json({ ok: false, message: `Invalid service type. Must be one of: ${VALID_TYPES.join(', ')}` });
+    res.status(400).json({
+      ok: false,
+      message: `Invalid service type. Must be one of: ${VALID_TYPES.join(', ')}`,
+    });
     return false;
   }
   return true;
@@ -26,7 +29,10 @@ const validateType = (type, res) => {
 const getServiceHistory = async (req, res) => {
   try {
     const { regNo } = req.params;
-    if (!regNo) return res.status(400).json({ ok: false, message: 'Registration number is required' });
+    if (!regNo)
+      return res
+        .status(400)
+        .json({ ok: false, message: 'Registration number is required' });
 
     const result = await service.fetchServiceHistory(regNo);
     res.status(result.status).json(result);
@@ -43,7 +49,10 @@ const getServiceHistory = async (req, res) => {
 const getServiceHistoryByType = async (req, res) => {
   try {
     const { regNo, type } = req.params;
-    if (!regNo) return res.status(400).json({ ok: false, message: 'Registration number is required' });
+    if (!regNo)
+      return res
+        .status(400)
+        .json({ ok: false, message: 'Registration number is required' });
     if (!validateType(type, res)) return;
 
     const result = await service.fetchServiceHistoryByType(regNo, type);
@@ -61,7 +70,8 @@ const getServiceHistoryByType = async (req, res) => {
 const getServiceHistoryById = async (req, res) => {
   try {
     const { id, type } = req.params;
-    if (!id)                      return res.status(400).json({ ok: false, message: 'ID is required' });
+    if (!id)
+      return res.status(400).json({ ok: false, message: 'ID is required' });
     if (!validateType(type, res)) return;
 
     const result = await service.fetchServiceHistoryById(id);
@@ -113,7 +123,8 @@ const addBatchServiceHistory = async (req, res) => {
 const deleteServiceHistory = async (req, res) => {
   try {
     const { id, type } = req.params;
-    if (!id)                      return res.status(400).json({ ok: false, message: 'ID is required' });
+    if (!id)
+      return res.status(400).json({ ok: false, message: 'ID is required' });
     if (!validateType(type, res)) return;
 
     const result = await service.deleteServiceHistory(id);
@@ -135,7 +146,10 @@ const deleteServiceHistory = async (req, res) => {
 const getLatestFullService = async (req, res) => {
   try {
     const { regNo } = req.params;
-    if (!regNo) return res.status(400).json({ ok: false, message: 'Registration number is required' });
+    if (!regNo)
+      return res
+        .status(400)
+        .json({ ok: false, message: 'Registration number is required' });
 
     const result = await service.fetchLatestFullService(regNo);
     res.status(result.status).json(result);

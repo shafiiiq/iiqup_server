@@ -9,7 +9,8 @@ const { MONTHS } = require('../constants/mechanic.constants');
  * @param {Date} date
  * @returns {string}
  */
-const getMonthYearString = (date) => `${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
+const getMonthYearString = (date) =>
+  `${MONTHS[date.getMonth()]} ${date.getFullYear()}`;
 
 /**
  * Returns a DD-MM-YYYY formatted string for a given date.
@@ -30,10 +31,10 @@ const getFormattedDateString = (date) =>
  * @returns {boolean}
  */
 const isOlderThanCutoff = (monthYear, cutoffMonthYear) => {
-  const [monthName,   yearStr]       = monthYear.split(' ');
+  const [monthName, yearStr] = monthYear.split(' ');
   const [cutoffMonth, cutoffYearStr] = cutoffMonthYear.split(' ');
 
-  const year       = parseInt(yearStr);
+  const year = parseInt(yearStr);
   const cutoffYear = parseInt(cutoffYearStr);
 
   if (year < cutoffYear) return true;
@@ -62,7 +63,9 @@ const getCutoffMonthYear = () => {
  * @returns {string}
  */
 const formatValidationError = (error) =>
-  Object.values(error.errors).map(e => e.message).join(', ');
+  Object.values(error.errors)
+    .map((e) => e.message)
+    .join(', ');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Response Builders
@@ -81,8 +84,8 @@ const buildAttendanceResponse = (mechanic, records, extra = {}) => ({
     mechanic: { name: mechanic.name, zktecoPin: mechanic.zktecoPin },
     records,
     count: records.length,
-    ...extra
-  }
+    ...extra,
+  },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -95,5 +98,5 @@ module.exports = {
   isOlderThanCutoff,
   getCutoffMonthYear,
   formatValidationError,
-  buildAttendanceResponse
+  buildAttendanceResponse,
 };

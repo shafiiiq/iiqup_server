@@ -14,7 +14,9 @@ const verifyRefresh = async (req, res) => {
     const { refreshToken } = req.body;
 
     if (!refreshToken) {
-      return res.status(400).json({ success: false, message: 'refreshToken is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'refreshToken is required' });
     }
 
     const result = await oauthServices.authRefresh(refreshToken);
@@ -22,7 +24,9 @@ const verifyRefresh = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[OAuth] verifyRefresh:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 

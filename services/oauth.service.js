@@ -1,8 +1,8 @@
 // services/oauth.service.js
-const nodemailer  = require('nodemailer');
-const jwt         = require('jsonwebtoken');
-const { google }  = require('googleapis');
-const GOAuth      = require('../models/GOAuth.model');
+const nodemailer = require('nodemailer');
+const jwt = require('jsonwebtoken');
+const { google } = require('googleapis');
+const GOAuth = require('../models/GOAuth.model');
 const { generateTokens } = require('../utils/jwt.utils');
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -34,13 +34,17 @@ const getValidAccessToken = async (service = 'gmail') => {
     if (tokens.is_expired || !tokens.access_token) {
       const { credentials } = await oauth2Client.refreshAccessToken();
 
-      await GOAuth.updateAccessToken(service, credentials.access_token, credentials.expiry_date);
+      await GOAuth.updateAccessToken(
+        service,
+        credentials.access_token,
+        credentials.expiry_date
+      );
 
       return {
-        access_token:   credentials.access_token,
-        client_id:      tokens.client_id,
-        client_secret:  tokens.client_secret,
-        refresh_token:  tokens.refresh_token,
+        access_token: credentials.access_token,
+        client_id: tokens.client_id,
+        client_secret: tokens.client_secret,
+        refresh_token: tokens.refresh_token,
       };
     }
 
@@ -60,16 +64,18 @@ const createSecureOAuthTransporter = async () => {
     return nodemailer.createTransport({
       service: 'gmail',
       auth: {
-        type:         'OAuth2',
-        user:         process.env.OTP_MAILER?.replace(/"/g, ''),
-        clientId:     tokens.client_id,
+        type: 'OAuth2',
+        user: process.env.OTP_MAILER?.replace(/"/g, ''),
+        clientId: tokens.client_id,
         clientSecret: tokens.client_secret,
         refreshToken: tokens.refresh_token,
-        accessToken:  tokens.access_token,
+        accessToken: tokens.access_token,
       },
     });
   } catch (error) {
-    throw new Error(`[OAuthService] createSecureOAuthTransporter: ${error.message}`);
+    throw new Error(
+      `[OAuthService] createSecureOAuthTransporter: ${error.message}`
+    );
   }
 };
 
@@ -80,9 +86,9 @@ const initializeOAuthTokens = async (tokens) => {
   try {
     return await GOAuth.saveTokens('gmail', {
       refresh_token: tokens.refresh_token,
-      access_token:  tokens.access_token,
-      expiry_date:   tokens.expiry_date,
-      client_id:     tokens.client_id     || process.env.GMAIL_CLIENT_ID,
+      access_token: tokens.access_token,
+      expiry_date: tokens.expiry_date,
+      client_id: tokens.client_id || process.env.GMAIL_CLIENT_ID,
       client_secret: tokens.client_secret || process.env.GMAIL_CLIENT_SECRET,
     });
   } catch (error) {
@@ -129,13 +135,23 @@ const revokeOAuthTokens = async (service = 'gmail') => {
 const authRefresh = async (refreshToken) => {
   try {
     if (!refreshToken) {
-      return { status: 401, success: false, message: 'Refresh token is required' };
+      return {
+        status: 401,
+        success: false,
+        message: 'Refresh token is required',
+      };
     }
 
     // Strip surrounding quotes if token was JSON-stringified
     let token = refreshToken;
-    if (typeof token === 'string' && token.startsWith('"') && token.endsWith('"')) {
-      try { token = JSON.parse(token); } catch (_) {}
+    if (
+      typeof token === 'string' &&
+      token.startsWith('"') &&
+      token.endsWith('"')
+    ) {
+      try {
+        token = JSON.parse(token);
+      } catch (_) {}
     }
 
     token = token.trim();
@@ -143,7 +159,11 @@ const authRefresh = async (refreshToken) => {
     const decoded = jwt.verify(token, JWT_SECRET);
 
     if (decoded.type !== 'refresh') {
-      return { status: 403, success: false, message: 'Invalid token type (must be refresh)' };
+      return {
+        status: 403,
+        success: false,
+        message: 'Invalid token type (must be refresh)',
+      };
     }
 
     const tokens = generateTokens({
@@ -156,17 +176,17 @@ const authRefresh = async (refreshToken) => {
     });
 
     return {
-      status:       200,
-      success:      true,
-      accessToken:  tokens.accessToken,
+      status: 200,
+      success: true,
+      accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
     };
   } catch (error) {
     console.error('[OAuthService] authRefresh:', error.message);
 
     let message = 'Invalid refresh token';
-    if (error.name === 'TokenExpiredError')  message = 'Refresh token expired';
-    if (error.name === 'JsonWebTokenError')  message = 'Malformed refresh token';
+    if (error.name === 'TokenExpiredError') message = 'Refresh token expired';
+    if (error.name === 'JsonWebTokenError') message = 'Malformed refresh token';
 
     return { status: 403, success: false, message };
   }

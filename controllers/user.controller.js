@@ -3,23 +3,36 @@ const path = require('path');
 const { putObject } = require('../aws/s3.aws');
 require('dotenv').config();
 
-const userService        = require('../services/user.service');
-const sessionService     = require('../services/session.service');
-const tokenService       = require('../services/token.service');
-const permissionService  = require('../services/permission.service');
-const signatureService   = require('../services/signature.service');
-const biometricService   = require('../services/biometric.service');
-const PushNotification   = require('../push/notification.push');
- 
+const userService = require('../services/user.service');
+const sessionService = require('../services/session.service');
+const tokenService = require('../services/token.service');
+const permissionService = require('../services/permission.service');
+const signatureService = require('../services/signature.service');
+const biometricService = require('../services/biometric.service');
+const PushNotification = require('../push/notification.push');
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ROLE_ENV_KEYS = [
-  'MECHANIC', 'MAINTENANCE_HEAD', 'OPERATOR', 'CAMP_BOSS', 'MECHANIC_HEAD',
-  'SUPER_ADMIN', 'JALEEL_KA', 'WORKSHOP_MANAGER', 'SUB_ADMIN',
-  'ASSISTANT_OFFICE_ADMIN', 'OFFICE_ADMIN', 'CEO', 'ACCOUNTANT',
-  'PURCHASE_MANAGER', 'MD', 'MANAGER', 'STORE_KEEPER' 
+  'MECHANIC',
+  'MAINTENANCE_HEAD',
+  'OPERATOR',
+  'CAMP_BOSS',
+  'MECHANIC_HEAD',
+  'SUPER_ADMIN',
+  'JALEEL_KA',
+  'WORKSHOP_MANAGER',
+  'SUB_ADMIN',
+  'ASSISTANT_OFFICE_ADMIN',
+  'OFFICE_ADMIN',
+  'CEO',
+  'ACCOUNTANT',
+  'PURCHASE_MANAGER',
+  'MD',
+  'MANAGER',
+  'STORE_KEEPER',
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -36,7 +49,9 @@ const addUsers = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] addUsers:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -50,7 +65,9 @@ const getUsers = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] getUsers:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -64,7 +81,9 @@ const getAllUsers = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] getAllUsers:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -75,13 +94,18 @@ const getAllUsers = async (req, res) => {
 const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!id) return res.status(400).json({ success: false, message: 'User ID is required' });
+    if (!id)
+      return res
+        .status(400)
+        .json({ success: false, message: 'User ID is required' });
 
     const result = await userService.userUpdate(id, req.body);
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] updateUser:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -92,13 +116,18 @@ const updateUser = async (req, res) => {
 const deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!id) return res.status(400).json({ success: false, message: 'User ID is required' });
+    if (!id)
+      return res
+        .status(400)
+        .json({ success: false, message: 'User ID is required' });
 
     const result = await userService.userDelete(id);
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] deleteUser:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -113,13 +142,23 @@ const deleteUser = async (req, res) => {
 const verifyUser = async (req, res) => {
   try {
     const { email, password, type, deviceInfo } = req.body;
-    if (!email || !password) return res.status(400).json({ success: false, message: 'Email and password are required' });
+    if (!email || !password)
+      return res
+        .status(400)
+        .json({ success: false, message: 'Email and password are required' });
 
-    const result = await userService.verifyUserCredentials(email, password, type, deviceInfo);
+    const result = await userService.verifyUserCredentials(
+      email,
+      password,
+      type,
+      deviceInfo
+    );
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] verifyUser:', error);
-    res.status(error.status || 500).json({ success: false, message: 'Authentication failed' });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: 'Authentication failed' });
   }
 };
 
@@ -130,13 +169,18 @@ const verifyUser = async (req, res) => {
 const verifyCEO = async (req, res) => {
   try {
     const { email } = req.body;
-    if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
+    if (!email)
+      return res
+        .status(400)
+        .json({ success: false, message: 'Email is required' });
 
     const result = await userService.verifyCEOcreds(email);
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] verifyCEO:', error);
-    res.status(error.status || 500).json({ success: false, message: 'Authentication failed' });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: 'Authentication failed' });
   }
 };
 
@@ -147,13 +191,18 @@ const verifyCEO = async (req, res) => {
 const verifyDocAuthUser = async (req, res) => {
   try {
     const { password } = req.body;
-    if (!password) return res.status(400).json({ success: false, message: 'Password is required' });
+    if (!password)
+      return res
+        .status(400)
+        .json({ success: false, message: 'Password is required' });
 
     const result = await userService.verifyDocAuthUserCreds(password);
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] verifyDocAuthUser:', error);
-    res.status(error.status || 500).json({ success: false, message: 'Authentication failed' });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: 'Authentication failed' });
   }
 };
 
@@ -163,7 +212,9 @@ const verifyDocAuthUser = async (req, res) => {
  */
 const verifyToken = async (req, res) => {
   try {
-    res.status(200).json({ success: true, valid: true, message: 'Token is valid' });
+    res
+      .status(200)
+      .json({ success: true, valid: true, message: 'Token is valid' });
   } catch (error) {
     console.error('[User] verifyToken:', error);
     res.status(500).json({ success: false, message: error.message });
@@ -183,22 +234,38 @@ const changePassword = async (req, res) => {
     const { email, currentPassword, newPassword } = req.body;
 
     if (!email || !currentPassword || !newPassword) {
-      return res.status(400).json({ success: false, message: 'Email, current password, and new password are required' });
+      return res.status(400).json({
+        success: false,
+        message: 'Email, current password, and new password are required',
+      });
     }
     if (currentPassword === newPassword) {
-      return res.status(400).json({ success: false, message: 'New password must be different from current password' });
+      return res.status(400).json({
+        success: false,
+        message: 'New password must be different from current password',
+      });
     }
 
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
+    const passwordRegex =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
     if (!passwordRegex.test(newPassword)) {
-      return res.status(400).json({ success: false, message: 'New password does not meet security requirements' });
+      return res.status(400).json({
+        success: false,
+        message: 'New password does not meet security requirements',
+      });
     }
 
-    const result = await userService.changePassword(email, currentPassword, newPassword);
+    const result = await userService.changePassword(
+      email,
+      currentPassword,
+      newPassword
+    );
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] changePassword:', error);
-    res.status(error.status || 500).json({ success: false, message: 'Password change failed' });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: 'Password change failed' });
   }
 };
 
@@ -209,13 +276,18 @@ const changePassword = async (req, res) => {
 const resetPassword = async (req, res) => {
   try {
     const { email, type } = req.body;
-    if (!email) return res.status(400).json({ success: false, message: 'Email is required' });
+    if (!email)
+      return res
+        .status(400)
+        .json({ success: false, message: 'Email is required' });
 
     const result = await userService.resetPassword(email, type);
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] resetPassword:', error);
-    res.status(error.status || 500).json({ success: false, message: 'Password reset failed' });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: 'Password reset failed' });
   }
 };
 
@@ -226,13 +298,18 @@ const resetPassword = async (req, res) => {
 const updateAuthMail = async (req, res) => {
   try {
     const { userId, authMail, type } = req.body;
-    if (!userId || !authMail) return res.status(400).json({ success: false, message: 'userId and authMail are required' });
+    if (!userId || !authMail)
+      return res
+        .status(400)
+        .json({ success: false, message: 'userId and authMail are required' });
 
     const result = await userService.updateUserAuthMail(userId, authMail, type);
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] updateAuthMail:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -245,13 +322,19 @@ const updateAuthMail = async (req, res) => {
  * Returns all user role codes from environment variables.
  */
 const getUserRoles = (req, res) => {
-  const missingVars = ROLE_ENV_KEYS.filter(key => !process.env[key]);
+  const missingVars = ROLE_ENV_KEYS.filter((key) => !process.env[key]);
   if (missingVars.length > 0) {
-    return res.status(500).json({ success: false, message: 'Cannot get all roles', missingVariables: missingVars });
+    return res.status(500).json({
+      success: false,
+      message: 'Cannot get all roles',
+      missingVariables: missingVars,
+    });
   }
   res.status(200).json({
     success: true,
-    roles: Object.fromEntries(ROLE_ENV_KEYS.map(key => [key, process.env[key]])),
+    roles: Object.fromEntries(
+      ROLE_ENV_KEYS.map((key) => [key, process.env[key]])
+    ),
   });
 };
 
@@ -265,7 +348,10 @@ const getUserRoles = (req, res) => {
  */
 const getUserSessions = async (req, res) => {
   try {
-    const result = await sessionService.getUserSessions(req.user.id, req.headers.authorization?.split(' ')[1]);
+    const result = await sessionService.getUserSessions(
+      req.user.id,
+      req.headers.authorization?.split(' ')[1]
+    );
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] getUserSessions:', error);
@@ -280,9 +366,16 @@ const getUserSessions = async (req, res) => {
 const logoutSession = async (req, res) => {
   try {
     const { sessionId } = req.params;
-    if (!sessionId) return res.status(400).json({ success: false, message: 'Session ID is required' });
+    if (!sessionId)
+      return res
+        .status(400)
+        .json({ success: false, message: 'Session ID is required' });
 
-    const result = await sessionService.logoutSession(sessionId, req.user.id, req.headers.authorization?.split(' ')[1]);
+    const result = await sessionService.logoutSession(
+      sessionId,
+      req.user.id,
+      req.headers.authorization?.split(' ')[1]
+    );
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] logoutSession:', error);
@@ -296,7 +389,10 @@ const logoutSession = async (req, res) => {
  */
 const logoutAllSessions = async (req, res) => {
   try {
-    const result = await sessionService.logoutAllSessions(req.user.id, req.headers.authorization?.split(' ')[1]);
+    const result = await sessionService.logoutAllSessions(
+      req.user.id,
+      req.headers.authorization?.split(' ')[1]
+    );
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] logoutAllSessions:', error);
@@ -311,7 +407,10 @@ const logoutAllSessions = async (req, res) => {
 const blockDevice = async (req, res) => {
   try {
     const { sessionId } = req.params;
-    if (!sessionId) return res.status(400).json({ success: false, message: 'Session ID is required' });
+    if (!sessionId)
+      return res
+        .status(400)
+        .json({ success: false, message: 'Session ID is required' });
 
     const result = await sessionService.blockDevice(sessionId, req.user.id);
     res.status(result.status).json(result);
@@ -332,14 +431,28 @@ const blockDevice = async (req, res) => {
 const addPushToken = async (req, res) => {
   try {
     const { uniqueCode, pushToken, platform } = req.body;
-    if (!uniqueCode || !pushToken) return res.status(400).json({ success: false, message: 'uniqueCode and pushToken are required' });
-    if (platform && !['ios', 'android'].includes(platform)) return res.status(400).json({ success: false, message: 'Platform must be either ios or android' });
+    if (!uniqueCode || !pushToken)
+      return res.status(400).json({
+        success: false,
+        message: 'uniqueCode and pushToken are required',
+      });
+    if (platform && !['ios', 'android'].includes(platform))
+      return res.status(400).json({
+        success: false,
+        message: 'Platform must be either ios or android',
+      });
 
-    const result = await tokenService.insertPushToken(uniqueCode, pushToken, platform);
+    const result = await tokenService.insertPushToken(
+      uniqueCode,
+      pushToken,
+      platform
+    );
     res.status(result.success ? 200 : 404).json({
       success: result.success,
-      message: result.success ? 'Push token registered successfully' : result.message,
-      data:    result.success ? result.data : undefined,
+      message: result.success
+        ? 'Push token registered successfully'
+        : result.message,
+      data: result.success ? result.data : undefined,
     });
   } catch (error) {
     console.error('[User] addPushToken:', error);
@@ -353,19 +466,21 @@ const addPushToken = async (req, res) => {
  */
 const registerVoipToken = async (req, res) => {
   try {
-    
-    
-    const { uniqueCode, voipToken } = req.body
-    console.log("uniqueCode :", uniqueCode);
-    console.log("voipToken :", voipToken); 
-    if (!uniqueCode || !voipToken) return res.status(400).json({ success: false, message: 'uniqueCode and voipToken are required' })
-    const result = await tokenService.insertVoipToken(uniqueCode, voipToken)
-    res.status(result.success ? 200 : 404).json(result)
+    const { uniqueCode, voipToken } = req.body;
+    console.log('uniqueCode :', uniqueCode);
+    console.log('voipToken :', voipToken);
+    if (!uniqueCode || !voipToken)
+      return res.status(400).json({
+        success: false,
+        message: 'uniqueCode and voipToken are required',
+      });
+    const result = await tokenService.insertVoipToken(uniqueCode, voipToken);
+    res.status(result.success ? 200 : 404).json(result);
   } catch (error) {
-    console.error('[User] registerVoipToken:', error)
-    res.status(500).json({ success: false, message: error.message })
+    console.error('[User] registerVoipToken:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
-}
+};
 
 /**
  * POST /user/remove-push-token
@@ -374,12 +489,18 @@ const registerVoipToken = async (req, res) => {
 const removePushToken = async (req, res) => {
   try {
     const { uniqueCode, pushToken } = req.body;
-    if (!uniqueCode || !pushToken) return res.status(400).json({ success: false, message: 'uniqueCode and pushToken are required' });
+    if (!uniqueCode || !pushToken)
+      return res.status(400).json({
+        success: false,
+        message: 'uniqueCode and pushToken are required',
+      });
 
     const result = await tokenService.removePushToken(uniqueCode, pushToken);
     res.status(result.success ? 200 : 404).json({
       success: result.success,
-      message: result.success ? 'Push token removed successfully' : result.message,
+      message: result.success
+        ? 'Push token removed successfully'
+        : result.message,
     });
   } catch (error) {
     console.error('[User] removePushToken:', error);
@@ -394,13 +515,16 @@ const removePushToken = async (req, res) => {
 const getUserPushTokens = async (req, res) => {
   try {
     const { uniqueCode } = req.body;
-    if (!uniqueCode) return res.status(400).json({ success: false, message: 'uniqueCode is required' });
+    if (!uniqueCode)
+      return res
+        .status(400)
+        .json({ success: false, message: 'uniqueCode is required' });
 
     const result = await tokenService.getUserPushTokens(uniqueCode);
     res.status(result.success ? 200 : 404).json({
       success: result.success,
       message: result.success ? undefined : result.message,
-      data:    result.success ? result.data : undefined,
+      data: result.success ? result.data : undefined,
     });
   } catch (error) {
     console.error('[User] getUserPushTokens:', error);
@@ -415,17 +539,22 @@ const getUserPushTokens = async (req, res) => {
 const sendTestNotification = async (req, res) => {
   try {
     const { uniqueCode, title, message } = req.body;
-    if (!uniqueCode) return res.status(400).json({ success: false, message: 'uniqueCode is required' });
+    if (!uniqueCode)
+      return res
+        .status(400)
+        .json({ success: false, message: 'uniqueCode is required' });
 
     const result = await tokenService.sendNotificationToUser(uniqueCode, {
-      title: title   || 'Test Notification',
-      body:  message || 'This is a test notification',
-      data:  { type: 'test', timestamp: new Date().toISOString() },
+      title: title || 'Test Notification',
+      body: message || 'This is a test notification',
+      data: { type: 'test', timestamp: new Date().toISOString() },
     });
     res.status(result.success ? 200 : 400).json({
       success: result.success,
-      message: result.success ? 'Test notification sent successfully' : result.message,
-      data:    result.success ? result.data : undefined,
+      message: result.success
+        ? 'Test notification sent successfully'
+        : result.message,
+      data: result.success ? result.data : undefined,
     });
   } catch (error) {
     console.error('[User] sendTestNotification:', error);
@@ -445,18 +574,26 @@ const sendTestNotification = async (req, res) => {
  */
 const requestGrant = async (req, res) => {
   try {
-    const { mechanicId }                          = req.params;
+    const { mechanicId } = req.params;
     const { date, regNo, times, workDetails, files, ...rest } = req.body;
 
     if (!date || !regNo || !times || !workDetails) {
-      return res.status(400).json({ success: false, message: 'date, regNo, times, and workDetails are required' });
+      return res.status(400).json({
+        success: false,
+        message: 'date, regNo, times, and workDetails are required',
+      });
     }
     if (!Array.isArray(times) || times.length === 0) {
-      return res.status(400).json({ success: false, message: 'times must be a non-empty array' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'times must be a non-empty array' });
     }
     for (let i = 0; i < times.length; i++) {
       if (!times[i].in || !times[i].out) {
-        return res.status(400).json({ success: false, message: `Time entry ${i + 1} is missing 'in' or 'out' time` });
+        return res.status(400).json({
+          success: false,
+          message: `Time entry ${i + 1} is missing 'in' or 'out' time`,
+        });
       }
     }
 
@@ -464,21 +601,51 @@ const requestGrant = async (req, res) => {
     if (files && files.length > 0) {
       filesWithUploadData = await Promise.all(
         files.map(async (file) => {
-          const ext           = path.extname(file.fileName);
+          const ext = path.extname(file.fileName);
           const finalFilename = `${mechanicId}-${Date.now()}${ext}`;
-          const s3Key         = `overtime/${mechanicId}/${finalFilename}`;
-          const uploadUrl     = await putObject(file.fileName, s3Key, file.mimeType);
-          return { fileName: finalFilename, originalName: file.fileName, filePath: s3Key, mimeType: file.mimeType, type: file.mimeType.startsWith('video/') ? 'video' : 'photo', uploadUrl, uploadDate: new Date() };
+          const s3Key = `overtime/${mechanicId}/${finalFilename}`;
+          const uploadUrl = await putObject(
+            file.fileName,
+            s3Key,
+            file.mimeType
+          );
+          return {
+            fileName: finalFilename,
+            originalName: file.fileName,
+            filePath: s3Key,
+            mimeType: file.mimeType,
+            type: file.mimeType.startsWith('video/') ? 'video' : 'photo',
+            uploadUrl,
+            uploadDate: new Date(),
+          };
         })
       );
     }
 
-    const response = await permissionService.submitOvertimeRequest(mechanicId, 'overtime', { date, regNo, times, workDetails, ...rest, mediaFiles: filesWithUploadData, totalFiles: filesWithUploadData.length });
+    const response = await permissionService.submitOvertimeRequest(
+      mechanicId,
+      'overtime',
+      {
+        date,
+        regNo,
+        times,
+        workDetails,
+        ...rest,
+        mediaFiles: filesWithUploadData,
+        totalFiles: filesWithUploadData.length,
+      }
+    );
 
-    res.status(response.status).json({ success: true, message: 'Pre-signed URLs generated', data: { uploadData: filesWithUploadData } });
+    res.status(response.status).json({
+      success: true,
+      message: 'Pre-signed URLs generated',
+      data: { uploadData: filesWithUploadData },
+    });
   } catch (error) {
     console.error('[User] requestGrant:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -492,7 +659,9 @@ const requestService = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] requestService:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -503,13 +672,23 @@ const requestService = async (req, res) => {
 const grantAccess = async (req, res) => {
   try {
     const { uniqueCode, dataId, purpose } = req.body;
-    if (!uniqueCode || !dataId || !purpose) return res.status(400).json({ success: false, message: 'uniqueCode, dataId, and purpose are required' });
+    if (!uniqueCode || !dataId || !purpose)
+      return res.status(400).json({
+        success: false,
+        message: 'uniqueCode, dataId, and purpose are required',
+      });
 
-    const result = await permissionService.approveRequest(uniqueCode, dataId, purpose);
+    const result = await permissionService.approveRequest(
+      uniqueCode,
+      dataId,
+      purpose
+    );
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] grantAccess:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -520,13 +699,21 @@ const grantAccess = async (req, res) => {
 const getGrantAccessData = async (req, res) => {
   try {
     const { uniqueCode, purpose } = req.body;
-    if (!uniqueCode) return res.status(400).json({ success: false, message: 'uniqueCode is required' });
+    if (!uniqueCode)
+      return res
+        .status(400)
+        .json({ success: false, message: 'uniqueCode is required' });
 
-    const result = await permissionService.getPendingRequests(uniqueCode, purpose);
+    const result = await permissionService.getPendingRequests(
+      uniqueCode,
+      purpose
+    );
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] getGrantAccessData:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -541,13 +728,18 @@ const getGrantAccessData = async (req, res) => {
 const getSignKey = async (req, res) => {
   try {
     const { password } = req.body;
-    if (!password) return res.status(400).json({ success: false, message: 'Password is required' });
+    if (!password)
+      return res
+        .status(400)
+        .json({ success: false, message: 'Password is required' });
 
     const result = await signatureService.getAuthSignKey(password);
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] getSignKey:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -557,11 +749,16 @@ const getSignKey = async (req, res) => {
 const getSignWmKey = async (req, res) => {
   try {
     const { deviceInfo } = req.body;
-    const result = await signatureService.getWmAuthSignKey(deviceInfo.userId, deviceInfo);
+    const result = await signatureService.getWmAuthSignKey(
+      deviceInfo.userId,
+      deviceInfo
+    );
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] getSignWmKey:', error);
-    res.status(error.status || 500).json({ success: false, message: 'Cannot get WM sign key' });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: 'Cannot get WM sign key' });
   }
 };
 
@@ -571,11 +768,16 @@ const getSignWmKey = async (req, res) => {
 const getSignPmKey = async (req, res) => {
   try {
     const { deviceInfo } = req.body;
-    const result = await signatureService.getPmAuthSignKey(deviceInfo.userId, deviceInfo);
+    const result = await signatureService.getPmAuthSignKey(
+      deviceInfo.userId,
+      deviceInfo
+    );
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] getSignPmKey:', error);
-    res.status(error.status || 500).json({ success: false, message: 'Cannot get PM sign key' });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: 'Cannot get PM sign key' });
   }
 };
 
@@ -585,11 +787,16 @@ const getSignPmKey = async (req, res) => {
 const getSignAccountsKey = async (req, res) => {
   try {
     const { deviceInfo } = req.body;
-    const result = await signatureService.getAccountsAuthSignKey(deviceInfo.userId, deviceInfo);
+    const result = await signatureService.getAccountsAuthSignKey(
+      deviceInfo.userId,
+      deviceInfo
+    );
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] getSignAccountsKey:', error);
-    res.status(error.status || 500).json({ success: false, message: 'Cannot get Accounts sign key' });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: 'Cannot get Accounts sign key' });
   }
 };
 
@@ -599,11 +806,16 @@ const getSignAccountsKey = async (req, res) => {
 const getSignManagerKey = async (req, res) => {
   try {
     const { deviceInfo } = req.body;
-    const result = await signatureService.getManagerAuthSignKey(deviceInfo.userId, deviceInfo);
+    const result = await signatureService.getManagerAuthSignKey(
+      deviceInfo.userId,
+      deviceInfo
+    );
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] getSignManagerKey:', error);
-    res.status(error.status || 500).json({ success: false, message: 'Cannot get Manager sign key' });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: 'Cannot get Manager sign key' });
   }
 };
 
@@ -613,11 +825,17 @@ const getSignManagerKey = async (req, res) => {
 const getSignAuthorizedKey = async (req, res) => {
   try {
     const { deviceInfo, authRole } = req.body;
-    const result = await signatureService.getAuthorizedAuthSignKey(deviceInfo.userId, deviceInfo, authRole);
+    const result = await signatureService.getAuthorizedAuthSignKey(
+      deviceInfo.userId,
+      deviceInfo,
+      authRole
+    );
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] getSignAuthorizedKey:', error);
-    res.status(error.status || 500).json({ success: false, message: 'Cannot get Authorized sign key' });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: 'Cannot get Authorized sign key' });
   }
 };
 
@@ -627,11 +845,16 @@ const getSignAuthorizedKey = async (req, res) => {
 const getSealKey = async (req, res) => {
   try {
     const { deviceInfo } = req.body;
-    const result = await signatureService.getAuthSealKey(deviceInfo.userId, deviceInfo);
+    const result = await signatureService.getAuthSealKey(
+      deviceInfo.userId,
+      deviceInfo
+    );
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] getSealKey:', error);
-    res.status(error.status || 500).json({ success: false, message: 'Cannot get Seal key' });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: 'Cannot get Seal key' });
   }
 };
 
@@ -643,14 +866,24 @@ const activateSignature = async (req, res) => {
   try {
     const { activationKey, signType, deviceInfo } = req.body;
     if (!activationKey || !signType || !deviceInfo) {
-      return res.status(400).json({ success: false, message: 'activationKey, signType, and deviceInfo are required' });
+      return res.status(400).json({
+        success: false,
+        message: 'activationKey, signType, and deviceInfo are required',
+      });
     }
 
-    const result = await signatureService.activateSignatureAccess(deviceInfo.userId, activationKey, signType, deviceInfo);
+    const result = await signatureService.activateSignatureAccess(
+      deviceInfo.userId,
+      activationKey,
+      signType,
+      deviceInfo
+    );
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] activateSignature:', error);
-    res.status(error.status || 500).json({ success: false, message: 'Signature activation failed' });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: 'Signature activation failed' });
   }
 };
 
@@ -662,14 +895,23 @@ const verifyDeviceTrust = async (req, res) => {
   try {
     const { signType, deviceInfo } = req.body;
     if (!signType || !deviceInfo) {
-      return res.status(400).json({ success: false, message: 'signType and deviceInfo are required' });
+      return res.status(400).json({
+        success: false,
+        message: 'signType and deviceInfo are required',
+      });
     }
 
-    const result = await signatureService.verifyTrustedDevice(deviceInfo.userId, signType, deviceInfo);
+    const result = await signatureService.verifyTrustedDevice(
+      deviceInfo.userId,
+      signType,
+      deviceInfo
+    );
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[User] verifyDeviceTrust:', error);
-    res.status(error.status || 500).json({ success: false, message: 'Device verification failed' });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: 'Device verification failed' });
   }
 };
 
@@ -684,13 +926,20 @@ const verifyDeviceTrust = async (req, res) => {
 const generateBiometricToken = async (req, res) => {
   try {
     const { uniqueCode, deviceInfo } = req.body;
-    if (!uniqueCode || !deviceInfo) return res.status(400).json({ success: false, message: 'uniqueCode and deviceInfo are required' });
+    if (!uniqueCode || !deviceInfo)
+      return res.status(400).json({
+        success: false,
+        message: 'uniqueCode and deviceInfo are required',
+      });
 
-    const result = await biometricService.generateBiometricToken(uniqueCode, deviceInfo);
+    const result = await biometricService.generateBiometricToken(
+      uniqueCode,
+      deviceInfo
+    );
     res.status(result.success ? 200 : 404).json({
       success: result.success,
       message: result.success ? undefined : result.message,
-      data:    result.success ? result.data : undefined,
+      data: result.success ? result.data : undefined,
     });
   } catch (error) {
     console.error('[User] generateBiometricToken:', error);
@@ -705,14 +954,21 @@ const generateBiometricToken = async (req, res) => {
 const biometricLogin = async (req, res) => {
   try {
     const { biometricToken, deviceInfo } = req.body;
-    if (!biometricToken || !deviceInfo) return res.status(400).json({ success: false, message: 'biometricToken and deviceInfo are required' });
+    if (!biometricToken || !deviceInfo)
+      return res.status(400).json({
+        success: false,
+        message: 'biometricToken and deviceInfo are required',
+      });
 
-    const result = await biometricService.biometricLogin(biometricToken, deviceInfo);
+    const result = await biometricService.biometricLogin(
+      biometricToken,
+      deviceInfo
+    );
     res.status(result.success ? 200 : 401).json({
-      success:    result.success,
+      success: result.success,
       authorized: result.success,
-      message:    result.success ? 'Biometric login successful' : result.message,
-      data:       result.success ? result.data : undefined,
+      message: result.success ? 'Biometric login successful' : result.message,
+      data: result.success ? result.data : undefined,
     });
   } catch (error) {
     console.error('[User] biometricLogin:', error);
@@ -727,10 +983,18 @@ const biometricLogin = async (req, res) => {
 const revokeBiometricToken = async (req, res) => {
   try {
     const { uniqueCode, deviceInfo } = req.body;
-    if (!uniqueCode) return res.status(400).json({ success: false, message: 'uniqueCode is required' });
+    if (!uniqueCode)
+      return res
+        .status(400)
+        .json({ success: false, message: 'uniqueCode is required' });
 
-    const result = await biometricService.revokeBiometricToken(uniqueCode, deviceInfo);
-    res.status(result.success ? 200 : 404).json({ success: result.success, message: result.message });
+    const result = await biometricService.revokeBiometricToken(
+      uniqueCode,
+      deviceInfo
+    );
+    res
+      .status(result.success ? 200 : 404)
+      .json({ success: result.success, message: result.message });
   } catch (error) {
     console.error('[User] revokeBiometricToken:', error);
     res.status(500).json({ success: false, message: error.message });
@@ -760,7 +1024,9 @@ const completeTutorial = async (req, res) => {
   try {
     const { tutorialId } = req.body;
     if (!tutorialId) {
-      return res.status(400).json({ success: false, message: 'tutorialId is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'tutorialId is required' });
     }
     const result = await userService.completeTutorial(req.user.id, tutorialId);
     res.status(result.status).json(result);
@@ -776,26 +1042,54 @@ const completeTutorial = async (req, res) => {
 
 module.exports = {
   // CRUD
-  addUsers, getUsers, getAllUsers, updateUser, deleteUser,
+  addUsers,
+  getUsers,
+  getAllUsers,
+  updateUser,
+  deleteUser,
   // Authentication
-  verifyUser, verifyCEO, verifyDocAuthUser, verifyToken,
+  verifyUser,
+  verifyCEO,
+  verifyDocAuthUser,
+  verifyToken,
   // Password
-  changePassword, resetPassword, updateAuthMail,
+  changePassword,
+  resetPassword,
+  updateAuthMail,
   // Roles
   getUserRoles,
   // Sessions
-  getUserSessions, logoutSession, logoutAllSessions, blockDevice,
+  getUserSessions,
+  logoutSession,
+  logoutAllSessions,
+  blockDevice,
   // Push tokens
-  addPushToken, removePushToken, getUserPushTokens, sendTestNotification, registerVoipToken,
+  addPushToken,
+  removePushToken,
+  getUserPushTokens,
+  sendTestNotification,
+  registerVoipToken,
   // Special notifications (removed)
   // Permissions
-  requestGrant, requestService, grantAccess, getGrantAccessData,
+  requestGrant,
+  requestService,
+  grantAccess,
+  getGrantAccessData,
   // Signatures & sign keys
-  getSignKey, getSignWmKey, getSignPmKey, getSignAccountsKey,
-  getSignManagerKey, getSignAuthorizedKey, getSealKey,
-  activateSignature, verifyDeviceTrust,
+  getSignKey,
+  getSignWmKey,
+  getSignPmKey,
+  getSignAccountsKey,
+  getSignManagerKey,
+  getSignAuthorizedKey,
+  getSealKey,
+  activateSignature,
+  verifyDeviceTrust,
   // Biometric
-  generateBiometricToken, biometricLogin, revokeBiometricToken,
+  generateBiometricToken,
+  biometricLogin,
+  revokeBiometricToken,
   // Tutorials & Explores
-  getTutorials,completeTutorial
+  getTutorials,
+  completeTutorial,
 };

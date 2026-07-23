@@ -1,7 +1,7 @@
 // services/biometric.service.js
 const crypto = require('crypto');
-const jwt    = require('jsonwebtoken');
-const User   = require('../models/user.model.js');
+const jwt = require('jsonwebtoken');
+const User = require('../models/user.model.js');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Write
@@ -19,22 +19,43 @@ const generateBiometricToken = async (uniqueCode, deviceInfo) => {
     if (!user) return { success: false, message: 'User not found' };
 
     const biometricToken = crypto.randomBytes(64).toString('hex');
-    const expiresAt      = new Date();
+    const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 90);
 
-    const existingTokenIndex = user.biometricTokens.findIndex(t => t.deviceInfo.deviceId === deviceInfo.deviceId);
+    const existingTokenIndex = user.biometricTokens.findIndex(
+      (t) => t.deviceInfo.deviceId === deviceInfo.deviceId
+    );
 
     if (existingTokenIndex !== -1) {
-      user.biometricTokens[existingTokenIndex] = { token: biometricToken, deviceInfo, createdAt: new Date(), expiresAt, isActive: true, lastUsed: new Date() };
+      user.biometricTokens[existingTokenIndex] = {
+        token: biometricToken,
+        deviceInfo,
+        createdAt: new Date(),
+        expiresAt,
+        isActive: true,
+        lastUsed: new Date(),
+      };
     } else {
-      user.biometricTokens.push({ token: biometricToken, deviceInfo, expiresAt, isActive: true });
+      user.biometricTokens.push({
+        token: biometricToken,
+        deviceInfo,
+        expiresAt,
+        isActive: true,
+      });
     }
 
     await user.save();
-    return { success: true, data: { biometricToken, expiresAt, expiresIn: '90 days' } };
+    return {
+      success: true,
+      data: { biometricToken, expiresAt, expiresIn: '90 days' },
+    };
   } catch (error) {
     console.error('[BiometricService] generateBiometricToken:', error);
-    return { success: false, message: 'Failed to generate biometric token', error: error.message };
+    return {
+      success: false,
+      message: 'Failed to generate biometric token',
+      error: error.message,
+    };
   }
 };
 
@@ -50,17 +71,25 @@ const revokeBiometricToken = async (uniqueCode, deviceInfo) => {
     if (!user) return { success: false, message: 'User not found' };
 
     if (deviceInfo?.deviceId) {
-      const tokenIndex = user.biometricTokens.findIndex(t => t.deviceInfo.deviceId === deviceInfo.deviceId);
+      const tokenIndex = user.biometricTokens.findIndex(
+        (t) => t.deviceInfo.deviceId === deviceInfo.deviceId
+      );
       if (tokenIndex !== -1) user.biometricTokens[tokenIndex].isActive = false;
     } else {
-      user.biometricTokens.forEach(t => { t.isActive = false; });
+      user.biometricTokens.forEach((t) => {
+        t.isActive = false;
+      });
     }
 
     await user.save();
     return { success: true, message: 'Biometric token revoked successfully' };
   } catch (error) {
     console.error('[BiometricService] revokeBiometricToken:', error);
-    return { success: false, message: 'Failed to revoke biometric token', error: error.message };
+    return {
+      success: false,
+      message: 'Failed to revoke biometric token',
+      error: error.message,
+    };
   }
 };
 
@@ -76,48 +105,89 @@ const revokeBiometricToken = async (uniqueCode, deviceInfo) => {
  */
 const biometricLogin = async (biometricToken, deviceInfo) => {
   try {
-    const user = await User.findOne({ 'biometricTokens.token': biometricToken, 'biometricTokens.isActive': true });
+    const user = await User.findOne({
+      'biometricTokens.token': biometricToken,
+      'biometricTokens.isActive': true,
+    });
     if (!user) return { success: false, message: 'Invalid biometric token' };
 
-    const tokenData = user.biometricTokens.find(t => t.token === biometricToken && t.isActive);
-    if (!tokenData) return { success: false, message: 'Token not found or inactive' };
+    const tokenData = user.biometricTokens.find(
+      (t) => t.token === biometricToken && t.isActive
+    );
+    if (!tokenData)
+      return { success: false, message: 'Token not found or inactive' };
 
     if (new Date() > tokenData.expiresAt) {
       tokenData.isActive = false;
       await user.save();
-      return { success: false, message: 'Biometric token expired. Please login again.' };
+      return {
+        success: false,
+        message: 'Biometric token expired. Please login again.',
+      };
     }
 
     if (tokenData.deviceInfo.deviceId !== deviceInfo.deviceId) {
-      return { success: false, message: 'Device mismatch. Please login again.' };
+      return {
+        success: false,
+        message: 'Device mismatch. Please login again.',
+      };
     }
 
     tokenData.lastUsed = new Date();
-    user.lastLogin     = new Date();
+    user.lastLogin = new Date();
     await user.save();
 
     const { createSession } = require('./session.service.js');
     const deviceData = {
-      deviceName:  deviceInfo?.deviceName  || 'Unknown Device',
+      deviceName: deviceInfo?.deviceName || 'Unknown Device',
       deviceModel: deviceInfo?.deviceModel || 'Unknown Model',
-      deviceId:    deviceInfo?.deviceId    || 'Unknown ID',
-      brand:       deviceInfo?.brand       || 'Unknown',
-      osName:      deviceInfo?.osName      || 'Unknown OS',
-      osVersion:   deviceInfo?.osVersion   || 'Unknown',
-     platform:    deviceInfo?.platform    || 'Unknown',
-     loginTime:   new Date().toISOString(),
+      deviceId: deviceInfo?.deviceId || 'Unknown ID',
+      brand: deviceInfo?.brand || 'Unknown',
+      osName: deviceInfo?.osName || 'Unknown OS',
+      osVersion: deviceInfo?.osVersion || 'Unknown',
+      platform: deviceInfo?.platform || 'Unknown',
+      loginTime: new Date().toISOString(),
     };
-    const sessionToken = await createSession(user._id, 'User', deviceData, null);
-    const auth0token    = jwt.sign({ userId: user._id, email: user.email, uniqueCode: user.uniqueCode }, process.env.JWT_SECRET, { expiresIn: '365d' });
-    const refresh_token = jwt.sign({ userId: user._id }, process.env.JWT_REFRESH_SECRET, { expiresIn: '365d' });
+    const sessionToken = await createSession(
+      user._id,
+      'User',
+      deviceData,
+      null
+    );
+    const auth0token = jwt.sign(
+      { userId: user._id, email: user.email, uniqueCode: user.uniqueCode },
+      process.env.JWT_SECRET,
+      { expiresIn: '365d' }
+    );
+    const refresh_token = jwt.sign(
+      { userId: user._id },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: '365d' }
+    );
 
     return {
       success: true,
-      data: { user: { _id: user._id, name: user.name, email: user.email, role: user.role, userType: user.userType, uniqueCode: user.uniqueCode, auth0token, refresh_token, sessionToken } }
+      data: {
+        user: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          userType: user.userType,
+          uniqueCode: user.uniqueCode,
+          auth0token,
+          refresh_token,
+          sessionToken,
+        },
+      },
     };
   } catch (error) {
     console.error('[BiometricService] biometricLogin:', error);
-    return { success: false, message: 'Failed to login with biometric', error: error.message };
+    return {
+      success: false,
+      message: 'Failed to login with biometric',
+      error: error.message,
+    };
   }
 };
 
@@ -125,4 +195,8 @@ const biometricLogin = async (biometricToken, deviceInfo) => {
 // Exports
 // ─────────────────────────────────────────────────────────────────────────────
 
-module.exports = { generateBiometricToken, revokeBiometricToken, biometricLogin };
+module.exports = {
+  generateBiometricToken,
+  revokeBiometricToken,
+  biometricLogin,
+};

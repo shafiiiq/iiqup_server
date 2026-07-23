@@ -1,6 +1,6 @@
-const express    = require('express');
-const router     = express.Router();
-const analyser   = require('../analyser/dashboard.analyser');
+const express = require('express');
+const router = express.Router();
+const analyser = require('../analyser/dashboard.analyser');
 const { REGISTRY, getSchemaMap } = require('../registry/model.registry');
 
 // ─── Schema endpoint ──────────────────────────────────────────────────────────
@@ -57,9 +57,14 @@ router.post('/comparison', async (req, res) => {
 // GET /dashboard/detailed/:collection?months=1&page=1&pageSize=50
 // collection: any registry key (equipment, stocks, etc.)
 router.get('/detailed/:collection', async (req, res) => {
-  const { collection }               = req.params;
+  const { collection } = req.params;
   const { months = 1, page = 1, pageSize = 50 } = req.query;
-  const result = await analyser.fetchDetailed(collection, Number(months), Number(page), Number(pageSize));
+  const result = await analyser.fetchDetailed(
+    collection,
+    Number(months),
+    Number(page),
+    Number(pageSize)
+  );
   res.status(result.status).json(result);
 });
 
@@ -85,28 +90,30 @@ router.post('/clear-cache', (req, res) => {
 
 // ─── Collections list (for frontend dropdowns) ────────────────────────────────
 router.get('/collections', (req, res) => {
-  res.json({ status: 200, data: REGISTRY.map(({ key, label }) => ({ key, label })) });
+  res.json({
+    status: 200,
+    data: REGISTRY.map(({ key, label }) => ({ key, label })),
+  });
 });
 
-
 // ─── Legacy route aliases (keeps frontend working) ────────────────────────────
-router.get('/get-daily-updates',            async (req, res) => {
+router.get('/get-daily-updates', async (req, res) => {
   const result = await analyser.fetchHistorical('today', 50);
   res.status(result.status).json(result);
 });
-router.get('/get-weekly-updates',           async (req, res) => {
+router.get('/get-weekly-updates', async (req, res) => {
   const result = await analyser.fetchHistorical('week', 50);
   res.status(result.status).json(result);
 });
-router.get('/get-monthly-updates',          async (req, res) => {
+router.get('/get-monthly-updates', async (req, res) => {
   const result = await analyser.fetchHistorical('month', 100);
   res.status(result.status).json(result);
 });
-router.get('/get-yearly-updates',           async (req, res) => {
+router.get('/get-yearly-updates', async (req, res) => {
   const result = await analyser.fetchHistorical('year', 200);
   res.status(result.status).json(result);
 });
-router.get('/get-last-5-days-comparison',   async (req, res) => {
+router.get('/get-last-5-days-comparison', async (req, res) => {
   const result = await analyser.fetchLast5DaysComparison();
   res.status(result.status).json(result);
 });
@@ -114,7 +121,7 @@ router.get('/get-last-5-months-comparison', async (req, res) => {
   const result = await analyser.fetchLast5MonthsComparison();
   res.status(result.status).json(result);
 });
-router.get('/get-last-5-years-comparison',  async (req, res) => {
+router.get('/get-last-5-years-comparison', async (req, res) => {
   const result = await analyser.fetchLast5YearsComparison();
   res.status(result.status).json(result);
 });

@@ -16,7 +16,9 @@ const addToolKits = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Toolkit] addToolKits:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -31,7 +33,9 @@ const getToolKits = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Toolkit] getToolKits:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -41,11 +45,13 @@ const getToolKits = async (req, res) => {
  */
 const updatetoolKits = async (req, res) => {
   try {
-    const { id }     = req.params;
+    const { id } = req.params;
     const updateData = req.body;
 
     if (!id) {
-      return res.status(400).json({ success: false, message: 'Toolkit ID is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Toolkit ID is required' });
     }
 
     const result = await toolkitServices.updateToolkit(id, updateData);
@@ -53,7 +59,9 @@ const updatetoolKits = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Toolkit] updatetoolKits:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -66,7 +74,9 @@ const deletetoolKits = async (req, res) => {
     const { id } = req.params;
 
     if (!id) {
-      return res.status(400).json({ success: false, message: 'Toolkit ID is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Toolkit ID is required' });
     }
 
     const result = await toolkitServices.deleteToolkit(id);
@@ -74,7 +84,9 @@ const deletetoolKits = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Toolkit] deletetoolKits:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -87,7 +99,9 @@ const searchToolkits = async (req, res) => {
     const { q } = req.query;
 
     if (!q) {
-      return res.status(400).json({ success: false, message: 'Search query is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Search query is required' });
     }
 
     const result = await toolkitServices.searchToolkits(q);
@@ -95,7 +109,9 @@ const searchToolkits = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Toolkit] searchToolkits:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -110,18 +126,27 @@ const searchToolkits = async (req, res) => {
 const updateVariant = async (req, res) => {
   try {
     const { toolkitId, variantId } = req.params;
-    const updateData               = req.body;
+    const updateData = req.body;
 
     if (!toolkitId || !variantId) {
-      return res.status(400).json({ success: false, message: 'toolkitId and variantId are required' });
+      return res.status(400).json({
+        success: false,
+        message: 'toolkitId and variantId are required',
+      });
     }
 
-    const result = await toolkitServices.updateVariant(toolkitId, variantId, updateData);
+    const result = await toolkitServices.updateVariant(
+      toolkitId,
+      variantId,
+      updateData
+    );
 
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Toolkit] updateVariant:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -134,7 +159,10 @@ const deleteVariant = async (req, res) => {
     const { toolkitId, variantId } = req.params;
 
     if (!toolkitId || !variantId) {
-      return res.status(400).json({ success: false, message: 'toolkitId and variantId are required' });
+      return res.status(400).json({
+        success: false,
+        message: 'toolkitId and variantId are required',
+      });
     }
 
     const result = await toolkitServices.deleteVariant(toolkitId, variantId);
@@ -142,7 +170,9 @@ const deleteVariant = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Toolkit] deleteVariant:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -156,25 +186,40 @@ const deleteVariant = async (req, res) => {
  */
 const reduceStock = async (req, res) => {
   try {
-    const { toolkitId, variantId }                                   = req.params;
-    const { quantity, reason, updatedBy, person, personId, assignedDate } = req.body;
+    const { toolkitId, variantId } = req.params;
+    const { quantity, reason, updatedBy, person, personId, assignedDate } =
+      req.body;
 
     if (!toolkitId || !variantId) {
-      return res.status(400).json({ success: false, message: 'toolkitId and variantId are required' });
+      return res.status(400).json({
+        success: false,
+        message: 'toolkitId and variantId are required',
+      });
     }
 
     if (!quantity || quantity <= 0) {
-      return res.status(400).json({ success: false, message: 'Valid quantity is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Valid quantity is required' });
     }
 
     const result = await toolkitServices.reduceStock(
-      toolkitId, variantId, quantity, reason, updatedBy, person, personId, assignedDate
+      toolkitId,
+      variantId,
+      quantity,
+      reason,
+      updatedBy,
+      person,
+      personId,
+      assignedDate
     );
 
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Toolkit] reduceStock:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -187,7 +232,10 @@ const getStockHistory = async (req, res) => {
     const { toolkitId, variantId } = req.params;
 
     if (!toolkitId || !variantId) {
-      return res.status(400).json({ success: false, message: 'toolkitId and variantId are required' });
+      return res.status(400).json({
+        success: false,
+        message: 'toolkitId and variantId are required',
+      });
     }
 
     const result = await toolkitServices.getStockHistory(toolkitId, variantId);
@@ -195,7 +243,9 @@ const getStockHistory = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Toolkit] getStockHistory:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -208,7 +258,9 @@ const getToolkitStockHistory = async (req, res) => {
     const { toolkitId } = req.params;
 
     if (!toolkitId) {
-      return res.status(400).json({ success: false, message: 'Toolkit ID is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Toolkit ID is required' });
     }
 
     const result = await toolkitServices.getToolkitStockHistory(toolkitId);
@@ -216,7 +268,9 @@ const getToolkitStockHistory = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Toolkit] getToolkitStockHistory:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -229,7 +283,9 @@ const scanToolkitByBarcode = async (req, res) => {
     const { objectId } = req.params;
 
     if (!objectId) {
-      return res.status(400).json({ success: false, message: 'Barcode data is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Barcode data is required' });
     }
 
     const result = await toolkitServices.scanToolkitByBarcode(objectId);
@@ -237,7 +293,9 @@ const scanToolkitByBarcode = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Toolkit] scanToolkitByBarcode:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 

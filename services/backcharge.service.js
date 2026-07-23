@@ -18,8 +18,18 @@ const analyser = require('../analyser/dashboard.analyser');
  * @param {string} priority
  * @returns {Promise<void>}
  */
-const notify = async (notifPayload, recipient, title, description, priority = 'high') => {
-  const notification = await createNotification({ ...notifPayload, recipient, time: new Date() });
+const notify = async (
+  notifPayload,
+  recipient,
+  title,
+  description,
+  priority = 'high'
+) => {
+  const notification = await createNotification({
+    ...notifPayload,
+    recipient,
+    time: new Date(),
+  });
 
   await PushNotificationService.sendGeneralNotification(
     recipient,
@@ -55,7 +65,9 @@ const resolveSupplierCode = async (supplierName) => {
   const existing = await Backcharge.findOne({
     supplierName: { $regex: new RegExp(`^${supplierName.trim()}$`, 'i') },
     supplierCode: { $ne: null },
-  }).select('supplierCode').lean();
+  })
+    .select('supplierCode')
+    .lean();
 
   if (existing) return existing.supplierCode;
 
@@ -83,7 +95,9 @@ const resolveSupplierMail = async (supplierCode) => {
   const record = await Backcharge.findOne({
     supplierCode,
     supplierMail: { $ne: null, $exists: true },
-  }).select('supplierMail').lean();
+  })
+    .select('supplierMail')
+    .lean();
 
   return record?.supplierMail || null;
 };
@@ -100,8 +114,10 @@ const getAllBackchargeReports = async () => {
   try {
     return await Backcharge.find().sort({ createdAt: -1 }).lean();
   } catch (error) {
-    console.error('[BackchargeService] getAllBackchargeReports:', error);
-    throw new Error(`Error retrieving backcharge reports: ${error.message}`);
+    throw new Error(
+      `[BackchargeService] getAllBackchargeReports:${error.message}`,
+      { cause: error }
+    );
   }
 };
 
@@ -115,7 +131,9 @@ const getBackchargeById = async (id) => {
     return await Backcharge.findById(id).lean();
   } catch (error) {
     console.error('[BackchargeService] getBackchargeById:', error);
-    throw new Error(`Error retrieving backcharge report by ID: ${error.message}`);
+    throw new Error(
+      `Error retrieving backcharge report by ID: ${error.message}`
+    );
   }
 };
 
@@ -129,7 +147,9 @@ const getBackchargeByReportNo = async (reportNo) => {
     return await Backcharge.findOne({ reportNo }).lean();
   } catch (error) {
     console.error('[BackchargeService] getBackchargeByReportNo:', error);
-    throw new Error(`Error retrieving backcharge report by report number: ${error.message}`);
+    throw new Error(
+      `Error retrieving backcharge report by report number: ${error.message}`
+    );
   }
 };
 
@@ -143,7 +163,9 @@ const getBackchargeByRefNo = async (refNo) => {
     return await Backcharge.findOne({ refNo }).lean();
   } catch (error) {
     console.error('[BackchargeService] getBackchargeByRefNo:', error);
-    throw new Error(`Error retrieving backcharge report by ref number: ${error.message}`);
+    throw new Error(
+      `Error retrieving backcharge report by ref number: ${error.message}`
+    );
   }
 };
 
@@ -154,7 +176,10 @@ const getBackchargeByRefNo = async (refNo) => {
  */
 const getLatestBackchargeRef = async () => {
   try {
-    const latest = await Backcharge.findOne().sort({ createdAt: -1 }).select('refNo').lean();
+    const latest = await Backcharge.findOne()
+      .sort({ createdAt: -1 })
+      .select('refNo')
+      .lean();
     if (!latest?.refNo) return 140;
 
     const parts = latest.refNo.split('-');
@@ -165,7 +190,9 @@ const getLatestBackchargeRef = async () => {
     return 140;
   } catch (error) {
     console.error('[BackchargeService] getLatestBackchargeRef:', error);
-    throw new Error(`Error retrieving latest backcharge reference: ${error.message}`);
+    throw new Error(
+      `Error retrieving latest backcharge reference: ${error.message}`
+    );
   }
 };
 
@@ -176,14 +203,20 @@ const getLatestBackchargeRef = async () => {
  * @param {object} filters
  * @returns {Promise<object>}
  */
-const getBackchargeReportsWithPagination = async (page = 1, limit = 10, filters = {}) => {
+const getBackchargeReportsWithPagination = async (
+  page = 1,
+  limit = 10,
+  filters = {}
+) => {
   try {
     const skip = (page - 1) * limit;
     const query = {};
 
     if (filters.reportNo) query.reportNo = new RegExp(filters.reportNo, 'i');
-    if (filters.equipmentType) query.equipmentType = new RegExp(filters.equipmentType, 'i');
-    if (filters.supplierName) query.supplierName = new RegExp(filters.supplierName, 'i');
+    if (filters.equipmentType)
+      query.equipmentType = new RegExp(filters.equipmentType, 'i');
+    if (filters.supplierName)
+      query.supplierName = new RegExp(filters.supplierName, 'i');
     if (filters.status) query.status = filters.status;
 
     if (filters.dateFrom || filters.dateTo) {
@@ -193,7 +226,11 @@ const getBackchargeReportsWithPagination = async (page = 1, limit = 10, filters 
     }
 
     const [reports, total] = await Promise.all([
-      Backcharge.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
+      Backcharge.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
       Backcharge.countDocuments(query),
     ]);
 
@@ -208,8 +245,13 @@ const getBackchargeReportsWithPagination = async (page = 1, limit = 10, filters 
       },
     };
   } catch (error) {
-    console.error('[BackchargeService] getBackchargeReportsWithPagination:', error);
-    throw new Error(`Error retrieving paginated backcharge reports: ${error.message}`);
+    console.error(
+      '[BackchargeService] getBackchargeReportsWithPagination:',
+      error
+    );
+    throw new Error(
+      `Error retrieving paginated backcharge reports: ${error.message}`
+    );
   }
 };
 
@@ -220,23 +262,52 @@ const getBackchargeReportsWithPagination = async (page = 1, limit = 10, filters 
 const getBackchargeStats = async () => {
   try {
     const [overall, byStatus, monthly] = await Promise.all([
-      Backcharge.aggregate([{ $group: { _id: null, totalReports: { $sum: 1 }, totalCost: { $sum: '$costSummary.totalCost' }, totalDeductions: { $sum: '$costSummary.approvedDeduction' }, avgCost: { $avg: '$costSummary.totalCost' }, avgDeduction: { $avg: '$costSummary.approvedDeduction' } } }]),
-      Backcharge.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
       Backcharge.aggregate([
-        { $group: { _id: { year: { $year: '$createdAt' }, month: { $month: '$createdAt' } }, count: { $sum: 1 }, totalCost: { $sum: '$costSummary.totalCost' } } },
+        {
+          $group: {
+            _id: null,
+            totalReports: { $sum: 1 },
+            totalCost: { $sum: '$costSummary.totalCost' },
+            totalDeductions: { $sum: '$costSummary.approvedDeduction' },
+            avgCost: { $avg: '$costSummary.totalCost' },
+            avgDeduction: { $avg: '$costSummary.approvedDeduction' },
+          },
+        },
+      ]),
+      Backcharge.aggregate([
+        { $group: { _id: '$status', count: { $sum: 1 } } },
+      ]),
+      Backcharge.aggregate([
+        {
+          $group: {
+            _id: {
+              year: { $year: '$createdAt' },
+              month: { $month: '$createdAt' },
+            },
+            count: { $sum: 1 },
+            totalCost: { $sum: '$costSummary.totalCost' },
+          },
+        },
         { $sort: { '_id.year': -1, '_id.month': -1 } },
         { $limit: 12 },
       ]),
     ]);
 
     return {
-      overall: overall[0] || { totalReports: 0, totalCost: 0, totalDeductions: 0, avgCost: 0, avgDeduction: 0 },
+      overall: overall[0] || {
+        totalReports: 0,
+        totalCost: 0,
+        totalDeductions: 0,
+        avgCost: 0,
+        avgDeduction: 0,
+      },
       byStatus,
       monthly,
     };
   } catch (error) {
-    console.error('[BackchargeService] getBackchargeStats:', error);
-    throw new Error(`Error retrieving backcharge statistics: ${error.message}`);
+    throw new Error(`[BackchargeService] getBackchargeStats:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -249,15 +320,18 @@ const searchEquipmentByPlate = async (plateNo) => {
   try {
     const results = await Backcharge.find({ plateNo: new RegExp(plateNo, 'i') })
       .select('plateNo equipmentType model supplierName contactPerson')
-      .limit(10).lean();
+      .limit(10)
+      .lean();
 
     return results.reduce((acc, cur) => {
-      if (!acc.find(i => i.plateNo === cur.plateNo)) acc.push(cur);
+      if (!acc.find((i) => i.plateNo === cur.plateNo)) acc.push(cur);
       return acc;
     }, []);
   } catch (error) {
-    console.error('[BackchargeService] searchEquipmentByPlate:', error);
-    throw new Error(`Error searching equipment: ${error.message}`);
+    throw new Error(
+      `[BackchargeService] searchEquipmentByPlate:${error.message}`,
+      { cause: error }
+    );
   }
 };
 
@@ -268,17 +342,22 @@ const searchEquipmentByPlate = async (plateNo) => {
  */
 const searchSuppliers = async (supplierName) => {
   try {
-    const results = await Backcharge.find({ supplierName: new RegExp(supplierName, 'i') })
+    const results = await Backcharge.find({
+      supplierName: new RegExp(supplierName, 'i'),
+    })
       .select('supplierName contactPerson')
-      .limit(10).lean();
+      .limit(10)
+      .lean();
 
     return results.reduce((acc, cur) => {
-      if (!acc.find(i => i.name === cur.supplierName)) acc.push({ name: cur.supplierName, contactPerson: cur.contactPerson });
+      if (!acc.find((i) => i.name === cur.supplierName))
+        acc.push({ name: cur.supplierName, contactPerson: cur.contactPerson });
       return acc;
     }, []);
   } catch (error) {
-    console.error('[BackchargeService] searchSuppliers:', error);
-    throw new Error(`Error searching suppliers: ${error.message}`);
+    throw new Error(`[BackchargeService] searchSuppliers:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -289,17 +368,22 @@ const searchSuppliers = async (supplierName) => {
  */
 const searchSites = async (siteLocation) => {
   try {
-    const results = await Backcharge.find({ siteLocation: new RegExp(siteLocation, 'i') })
+    const results = await Backcharge.find({
+      siteLocation: new RegExp(siteLocation, 'i'),
+    })
       .select('siteLocation')
-      .limit(10).lean();
+      .limit(10)
+      .lean();
 
     return results.reduce((acc, cur) => {
-      if (!acc.find(i => i.location === cur.siteLocation)) acc.push({ location: cur.siteLocation });
+      if (!acc.find((i) => i.location === cur.siteLocation))
+        acc.push({ location: cur.siteLocation });
       return acc;
     }, []);
   } catch (error) {
-    console.error('[BackchargeService] searchSites:', error);
-    throw new Error(`Error searching sites: ${error.message}`);
+    throw new Error(`[BackchargeService] searchSites:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -330,7 +414,10 @@ const addBackcharge = async (data) => {
       supplierCode,
       supplierMail,
       scopeOfWork: buildTextLines(data.scopeOfWork, data.scopeLine2Text),
-      workshopComments: buildTextLines(data.workshopComments, data.workSummaryLine2),
+      workshopComments: buildTextLines(
+        data.workshopComments,
+        data.workSummaryLine2
+      ),
       sparePartsTable: data.tableRows || [],
       workDate: data.workDate || '',
       costSummary: {
@@ -346,7 +433,8 @@ const addBackcharge = async (data) => {
         authorizedSignatory: {
           signedBy: data.authorizedSignatoryName || 'Ahammed Kamal',
           authorizedSignatoryMode: data.authorizedSignatoryMode || 'CEO',
-          authorizedSignatoryName: data.authorizedSignatoryName || 'Ahammed Kamal',
+          authorizedSignatoryName:
+            data.authorizedSignatoryName || 'Ahammed Kamal',
         },
       },
       status: 'draft',
@@ -356,8 +444,9 @@ const addBackcharge = async (data) => {
     wsUtils.sendDashboardUpdate('backcharge');
     return await newBackcharge.save();
   } catch (error) {
-    console.error('[BackchargeService] addBackcharge:', error);
-    throw new Error(`Error creating backcharge report: ${error.message}`);
+    throw new Error(`[BackchargeService] addBackcharge:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -371,16 +460,27 @@ const addBackcharge = async (data) => {
 const updateBackcharge = async (id, updateData) => {
   try {
     if ('scopeOfWork' in updateData || 'scopeLine2Text' in updateData) {
-      updateData.scopeOfWork = buildTextLines(updateData.scopeOfWork, updateData.scopeLine2Text);
+      updateData.scopeOfWork = buildTextLines(
+        updateData.scopeOfWork,
+        updateData.scopeLine2Text
+      );
       delete updateData.scopeLine2Text;
     }
 
     if ('workshopComments' in updateData || 'workSummaryLine2' in updateData) {
-      updateData.workshopComments = buildTextLines(updateData.workshopComments, updateData.workSummaryLine2);
+      updateData.workshopComments = buildTextLines(
+        updateData.workshopComments,
+        updateData.workSummaryLine2
+      );
       delete updateData.workSummaryLine2;
     }
 
-    if (updateData.sparePartsCost || updateData.labourCharges || updateData.totalCost || updateData.approvedDeduction) {
+    if (
+      updateData.sparePartsCost ||
+      updateData.labourCharges ||
+      updateData.totalCost ||
+      updateData.approvedDeduction
+    ) {
       updateData.costSummary = {
         sparePartsCost: parseFloat(updateData.sparePartsCost) || 0,
         labourCharges: parseFloat(updateData.labourCharges) || 0,
@@ -400,10 +500,14 @@ const updateBackcharge = async (id, updateData) => {
 
     updateData.updatedAt = new Date();
 
-    return await Backcharge.findByIdAndUpdate(id, updateData, { new: true, runValidators: true });
+    return await Backcharge.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true,
+    });
   } catch (error) {
-    console.error('[BackchargeService] updateBackcharge:', error);
-    throw new Error(`Error updating backcharge report: ${error.message}`);
+    throw new Error(`[BackchargeService] updateBackcharge:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -416,8 +520,9 @@ const deleteBackcharge = async (id) => {
   try {
     return await Backcharge.findByIdAndDelete(id);
   } catch (error) {
-    console.error('[BackchargeService] deleteBackcharge:', error);
-    throw new Error(`Error deleting backcharge report: ${error.message}`);
+    throw new Error(`[BackchargeService] deleteBackcharge:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -429,10 +534,14 @@ const deleteBackcharge = async (id) => {
  */
 const saveSupplierEmail = async (supplierCode, email) => {
   try {
-    return await Backcharge.updateMany({ supplierCode }, { $set: { supplierMail: email } });
+    return await Backcharge.updateMany(
+      { supplierCode },
+      { $set: { supplierMail: email } }
+    );
   } catch (error) {
-    console.error('[BackchargeService] saveSupplierEmail:', error);
-    throw new Error(`Error saving supplier email: ${error.message}`);
+    throw new Error(`[BackchargeService] saveSupplierEmail:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -453,57 +562,107 @@ const saveSupplierEmail = async (supplierCode, email) => {
  */
 const signBackcharge = async (refNo, signData) => {
   const {
-    uniqueCode, signedDate, signedFrom, override = false,
-    signedIP = null, signedDevice = null, signedLocation = null
+    uniqueCode,
+    signedDate,
+    signedFrom,
+    override = false,
+    signedIP = null,
+    signedDevice = null,
+    signedLocation = null,
   } = signData;
 
   // ── Role resolution ────────────────────────────────────────────────────────
   const roleMap = [
-    { envKey: process.env.WORKSHOP_MANAGER, field: 'workshopManager', role: 'WORKSHOP_MANAGER' },
-    { envKey: process.env.PURCHASE_MANAGER, field: 'purchaseManager', role: 'PURCHASE_MANAGER' },
-    { envKey: process.env.MANAGER, field: 'operationsManager', role: 'MANAGER' },
+    {
+      envKey: process.env.WORKSHOP_MANAGER,
+      field: 'workshopManager',
+      role: 'WORKSHOP_MANAGER',
+    },
+    {
+      envKey: process.env.PURCHASE_MANAGER,
+      field: 'purchaseManager',
+      role: 'PURCHASE_MANAGER',
+    },
+    {
+      envKey: process.env.MANAGER,
+      field: 'operationsManager',
+      role: 'MANAGER',
+    },
     { envKey: process.env.CEO, field: 'authorizedSignatory', role: 'CEO' },
-    { envKey: process.env.MD, field: 'authorizedSignatory', role: 'MANAGING_DIRECTOR' },
+    {
+      envKey: process.env.MD,
+      field: 'authorizedSignatory',
+      role: 'MANAGING_DIRECTOR',
+    },
   ];
 
-  const matched = roleMap.find(r => r.envKey === uniqueCode);
-  if (!matched) throw { status: 403, message: 'Unauthorised: your device is not recognised as an authorised signatory for backcharge documents' };
+  const matched = roleMap.find((r) => r.envKey === uniqueCode);
+  if (!matched)
+    throw {
+      status: 403,
+      message:
+        'Unauthorised: your device is not recognised as an authorised signatory for backcharge documents',
+    };
 
   const backcharge = await Backcharge.findOne({ refNo });
-  if (!backcharge) throw { status: 404, message: `Backcharge not found: ${refNo}` };
+  if (!backcharge)
+    throw { status: 404, message: `Backcharge not found: ${refNo}` };
 
   // ── CEO vs MD guard ────────────────────────────────────────────────────────
   if (matched.field === 'authorizedSignatory') {
-    const savedMode = backcharge.signatures?.authorizedSignatory?.authorizedSignatoryMode || 'CEO';
-    const expectedRole = savedMode === 'MANAGING DIRECTOR' ? 'MANAGING_DIRECTOR' : 'CEO';
-    if (matched.role !== expectedRole) throw { status: 403, message: `This document requires ${savedMode} signature, not ${matched.role}` };
+    const savedMode =
+      backcharge.signatures?.authorizedSignatory?.authorizedSignatoryMode ||
+      'CEO';
+    const expectedRole =
+      savedMode === 'MANAGING DIRECTOR' ? 'MANAGING_DIRECTOR' : 'CEO';
+    if (matched.role !== expectedRole)
+      throw {
+        status: 403,
+        message: `This document requires ${savedMode} signature, not ${matched.role}`,
+      };
   }
 
   // ── Already signed guard ───────────────────────────────────────────────────
   if (backcharge.signatures?.[matched.field]?.signed) {
-    throw { status: 409, message: `This position (${matched.role}) has already been signed` };
+    throw {
+      status: 409,
+      message: `This position (${matched.role}) has already been signed`,
+    };
   }
 
   // ── Out-of-order detection ─────────────────────────────────────────────────
   const chain = [
-    { role: 'WORKSHOP_MANAGER', signed: backcharge.signatures?.workshopManager?.signed, order: 1 },
-    { role: 'PURCHASE_MANAGER', signed: backcharge.signatures?.purchaseManager?.signed, order: 2 },
-    { role: 'MANAGER', signed: backcharge.signatures?.operationsManager?.signed, order: 3 },
+    {
+      role: 'WORKSHOP_MANAGER',
+      signed: backcharge.signatures?.workshopManager?.signed,
+      order: 1,
+    },
+    {
+      role: 'PURCHASE_MANAGER',
+      signed: backcharge.signatures?.purchaseManager?.signed,
+      order: 2,
+    },
+    {
+      role: 'MANAGER',
+      signed: backcharge.signatures?.operationsManager?.signed,
+      order: 3,
+    },
     {
       role: matched.role === 'MANAGING_DIRECTOR' ? 'MANAGING_DIRECTOR' : 'CEO',
-      signed: backcharge.signatures?.authorizedSignatory?.signed, order: 4
+      signed: backcharge.signatures?.authorizedSignatory?.signed,
+      order: 4,
     },
   ];
 
-  const myOrder = chain.find(c => c.role === matched.role)?.order;
-  const unsignedAbove = chain.filter(c => c.order < myOrder && !c.signed);
+  const myOrder = chain.find((c) => c.role === matched.role)?.order;
+  const unsignedAbove = chain.filter((c) => c.order < myOrder && !c.signed);
 
   if (unsignedAbove.length > 0 && !override) {
     return {
       status: 202,
       requireOverride: true,
       message: 'Out-of-order signing detected. Confirm override to proceed.',
-      unsignedAbove: unsignedAbove.map(c => c.role),
+      unsignedAbove: unsignedAbove.map((c) => c.role),
     };
   }
 
@@ -522,17 +681,20 @@ const signBackcharge = async (refNo, signData) => {
         approvalTrail: {
           signedBy: uniqueCode,
           role: matched.role,
-          action: override && unsignedAbove.length > 0 ? 'override_signed' : 'signed',
+          action:
+            override && unsignedAbove.length > 0 ? 'override_signed' : 'signed',
           signedDate: new Date(),
-          comments: override && unsignedAbove.length > 0
-            ? `Override signed by ${matched.role} — predecessors not yet signed`
-            : `${matched.role} signed the backcharge document`,
+          comments:
+            override && unsignedAbove.length > 0
+              ? `Override signed by ${matched.role} — predecessors not yet signed`
+              : `${matched.role} signed the backcharge document`,
         },
       },
     },
     { new: true }
   );
-  if (!updated) throw { status: 500, message: 'Failed to update backcharge record' };
+  if (!updated)
+    throw { status: 500, message: 'Failed to update backcharge record' };
 
   // ── Notifications ──────────────────────────────────────────────────────────
 
@@ -543,7 +705,12 @@ const signBackcharge = async (refNo, signData) => {
       const description = `${matched.role} has signed backcharge ${refNo} out of order. ${above.role} signature is still required.`;
 
       await notify(
-        { title, description, priority: 'high', sourceId: 'backcharge_approval' },
+        {
+          title,
+          description,
+          priority: 'high',
+          sourceId: 'backcharge_approval',
+        },
         JSON.parse(process.env.OFFICE_HERO),
         title,
         description
@@ -569,9 +736,11 @@ const signBackcharge = async (refNo, signData) => {
       MANAGER: {
         title: `${updated.signatures?.authorizedSignatory?.authorizedSignatoryMode || 'CEO'} Approval Needed - ${refNo}`,
         description: `Manager signed backcharge ${refNo}. ${updated.signatures?.authorizedSignatory?.authorizedSignatoryMode || 'CEO'} approval needed.`,
-        sourceId: updated.signatures?.authorizedSignatory?.authorizedSignatoryMode === 'MANAGING DIRECTOR'
-          ? 'md_approval'
-          : 'ceo_approval',
+        sourceId:
+          updated.signatures?.authorizedSignatory?.authorizedSignatoryMode ===
+          'MANAGING DIRECTOR'
+            ? 'md_approval'
+            : 'ceo_approval',
         recipient: JSON.parse(process.env.OFFICE_HERO),
       },
       CEO: {
@@ -617,14 +786,34 @@ const signBackcharge = async (refNo, signData) => {
 const getPendingSignatures = async (uniqueCode) => {
   try {
     const roleMap = [
-      { envKey: process.env.WORKSHOP_MANAGER, field: 'workshopManager', prevField: null },
-      { envKey: process.env.PURCHASE_MANAGER, field: 'purchaseManager', prevField: 'workshopManager' },
-      { envKey: process.env.MANAGER, field: 'operationsManager', prevField: 'purchaseManager' },
-      { envKey: process.env.CEO, field: 'authorizedSignatory', prevField: 'operationsManager' },
-      { envKey: process.env.MD, field: 'authorizedSignatory', prevField: 'operationsManager' },
+      {
+        envKey: process.env.WORKSHOP_MANAGER,
+        field: 'workshopManager',
+        prevField: null,
+      },
+      {
+        envKey: process.env.PURCHASE_MANAGER,
+        field: 'purchaseManager',
+        prevField: 'workshopManager',
+      },
+      {
+        envKey: process.env.MANAGER,
+        field: 'operationsManager',
+        prevField: 'purchaseManager',
+      },
+      {
+        envKey: process.env.CEO,
+        field: 'authorizedSignatory',
+        prevField: 'operationsManager',
+      },
+      {
+        envKey: process.env.MD,
+        field: 'authorizedSignatory',
+        prevField: 'operationsManager',
+      },
     ];
 
-    const matched = roleMap.find(r => r.envKey === uniqueCode);
+    const matched = roleMap.find((r) => r.envKey === uniqueCode);
     if (!matched) return [];
 
     // Build query: their field is not yet signed
@@ -637,20 +826,26 @@ const getPendingSignatures = async (uniqueCode) => {
 
     // CEO/MD: also filter by authorizedSignatoryMode matching their role
     if (matched.envKey === process.env.CEO) {
-      query['signatures.authorizedSignatory.authorizedSignatoryMode'] = { $nin: ['MANAGING DIRECTOR'] };
+      query['signatures.authorizedSignatory.authorizedSignatoryMode'] = {
+        $nin: ['MANAGING DIRECTOR'],
+      };
     }
     if (matched.envKey === process.env.MD) {
-      query['signatures.authorizedSignatory.authorizedSignatoryMode'] = 'MANAGING DIRECTOR';
+      query['signatures.authorizedSignatory.authorizedSignatoryMode'] =
+        'MANAGING DIRECTOR';
     }
 
     return await Backcharge.find(query)
-      .select('refNo reportNo supplierName equipmentType plateNo date signatures')
+      .select(
+        'refNo reportNo supplierName equipmentType plateNo date signatures'
+      )
       .sort({ createdAt: -1 })
       .lean();
-
   } catch (error) {
-    console.error('[BackchargeService] getPendingSignatures:', error);
-    throw new Error(`Error fetching pending signatures: ${error.message}`);
+    throw new Error(
+      `[BackchargeService] getPendingSignatures:${error.message}`,
+      { cause: error }
+    );
   }
 };
 
@@ -669,17 +864,21 @@ const getSignedByUser = async (uniqueCode) => {
       { envKey: process.env.MD, field: 'authorizedSignatory' },
     ];
 
-    const matched = roleMap.find(r => r.envKey === uniqueCode);
+    const matched = roleMap.find((r) => r.envKey === uniqueCode);
     if (!matched) return [];
 
-    return await Backcharge.find({ [`signatures.${matched.field}.signed`]: true })
-      .select('refNo reportNo supplierName equipmentType plateNo date signatures')
+    return await Backcharge.find({
+      [`signatures.${matched.field}.signed`]: true,
+    })
+      .select(
+        'refNo reportNo supplierName equipmentType plateNo date signatures'
+      )
       .sort({ createdAt: -1 })
       .lean();
-
   } catch (error) {
-    console.error('[BackchargeService] getSignedByUser:', error);
-    throw new Error(`Error fetching signed documents: ${error.message}`);
+    throw new Error(`[BackchargeService] getSignedByUser:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -704,5 +903,5 @@ module.exports = {
   saveSupplierEmail,
   signBackcharge,
   getPendingSignatures,
-  getSignedByUser
+  getSignedByUser,
 };

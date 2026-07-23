@@ -1,17 +1,17 @@
-const serviceHistoryModel    = require('../models/history.model.js');
-const serviceReportModel     = require('../models/report.model.js');
+const serviceHistoryModel = require('../models/history.model.js');
+const serviceReportModel = require('../models/report.model.js');
 const maintananceHistoryModel = require('../models/maintenance.model.js');
-const tyreModel              = require('../models/tyre.model.js');
-const batteryModel           = require('../models/battery.model.js');
-const stocksModel            = require('../models/stock.model.js');
-const equipmnentModel        = require('../models/equipment.model.js');
-const toolkitModel           = require('../models/toolkit.model.js');
-const complaintModel         = require('../models/complaint.model.js');
-const mobilizationModel      = require('../models/mobilizations.model.js');
-const replacementModel       = require('../models/replacements.model.js');
-const lpoModel               = require('../models/lpo.model.js');
-const backchargeModel        = require('../models/backcharge.model.js');
-const documentModel          = require('../models/document.model.js');
+const tyreModel = require('../models/tyre.model.js');
+const batteryModel = require('../models/battery.model.js');
+const stocksModel = require('../models/stock.model.js');
+const equipmnentModel = require('../models/equipment.model.js');
+const toolkitModel = require('../models/toolkit.model.js');
+const complaintModel = require('../models/complaint.model.js');
+const mobilizationModel = require('../models/mobilizations.model.js');
+const replacementModel = require('../models/replacements.model.js');
+const lpoModel = require('../models/lpo.model.js');
+const backchargeModel = require('../models/backcharge.model.js');
+const documentModel = require('../models/document.model.js');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Cache
@@ -34,7 +34,9 @@ const cache = {
     return item.value;
   },
 
-  clear: () => { cache.data = {}; }
+  clear: () => {
+    cache.data = {};
+  },
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -42,20 +44,40 @@ const cache = {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const models = [
-  { model: serviceHistoryModel,     source: 'serviceHistoryModel',      content: 'service-history'     },
-  { model: serviceReportModel,      source: 'serviceReportModel',       content: 'service-report'      },
-  { model: maintananceHistoryModel, source: 'maintananceHistoryModel',  content: 'maintenance-history' },
-  { model: tyreModel,               source: 'tyreModel',                content: 'tyre-history'        },
-  { model: batteryModel,            source: 'batteryModel',             content: 'battery-history'     },
-  { model: equipmnentModel,         source: 'equipmnentModel',          content: 'equipment'           },
-  { model: stocksModel,             source: 'stocksModel',              content: 'stocks'              },
-  { model: toolkitModel,            source: 'toolkitModel',             content: 'toolkit'             },
-  { model: complaintModel,          source: 'complaintModel',           content: 'complaints'          },
-  { model: mobilizationModel,       source: 'mobilizationModel',        content: 'mobilization'        },
-  { model: replacementModel,        source: 'replacementModel',         content: 'replacement'         },
-  { model: lpoModel,                source: 'lpoModel',                 content: 'lpo'                 },
-  { model: backchargeModel,         source: 'backchargeModel',          content: 'backcharge'          },
-  { model: documentModel,           source: 'documentModel',            content: 'document'            },
+  {
+    model: serviceHistoryModel,
+    source: 'serviceHistoryModel',
+    content: 'service-history',
+  },
+  {
+    model: serviceReportModel,
+    source: 'serviceReportModel',
+    content: 'service-report',
+  },
+  {
+    model: maintananceHistoryModel,
+    source: 'maintananceHistoryModel',
+    content: 'maintenance-history',
+  },
+  { model: tyreModel, source: 'tyreModel', content: 'tyre-history' },
+  { model: batteryModel, source: 'batteryModel', content: 'battery-history' },
+  { model: equipmnentModel, source: 'equipmnentModel', content: 'equipment' },
+  { model: stocksModel, source: 'stocksModel', content: 'stocks' },
+  { model: toolkitModel, source: 'toolkitModel', content: 'toolkit' },
+  { model: complaintModel, source: 'complaintModel', content: 'complaints' },
+  {
+    model: mobilizationModel,
+    source: 'mobilizationModel',
+    content: 'mobilization',
+  },
+  {
+    model: replacementModel,
+    source: 'replacementModel',
+    content: 'replacement',
+  },
+  { model: lpoModel, source: 'lpoModel', content: 'lpo' },
+  { model: backchargeModel, source: 'backchargeModel', content: 'backcharge' },
+  { model: documentModel, source: 'documentModel', content: 'document' },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -83,7 +105,7 @@ const buildDateQuery = (startDate, endDate = null) => {
  */
 const mergeCountsArray = (countsArray) => {
   const result = {};
-  countsArray.forEach(item => Object.assign(result, item));
+  countsArray.forEach((item) => Object.assign(result, item));
   return result;
 };
 
@@ -92,7 +114,8 @@ const mergeCountsArray = (countsArray) => {
  * @param {object} counts
  * @returns {number}
  */
-const sumCounts = (counts) => Object.values(counts).reduce((sum, n) => sum + n, 0);
+const sumCounts = (counts) =>
+  Object.values(counts).reduce((sum, n) => sum + n, 0);
 
 /**
  * Builds the standard update-list payload shared by all *Updates methods.
@@ -101,17 +124,17 @@ const sumCounts = (counts) => Object.values(counts).reduce((sum, n) => sum + n, 
  * @returns {object}
  */
 const buildUpdatesPayload = (updatesByCollection, counts) => ({
-  serviceHistory:     updatesByCollection['service-history']    || [],
-  serviceReports:     updatesByCollection['service-report']     || [],
+  serviceHistory: updatesByCollection['service-history'] || [],
+  serviceReports: updatesByCollection['service-report'] || [],
   maintenanceHistory: updatesByCollection['maintenance-history'] || [],
-  tyreHistory:        updatesByCollection['tyre-history']       || [],
-  batteryHistory:     updatesByCollection['battery-history']    || [],
-  equipment:          updatesByCollection['equipment']          || [],
-  stocks:             updatesByCollection['stocks']             || [],
-  toolkit:            updatesByCollection['toolkit']            || [],
-  complaints:         updatesByCollection['complaints']         || [],
+  tyreHistory: updatesByCollection['tyre-history'] || [],
+  batteryHistory: updatesByCollection['battery-history'] || [],
+  equipment: updatesByCollection['equipment'] || [],
+  stocks: updatesByCollection['stocks'] || [],
+  toolkit: updatesByCollection['toolkit'] || [],
+  complaints: updatesByCollection['complaints'] || [],
   counts,
-  total: sumCounts(counts)
+  total: sumCounts(counts),
 });
 
 /**
@@ -125,7 +148,7 @@ const getCountsForPeriod = async (startDate, endDate = null) => {
 
   const countsArray = await Promise.all(
     models.map(async ({ model, content }) => ({
-      [content]: await model.countDocuments(query)
+      [content]: await model.countDocuments(query),
     }))
   );
 
@@ -139,8 +162,8 @@ const getCountsForPeriod = async (startDate, endDate = null) => {
  * @returns {Promise<object>}
  */
 const getLimitedDataForPeriod = async (startDate, limit = 50) => {
-  const query                = buildDateQuery(startDate);
-  const updatesByCollection  = {};
+  const query = buildDateQuery(startDate);
+  const updatesByCollection = {};
 
   await Promise.all(
     models.map(async ({ model, content }) => {
@@ -150,7 +173,11 @@ const getLimitedDataForPeriod = async (startDate, limit = 50) => {
         .limit(limit)
         .lean();
 
-      updatesByCollection[content] = docs.map(doc => ({ ...doc, source: model.modelName, content }));
+      updatesByCollection[content] = docs.map((doc) => ({
+        ...doc,
+        source: model.modelName,
+        content,
+      }));
     })
   );
 
@@ -168,13 +195,17 @@ const getLimitedDataForPeriod = async (startDate, limit = 50) => {
 const fetchDailyCounts = async () => {
   try {
     const cacheKey = 'daily-counts';
-    const cached   = cache.get(cacheKey);
+    const cached = cache.get(cacheKey);
     if (cached) return cached;
 
-    const now        = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const counts     = await getCountsForPeriod(todayStart);
-    const result     = { status: 200, data: { counts, total: sumCounts(counts) } };
+    const now = new Date();
+    const todayStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    );
+    const counts = await getCountsForPeriod(todayStart);
+    const result = { status: 200, data: { counts, total: sumCounts(counts) } };
 
     cache.set(cacheKey, result, 60000); // 1 min
     return result;
@@ -190,8 +221,8 @@ const fetchDailyCounts = async () => {
  */
 const fetchWeeklyCounts = async () => {
   try {
-    const cacheKey  = 'weekly-counts';
-    const cached    = cache.get(cacheKey);
+    const cacheKey = 'weekly-counts';
+    const cached = cache.get(cacheKey);
     if (cached) return cached;
 
     const oneWeekAgo = new Date();
@@ -214,8 +245,8 @@ const fetchWeeklyCounts = async () => {
  */
 const fetchMonthlyCounts = async () => {
   try {
-    const cacheKey   = 'monthly-counts';
-    const cached     = cache.get(cacheKey);
+    const cacheKey = 'monthly-counts';
+    const cached = cache.get(cacheKey);
     if (cached) return cached;
 
     const oneMonthAgo = new Date();
@@ -238,8 +269,8 @@ const fetchMonthlyCounts = async () => {
  */
 const fetchYearlyCounts = async () => {
   try {
-    const cacheKey  = 'yearly-counts';
-    const cached    = cache.get(cacheKey);
+    const cacheKey = 'yearly-counts';
+    const cached = cache.get(cacheKey);
     if (cached) return cached;
 
     const oneYearAgo = new Date();
@@ -267,15 +298,22 @@ const fetchYearlyCounts = async () => {
 const fetchDailyUpdates = async () => {
   try {
     const cacheKey = 'daily-updates';
-    const cached   = cache.get(cacheKey);
+    const cached = cache.get(cacheKey);
     if (cached) return cached;
 
-    const now        = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const now = new Date();
+    const todayStart = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    );
 
-    const counts             = await getCountsForPeriod(todayStart);
+    const counts = await getCountsForPeriod(todayStart);
     const updatesByCollection = await getLimitedDataForPeriod(todayStart, 50);
-    const result             = { status: 200, data: buildUpdatesPayload(updatesByCollection, counts) };
+    const result = {
+      status: 200,
+      data: buildUpdatesPayload(updatesByCollection, counts),
+    };
 
     cache.set(cacheKey, result, 60000); // 1 min
     return result;
@@ -292,15 +330,18 @@ const fetchDailyUpdates = async () => {
 const fetchWeeklyUpdates = async () => {
   try {
     const cacheKey = 'weekly-updates';
-    const cached   = cache.get(cacheKey);
+    const cached = cache.get(cacheKey);
     if (cached) return cached;
 
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
-    const counts              = await getCountsForPeriod(oneWeekAgo);
+    const counts = await getCountsForPeriod(oneWeekAgo);
     const updatesByCollection = await getLimitedDataForPeriod(oneWeekAgo, 50);
-    const result              = { status: 200, data: buildUpdatesPayload(updatesByCollection, counts) };
+    const result = {
+      status: 200,
+      data: buildUpdatesPayload(updatesByCollection, counts),
+    };
 
     cache.set(cacheKey, result, 120000); // 2 min
     return result;
@@ -317,15 +358,18 @@ const fetchWeeklyUpdates = async () => {
 const fetchMonthlyUpdates = async () => {
   try {
     const cacheKey = 'monthly-updates';
-    const cached   = cache.get(cacheKey);
+    const cached = cache.get(cacheKey);
     if (cached) return cached;
 
     const oneMonthAgo = new Date();
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
 
-    const counts              = await getCountsForPeriod(oneMonthAgo);
+    const counts = await getCountsForPeriod(oneMonthAgo);
     const updatesByCollection = await getLimitedDataForPeriod(oneMonthAgo, 100);
-    const result              = { status: 200, data: buildUpdatesPayload(updatesByCollection, counts) };
+    const result = {
+      status: 200,
+      data: buildUpdatesPayload(updatesByCollection, counts),
+    };
 
     cache.set(cacheKey, result, 300000); // 5 min
     return result;
@@ -342,15 +386,18 @@ const fetchMonthlyUpdates = async () => {
 const fetchYearlyUpdates = async () => {
   try {
     const cacheKey = 'yearly-updates';
-    const cached   = cache.get(cacheKey);
+    const cached = cache.get(cacheKey);
     if (cached) return cached;
 
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
-    const counts              = await getCountsForPeriod(oneYearAgo);
+    const counts = await getCountsForPeriod(oneYearAgo);
     const updatesByCollection = await getLimitedDataForPeriod(oneYearAgo, 200);
-    const result              = { status: 200, data: buildUpdatesPayload(updatesByCollection, counts) };
+    const result = {
+      status: 200,
+      data: buildUpdatesPayload(updatesByCollection, counts),
+    };
 
     cache.set(cacheKey, result, 600000); // 10 min
     return result;
@@ -371,10 +418,10 @@ const fetchYearlyUpdates = async () => {
 const fetchLast5DaysComparison = async () => {
   try {
     const cacheKey = 'comparison-5-days';
-    const cached   = cache.get(cacheKey);
+    const cached = cache.get(cacheKey);
     if (cached) return cached;
 
-    const now            = new Date();
+    const now = new Date();
     const comparisonData = [];
 
     for (let i = 0; i < 5; i++) {
@@ -387,13 +434,16 @@ const fetchLast5DaysComparison = async () => {
 
       const counts = await getCountsForPeriod(dayStart, dayEnd);
       comparisonData.push({
-        date:        dayStart.toISOString().split('T')[0],
+        date: dayStart.toISOString().split('T')[0],
         collections: counts,
-        total:       sumCounts(counts)
+        total: sumCounts(counts),
       });
     }
 
-    const result = { status: 200, data: { period: 'last-5-days', comparison: comparisonData.reverse() } };
+    const result = {
+      status: 200,
+      data: { period: 'last-5-days', comparison: comparisonData.reverse() },
+    };
 
     cache.set(cacheKey, result, 300000); // 5 min
     return result;
@@ -410,25 +460,39 @@ const fetchLast5DaysComparison = async () => {
 const fetchLast5MonthsComparison = async () => {
   try {
     const cacheKey = 'comparison-5-months';
-    const cached   = cache.get(cacheKey);
+    const cached = cache.get(cacheKey);
     if (cached) return cached;
 
-    const now            = new Date();
+    const now = new Date();
     const comparisonData = [];
 
     for (let i = 0; i < 5; i++) {
       const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthEnd   = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
+      const monthEnd = new Date(
+        now.getFullYear(),
+        now.getMonth() - i + 1,
+        0,
+        23,
+        59,
+        59,
+        999
+      );
 
       const counts = await getCountsForPeriod(monthStart, monthEnd);
       comparisonData.push({
-        month:       monthStart.toLocaleString('default', { month: 'long', year: 'numeric' }),
+        month: monthStart.toLocaleString('default', {
+          month: 'long',
+          year: 'numeric',
+        }),
         collections: counts,
-        total:       sumCounts(counts)
+        total: sumCounts(counts),
       });
     }
 
-    const result = { status: 200, data: { period: 'last-5-months', comparison: comparisonData.reverse() } };
+    const result = {
+      status: 200,
+      data: { period: 'last-5-months', comparison: comparisonData.reverse() },
+    };
 
     cache.set(cacheKey, result, 600000); // 10 min
     return result;
@@ -445,25 +509,28 @@ const fetchLast5MonthsComparison = async () => {
 const fetchLast5YearsComparison = async () => {
   try {
     const cacheKey = 'comparison-5-years';
-    const cached   = cache.get(cacheKey);
+    const cached = cache.get(cacheKey);
     if (cached) return cached;
 
-    const now            = new Date();
+    const now = new Date();
     const comparisonData = [];
 
     for (let i = 0; i < 5; i++) {
       const yearStart = new Date(now.getFullYear() - i, 0, 1);
-      const yearEnd   = new Date(now.getFullYear() - i, 11, 31, 23, 59, 59, 999);
+      const yearEnd = new Date(now.getFullYear() - i, 11, 31, 23, 59, 59, 999);
 
       const counts = await getCountsForPeriod(yearStart, yearEnd);
       comparisonData.push({
-        year:        yearStart.getFullYear(),
+        year: yearStart.getFullYear(),
         collections: counts,
-        total:       sumCounts(counts)
+        total: sumCounts(counts),
       });
     }
 
-    const result = { status: 200, data: { period: 'last-5-years', comparison: comparisonData.reverse() } };
+    const result = {
+      status: 200,
+      data: { period: 'last-5-years', comparison: comparisonData.reverse() },
+    };
 
     cache.set(cacheKey, result, 1800000); // 30 min
     return result;
@@ -502,5 +569,5 @@ module.exports = {
   fetchLast5DaysComparison,
   fetchLast5MonthsComparison,
   fetchLast5YearsComparison,
-  clearCache
+  clearCache,
 };

@@ -15,7 +15,7 @@ process.emit = function (event, ...args) {
   if (event === 'warning') {
     const warning = args[0];
     const message = warning?.message || String(warning);
-    if (SUPPRESSED_WARNINGS.some(w => message.includes(w))) return false;
+    if (SUPPRESSED_WARNINGS.some((w) => message.includes(w))) return false;
   }
   return originalEmit(event, ...args);
 };

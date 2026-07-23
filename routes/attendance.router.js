@@ -1,5 +1,5 @@
-const express    = require('express');
-const router     = express.Router();
+const express = require('express');
+const router = express.Router();
 const controller = require('../controllers/attendance.controller');
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -7,15 +7,15 @@ const controller = require('../controllers/attendance.controller');
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Records ───────────────────────────────────────────────────────────────────
-router.post('/add-attendance',      controller.storeToProcess);
+router.post('/add-attendance', controller.storeToProcess);
 
 // ── Live monitoring ───────────────────────────────────────────────────────────
-router.get ('/get-live-attendance', controller.getLiveAttendance);
+router.get('/get-live-attendance', controller.getLiveAttendance);
 
 // ── Reports ───────────────────────────────────────────────────────────────────
-router.get('/today-attendance',     controller.getTodayAttendance);
-router.get('/attendance-stats',     controller.getAttendanceStats);
-router.get('/daily-report',         controller.getDailyReport);
-router.get('/employee-monthly',     controller.getEmployeeMonthlyAttendance);
+router.get('/today-attendance', controller.getTodayAttendance);
+router.get('/attendance-stats', controller.getAttendanceStats);
+router.get('/daily-report', controller.getDailyReport);
+router.get('/employee-monthly', controller.getEmployeeMonthlyAttendance);
 
 module.exports = router;

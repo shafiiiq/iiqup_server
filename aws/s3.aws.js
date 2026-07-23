@@ -1,4 +1,10 @@
-const { S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
+const {
+  S3Client,
+  GetObjectCommand,
+  PutObjectCommand,
+  DeleteObjectCommand,
+  HeadObjectCommand,
+} = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 require('dotenv').config();
 
@@ -7,7 +13,7 @@ require('dotenv').config();
 const s3Client = new S3Client({
   region: process.env.S3_REGION,
   credentials: {
-    accessKeyId:     process.env.S3_ACCESS_KEY_ID,
+    accessKeyId: process.env.S3_ACCESS_KEY_ID,
     secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
   },
 });
@@ -15,9 +21,9 @@ const s3Client = new S3Client({
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const getExpiresIn = (isLong, isAuthSign) => {
-  if (isAuthSign) return 100;         // 10 seconds
-  if (isLong)     return 86400;      // 24 hours
-  return 3600;                       // 1 hour
+  if (isAuthSign) return 100; // 10 seconds
+  if (isLong) return 86400; // 24 hours
+  return 3600; // 1 hour
 };
 
 // ─── Methods ──────────────────────────────────────────────────────────────────
@@ -25,17 +31,19 @@ const getExpiresIn = (isLong, isAuthSign) => {
 const getObjectUrl = async (key, isLong, isAuthSign = false) => {
   const command = new GetObjectCommand({
     Bucket: process.env.BUCKET_NAME,
-    Key:    key,
+    Key: key,
   });
 
-  const url = await getSignedUrl(s3Client, command, { expiresIn: getExpiresIn(isLong, isAuthSign) });
+  const url = await getSignedUrl(s3Client, command, {
+    expiresIn: getExpiresIn(isLong, isAuthSign),
+  });
   return url;
 };
 
 const putObject = async (fileName, key, contentType) => {
   const command = new PutObjectCommand({
-    Bucket:      process.env.BUCKET_NAME,
-    Key:         key,
+    Bucket: process.env.BUCKET_NAME,
+    Key: key,
     ContentType: contentType,
   });
 
@@ -46,7 +54,7 @@ const putObject = async (fileName, key, contentType) => {
 const deleteObject = async (key) => {
   const command = new DeleteObjectCommand({
     Bucket: process.env.BUCKET_NAME,
-    Key:         key,
+    Key: key,
   });
 
   await s3Client.send(command);
@@ -57,7 +65,7 @@ const objectExists = async (key) => {
   try {
     const command = new HeadObjectCommand({
       Bucket: process.env.BUCKET_NAME,
-      Key:    key,
+      Key: key,
     });
     await s3Client.send(command);
     return true;

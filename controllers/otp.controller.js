@@ -20,13 +20,15 @@ const resolveEmail = (email) =>
  */
 const requestOTP = async (req, res) => {
   try {
-    console.log("req.body.email", req.body.email);
-    console.log("resolved email", resolveEmail(req.body.email));
+    console.log('req.body.email', req.body.email);
+    console.log('resolved email', resolveEmail(req.body.email));
 
     const email = resolveEmail(req.body.email);
 
     if (!email) {
-      return res.status(400).json({ success: false, message: 'Email address is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Email address is required' });
     }
 
     const result = await otpServices.generateAndSendOTP(email);
@@ -44,16 +46,19 @@ const requestOTP = async (req, res) => {
  */
 const verifyOTP = async (req, res) => {
   try {
-    console.log("otp verify req.body", req.body.otp);
+    console.log('otp verify req.body', req.body.otp);
     const { otp, qatarId } = req.body;
-    const emailInput = req.body.email || req.body.authMail || req.body.authMailAddress;
+    const emailInput =
+      req.body.email || req.body.authMail || req.body.authMailAddress;
 
     const isVerifier = emailInput === DOCUMENT_VERIFIER_ALIAS;
-    const email      = resolveEmail(emailInput);
-    const type       = isVerifier ? 'office' : req.body.type;
+    const email = resolveEmail(emailInput);
+    const type = isVerifier ? 'office' : req.body.type;
 
     if (!email || !otp) {
-      return res.status(400).json({ success: false, message: 'Email and OTP are required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Email and OTP are required' });
     }
 
     const result = await otpServices.verifyOTP(
@@ -63,7 +68,7 @@ const verifyOTP = async (req, res) => {
       type === 'operator' ? qatarId : null
     );
 
-    console.log("otp verify result", result);
+    console.log('otp verify result', result);
 
     res.status(result.status).json(result);
   } catch (error) {
@@ -81,14 +86,24 @@ const resetPassword = async (req, res) => {
     const { email, otp, newPassword } = req.body;
 
     if (!email || !otp || !newPassword) {
-      return res.status(400).json({ success: false, message: 'Email, OTP, and new password are required' });
+      return res.status(400).json({
+        success: false,
+        message: 'Email, OTP, and new password are required',
+      });
     }
 
     if (newPassword.length < 6) {
-      return res.status(400).json({ success: false, message: 'Password must be at least 6 characters long' });
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long',
+      });
     }
 
-    const result = await otpServices.resetPasswordWithOTP(email, otp, newPassword);
+    const result = await otpServices.resetPasswordWithOTP(
+      email,
+      otp,
+      newPassword
+    );
 
     res.status(result.status).json(result);
   } catch (error) {

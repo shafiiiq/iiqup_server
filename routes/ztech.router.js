@@ -1,5 +1,5 @@
-const express  = require('express');
-const router   = express.Router();
+const express = require('express');
+const router = express.Router();
 const Mechanic = require('../models/mechanic.model.js');
 
 const controller = require('../controllers/attendance.controller.js');
@@ -32,25 +32,27 @@ const parseZKTecoAttendanceData = (dataString) => {
       const parts = line.split('\t');
 
       if (parts.length >= 4) {
-        const pinStr     = parts[0].trim();
-        const timestamp  = parts[1] ? parts[1].trim() : new Date().toISOString().replace('T', ' ').substring(0, 19);
-        const workCode   = parts[4] ? parts[4].trim() : '0';
+        const pinStr = parts[0].trim();
+        const timestamp = parts[1]
+          ? parts[1].trim()
+          : new Date().toISOString().replace('T', ' ').substring(0, 19);
+        const workCode = parts[4] ? parts[4].trim() : '0';
         const timestampMs = Date.parse(timestamp);
-        const pinNumber  = parseInt(pinStr, 10) || 0;
-        const stableId   = Number.isFinite(timestampMs)
+        const pinNumber = parseInt(pinStr, 10) || 0;
+        const stableId = Number.isFinite(timestampMs)
           ? timestampMs * 1000 + pinNumber
           : Date.now() * 1000 + pinNumber;
 
         records.push({
-          pin:        pinStr,
+          pin: pinStr,
           timestamp,
-          punchType:  parts[2].trim(),
+          punchType: parts[2].trim(),
           verifyMode: parts[3].trim(),
           workCode,
-          state:      parts[2].trim(),
-          work_code:  workCode,
-          raw:        line,
-          id:         stableId,
+          state: parts[2].trim(),
+          work_code: workCode,
+          raw: line,
+          id: stableId,
         });
       }
     }
@@ -70,17 +72,20 @@ const parseZKTecoAttendanceData = (dataString) => {
 const processAttendanceRecord = async (record) => {
   const now = new Date();
   const timestampParts = record.timestamp ? record.timestamp.split(' ') : [];
-  const currentTime = timestampParts.length > 1 ? timestampParts[1] : now.toTimeString().split(' ')[0];
+  const currentTime =
+    timestampParts.length > 1
+      ? timestampParts[1]
+      : now.toTimeString().split(' ')[0];
 
   const formattedRecord = {
-    id:         Number.isFinite(record.id) ? record.id : Date.now() * 1000,
-    pin:        record.pin,
-    emp_name:   `Employee ${record.pin}`,
+    id: Number.isFinite(record.id) ? record.id : Date.now() * 1000,
+    pin: record.pin,
+    emp_name: `Employee ${record.pin}`,
     punch_time: currentTime,
-    state:      record.punchType || record.state || '255',
-    work_code:  record.workCode  || record.work_code || '0',
-    photo:      '',
-    location:   'ZKTeco Device',
+    state: record.punchType || record.state || '255',
+    work_code: record.workCode || record.work_code || '0',
+    photo: '',
+    location: 'ZKTeco Device',
   };
 
   await controller.sendToServer({ body: formattedRecord });
@@ -111,7 +116,10 @@ router.post('/iclock/cdata', async (req, res) => {
         if (bodyString.includes('\t') || bodyString.includes('\n')) {
           attendanceData = parseZKTecoAttendanceData(bodyString);
         }
-      } else if (typeof req.body === 'object' && Object.keys(req.body).length > 0) {
+      } else if (
+        typeof req.body === 'object' &&
+        Object.keys(req.body).length > 0
+      ) {
         attendanceData = req.body;
       } else if (typeof req.body === 'string' && req.body.length > 0) {
         attendanceData = parseZKTecoAttendanceData(req.body);
@@ -170,13 +178,13 @@ router.put('/add-zkteco-pin', async (req, res) => {
       });
     }
 
-    mechanic.zktecoPin        = zktecoPin;
-    const updatedMechanic     = await mechanic.save();
+    mechanic.zktecoPin = zktecoPin;
+    const updatedMechanic = await mechanic.save();
 
     res.status(200).json({
       success: true,
       message: 'ZKTeco PIN added successfully',
-      data:    updatedMechanic,
+      data: updatedMechanic,
     });
   } catch (error) {
     console.error('[ZKTeco] Error adding ZKTeco PIN:', error);

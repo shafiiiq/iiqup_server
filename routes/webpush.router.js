@@ -1,7 +1,7 @@
 const express = require('express');
-const router  = express.Router();
+const router = express.Router();
 const webpush = require('web-push');
-const User    = require('../models/user.model');
+const User = require('../models/user.model');
 
 webpush.setVapidDetails(
   process.env.VAPID_EMAIL,
@@ -11,7 +11,8 @@ webpush.setVapidDetails(
 
 router.post('/subscribe', async (req, res) => {
   const { subscription, uniqueCode } = req.body;
-  if (!subscription || !uniqueCode) return res.status(400).json({ success: false });
+  if (!subscription || !uniqueCode)
+    return res.status(400).json({ success: false });
 
   await User.findOneAndUpdate(
     { uniqueCode },
@@ -25,7 +26,8 @@ router.post('/send', async (req, res) => {
   const { uniqueCode, title, description } = req.body;
 
   const user = await User.findOne({ uniqueCode }).select('webPushSubscription');
-  if (!user?.webPushSubscription) return res.status(404).json({ success: false });
+  if (!user?.webPushSubscription)
+    return res.status(404).json({ success: false });
 
   try {
     await webpush.sendNotification(
@@ -35,7 +37,10 @@ router.post('/send', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     if (err.statusCode === 410) {
-      await User.findOneAndUpdate({ uniqueCode }, { $set: { webPushSubscription: null } });
+      await User.findOneAndUpdate(
+        { uniqueCode },
+        { $set: { webPushSubscription: null } }
+      );
     }
     res.status(500).json({ success: false, message: err.message });
   }

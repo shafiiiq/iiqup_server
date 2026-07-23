@@ -1,7 +1,7 @@
 // services/operator.service.js
-const Operator    = require('../models/operator.model');
-const Equipment   = require('../models/equipment.model');
-const User        = require('../models/user.model');
+const Operator = require('../models/operator.model');
+const Equipment = require('../models/equipment.model');
+const User = require('../models/user.model');
 const otpServices = require('./otp.service');
 const { putObject } = require('../aws/s3.aws');
 require('dotenv').config();
@@ -17,7 +17,10 @@ require('dotenv').config();
  */
 const getAuthUser = async () => {
   const authUser = await User.findOne({ email: process.env.AUTH_USER });
-  if (!authUser) throw Object.assign(new Error('Authorization user not found'), { status: 404 });
+  if (!authUser)
+    throw Object.assign(new Error('Authorization user not found'), {
+      status: 404,
+    });
   return authUser;
 };
 
@@ -32,17 +35,24 @@ const getAuthUser = async () => {
  */
 const createOperator = async (operatorData) => {
   const existing = await Operator.findOne({ qatarId: operatorData.qatarId });
-  if (existing) throw Object.assign(new Error('Operator with this Qatar ID already exists'), { status: 409 });
+  if (existing)
+    throw Object.assign(
+      new Error('Operator with this Qatar ID already exists'),
+      { status: 409 }
+    );
 
   const lastOperator = await Operator.findOne().sort({ slNo: -1 }).lean();
-  const nextSlNo     = lastOperator ? (lastOperator.slNo || 0) + 1 : 1;
-  const nextId       = lastOperator ? (lastOperator.id   || 0) + 1 : 1;
-  const paddedSlNo   = String(nextSlNo).padStart(3, '0');
+  const nextSlNo = lastOperator ? (lastOperator.slNo || 0) + 1 : 1;
+  const nextId = lastOperator ? (lastOperator.id || 0) + 1 : 1;
+  const paddedSlNo = String(nextSlNo).padStart(3, '0');
 
-  const isHired             = operatorData.hired === true || operatorData.sponsorship === 'HIRED';
-  operatorData.slNo         = nextSlNo;
-  operatorData.id           = nextId;
-  operatorData.uniqueCode   = isHired ? `AL-HIRED-${paddedSlNo}` : `ATE-OP-${paddedSlNo}`;
+  const isHired =
+    operatorData.hired === true || operatorData.sponsorship === 'HIRED';
+  operatorData.slNo = nextSlNo;
+  operatorData.id = nextId;
+  operatorData.uniqueCode = isHired
+    ? `AL-HIRED-${paddedSlNo}`
+    : `ATE-OP-${paddedSlNo}`;
 
   await getAuthUser();
 
@@ -55,22 +65,33 @@ const createOperator = async (operatorData) => {
  * @returns {Promise<object>}
  */
 const verifyOperator = async (qatarId) => {
-  if (!qatarId) throw Object.assign(new Error('Qatar ID is required'), { status: 400 });
+  if (!qatarId)
+    throw Object.assign(new Error('Qatar ID is required'), { status: 400 });
 
   const validOperator = await Operator.findOne({ qatarId });
-  if (!validOperator) throw Object.assign(new Error('Operator not found'), { status: 404 });
+  if (!validOperator)
+    throw Object.assign(new Error('Operator not found'), { status: 404 });
 
   const authUser = await getAuthUser();
   if (!authUser?.authMail) {
-    throw Object.assign(new Error('Authorization email not found'), { status: 500 });
+    throw Object.assign(new Error('Authorization email not found'), {
+      status: 500,
+    });
   }
 
   let OTP;
   try {
-    OTP = await otpServices.generateAndSendOTP(authUser.authMail, true, validOperator.name);
+    OTP = await otpServices.generateAndSendOTP(
+      authUser.authMail,
+      true,
+      validOperator.name
+    );
   } catch (otpError) {
     console.error('[OperatorService] verifyOperator OTP error:', otpError);
-    throw Object.assign(new Error('Failed to send OTP'), { status: 500, details: otpError.message });
+    throw Object.assign(new Error('Failed to send OTP'), {
+      status: 500,
+      details: otpError.message,
+    });
   }
 
   const updatedOperator = await Operator.findOneAndUpdate(
@@ -78,7 +99,11 @@ const verifyOperator = async (qatarId) => {
     { isVerified: true, updatedAt: Date.now(), verifiedAt: Date.now() },
     { new: true, runValidators: true }
   );
-  if (!updatedOperator) throw Object.assign(new Error('Failed to update operator verification status'), { status: 500 });
+  if (!updatedOperator)
+    throw Object.assign(
+      new Error('Failed to update operator verification status'),
+      { status: 500 }
+    );
 
   const response = updatedOperator.toObject();
   response.authMail = authUser.authMail;
@@ -98,21 +123,32 @@ const verifyOperator = async (qatarId) => {
  */
 const uploadProfilePic = async (qatarId, fileName, mimeType) => {
   if (!qatarId || !fileName || !mimeType) {
-    throw Object.assign(new Error('Qatar ID, fileName, and mimeType are required'), { status: 400 });
+    throw Object.assign(
+      new Error('Qatar ID, fileName, and mimeType are required'),
+      { status: 400 }
+    );
   }
 
   const operator = await Operator.findOne({ qatarId });
-  if (!operator) throw Object.assign(new Error('Operator not found'), { status: 404 });
+  if (!operator)
+    throw Object.assign(new Error('Operator not found'), { status: 404 });
 
-  const timestamp     = Date.now();
+  const timestamp = Date.now();
   const fileExtension = fileName.split('.').pop() || 'jpg';
   const finalFileName = `${operator.name.replace(/\s+/g, '-')}-${operator.qatarId}-${timestamp}.${fileExtension}`;
-  const s3Key         = `operators/profiles/${finalFileName}`;
+  const s3Key = `operators/profiles/${finalFileName}`;
 
   try {
     const uploadUrl = await putObject(fileName, s3Key, mimeType);
 
-    const profilePicData = { fileName: finalFileName, originalName: fileName, filePath: s3Key, mimeType, uploadDate: new Date(), url: s3Key };
+    const profilePicData = {
+      fileName: finalFileName,
+      originalName: fileName,
+      filePath: s3Key,
+      mimeType,
+      uploadDate: new Date(),
+      url: s3Key,
+    };
 
     const updatedOperator = await Operator.findOneAndUpdate(
       { qatarId },
@@ -123,7 +159,9 @@ const uploadProfilePic = async (qatarId, fileName, mimeType) => {
     return { uploadUrl, profilePicData, operator: updatedOperator };
   } catch (error) {
     console.error('[OperatorService] uploadProfilePic S3 error:', error);
-    throw Object.assign(new Error('Failed to generate upload URL'), { status: 500 });
+    throw Object.assign(new Error('Failed to generate upload URL'), {
+      status: 500,
+    });
   }
 };
 
@@ -134,41 +172,78 @@ const uploadProfilePic = async (qatarId, fileName, mimeType) => {
  * @returns {Promise<object>}
  */
 const updateOperator = async (qatarId, updateData) => {
-  if (!qatarId) throw Object.assign(new Error('Qatar ID is required'), { status: 400 });
+  if (!qatarId)
+    throw Object.assign(new Error('Qatar ID is required'), { status: 400 });
 
   const existing = await Operator.findOneAndUpdate(qatarId);
-  if (!existing) throw Object.assign(new Error('Operator not found'), { status: 404 });
+  if (!existing)
+    throw Object.assign(new Error('Operator not found'), { status: 404 });
 
-  const equipmentNumberChanged = updateData.equipmentNumber !== undefined && updateData.equipmentNumber !== existing.equipmentNumber;
-  const oldEquipmentNumber     = existing.equipmentNumber;
-  const newEquipmentNumber     = updateData.equipmentNumber;
+  const equipmentNumberChanged =
+    updateData.equipmentNumber !== undefined &&
+    updateData.equipmentNumber !== existing.equipmentNumber;
+  const oldEquipmentNumber = existing.equipmentNumber;
+  const newEquipmentNumber = updateData.equipmentNumber;
 
-  const operator = await Operator.findOneAndUpdate({ qatarId }, { ...updateData, updatedAt: Date.now() }, { new: true, runValidators: true });
-  if (!operator) throw Object.assign(new Error('Operator not found'), { status: 404 });
+  const operator = await Operator.findOneAndUpdate(
+    { qatarId },
+    { ...updateData, updatedAt: Date.now() },
+    { new: true, runValidators: true }
+  );
+  if (!operator)
+    throw Object.assign(new Error('Operator not found'), { status: 404 });
 
   if (equipmentNumberChanged) {
     try {
       if (oldEquipmentNumber?.trim()) {
-        const oldEquipment = await Equipment.findOne({ regNo: oldEquipmentNumber });
+        const oldEquipment = await Equipment.findOne({
+          regNo: oldEquipmentNumber,
+        });
         if (oldEquipment) {
           await Equipment.findOneAndUpdate(
             { regNo: oldEquipmentNumber },
-            { $set: { certificationBody: oldEquipment.certificationBody.filter(c => c.operatorId !== operator._id.toString()), updatedAt: new Date() } }
+            {
+              $set: {
+                certificationBody: oldEquipment.certificationBody.filter(
+                  (c) => c.operatorId !== operator._id.toString()
+                ),
+                updatedAt: new Date(),
+              },
+            }
           );
         }
       }
 
       if (newEquipmentNumber?.trim()) {
-        const newEquipment = await Equipment.findOne({ regNo: newEquipmentNumber });
-        if (newEquipment && !newEquipment.certificationBody.some(c => c.operatorId === operator._id.toString())) {
+        const newEquipment = await Equipment.findOne({
+          regNo: newEquipmentNumber,
+        });
+        if (
+          newEquipment &&
+          !newEquipment.certificationBody.some(
+            (c) => c.operatorId === operator._id.toString()
+          )
+        ) {
           await Equipment.findOneAndUpdate(
             { regNo: newEquipmentNumber },
-            { $push: { certificationBody: { operatorName: operator.name, operatorId: operator._id.toString(), assignedAt: new Date() } }, $set: { updatedAt: new Date() } }
+            {
+              $push: {
+                certificationBody: {
+                  operatorName: operator.name,
+                  operatorId: operator._id.toString(),
+                  assignedAt: new Date(),
+                },
+              },
+              $set: { updatedAt: new Date() },
+            }
           );
         }
       }
     } catch (equipmentError) {
-      console.error('[OperatorService] updateOperator equipment sync error:', equipmentError);
+      console.error(
+        '[OperatorService] updateOperator equipment sync error:',
+        equipmentError
+      );
     }
   }
 
@@ -181,10 +256,12 @@ const updateOperator = async (qatarId, updateData) => {
  * @returns {Promise<object>}
  */
 const deleteOperator = async (qatarId) => {
-  if (!qatarId) throw Object.assign(new Error('Qatar ID is required'), { status: 400 });
+  if (!qatarId)
+    throw Object.assign(new Error('Qatar ID is required'), { status: 400 });
 
   const operator = await Operator.findOneAndDelete({ qatarId });
-  if (!operator) throw Object.assign(new Error('Operator not found'), { status: 404 });
+  if (!operator)
+    throw Object.assign(new Error('Operator not found'), { status: 404 });
 
   return operator;
 };
@@ -207,10 +284,12 @@ const getAllOperators = async () => {
  * @returns {Promise<object>}
  */
 const getOperatorByQatarId = async (qatarId) => {
-  if (!qatarId) throw Object.assign(new Error('Qatar ID is required'), { status: 400 });
+  if (!qatarId)
+    throw Object.assign(new Error('Qatar ID is required'), { status: 400 });
 
   const operator = await Operator.findOne({ qatarId });
-  if (!operator) throw Object.assign(new Error('Operator not found'), { status: 404 });
+  if (!operator)
+    throw Object.assign(new Error('Operator not found'), { status: 404 });
 
   return operator;
 };

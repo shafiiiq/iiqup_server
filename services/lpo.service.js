@@ -1,4 +1,4 @@
-const LPO                    = require('../models/lpo.model');
+const LPO = require('../models/lpo.model');
 const { createNotification } = require('./notification.service');
 const PushNotificationService = require('../push/notification.push');
 const { default: wsUtils } = require('../sockets/websocket.js');
@@ -14,11 +14,11 @@ const analyser = require('../analyser/dashboard.analyser');
  * @returns {object}
  */
 const buildSignatures = (signatures) => ({
-  accountsDept:              signatures?.accountsDept              || 'ROSHAN SHA',
-  purchasingManager:         signatures?.purchasingManager         || 'ABDUL MALIK',
-  operationsManager:         signatures?.operationsManager         || 'SURESHKANTH',
-  authorizedSignatory:       signatures?.authorizedSignatory       || 'AHAMMED KAMAL',
-  authorizedSignatoryTitle:  signatures?.authorizedSignatoryTitle  || 'CEO'
+  accountsDept: signatures?.accountsDept || 'ROSHAN SHA',
+  purchasingManager: signatures?.purchasingManager || 'ABDUL MALIK',
+  operationsManager: signatures?.operationsManager || 'SURESHKANTH',
+  authorizedSignatory: signatures?.authorizedSignatory || 'AHAMMED KAMAL',
+  authorizedSignatoryTitle: signatures?.authorizedSignatoryTitle || 'CEO',
 });
 
 /**
@@ -29,11 +29,14 @@ const buildSignatures = (signatures) => ({
 const resolveVendorCode = async (vendorName) => {
   const existingVendor = await LPO.findOne({
     'company.vendor': { $regex: new RegExp(`^${vendorName.trim()}$`, 'i') },
-    vendorCode: { $ne: null }
+    vendorCode: { $ne: null },
   }).select('vendorCode vendorMail');
 
   if (existingVendor) {
-    return { vendorCode: existingVendor.vendorCode, vendorMail: existingVendor.vendorMail || [] };
+    return {
+      vendorCode: existingVendor.vendorCode,
+      vendorMail: existingVendor.vendorMail || [],
+    };
   }
 
   const lastVendor = await LPO.findOne({ vendorCode: { $ne: null } })
@@ -41,7 +44,7 @@ const resolveVendorCode = async (vendorName) => {
     .select('vendorCode');
 
   if (lastVendor?.vendorCode) {
-    const num        = parseInt(lastVendor.vendorCode.split('-')[1]) + 1;
+    const num = parseInt(lastVendor.vendorCode.split('-')[1]) + 1;
     const vendorCode = `VEN-${String(num).padStart(3, '0')}`;
     return { vendorCode, vendorMail: null };
   }
@@ -70,16 +73,21 @@ const calculateTotal = (items, showDiscountInTotal, discount) => {
  */
 const buildSignedFields = (prefix, creds) => {
   const fields = {
-    [`lpoDetails.${prefix}signed`]:      true,
-    [`lpoDetails.${prefix}authorised`]:  creds.authorised,
-    [`lpoDetails.${prefix}approvedBy`]:  creds.approvedBy,
-    [`lpoDetails.${prefix}approvedDate`]: creds.approvedDate || new Date().toISOString()
+    [`lpoDetails.${prefix}signed`]: true,
+    [`lpoDetails.${prefix}authorised`]: creds.authorised,
+    [`lpoDetails.${prefix}approvedBy`]: creds.approvedBy,
+    [`lpoDetails.${prefix}approvedDate`]:
+      creds.approvedDate || new Date().toISOString(),
   };
 
-  if (creds.approvedFrom)    fields[`lpoDetails.${prefix}approvedFrom`]    = creds.approvedFrom;
-  if (creds.approvedIP)      fields[`lpoDetails.${prefix}approvedIP`]      = creds.approvedIP;
-  if (creds.approvedBDevice) fields[`lpoDetails.${prefix}approvedBDevice`] = creds.approvedBDevice;
-  if (creds.approvedLocation) fields[`lpoDetails.${prefix}approvedLocation`] = creds.approvedLocation;
+  if (creds.approvedFrom)
+    fields[`lpoDetails.${prefix}approvedFrom`] = creds.approvedFrom;
+  if (creds.approvedIP)
+    fields[`lpoDetails.${prefix}approvedIP`] = creds.approvedIP;
+  if (creds.approvedBDevice)
+    fields[`lpoDetails.${prefix}approvedBDevice`] = creds.approvedBDevice;
+  if (creds.approvedLocation)
+    fields[`lpoDetails.${prefix}approvedLocation`] = creds.approvedLocation;
 
   return fields;
 };
@@ -87,14 +95,25 @@ const buildSignedFields = (prefix, creds) => {
 /**
  * Sends a notification and a push notification together.
  * @param {object} notifPayload
- * @param {string|Array} recipient 
+ * @param {string|Array} recipient
  * @param {string} title
  * @param {string} description
- * @param {string} priority 
+ * @param {string} priority
  * @returns {Promise<void>}
  */
-const notify = async (notifPayload, recipient, title, description, priority = 'high') => {
-  const notification = await createNotification({ ...notifPayload, category: 'lpo', recipient, time: new Date() });
+const notify = async (
+  notifPayload,
+  recipient,
+  title,
+  description,
+  priority = 'high'
+) => {
+  const notification = await createNotification({
+    ...notifPayload,
+    category: 'lpo',
+    recipient,
+    time: new Date(),
+  });
 
   // await PushNotificationService.sendGeneralNotification(
   //   recipient,
@@ -108,59 +127,62 @@ const notify = async (notifPayload, recipient, title, description, priority = 'h
 
 const roleScreenMap = (role, isMD) => {
   const map = {
-    PURCHASE_MANAGER:  'pm',
-    MANAGER:           'op',
-    CEO:               isMD ? 'md' : 'ceo',
+    PURCHASE_MANAGER: 'pm',
+    MANAGER: 'op',
+    CEO: isMD ? 'md' : 'ceo',
     MANAGING_DIRECTOR: 'md',
-    ACCOUNTS:          'accounts',
+    ACCOUNTS: 'accounts',
   };
   return map[role] || 'lpoSign';
 };
 
 const buildNextStepNotif = (role, lpoRef, updated) => {
-  const isMD = updated.signatures?.authorizedSignatoryTitle === 'MANAGING DIRECTOR';
+  const isMD =
+    updated.signatures?.authorizedSignatoryTitle === 'MANAGING DIRECTOR';
 
   const map = {
-     MANAGER: {
-       title:        `Purchase Manager Approval Needed — LPO ${lpoRef}`,
-       description:  `Manager signed LPO ${lpoRef}. Purchase Manager approval needed.`,
-       sourceId:     'lpo_approval',
-       navigateTo:   `/(signature)/pm/${lpoRef}`,
-       navigateText: 'View and Sign',
-       recipient:    JSON.parse(process.env.OFFICE_HERO),
-     },
-     PURCHASE_MANAGER: {
-       title:        `Accounts Approval Needed — LPO ${lpoRef}`,
-       description:  `Purchase Manager signed LPO ${lpoRef}. Accounts approval needed.`,
-       sourceId:     'accounts_approval',
-       navigateTo:   `/(signature)/accounts/${lpoRef}`,
-       navigateText: 'View and Sign',
-       recipient:    JSON.parse(process.env.OFFICE_HERO),
-     },
-     ACCOUNTS: {
-       title:        `${updated.signatures?.authorizedSignatoryTitle || 'CEO'} Approval Needed — LPO ${lpoRef}`,
-       description:  `Accounts signed LPO ${lpoRef}. ${updated.signatures?.authorizedSignatoryTitle || 'CEO'} approval needed.`,
-       sourceId:     isMD ? 'md_approval' : 'ceo_approval',
-       navigateTo:   isMD ? `/(signature)/md/${lpoRef}` : `/(signature)/ceo/${lpoRef}`,
-       navigateText: 'View and Sign',
-       recipient:    JSON.parse(process.env.OFFICE_HERO),
-     },
-     CEO: {
-       title:        `LPO ${lpoRef} Fully Signed`,
-       description:  `CEO signed LPO ${lpoRef}. All signatures complete.`,
-       sourceId:     'final_approval',
-       navigateTo:   `/(workflow)/lpo/${lpoRef}`,
-       navigateText: 'View LPO',
-       recipient:    JSON.parse(process.env.OFFICE_MAIN),
-     },
-     MANAGING_DIRECTOR: {
-       title:        `LPO ${lpoRef} Fully Signed`,
-       description:  `MD signed LPO ${lpoRef}. All signatures complete.`,
-       sourceId:     'final_approval',
-       navigateTo:   `/(workflow)/lpo/${lpoRef}`,
-       navigateText: 'View LPO',
-       recipient:    JSON.parse(process.env.OFFICE_MAIN),
-     },
+    MANAGER: {
+      title: `Purchase Manager Approval Needed — LPO ${lpoRef}`,
+      description: `Manager signed LPO ${lpoRef}. Purchase Manager approval needed.`,
+      sourceId: 'lpo_approval',
+      navigateTo: `/(signature)/pm/${lpoRef}`,
+      navigateText: 'View and Sign',
+      recipient: JSON.parse(process.env.OFFICE_HERO),
+    },
+    PURCHASE_MANAGER: {
+      title: `Accounts Approval Needed — LPO ${lpoRef}`,
+      description: `Purchase Manager signed LPO ${lpoRef}. Accounts approval needed.`,
+      sourceId: 'accounts_approval',
+      navigateTo: `/(signature)/accounts/${lpoRef}`,
+      navigateText: 'View and Sign',
+      recipient: JSON.parse(process.env.OFFICE_HERO),
+    },
+    ACCOUNTS: {
+      title: `${updated.signatures?.authorizedSignatoryTitle || 'CEO'} Approval Needed — LPO ${lpoRef}`,
+      description: `Accounts signed LPO ${lpoRef}. ${updated.signatures?.authorizedSignatoryTitle || 'CEO'} approval needed.`,
+      sourceId: isMD ? 'md_approval' : 'ceo_approval',
+      navigateTo: isMD
+        ? `/(signature)/md/${lpoRef}`
+        : `/(signature)/ceo/${lpoRef}`,
+      navigateText: 'View and Sign',
+      recipient: JSON.parse(process.env.OFFICE_HERO),
+    },
+    CEO: {
+      title: `LPO ${lpoRef} Fully Signed`,
+      description: `CEO signed LPO ${lpoRef}. All signatures complete.`,
+      sourceId: 'final_approval',
+      navigateTo: `/(workflow)/lpo/${lpoRef}`,
+      navigateText: 'View LPO',
+      recipient: JSON.parse(process.env.OFFICE_MAIN),
+    },
+    MANAGING_DIRECTOR: {
+      title: `LPO ${lpoRef} Fully Signed`,
+      description: `MD signed LPO ${lpoRef}. All signatures complete.`,
+      sourceId: 'final_approval',
+      navigateTo: `/(workflow)/lpo/${lpoRef}`,
+      navigateText: 'View LPO',
+      recipient: JSON.parse(process.env.OFFICE_MAIN),
+    },
   };
 
   return map[role] || null;
@@ -177,22 +199,28 @@ const buildNextStepNotif = (role, lpoRef, updated) => {
  */
 const createLPO = async (lpoData) => {
   try {
-    const totalAmount              = calculateTotal(lpoData.items, lpoData.showDiscountInTotal, lpoData.discount);
-    const signatures               = buildSignatures(lpoData.signatures);
-    const { vendorCode, vendorMail } = await resolveVendorCode(lpoData.company.vendor);
+    const totalAmount = calculateTotal(
+      lpoData.items,
+      lpoData.showDiscountInTotal,
+      lpoData.discount
+    );
+    const signatures = buildSignatures(lpoData.signatures);
+    const { vendorCode, vendorMail } = await resolveVendorCode(
+      lpoData.company.vendor
+    );
 
     const lpo = new LPO({
       ...lpoData,
       totalAmount,
       signatures,
-      vendorCode, 
+      vendorCode,
       vendorMail,
       isAmendmented: false,
-      amendments:    []
+      amendments: [],
     });
 
     if (lpoData.normalLPO) {
-      const title       = `LPO ${lpo.lpoRef} Created`;
+      const title = `LPO ${lpo.lpoRef} Created`;
       const description = `LPO: ${lpoData.lpoRef} for ${lpoData.company.vendor} for ${lpoData.equipments}, Await until lpo is uploaded`;
 
       await notify(
@@ -205,11 +233,12 @@ const createLPO = async (lpoData) => {
 
     analyser.clearCache();
     wsUtils.sendDashboardUpdate('lpo');
-    
+
     return await lpo.save();
   } catch (error) {
-    console.error('[LPOService] createLPO:', error);
-    throw new Error(`Error creating LPO: ${error.message}`);
+    throw new Error(`[LPOService] createLPO:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -222,72 +251,101 @@ const createLPO = async (lpoData) => {
  * @param {boolean} isAmendment
  * @returns {Promise<object>}
  */
-const uploadLPO = async (lpoFileData, uploadedBy, lpoRef, description, isAmendment = false) => {
+const uploadLPO = async (
+  lpoFileData,
+  uploadedBy,
+  lpoRef,
+  description,
+  isAmendment = false
+) => {
   try {
     const LpoData = await LPO.findOne({ lpoRef });
-    if (!LpoData) throw Object.assign(new Error('LPO not found'), { status: 404 });
+    if (!LpoData)
+      throw Object.assign(new Error('LPO not found'), { status: 404 });
 
     const validStatuses = isAmendment
-      ? ['lpo_uploaded', 'purchase_approved', 'accounts_approved', 'manager_approved', 'ceo_approved', 'md_approved', 'items_available']
+      ? [
+          'lpo_uploaded',
+          'purchase_approved',
+          'accounts_approved',
+          'manager_approved',
+          'ceo_approved',
+          'md_approved',
+          'items_available',
+        ]
       : ['lpo_created'];
 
     if (!validStatuses.includes(LpoData.workflowStatus)) {
       throw Object.assign(
-        new Error(`Invalid workflow status for LPO ${isAmendment ? 'amendment' : 'upload'}`),
+        new Error(
+          `Invalid workflow status for LPO ${isAmendment ? 'amendment' : 'upload'}`
+        ),
         { status: 400 }
       );
     }
 
     const updateData = {
-      workflowStatus:               isAmendment ? 'lpo_amended' : 'lpo_uploaded',
-      updatedAt:                    new Date(),
-      'lpoDetails.lpoFile':         lpoFileData,
-      'lpoDetails.lpoRef':          lpoRef,
-      'lpoDetails.description':     description || '',
-      'lpoDetails.uploadedBy':      uploadedBy,
-      'lpoDetails.uploadedDate':    new Date(),
-      'lpoDetails.status':          isAmendment ? 'amended' : 'uploaded'
+      workflowStatus: isAmendment ? 'lpo_amended' : 'lpo_uploaded',
+      updatedAt: new Date(),
+      'lpoDetails.lpoFile': lpoFileData,
+      'lpoDetails.lpoRef': lpoRef,
+      'lpoDetails.description': description || '',
+      'lpoDetails.uploadedBy': uploadedBy,
+      'lpoDetails.uploadedDate': new Date(),
+      'lpoDetails.status': isAmendment ? 'amended' : 'uploaded',
     };
 
     if (isAmendment) {
       Object.assign(updateData, {
-        'lpoDetails.isAmendment':       true,
-        'lpoDetails.amendmentDate':     new Date().toLocaleDateString('en-GB'),
-        'lpoDetails.PMRsigned':         false,
-        'lpoDetails.PMRauthorised':     false,
-        'lpoDetails.MANAGERsigned':     false,
+        'lpoDetails.isAmendment': true,
+        'lpoDetails.amendmentDate': new Date().toLocaleDateString('en-GB'),
+        'lpoDetails.PMRsigned': false,
+        'lpoDetails.PMRauthorised': false,
+        'lpoDetails.MANAGERsigned': false,
         'lpoDetails.MANAGERauthorised': false,
-        'lpoDetails.ACCOUNTSsigned':    false,
+        'lpoDetails.ACCOUNTSsigned': false,
         'lpoDetails.ACCOUNTSauthorised': false,
-        'lpoDetails.CEOsigned':         false,
-        'lpoDetails.CEOauthorised':     false,
-        'lpoDetails.MDsigned':          false,
-        'lpoDetails.MDauthorised':      false
+        'lpoDetails.CEOsigned': false,
+        'lpoDetails.CEOauthorised': false,
+        'lpoDetails.MDsigned': false,
+        'lpoDetails.MDauthorised': false,
       });
     }
 
     updateData.$push = {
       approvalTrail: {
-        approvedBy:   uploadedBy,
-        role:         'WORKSHOP_MANAGER',
+        approvedBy: uploadedBy,
+        role: 'WORKSHOP_MANAGER',
         approvalDate: new Date(),
-        comments:     isAmendment ? `LPO amendment uploaded: ${lpoRef}` : `LPO document uploaded: ${lpoRef}`,
-        action:       'uploaded'
-      }
+        comments: isAmendment
+          ? `LPO amendment uploaded: ${lpoRef}`
+          : `LPO document uploaded: ${lpoRef}`,
+        action: 'uploaded',
+      },
     };
 
-    const lpoUpdated = await LPO.findOneAndUpdate({ lpoRef }, updateData, { new: true, runValidators: true });
+    const lpoUpdated = await LPO.findOneAndUpdate({ lpoRef }, updateData, {
+      new: true,
+      runValidators: true,
+    });
 
-    const title       = isAmendment ? `LPO Amendment Approval Needed - ${lpoRef}` : `LPO Approval Needed - ${lpoRef}`;
+    const title = isAmendment
+      ? `LPO Amendment Approval Needed - ${lpoRef}`
+      : `LPO Approval Needed - ${lpoRef}`;
     const description2 = isAmendment
       ? `LPO has been amended. LPO Ref: ${lpoRef}. Manager Approval Needed! Please review and approve the amendment.`
       : `New LPO created. LPO Ref: ${lpoRef}. Manager Approval Needed! Please review and approve.`;
 
     await notify(
       {
-        title, description: description2, priority: 'high', sourceId: 'lpo_approval',
+        title,
+        description: description2,
+        priority: 'high',
+        sourceId: 'lpo_approval',
         navigateTo: `/(signature)/op/${lpoRef}`,
-        navigateText: 'View and Sign', navigteToId: lpoRef, hasButton: true
+        navigateText: 'View and Sign',
+        navigteToId: lpoRef,
+        hasButton: true,
       },
       JSON.parse(process.env.OFFICE_HERO),
       title,
@@ -295,11 +353,11 @@ const uploadLPO = async (lpoFileData, uploadedBy, lpoRef, description, isAmendme
     );
 
     return {
-      status:  202,
+      status: 202,
       message: isAmendment
         ? 'LPO amendment uploaded successfully and sent for re-approval'
         : 'LPO uploaded successfully and sent to PURCHASE_MANAGER for approval',
-      data: lpoUpdated
+      data: lpoUpdated,
     };
   } catch (error) {
     console.error('[LPOService] uploadLPO:', error);
@@ -321,44 +379,62 @@ const updateLPO = async (refNo, updateData) => {
     if (updateData.isAmendmented === true) {
       const amendment = {
         amendmentDate: new Date(),
-        amendedBy:     updateData.amendedBy || 'System',
-        reason:        updateData.amendmentReason || 'Amendment requested'
+        amendedBy: updateData.amendedBy || 'System',
+        reason: updateData.amendmentReason || 'Amendment requested',
       };
 
       if (updateData.items?.length > 0) {
-        amendment.amendedItems       = updateData.items;
-        amendment.amendedTotalAmount = updateData.items.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+        amendment.amendedItems = updateData.items;
+        amendment.amendedTotalAmount = updateData.items.reduce(
+          (sum, item) => sum + (item.totalPrice || 0),
+          0
+        );
 
         if (updateData.showDiscountInTotal && updateData.discount) {
           amendment.amendedTotalAmount -= updateData.discount;
-          amendment.amendedDiscount    = updateData.discount;
+          amendment.amendedDiscount = updateData.discount;
         }
       }
 
-      if (updateData.company)           amendment.amendedCompany          = updateData.company;
-      if (updateData.equipments)        amendment.amendedEquipments       = updateData.equipments;
-      if (updateData.workingHrs  !== undefined) amendment.amendedWorkingHrs  = updateData.workingHrs;
-      if (updateData.runningKm   !== undefined) amendment.amendedRunningKm   = updateData.runningKm;
-      if (updateData.quoteNo)           amendment.amendedQuoteNo           = updateData.quoteNo;
-      if (updateData.requestText)       amendment.amendedRequestText       = updateData.requestText;
-      if (updateData.termsAndConditions) amendment.amendedTermsAndConditions = updateData.termsAndConditions;
+      if (updateData.company) amendment.amendedCompany = updateData.company;
+      if (updateData.equipments)
+        amendment.amendedEquipments = updateData.equipments;
+      if (updateData.workingHrs !== undefined)
+        amendment.amendedWorkingHrs = updateData.workingHrs;
+      if (updateData.runningKm !== undefined)
+        amendment.amendedRunningKm = updateData.runningKm;
+      if (updateData.quoteNo) amendment.amendedQuoteNo = updateData.quoteNo;
+      if (updateData.requestText)
+        amendment.amendedRequestText = updateData.requestText;
+      if (updateData.termsAndConditions)
+        amendment.amendedTermsAndConditions = updateData.termsAndConditions;
 
       return await LPO.findOneAndUpdate(
         { lpoRef: refNo.trim() },
         {
-          $set:  { isAmendmented: true, pmSigned: false, accountsSigned: false, managerSigned: false, ceoSigned: false },
-          $push: { amendments: amendment }
+          $set: {
+            isAmendmented: true,
+            pmSigned: false,
+            accountsSigned: false,
+            managerSigned: false,
+            ceoSigned: false,
+          },
+          $push: { amendments: amendment },
         },
         { new: true, runValidators: true }
       );
     }
 
     if (updateData.items?.length > 0) {
-      updateData.totalAmount = updateData.items.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+      updateData.totalAmount = updateData.items.reduce(
+        (sum, item) => sum + (item.totalPrice || 0),
+        0
+      );
     }
 
     if (updateData.showDiscountInTotal && updateData.discount) {
-      updateData.totalAmount = (updateData.totalAmount || 0) - (updateData.discount || 0);
+      updateData.totalAmount =
+        (updateData.totalAmount || 0) - (updateData.discount || 0);
     }
 
     delete updateData.amendedBy;
@@ -370,8 +446,9 @@ const updateLPO = async (refNo, updateData) => {
       { new: true, runValidators: true }
     );
   } catch (error) {
-    console.error('[LPOService] updateLPO:', error);
-    throw new Error(`Error updating LPO: ${error.message}`);
+    throw new Error(`[LPOService] updateLPO:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -386,8 +463,9 @@ const deleteLPO = async (refNo) => {
     if (!lpo) throw new Error('LPO not found');
     return lpo;
   } catch (error) {
-    console.error('[LPOService] deleteLPO:', error);
-    throw new Error(`Error deleting LPO: ${error.message}`);
+    throw new Error(`[LPOService] deleteLPO:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -400,10 +478,14 @@ const deleteLPO = async (refNo) => {
 const saveVendorEmail = async (vendorCode, emails) => {
   try {
     const emailArray = Array.isArray(emails) ? emails : [emails];
-    return await LPO.updateMany({ vendorCode }, { $set: { vendorMail: emailArray } });
+    return await LPO.updateMany(
+      { vendorCode },
+      { $set: { vendorMail: emailArray } }
+    );
   } catch (error) {
-    console.error('[LPOService] saveVendorEmail:', error);
-    throw new Error(`Error saving vendor email: ${error.message}`);
+    throw new Error(`[LPOService] saveVendorEmail:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -420,8 +502,15 @@ const saveVendorEmail = async (vendorCode, emails) => {
 const purchaseApproval = async (lpoRef, approvalData) => {
   try {
     const {
-      approvedBy, comments = '', signed = false, authorised = false,
-      approvedDate, approvedFrom, approvedIP, approvedBDevice, approvedLocation
+      approvedBy,
+      comments = '',
+      signed = false,
+      authorised = false,
+      approvedDate,
+      approvedFrom,
+      approvedIP,
+      approvedBDevice,
+      approvedLocation,
     } = approvalData;
 
     const lpo = await LPO.findOne({ lpoRef });
@@ -429,37 +518,65 @@ const purchaseApproval = async (lpoRef, approvalData) => {
 
     const validStatuses = ['lpo_uploaded', 'lpo_amended'];
     if (!validStatuses.includes(lpo.workflowStatus)) {
-      throw { status: 400, message: `Invalid workflow status. Expected 'lpo_uploaded' or 'lpo_amended', got '${lpo.workflowStatus}'` };
+      throw {
+        status: 400,
+        message: `Invalid workflow status. Expected 'lpo_uploaded' or 'lpo_amended', got '${lpo.workflowStatus}'`,
+      };
     }
 
     const updateFields = {
       'lpoDetails.purchaseApprovalDate': new Date(),
-      'lpoDetails.status':               'purchase_approved',
-      workflowStatus:                    'purchase_approved',
+      'lpoDetails.status': 'purchase_approved',
+      workflowStatus: 'purchase_approved',
       $push: {
-        approvalTrail: { approvedBy, role: 'PURCHASE_MANAGER', action: 'approved', comments: comments || 'Purchase approved' }
-      }
+        approvalTrail: {
+          approvedBy,
+          role: 'PURCHASE_MANAGER',
+          action: 'approved',
+          comments: comments || 'Purchase approved',
+        },
+      },
     };
 
     if (signed) {
-      Object.assign(updateFields, buildSignedFields('PMR', { approvedBy, authorised, approvedDate, approvedFrom, approvedIP, approvedBDevice, approvedLocation }));
+      Object.assign(
+        updateFields,
+        buildSignedFields('PMR', {
+          approvedBy,
+          authorised,
+          approvedDate,
+          approvedFrom,
+          approvedIP,
+          approvedBDevice,
+          approvedLocation,
+        })
+      );
       updateFields.pmSigned = true;
     }
 
-    const lpoUpdated = await LPO.findOneAndUpdate({ lpoRef }, updateFields, { new: true });
+    const lpoUpdated = await LPO.findOneAndUpdate({ lpoRef }, updateFields, {
+      new: true,
+    });
     if (!lpoUpdated) throw { status: 404, message: 'Failed to update LPO' };
 
     const isAmendment = lpoUpdated.isAmendmented;
-    const title       = isAmendment ? `Amendment! MANAGER Approval Needed - LPO ${lpoRef}` : `MANAGER Approval Needed - LPO ${lpoRef}`;
+    const title = isAmendment
+      ? `Amendment! MANAGER Approval Needed - LPO ${lpoRef}`
+      : `MANAGER Approval Needed - LPO ${lpoRef}`;
     const description = isAmendment
       ? 'Purchase Manager signed and approved amendment LPO. Manager approval needed.'
       : 'Purchase Manager signed and approved LPO. Manager approval needed.';
 
     await notify(
       {
-        title, description, priority: 'high', sourceId: 'accounts_approval',
+        title,
+        description,
+        priority: 'high',
+        sourceId: 'accounts_approval',
         navigateTo: `/(signature)/op/${lpoRef}`,
-        navigateText: 'View and Sign', navigteToId: lpoRef, hasButton: true
+        navigateText: 'View and Sign',
+        navigteToId: lpoRef,
+        hasButton: true,
       },
       JSON.parse(process.env.OFFICE_HERO),
       title,
@@ -467,11 +584,11 @@ const purchaseApproval = async (lpoRef, approvalData) => {
     );
 
     return {
-      status:  200,
+      status: 200,
       message: `Purchase Manager approval ${signed ? 'and signing ' : ''}completed successfully`,
-      data:    lpoUpdated,
+      data: lpoUpdated,
       signed,
-      authorised
+      authorised,
     };
   } catch (error) {
     console.error('[LPOService] purchaseApproval:', error);
@@ -487,15 +604,25 @@ const purchaseApproval = async (lpoRef, approvalData) => {
  * @param {object} approvedCreds
  * @returns {Promise<object>}
  */
-const managerApproval = async (lpoRef, approvedBy, comments = '', approvedCreds) => {
+const managerApproval = async (
+  lpoRef,
+  approvedBy,
+  comments = '',
+  approvedCreds
+) => {
   try {
     const updateFields = {
       'lpoDetails.managerApprovalDate': new Date(),
-      'lpoDetails.status':              'manager_approved',
-      workflowStatus:                   'manager_approved',
+      'lpoDetails.status': 'manager_approved',
+      workflowStatus: 'manager_approved',
       $push: {
-        approvalTrail: { approvedBy, role: 'MANAGER', action: 'approved', comments: comments || 'MANAGER approved' }
-      }
+        approvalTrail: {
+          approvedBy,
+          role: 'MANAGER',
+          action: 'approved',
+          comments: comments || 'MANAGER approved',
+        },
+      },
     };
 
     if (approvedCreds?.signed) {
@@ -503,35 +630,42 @@ const managerApproval = async (lpoRef, approvedBy, comments = '', approvedCreds)
       updateFields.managerSigned = true;
     }
 
-    const lpoUpdated = await LPO.findOneAndUpdate({ lpoRef }, updateFields, { new: true });
+    const lpoUpdated = await LPO.findOneAndUpdate({ lpoRef }, updateFields, {
+      new: true,
+    });
     if (!lpoUpdated) throw { status: 404, message: 'LPO not found' };
 
-    const isAmendment    = lpoUpdated.isAmendmented;
-    const signatoryTitle = lpoUpdated.signatures?.authorizedSignatoryTitle || 'CEO';
-    const isCEO          = signatoryTitle === 'CEO';
-    const signedLabel    = approvedCreds?.signed ? 'signed and ' : '';
-    const prefix         = isAmendment ? 'Amendment! ' : '';
+    const isAmendment = lpoUpdated.isAmendmented;
+    const signatoryTitle =
+      lpoUpdated.signatures?.authorizedSignatoryTitle || 'CEO';
+    const isCEO = signatoryTitle === 'CEO';
+    const signedLabel = approvedCreds?.signed ? 'signed and ' : '';
+    const prefix = isAmendment ? 'Amendment! ' : '';
 
     let target, screen, title, description, source;
 
     if (isCEO && !isAmendment) {
-      target = process.env.CEO; screen = `/(signature)/ceo/${lpoRef}`;
-      title  = `CEO Approval Needed - LPO ${lpoRef}`;
+      target = process.env.CEO;
+      screen = `/(signature)/ceo/${lpoRef}`;
+      title = `CEO Approval Needed - LPO ${lpoRef}`;
       description = `Manager ${signedLabel}approved LPO. CEO approval needed.`;
       source = 'ceo_approval';
     } else if (!isCEO && !isAmendment) {
-      target = process.env.MD; screen = `/(signature)/md/${lpoRef}`;
-      title  = `MD Approval Needed - LPO ${lpoRef}`;
+      target = process.env.MD;
+      screen = `/(signature)/md/${lpoRef}`;
+      title = `MD Approval Needed - LPO ${lpoRef}`;
       description = `Manager ${signedLabel}approved LPO. MD approval needed.`;
       source = 'md_approval';
     } else if (isCEO && isAmendment) {
-      target = process.env.CEO; screen = `/(signature)/ceo/${lpoRef}`;
-      title  = `${prefix}CEO Approval Needed - LPO ${lpoRef}`;
+      target = process.env.CEO;
+      screen = `/(signature)/ceo/${lpoRef}`;
+      title = `${prefix}CEO Approval Needed - LPO ${lpoRef}`;
       description = `Manager ${signedLabel}approved amendment LPO. CEO approval needed.`;
       source = 'ceo_approval';
     } else if (!isCEO && isAmendment) {
-      target = process.env.MD; screen = `/(signature)/md/${lpoRef}`;
-      title  = `${prefix}MD Approval Needed - LPO ${lpoRef}`;
+      target = process.env.MD;
+      screen = `/(signature)/md/${lpoRef}`;
+      title = `${prefix}MD Approval Needed - LPO ${lpoRef}`;
       description = `Manager ${signedLabel}approved amendment LPO. MD approval needed.`;
       source = 'md_approval';
     } else {
@@ -540,15 +674,25 @@ const managerApproval = async (lpoRef, approvedBy, comments = '', approvedCreds)
 
     await notify(
       {
-        title, description, priority: 'high', sourceId: source,
-        navigateTo: screen, navigateText: 'View and Sign', navigteToId: lpoRef, hasButton: true
+        title,
+        description,
+        priority: 'high',
+        sourceId: source,
+        navigateTo: screen,
+        navigateText: 'View and Sign',
+        navigteToId: lpoRef,
+        hasButton: true,
       },
       JSON.parse(process.env.OFFICE_HERO),
       title,
       description
     );
 
-    return { status: 200, message: 'MANAGER approval completed', data: lpoUpdated };
+    return {
+      status: 200,
+      message: 'MANAGER approval completed',
+      data: lpoUpdated,
+    };
   } catch (error) {
     console.error('[LPOService] managerApproval:', error);
     throw error;
@@ -564,50 +708,73 @@ const managerApproval = async (lpoRef, approvedBy, comments = '', approvedCreds)
  * @param {string} authUser  'CEO' | 'MD'
  * @returns {Promise<object>}
  */
-const ceoApproval = async (lpoRef, approvedBy, comments = '', approvedCreds, authUser) => {
+const ceoApproval = async (
+  lpoRef,
+  approvedBy,
+  comments = '',
+  approvedCreds,
+  authUser
+) => {
   try {
-    const approverType    = authUser === 'MD' ? 'MD' : 'CEO';
-    const approvalStatus  = `${approverType.toLowerCase()}_approved`;
+    const approverType = authUser === 'MD' ? 'MD' : 'CEO';
+    const approvalStatus = `${approverType.toLowerCase()}_approved`;
 
     const updateFields = {
       [`lpoDetails.${approverType.toLowerCase()}ApprovalDate`]: new Date(),
       'lpoDetails.status': approvalStatus,
-      workflowStatus:      approvalStatus,
+      workflowStatus: approvalStatus,
       $push: {
         approvalTrail: {
-          approvedBy, role: approverType, action: 'approved',
-          comments: comments || `${approverType} approved`
-        }
-      }
+          approvedBy,
+          role: approverType,
+          action: 'approved',
+          comments: comments || `${approverType} approved`,
+        },
+      },
     };
 
     if (approvedCreds?.signed) {
-      Object.assign(updateFields, buildSignedFields(approverType, approvedCreds));
+      Object.assign(
+        updateFields,
+        buildSignedFields(approverType, approvedCreds)
+      );
       updateFields.ceoSigned = true;
     }
 
-    const lpoUpdated = await LPO.findOneAndUpdate({ lpoRef }, updateFields, { new: true });
+    const lpoUpdated = await LPO.findOneAndUpdate({ lpoRef }, updateFields, {
+      new: true,
+    });
     if (!lpoUpdated) throw { status: 404, message: 'LPO not found' };
 
-    const isAmendment    = lpoUpdated.isAmendmented;
-    const signatoryTitle = lpoUpdated.signatures?.authorizedSignatoryTitle === 'CEO' ? 'CEO' : 'MD';
-    const prefix         = isAmendment ? 'Amendment! ' : '';
+    const isAmendment = lpoUpdated.isAmendmented;
+    const signatoryTitle =
+      lpoUpdated.signatures?.authorizedSignatoryTitle === 'CEO' ? 'CEO' : 'MD';
+    const prefix = isAmendment ? 'Amendment! ' : '';
 
-    const title       = `${prefix}ACCOUNTS Approval Needed - LPO ${lpoRef}`;
+    const title = `${prefix}ACCOUNTS Approval Needed - LPO ${lpoRef}`;
     const description = `${signatoryTitle} signed and approved ${isAmendment ? 'amendment ' : ''}LPO. Accounts approval needed.`;
 
     await notify(
       {
-        title, description, priority: 'high', sourceId: 'final_approval',
+        title,
+        description,
+        priority: 'high',
+        sourceId: 'final_approval',
         navigateTo: `/(signature)/accounts/${lpoRef}`,
-        navigateText: 'View and Sign', navigteToId: lpoRef, hasButton: true
+        navigateText: 'View and Sign',
+        navigteToId: lpoRef,
+        hasButton: true,
       },
       JSON.parse(process.env.OFFICE_HERO),
       title,
       description
     );
 
-    return { status: 200, message: `${approverType} approval completed`, data: lpoUpdated };
+    return {
+      status: 200,
+      message: `${approverType} approval completed`,
+      data: lpoUpdated,
+    };
   } catch (error) {
     console.error('[LPOService] ceoApproval:', error);
     throw error;
@@ -622,15 +789,25 @@ const ceoApproval = async (lpoRef, approvedBy, comments = '', approvedCreds, aut
  * @param {object} approvedCreds
  * @returns {Promise<object>}
  */
-const accountsApproval = async (lpoRef, approvedBy, comments = '', approvedCreds) => {
+const accountsApproval = async (
+  lpoRef,
+  approvedBy,
+  comments = '',
+  approvedCreds
+) => {
   try {
     const updateFields = {
       'lpoDetails.accountsApprovalDate': new Date(),
-      'lpoDetails.status':               'accounts_approved',
-      workflowStatus:                    'accounts_approved',
+      'lpoDetails.status': 'accounts_approved',
+      workflowStatus: 'accounts_approved',
       $push: {
-        approvalTrail: { approvedBy, role: 'ACCOUNTS', action: 'approved', comments: comments || 'ACCOUNTS approved' }
-      }
+        approvalTrail: {
+          approvedBy,
+          role: 'ACCOUNTS',
+          action: 'approved',
+          comments: comments || 'ACCOUNTS approved',
+        },
+      },
     };
 
     if (approvedCreds?.signed) {
@@ -638,27 +815,40 @@ const accountsApproval = async (lpoRef, approvedBy, comments = '', approvedCreds
       updateFields.accountsSigned = true;
     }
 
-    const lpoUpdated = await LPO.findOneAndUpdate({ lpoRef }, updateFields, { new: true });
+    const lpoUpdated = await LPO.findOneAndUpdate({ lpoRef }, updateFields, {
+      new: true,
+    });
     if (!lpoUpdated) throw { status: 404, message: 'LPO not found' };
 
     const isAmendment = lpoUpdated.isAmendmented;
-    const title       = isAmendment ? `Amendment! Approved - LPO ${lpoRef}` : `Approved - LPO ${lpoRef}`;
+    const title = isAmendment
+      ? `Amendment! Approved - LPO ${lpoRef}`
+      : `Approved - LPO ${lpoRef}`;
     const description = isAmendment
       ? 'Accounts approved amendment LPO. Items can now be procured.'
       : 'Accounts approved LPO. Items can now be procured.';
 
     await notify(
       {
-        title, description, priority: 'high', sourceId: 'manager_approval',
+        title,
+        description,
+        priority: 'high',
+        sourceId: 'manager_approval',
         navigateTo: `/(workflow)/lpo/${lpoRef}`,
-        navigateText: 'View the item required', navigteToId: lpoRef, hasButton: true
+        navigateText: 'View the item required',
+        navigteToId: lpoRef,
+        hasButton: true,
       },
       JSON.parse(process.env.OFFICE_MAIN),
       title,
       description
     );
 
-    return { status: 200, message: 'ACCOUNTS approval completed', data: lpoUpdated };
+    return {
+      status: 200,
+      message: 'ACCOUNTS approval completed',
+      data: lpoUpdated,
+    };
   } catch (error) {
     console.error('[LPOService] accountsApproval:', error);
     throw error;
@@ -677,17 +867,22 @@ const markItemsAvailable = async (lpoRef, markedBy) => {
       { lpoRef },
       {
         'lpoDetails.status': 'items_procured',
-        workflowStatus:      'items_available',
+        workflowStatus: 'items_available',
         $push: {
-          approvalTrail: { approvedBy: markedBy, role: 'PROCUREMENT', action: 'approved', comments: 'Items procured and available' }
-        }
+          approvalTrail: {
+            approvedBy: markedBy,
+            role: 'PROCUREMENT',
+            action: 'approved',
+            comments: 'Items procured and available',
+          },
+        },
       },
       { new: true }
     );
 
     if (!lpoUpdated) throw { status: 404, message: 'LPO not found' };
 
-    const title       = `LPO Approved - ${lpoRef}`;
+    const title = `LPO Approved - ${lpoRef}`;
     const description = 'All requested items can now be procured';
 
     await notify(
@@ -697,7 +892,11 @@ const markItemsAvailable = async (lpoRef, markedBy) => {
       description
     );
 
-    return { status: 200, message: 'Items marked as available', data: lpoUpdated };
+    return {
+      status: 200,
+      message: 'Items marked as available',
+      data: lpoUpdated,
+    };
   } catch (error) {
     console.error('[LPOService] markItemsAvailable:', error);
     throw error;
@@ -712,8 +911,13 @@ const markItemsAvailable = async (lpoRef, markedBy) => {
  */
 const signLPO = async (lpoRef, signData) => {
   const {
-    uniqueCode, signedDate, signedFrom, override = false,
-    signedIP = null, signedDevice = null, signedLocation = null
+    uniqueCode,
+    signedDate,
+    signedFrom,
+    override = false,
+    signedIP = null,
+    signedDevice = null,
+    signedLocation = null,
   } = signData;
 
   // ── Role resolution ────────────────────────────────────────────────────────
@@ -735,101 +939,155 @@ const signLPO = async (lpoRef, signData) => {
   };
 
   const roleConfig = {
-    MANAGER:            { envKey: process.env.MANAGER,          field: 'managerSigned',  detailsPrefix: 'MANAGER',  role: 'MANAGER',            order: 1 },
-    PURCHASE_MANAGER:   { envKey: process.env.PURCHASE_MANAGER, field: 'pmSigned',       detailsPrefix: 'PMR',      role: 'PURCHASE_MANAGER',  order: 2 },
-    ACCOUNTS:           { envKey: process.env.ACCOUNTS,         field: 'accountsSigned', detailsPrefix: 'ACCOUNTS', role: 'ACCOUNTS',          order: 3 },
-    CEO:                { envKey: process.env.CEO,              field: 'ceoSigned',      detailsPrefix: 'CEO',      role: 'CEO',               order: 4 },
-    MANAGING_DIRECTOR: { envKey: process.env.MD,               field: 'ceoSigned',      detailsPrefix: 'MD',       role: 'MANAGING_DIRECTOR', order: 4 },
+    MANAGER: {
+      envKey: process.env.MANAGER,
+      field: 'managerSigned',
+      detailsPrefix: 'MANAGER',
+      role: 'MANAGER',
+      order: 1,
+    },
+    PURCHASE_MANAGER: {
+      envKey: process.env.PURCHASE_MANAGER,
+      field: 'pmSigned',
+      detailsPrefix: 'PMR',
+      role: 'PURCHASE_MANAGER',
+      order: 2,
+    },
+    ACCOUNTS: {
+      envKey: process.env.ACCOUNTS,
+      field: 'accountsSigned',
+      detailsPrefix: 'ACCOUNTS',
+      role: 'ACCOUNTS',
+      order: 3,
+    },
+    CEO: {
+      envKey: process.env.CEO,
+      field: 'ceoSigned',
+      detailsPrefix: 'CEO',
+      role: 'CEO',
+      order: 4,
+    },
+    MANAGING_DIRECTOR: {
+      envKey: process.env.MD,
+      field: 'ceoSigned',
+      detailsPrefix: 'MD',
+      role: 'MANAGING_DIRECTOR',
+      order: 4,
+    },
   };
 
   const requestedRole = normalizeRole(signData.role);
   const matched = requestedRole
     ? roleConfig[requestedRole]
-    : Object.values(roleConfig).find(r => r.envKey === uniqueCode);
+    : Object.values(roleConfig).find((r) => r.envKey === uniqueCode);
 
   if (!matched || matched.envKey !== uniqueCode) {
-    throw { status: 403, message: 'Unauthorised: your account is not recognised as an authorised signatory for LPO documents' };
+    throw {
+      status: 403,
+      message:
+        'Unauthorised: your account is not recognised as an authorised signatory for LPO documents',
+    };
   }
 
   const lpo = await LPO.findOne({ lpoRef });
   if (!lpo) throw { status: 404, message: `LPO not found: ${lpoRef}` };
 
   if (lpo.workflowStatus === 'lpo_created') {
-     throw { status: 403, message: 'LPO_NOT_UPLOADED' }; 
+    throw { status: 403, message: 'LPO_NOT_UPLOADED' };
   }
 
   // ── Role-specific restrictions ─────────────────────────────────────────────
-  if (matched.role === 'CEO' && lpo.signatures?.authorizedSignatoryTitle !== 'CEO') {
-    throw { status: 403, message: 'Only the designated CEO is authorised to sign this LPO' };
+  if (
+    matched.role === 'CEO' &&
+    lpo.signatures?.authorizedSignatoryTitle !== 'CEO'
+  ) {
+    throw {
+      status: 403,
+      message: 'Only the designated CEO is authorised to sign this LPO',
+    };
   }
 
-  if (matched.role === 'MANAGING_DIRECTOR' && lpo.signatures?.authorizedSignatoryTitle !== 'MANAGING DIRECTOR') {
-    throw { status: 403, message: 'Only the designated Managing Director is authorised to sign this LPO' };
+  if (
+    matched.role === 'MANAGING_DIRECTOR' &&
+    lpo.signatures?.authorizedSignatoryTitle !== 'MANAGING DIRECTOR'
+  ) {
+    throw {
+      status: 403,
+      message:
+        'Only the designated Managing Director is authorised to sign this LPO',
+    };
   }
 
   // ── Already signed guard ───────────────────────────────────────────────────
   if (lpo[matched.field] === true) {
-    throw { status: 409, message: `The authorized signatory role has already been signed` };
+    throw {
+      status: 409,
+      message: `The authorized signatory role has already been signed`,
+    };
   }
 
   // ── Out-of-order detection ─────────────────────────────────────────────────
-  const isMD     = lpo.signatures?.authorizedSignatoryTitle === 'MANAGING DIRECTOR';
+  const isMD = lpo.signatures?.authorizedSignatoryTitle === 'MANAGING DIRECTOR';
   const authRole = isMD ? 'MANAGING_DIRECTOR' : 'CEO';
 
   const chain = [
-    { role: 'MANAGER',          signed: lpo.managerSigned,  order: 1 },
-    { role: 'PURCHASE_MANAGER', signed: lpo.pmSigned,       order: 2 },
-    { role: 'ACCOUNTS',         signed: lpo.accountsSigned, order: 3 },
-    { role: authRole,           signed: lpo.ceoSigned,      order: 4 },
+    { role: 'MANAGER', signed: lpo.managerSigned, order: 1 },
+    { role: 'PURCHASE_MANAGER', signed: lpo.pmSigned, order: 2 },
+    { role: 'ACCOUNTS', signed: lpo.accountsSigned, order: 3 },
+    { role: authRole, signed: lpo.ceoSigned, order: 4 },
   ];
 
-  const myOrder       = matched.order;
-  const unsignedAbove = chain.filter(c => c.order < myOrder && !c.signed);
+  const myOrder = matched.order;
+  const unsignedAbove = chain.filter((c) => c.order < myOrder && !c.signed);
 
   if (unsignedAbove.length > 0 && !override) {
     return {
-      status:          202,
+      status: 202,
       requireOverride: true,
-      message:         'Out-of-order signing detected. Confirm override to proceed.',
-      unsignedAbove:   unsignedAbove.map(c => c.role),
+      message: 'Out-of-order signing detected. Confirm override to proceed.',
+      unsignedAbove: unsignedAbove.map((c) => c.role),
     };
   }
 
   // ── Write the signature ────────────────────────────────────────────────────
-  const p            = matched.detailsPrefix;
+  const p = matched.detailsPrefix;
   const workflowProgressMap = {
-    MANAGER:            'manager_approved',
-    PURCHASE_MANAGER:   'purchase_approved',
-    ACCOUNTS:           'accounts_approved',
-    CEO:                'ceo_approved',
-    MANAGING_DIRECTOR:  'md_approved',
+    MANAGER: 'manager_approved',
+    PURCHASE_MANAGER: 'purchase_approved',
+    ACCOUNTS: 'accounts_approved',
+    CEO: 'ceo_approved',
+    MANAGING_DIRECTOR: 'md_approved',
   };
 
   const updateFields = {
-    [matched.field]:                     true,
-    [`lpoDetails.${p}signed`]:           true,
-    [`lpoDetails.${p}authorised`]:       true,
-    [`lpoDetails.${p}approvedBy`]:       uniqueCode,
-    [`lpoDetails.${p}approvedDate`]:     signedDate,
-    [`lpoDetails.${p}approvedFrom`]:     signedFrom,
-    [`lpoDetails.${p}approvedIP`]:       signedIP,
-    [`lpoDetails.${p}approvedBDevice`]:  signedDevice,
+    [matched.field]: true,
+    [`lpoDetails.${p}signed`]: true,
+    [`lpoDetails.${p}authorised`]: true,
+    [`lpoDetails.${p}approvedBy`]: uniqueCode,
+    [`lpoDetails.${p}approvedDate`]: signedDate,
+    [`lpoDetails.${p}approvedFrom`]: signedFrom,
+    [`lpoDetails.${p}approvedIP`]: signedIP,
+    [`lpoDetails.${p}approvedBDevice`]: signedDevice,
     [`lpoDetails.${p}approvedLocation`]: signedLocation,
-    workflowStatus:                      workflowProgressMap[matched.role],
+    workflowStatus: workflowProgressMap[matched.role],
     $push: {
       approvalTrail: {
-        approvedBy:   uniqueCode,
-        role:         matched.role,
-        action:       override && unsignedAbove.length > 0 ? 'override_signed' : 'signed',
-        comments:     override && unsignedAbove.length > 0
-          ? `Override signed by ${matched.role} — predecessors not yet signed`
-          : `Signed via mobile app by ${matched.role}`,
+        approvedBy: uniqueCode,
+        role: matched.role,
+        action:
+          override && unsignedAbove.length > 0 ? 'override_signed' : 'signed',
+        comments:
+          override && unsignedAbove.length > 0
+            ? `Override signed by ${matched.role} — predecessors not yet signed`
+            : `Signed via mobile app by ${matched.role}`,
         approvalDate: new Date(),
-      }
-    }
+      },
+    },
   };
 
-  const updated = await LPO.findOneAndUpdate({ lpoRef }, updateFields, { new: true });
+  const updated = await LPO.findOneAndUpdate({ lpoRef }, updateFields, {
+    new: true,
+  });
   if (!updated) throw { status: 500, message: 'Failed to update LPO record' };
 
   // ── Notifications ──────────────────────────────────────────────────────────
@@ -837,16 +1095,19 @@ const signLPO = async (lpoRef, signData) => {
   // 1. Override — notify OFFICE_HERO once per unsigned person above
   if (override && unsignedAbove.length > 0) {
     for (const above of unsignedAbove) {
-      const title       = `Action Required — LPO ${lpoRef} override signed`;
+      const title = `Action Required — LPO ${lpoRef} override signed`;
       const description = `${matched.role} has signed LPO ${lpoRef} out of order. ${above.role} signature is still required.`;
 
       await notify(
         {
-          title, description, priority: 'high', sourceId: 'lpo_approval',
-          navigateTo:   `/(signature)/${roleScreenMap(above.role, isMD)}/${lpoRef}`,
+          title,
+          description,
+          priority: 'high',
+          sourceId: 'lpo_approval',
+          navigateTo: `/(signature)/${roleScreenMap(above.role, isMD)}/${lpoRef}`,
           navigateText: 'View and Sign',
-          navigteToId:  lpoRef,
-          hasButton:    true,
+          navigteToId: lpoRef,
+          hasButton: true,
         },
         JSON.parse(process.env.OFFICE_HERO),
         title,
@@ -861,14 +1122,14 @@ const signLPO = async (lpoRef, signData) => {
     if (nextNotif) {
       await notify(
         {
-          title:        nextNotif.title,
-          description:  nextNotif.description,
-          priority:     'high',
-          sourceId:     nextNotif.sourceId,
-          navigateTo:   nextNotif.navigateTo,
+          title: nextNotif.title,
+          description: nextNotif.description,
+          priority: 'high',
+          sourceId: nextNotif.sourceId,
+          navigateTo: nextNotif.navigateTo,
           navigateText: nextNotif.navigateText,
-          navigteToId:  lpoRef,
-          hasButton:    true,
+          navigteToId: lpoRef,
+          hasButton: true,
         },
         nextNotif.recipient,
         nextNotif.title,
@@ -885,16 +1146,19 @@ const signLPO = async (lpoRef, signData) => {
     updated.accountsSigned;
 
   if (allSigned) {
-    const title       = `LPO Signed & Ready — ${lpoRef}`;
+    const title = `LPO Signed & Ready — ${lpoRef}`;
     const description = `All 4 signatures complete on LPO ${lpoRef}. Items can now be procured.`;
 
     await notify(
       {
-        title, description, priority: 'high', sourceId: 'manager_approval',
-        navigateTo:   `/(workflow)/lpo/${lpoRef}`,
+        title,
+        description,
+        priority: 'high',
+        sourceId: 'manager_approval',
+        navigateTo: `/(workflow)/lpo/${lpoRef}`,
         navigateText: 'View the item required',
-        navigteToId:  lpoRef,
-        hasButton:    true,
+        navigteToId: lpoRef,
+        hasButton: true,
       },
       JSON.parse(process.env.OFFICE_MAIN),
       title,
@@ -903,10 +1167,10 @@ const signLPO = async (lpoRef, signData) => {
   }
 
   return {
-    status:  200,
+    status: 200,
     message: `${matched.role} signature recorded successfully`,
-    data:    updated,
-    role:    matched.role,
+    data: updated,
+    role: matched.role,
   };
 };
 
@@ -922,8 +1186,9 @@ const getAllLPOs = async () => {
   try {
     return await LPO.find({}).sort({ createdAt: -1 });
   } catch (error) {
-    console.error('[LPOService] getAllLPOs:', error);
-    throw new Error(`Error fetching LPOs: ${error.message}`);
+    throw new Error(`[LPOService] getAllLPOs:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -934,13 +1199,14 @@ const getAllLPOs = async () => {
  */
 const getLPOByRef = async (refNo) => {
   try {
-    console.log("refNo", refNo)
+    console.log('refNo', refNo);
     const lpo = await LPO.findOne({ lpoRef: refNo });
     if (!lpo) throw new Error('LPO not found');
     return lpo;
   } catch (error) {
-    console.error('[LPOService] getLPOByRef:', error);
-    throw new Error(`Error fetching LPO: ${error.message}`);
+    throw new Error(`[LPOService] getLPOByRef:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -957,75 +1223,79 @@ const getPendingSignatures = async (uniqueCode) => {
         // Manager signs first — no prerequisite
         envKey: process.env.MANAGER,
         query: {
-          managerSigned:  { $ne: true },
+          managerSigned: { $ne: true },
           workflowStatus: { $in: ['lpo_uploaded', 'lpo_amended'] },
         },
       },
       {
-         // PM signs after Manager
-         envKey: process.env.PURCHASE_MANAGER,
+        // PM signs after Manager
+        envKey: process.env.PURCHASE_MANAGER,
         query: {
-          managerSigned:  true,
-           pmSigned:       { $ne: true },
-           workflowStatus: { $in: ['manager_approved'] },
+          managerSigned: true,
+          pmSigned: { $ne: true },
+          workflowStatus: { $in: ['manager_approved'] },
         },
       },
       {
         // Workshop Manager also signs at step 2 — same field as PM
         envKey: process.env.WORKSHOP_MANAGER,
-         query: {
-           managerSigned:  true,
-           pmSigned:       { $ne: true },
-           workflowStatus: { $in: ['manager_approved'] },
+        query: {
+          managerSigned: true,
+          pmSigned: { $ne: true },
+          workflowStatus: { $in: ['manager_approved'] },
         },
-       },
-       {
-        // Accounts signs after Manager + PM
-         envKey: process.env.ACCOUNTS,
-         query: {
-           managerSigned:  true,
-          pmSigned:       true,
-           accountsSigned: { $ne: true },
-          workflowStatus: { $in: ['purchase_approved'] },
-         },
       },
       {
-      // CEO signs after all three above
+        // Accounts signs after Manager + PM
+        envKey: process.env.ACCOUNTS,
+        query: {
+          managerSigned: true,
+          pmSigned: true,
+          accountsSigned: { $ne: true },
+          workflowStatus: { $in: ['purchase_approved'] },
+        },
+      },
+      {
+        // CEO signs after all three above
         envKey: process.env.CEO,
         query: {
-          managerSigned:  true,
-           pmSigned:       true,
-           accountsSigned: true,
-           ceoSigned:      { $ne: true },
-           workflowStatus: { $in: ['accounts_approved'] },
-           'signatures.authorizedSignatoryTitle': { $nin: ['MANAGING DIRECTOR'] },
-         },
-       },
-       {
+          managerSigned: true,
+          pmSigned: true,
+          accountsSigned: true,
+          ceoSigned: { $ne: true },
+          workflowStatus: { $in: ['accounts_approved'] },
+          'signatures.authorizedSignatoryTitle': {
+            $nin: ['MANAGING DIRECTOR'],
+          },
+        },
+      },
+      {
         // MD signs after all three above
         envKey: process.env.MD,
         query: {
-          managerSigned:  true,
-          pmSigned:       true,
+          managerSigned: true,
+          pmSigned: true,
           accountsSigned: true,
-           ceoSigned:      { $ne: true },
-           workflowStatus: { $in: ['accounts_approved'] },
-           'signatures.authorizedSignatoryTitle': 'MANAGING DIRECTOR',
-         },
-       },
+          ceoSigned: { $ne: true },
+          workflowStatus: { $in: ['accounts_approved'] },
+          'signatures.authorizedSignatoryTitle': 'MANAGING DIRECTOR',
+        },
+      },
     ];
 
-    const matched = roleMap.find(r => r.envKey === uniqueCode);
+    const matched = roleMap.find((r) => r.envKey === uniqueCode);
     if (!matched) return [];
 
     return await LPO.find(matched.query)
-      .select('lpoRef date company equipments totalAmount workflowStatus pmSigned managerSigned ceoSigned accountsSigned signatures')
+      .select(
+        'lpoRef date company equipments totalAmount workflowStatus pmSigned managerSigned ceoSigned accountsSigned signatures'
+      )
       .sort({ createdAt: -1 })
       .lean();
-
   } catch (error) {
-    console.error('[LPOService] getPendingSignatures:', error);
-    throw new Error(`Error fetching pending LPO signatures: ${error.message}`);
+    throw new Error(`[LPOService] getPendingSignatures:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -1039,47 +1309,51 @@ const getSignedByUser = async (uniqueCode) => {
     const roleMap = [
       {
         envKey: process.env.PURCHASE_MANAGER,
-        query:  { pmSigned: true },
+        query: { pmSigned: true },
       },
       {
         envKey: process.env.WORKSHOP_MANAGER,
-        query:  { pmSigned: true },  
+        query: { pmSigned: true },
       },
       {
         envKey: process.env.MANAGER,
-        query:  { managerSigned: true },
+        query: { managerSigned: true },
       },
       {
         envKey: process.env.CEO,
-        query:  {
+        query: {
           ceoSigned: true,
-          'signatures.authorizedSignatoryTitle': { $nin: ['MANAGING DIRECTOR'] },
+          'signatures.authorizedSignatoryTitle': {
+            $nin: ['MANAGING DIRECTOR'],
+          },
         },
       },
       {
         envKey: process.env.MD,
-        query:  {
+        query: {
           ceoSigned: true,
           'signatures.authorizedSignatoryTitle': 'MANAGING DIRECTOR',
         },
       },
       {
         envKey: process.env.ACCOUNTS,
-        query:  { accountsSigned: true },
+        query: { accountsSigned: true },
       },
     ];
 
-    const matched = roleMap.find(r => r.envKey === uniqueCode);
+    const matched = roleMap.find((r) => r.envKey === uniqueCode);
     if (!matched) return [];
 
     return await LPO.find(matched.query)
-      .select('lpoRef date company equipments totalAmount workflowStatus pmSigned managerSigned ceoSigned accountsSigned signatures')
+      .select(
+        'lpoRef date company equipments totalAmount workflowStatus pmSigned managerSigned ceoSigned accountsSigned signatures'
+      )
       .sort({ createdAt: -1 })
       .lean();
-
   } catch (error) {
-    console.error('[LPOService] getSignedByUser:', error);
-    throw new Error(`Error fetching signed LPOs: ${error.message}`);
+    throw new Error(`[LPOService] getSignedByUser:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -1090,16 +1364,17 @@ const getSignedByUser = async (uniqueCode) => {
 const getAllCompanyDetails = async () => {
   try {
     const lpos = await LPO.find({}, 'company lpoRef date');
-    return lpos.map(lpo => ({
-      lpoRef:      lpo.lpoRef,
-      date:        lpo.date,
-      vendor:      lpo.company.vendor,
-      attention:   lpo.company.attention,
-      designation: lpo.company.designation
+    return lpos.map((lpo) => ({
+      lpoRef: lpo.lpoRef,
+      date: lpo.date,
+      vendor: lpo.company.vendor,
+      attention: lpo.company.attention,
+      designation: lpo.company.designation,
     }));
   } catch (error) {
-    console.error('[LPOService] getAllCompanyDetails:', error);
-    throw new Error(`Error fetching company details: ${error.message}`);
+    throw new Error(`[LPOService] getAllCompanyDetails:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -1109,14 +1384,17 @@ const getAllCompanyDetails = async () => {
  */
 const getLatestLPORef = async () => {
   try {
-    const latestLPO = await LPO.findOne({}).sort({ createdAt: -1 }).select('lpoRef');
+    const latestLPO = await LPO.findOne({})
+      .sort({ createdAt: -1 })
+      .select('lpoRef');
     if (!latestLPO?.lpoRef) return null;
 
     const match = latestLPO.lpoRef.match(/^ATE(\d+)\/SP/);
     return match ? match[1] : null;
   } catch (error) {
-    console.error('[LPOService] getLatestLPORef:', error);
-    throw new Error(`Error fetching latest LPO reference: ${error.message}`);
+    throw new Error(`[LPOService] getLatestLPORef:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -1128,8 +1406,9 @@ const getLatestLPO = async () => {
   try {
     return await LPO.findOne({}).sort({ createdAt: -1 });
   } catch (error) {
-    console.error('[LPOService] getLatestLPO:', error);
-    throw new Error(`Error fetching latest LPO: ${error.message}`);
+    throw new Error(`[LPOService] getLatestLPO:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -1139,11 +1418,14 @@ const getLatestLPO = async () => {
  */
 const getNextLPOCounter = async () => {
   try {
-    const latestLPO = await LPO.findOne({}).sort({ lpoCounter: -1 }).select('lpoCounter');
+    const latestLPO = await LPO.findOne({})
+      .sort({ lpoCounter: -1 })
+      .select('lpoCounter');
     return latestLPO ? latestLPO.lpoCounter + 1 : 1;
   } catch (error) {
-    console.error('[LPOService] getNextLPOCounter:', error);
-    throw new Error(`Error fetching next LPO counter: ${error.message}`);
+    throw new Error(`[LPOService] getNextLPOCounter:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -1156,11 +1438,12 @@ const getNextLPOCounter = async () => {
 const getLPOsByDateRange = async (startDate, endDate) => {
   try {
     return await LPO.find({
-      createdAt: { $gte: new Date(startDate), $lte: new Date(endDate) }
+      createdAt: { $gte: new Date(startDate), $lte: new Date(endDate) },
     }).sort({ createdAt: -1 });
   } catch (error) {
-    console.error('[LPOService] getLPOsByDateRange:', error);
-    throw new Error(`Error fetching LPOs by date range: ${error.message}`);
+    throw new Error(`[LPOService] getLPOsByDateRange:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -1172,11 +1455,12 @@ const getLPOsByDateRange = async (startDate, endDate) => {
 const getLPOsByCompany = async (vendorName) => {
   try {
     return await LPO.find({
-      'company.vendor': { $regex: vendorName, $options: 'i' }
+      'company.vendor': { $regex: vendorName, $options: 'i' },
     }).sort({ createdAt: -1 });
   } catch (error) {
-    console.error('[LPOService] getLPOsByCompany:', error);
-    throw new Error(`Error fetching LPOs by company: ${error.message}`);
+    throw new Error(`[LPOService] getLPOsByCompany:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -1188,10 +1472,14 @@ const getLPOsByCompany = async (vendorName) => {
 const getLposByRegNo = async (regNo) => {
   try {
     const regex = new RegExp(`^${regNo}\\s*–`, 'i');
-    return await LPO.find({ equipments: { $elemMatch: { $regex: regex } } }).sort({ createdAt: -1 });
+    return await LPO.find({
+      equipments: { $elemMatch: { $regex: regex } },
+    }).sort({ createdAt: -1 });
   } catch (error) {
     console.error('[LPOService] getLposByRegNo:', error);
-    throw new Error(`Error fetching LPOs by registration number: ${error.message}`);
+    throw new Error(
+      `Error fetching LPOs by registration number: ${error.message}`
+    );
   }
 };
 
@@ -1201,10 +1489,13 @@ const getLposByRegNo = async (regNo) => {
  */
 const getLposForStock = async () => {
   try {
-    return await LPO.find({ equipment: { $regex: /^For Stock$/i } }).sort({ createdAt: -1 });
+    return await LPO.find({ equipment: { $regex: /^For Stock$/i } }).sort({
+      createdAt: -1,
+    });
   } catch (error) {
-    console.error('[LPOService] getLposForStock:', error);
-    throw new Error(`Error fetching stock LPOs: ${error.message}`);
+    throw new Error(`[LPOService] getLposForStock:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -1214,10 +1505,13 @@ const getLposForStock = async () => {
  */
 const getLposForAllEquipments = async () => {
   try {
-    return await LPO.find({ equipment: { $regex: /^For all equipment$/i } }).sort({ createdAt: -1 });
+    return await LPO.find({
+      equipment: { $regex: /^For all equipment$/i },
+    }).sort({ createdAt: -1 });
   } catch (error) {
-    console.error('[LPOService] getLposForAllEquipments:', error);
-    throw new Error(`Error fetching all equipment LPOs: ${error.message}`);
+    throw new Error(`[LPOService] getLposForAllEquipments:${error.message}`, {
+      cause: error,
+    });
   }
 };
 
@@ -1249,5 +1543,5 @@ module.exports = {
   getLPOsByCompany,
   getLposByRegNo,
   getLposForStock,
-  getLposForAllEquipments
+  getLposForAllEquipments,
 };

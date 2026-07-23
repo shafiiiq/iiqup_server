@@ -1,16 +1,16 @@
 // services/otp.service.js
-const crypto  = require('crypto');
-const bcrypt  = require('bcrypt');
-const OTP     = require('../models/otp.model');
-const User    = require('../models/user.model');
+const crypto = require('crypto');
+const bcrypt = require('bcrypt');
+const OTP = require('../models/otp.model');
+const User = require('../models/user.model');
 const Mechanic = require('../models/mechanic.model');
 const Operator = require('../models/operator.model');
-const emailService       = require('../gmail/otp.gmail');
+const emailService = require('../gmail/otp.gmail');
 const { generateTokens } = require('../utils/jwt.utils');
 
-const OTP_SALT_ROUNDS  = 12;
+const OTP_SALT_ROUNDS = 12;
 const MAX_OTP_ATTEMPTS = 5;
-const OTP_LENGTH       = 6;
+const OTP_LENGTH = 6;
 const OTP_EXPIRY_MINUTES = 5;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -19,7 +19,7 @@ const OTP_EXPIRY_MINUTES = 5;
 
 const generateSecureOTP = () => {
   const num = crypto.randomBytes(4).readUInt32BE(0);
-  return (num % 900000 + 100000).toString();
+  return ((num % 900000) + 100000).toString();
 };
 
 const hashOTP = async (otp) => {
@@ -43,14 +43,23 @@ const verifyOTPHash = async (plain, hashed) => bcrypt.compare(plain, hashed);
 const generateAndSendOTP = async (email, demo_opr = false, name) => {
   try {
     if (!email || !email.match(/^\S+@\S+\.\S+$/)) {
-      return { status: 400, success: false, message: 'Valid email address is required' };
+      return {
+        status: 400,
+        success: false,
+        message: 'Valid email address is required',
+      };
     }
 
     let user = await User.findOne({ authMail: email });
     if (!user) user = await Mechanic.findOne({ authMail: email });
-    if (!user) return { status: 404, success: false, message: 'No user found with this email address' };
+    if (!user)
+      return {
+        status: 404,
+        success: false,
+        message: 'No user found with this email address',
+      };
 
-    const otp       = generateSecureOTP();
+    const otp = generateSecureOTP();
     const hashedOTP = await hashOTP(otp);
 
     console.log(`Generated OTP for ${email}: ${otp} (hashed: ${hashedOTP})`); // Debug log
@@ -60,7 +69,14 @@ const generateAndSendOTP = async (email, demo_opr = false, name) => {
 
     await OTP.findOneAndUpdate(
       { email },
-      { email, otp: hashedOTP, expiresAt, verified: false, attempts: 0, createdAt: new Date() },
+      {
+        email,
+        otp: hashedOTP,
+        expiresAt,
+        verified: false,
+        attempts: 0,
+        createdAt: new Date(),
+      },
       { upsert: true, new: true }
     );
 
@@ -70,9 +86,12 @@ const generateAndSendOTP = async (email, demo_opr = false, name) => {
       await emailService.sendOTPEmail(email, otp, user.name);
     }
 
-    const isDemoAccount  = process.env.DEMO_OFFICE == user.email || process.env.DEMO_MECHANIC == user.email || demo_opr;
-    const isDevelopment  = process.env.NODE_ENV === 'development';
-    const exposeOTP      = isDemoAccount || isDevelopment;
+    const isDemoAccount =
+      process.env.DEMO_OFFICE == user.email ||
+      process.env.DEMO_MECHANIC == user.email ||
+      demo_opr;
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const exposeOTP = isDemoAccount || isDevelopment;
 
     return {
       status: 200,
@@ -87,7 +106,12 @@ const generateAndSendOTP = async (email, demo_opr = false, name) => {
     };
   } catch (error) {
     console.error('Error generating OTP:', error);
-    return { status: 500, success: false, message: 'Failed to generate OTP', error: error.message };
+    return {
+      status: 500,
+      success: false,
+      message: 'Failed to generate OTP',
+      error: error.message,
+    };
   }
 };
 
@@ -106,20 +130,34 @@ const verifyOTP = async (email, otp, type, qatarId = null) => {
     }
 
     const otpRecord = await OTP.findOne({ email });
-    if (!otpRecord) return { status: 404, success: false, message: 'Invalid OTP' };
+    if (!otpRecord)
+      return { status: 404, success: false, message: 'Invalid OTP' };
 
     if (otpRecord.expiresAt < new Date()) {
       await OTP.deleteOne({ email });
-      return { status: 400, success: false, message: 'OTP has expired. Please request a new one.' };
+      return {
+        status: 400,
+        success: false,
+        message: 'OTP has expired. Please request a new one.',
+      };
     }
 
     if (otpRecord.verified) {
-      return { status: 400, success: false, message: 'OTP has already been used' };
+      return {
+        status: 400,
+        success: false,
+        message: 'OTP has already been used',
+      };
     }
 
     if (otpRecord.attempts >= MAX_OTP_ATTEMPTS) {
       await OTP.deleteOne({ email });
-      return { status: 429, success: false, message: 'Maximum verification attempts exceeded. Please request a new OTP.' };
+      return {
+        status: 429,
+        success: false,
+        message:
+          'Maximum verification attempts exceeded. Please request a new OTP.',
+      };
     }
 
     const isValid = await verifyOTPHash(otp, otpRecord.otp);
@@ -128,7 +166,11 @@ const verifyOTP = async (email, otp, type, qatarId = null) => {
       otpRecord.attempts = (otpRecord.attempts || 0) + 1;
       await otpRecord.save();
       const remaining = MAX_OTP_ATTEMPTS - otpRecord.attempts;
-      return { status: 400, success: false, message: `Invalid OTP. ${remaining} attempt(s) remaining.` };
+      return {
+        status: 400,
+        success: false,
+        message: `Invalid OTP. ${remaining} attempt(s) remaining.`,
+      };
     }
 
     otpRecord.verified = true;
@@ -136,14 +178,21 @@ const verifyOTP = async (email, otp, type, qatarId = null) => {
 
     let user;
     if (type === 'mechanic') {
-      user = await Mechanic.findOne({ authMail: email }).select('_id name email role uniqueCode userType');
+      user = await Mechanic.findOne({ authMail: email }).select(
+        '_id name email role uniqueCode userType'
+      );
     } else if (type === 'operator') {
-      user = await Operator.findOne({ qatarId }).select('_id name uniqueCode userType equipmentNumber qatarId');
+      user = await Operator.findOne({ qatarId }).select(
+        '_id name uniqueCode userType equipmentNumber qatarId'
+      );
     } else {
-      user = await User.findOne({ authMail: email }).select('_id name email role uniqueCode userType');
+      user = await User.findOne({ authMail: email }).select(
+        '_id name email role uniqueCode userType'
+      );
     }
 
-    if (!user) return { status: 404, success: false, message: 'User not found' };
+    if (!user)
+      return { status: 404, success: false, message: 'User not found' };
 
     const _auth_tokens = generateTokens({
       _id: user._id,
@@ -155,7 +204,16 @@ const verifyOTP = async (email, otp, type, qatarId = null) => {
     });
 
     const { createSession } = require('./session.service.js');
-    const sessionToken = await createSession(user._id, type === 'mechanic' ? 'Mechanic' : type === 'operator' ? 'Operator' : 'User', { loginTime: new Date().toISOString() }, null);
+    const sessionToken = await createSession(
+      user._id,
+      type === 'mechanic'
+        ? 'Mechanic'
+        : type === 'operator'
+          ? 'Operator'
+          : 'User',
+      { loginTime: new Date().toISOString() },
+      null
+    );
 
     await OTP.deleteOne({ email });
 
@@ -182,7 +240,12 @@ const verifyOTP = async (email, otp, type, qatarId = null) => {
     };
   } catch (error) {
     console.error('Error verifying OTP:', error);
-    return { status: 500, success: false, message: 'Failed to verify OTP', error: error.message };
+    return {
+      status: 500,
+      success: false,
+      message: 'Failed to verify OTP',
+      error: error.message,
+    };
   }
 };
 
@@ -196,20 +259,38 @@ const verifyOTP = async (email, otp, type, qatarId = null) => {
 const resetPasswordWithOTP = async (email, otp, newPassword) => {
   try {
     const otpRecord = await OTP.findOne({ email });
-    if (!otpRecord) return { status: 404, success: false, message: 'No OTP found for this email address' };
+    if (!otpRecord)
+      return {
+        status: 404,
+        success: false,
+        message: 'No OTP found for this email address',
+      };
 
     if (otpRecord.expiresAt < new Date()) {
       await OTP.deleteOne({ email });
-      return { status: 400, success: false, message: 'OTP has expired. Please request a new one.' };
+      return {
+        status: 400,
+        success: false,
+        message: 'OTP has expired. Please request a new one.',
+      };
     }
 
     if (otpRecord.verified) {
-      return { status: 400, success: false, message: 'OTP has already been used' };
+      return {
+        status: 400,
+        success: false,
+        message: 'OTP has already been used',
+      };
     }
 
     if (otpRecord.attempts >= MAX_OTP_ATTEMPTS) {
       await OTP.deleteOne({ email });
-      return { status: 429, success: false, message: 'Maximum verification attempts exceeded. Please request a new OTP.' };
+      return {
+        status: 429,
+        success: false,
+        message:
+          'Maximum verification attempts exceeded. Please request a new OTP.',
+      };
     }
 
     const isValid = await verifyOTPHash(otp, otpRecord.otp);
@@ -218,10 +299,14 @@ const resetPasswordWithOTP = async (email, otp, newPassword) => {
       otpRecord.attempts = (otpRecord.attempts || 0) + 1;
       await otpRecord.save();
       const remaining = MAX_OTP_ATTEMPTS - otpRecord.attempts;
-      return { status: 400, success: false, message: `Invalid OTP. ${remaining} attempt(s) remaining.` };
+      return {
+        status: 400,
+        success: false,
+        message: `Invalid OTP. ${remaining} attempt(s) remaining.`,
+      };
     }
 
-    const salt           = await bcrypt.genSalt(10);
+    const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(newPassword, salt);
 
     const updatedUser = await User.findOneAndUpdate(
@@ -230,7 +315,8 @@ const resetPasswordWithOTP = async (email, otp, newPassword) => {
       { new: true }
     ).select('-password');
 
-    if (!updatedUser) return { status: 404, success: false, message: 'User not found' };
+    if (!updatedUser)
+      return { status: 404, success: false, message: 'User not found' };
 
     await OTP.deleteOne({ email });
 
@@ -242,7 +328,12 @@ const resetPasswordWithOTP = async (email, otp, newPassword) => {
     };
   } catch (error) {
     console.error('Error resetting password:', error);
-    return { status: 500, success: false, message: 'Failed to reset password', error: error.message };
+    return {
+      status: 500,
+      success: false,
+      message: 'Failed to reset password',
+      error: error.message,
+    };
   }
 };
 

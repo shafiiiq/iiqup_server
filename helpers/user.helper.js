@@ -14,7 +14,11 @@ const formatDate = (isoString) => {
   if (!isoString) return 'Invalid Date';
   const date = new Date(isoString);
   if (isNaN(date.getTime())) return 'Invalid Date';
-  return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
 };
 
 /**
@@ -26,7 +30,11 @@ const convertToAMPM = (isoString) => {
   if (!isoString) return 'Invalid Time';
   const date = new Date(isoString);
   if (isNaN(date.getTime())) return 'Invalid Date';
-  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -41,9 +49,12 @@ const convertToAMPM = (isoString) => {
 const getChannelId = (priority) => {
   switch (priority) {
     case 'high':
-    case 'urgent': return 'urgent';
-    case 'low':    return 'silent';
-    default:       return 'default';
+    case 'urgent':
+      return 'urgent';
+    case 'low':
+      return 'silent';
+    default:
+      return 'default';
   }
 };
 
@@ -69,11 +80,14 @@ const getFileType = (mimeType) => {
  */
 const cleanupFiles = (files) => {
   if (!files || !Array.isArray(files)) return;
-  files.forEach(file => {
+  files.forEach((file) => {
     try {
       if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
     } catch (error) {
-      console.error(`[UserHelper] cleanupFiles: failed to delete ${file.filename}:`, error.message);
+      console.error(
+        `[UserHelper] cleanupFiles: failed to delete ${file.filename}:`,
+        error.message
+      );
     }
   });
 };
@@ -82,4 +96,10 @@ const cleanupFiles = (files) => {
 // Exports
 // ─────────────────────────────────────────────────────────────────────────────
 
-module.exports = { formatDate, convertToAMPM, getChannelId, getFileType, cleanupFiles };
+module.exports = {
+  formatDate,
+  convertToAMPM,
+  getChannelId,
+  getFileType,
+  cleanupFiles,
+};

@@ -5,44 +5,77 @@ const multer = require('multer');
 
 const storage = multer.memoryStorage();
 const upload = multer({
-    storage: storage,
-    limits: {
-        fileSize: 1024 * 1024 * 1024, // 1GB per file
-        files: 10
-    }
+  storage: storage,
+  limits: {
+    fileSize: 1024 * 1024 * 1024, // 1GB per file
+    files: 10,
+  },
 });
 const mechanicUpload = upload.fields([
-    { name: 'audioFile', maxCount: 1 },
-    { name: 'files', maxCount: 10 },
+  { name: 'audioFile', maxCount: 1 },
+  { name: 'files', maxCount: 10 },
 ]);
 
-router.post('/register', upload.array('files', 10), ComplaintController.registerComplaint);
+router.post(
+  '/register',
+  upload.array('files', 10),
+  ComplaintController.registerComplaint
+);
 
-// Step 2: MAINTENANCE_HEAD assigns mechanic  
-router.post('/assign-mechanic/:complaintId', ComplaintController.assignMechanic);
+// Step 2: MAINTENANCE_HEAD assigns mechanic
+router.post(
+  '/assign-mechanic/:complaintId',
+  ComplaintController.assignMechanic
+);
 
 // Step 3: Mechanic requests items/tools
-router.post('/mechanic-request/:complaintId', mechanicUpload, ComplaintController.mechanicRequestItems);
+router.post(
+  '/mechanic-request/:complaintId',
+  mechanicUpload,
+  ComplaintController.mechanicRequestItems
+);
 
 // Step 4: MAINTENANCE_HEAD forwards to WORKSHOP_MANAGER
-router.post('/forward-to-workshop/:complaintId', ComplaintController.forwardToWorkshop);
+router.post(
+  '/forward-to-workshop/:complaintId',
+  ComplaintController.forwardToWorkshop
+);
 
-router.post('/forward-to-workshop/without-lpo/:complaintId', ComplaintController.forwardToWorkshopWithoutLPO);
+router.post(
+  '/forward-to-workshop/without-lpo/:complaintId',
+  ComplaintController.forwardToWorkshopWithoutLPO
+);
 
-router.post('/approve-item/without-lpo/:complaintId', ComplaintController.approveItemWithoutLPO);
+router.post(
+  '/approve-item/without-lpo/:complaintId',
+  ComplaintController.approveItemWithoutLPO
+);
 
 // Step 5: WORKSHOP_MANAGER creates LPO
-router.post('/create-lpo/:complaintId', ComplaintController.createLPOForComplaint);
+router.post(
+  '/create-lpo/:complaintId',
+  ComplaintController.createLPOForComplaint
+);
 
-router.post('/upload-lpo/:complaintId', ComplaintController.uploadLPOForComplaint);
+router.post(
+  '/upload-lpo/:complaintId',
+  ComplaintController.uploadLPOForComplaint
+);
 
 router.post('/sign/:complaintId', ComplaintController.signComplaint);
 
 // Step 8: Mark items as available (by JALEEL_KA or MAINTENANCE_HEAD)
-router.post('/items-available/:complaintId', ComplaintController.markItemsAvailable);
+router.post(
+  '/items-available/:complaintId',
+  ComplaintController.markItemsAvailable
+);
 
 // Step 9: Mechanic completes work (updated)
-router.post('/rectified/:complaintId', mechanicUpload, ComplaintController.addSolution);
+router.post(
+  '/rectified/:complaintId',
+  mechanicUpload,
+  ComplaintController.addSolution
+);
 
 // Existing routes (unchanged)
 router.get('/user/:uniqueCode', ComplaintController.getUserComplaints);
@@ -54,4 +87,3 @@ router.get('/status/:status', ComplaintController.getComplaintsByStatus);
 router.post('/mechanic-jobs', ComplaintController.getMechanicComplaints);
 
 module.exports = router;
-

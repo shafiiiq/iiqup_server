@@ -1,5 +1,5 @@
-const OperatorService    = require('../services/operator.service');
-const Equipment          = require('../models/equipment.model');
+const OperatorService = require('../services/operator.service');
+const Equipment = require('../models/equipment.model');
 require('dotenv').config();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -19,7 +19,10 @@ const validate = (fields, source) => {
   for (const [field, rules] of Object.entries(fields)) {
     const value = source[field];
 
-    if (rules.required && (value === undefined || value === null || value === '')) {
+    if (
+      rules.required &&
+      (value === undefined || value === null || value === '')
+    ) {
       errors.push({ field, message: `${field} is required` });
       continue;
     }
@@ -39,7 +42,9 @@ const validate = (fields, source) => {
  * @param {Array}  errors - Array of validation error objects.
  */
 const sendValidationError = (res, errors) =>
-  res.status(400).json({ success: false, message: 'Validation failed', errors });
+  res
+    .status(400)
+    .json({ success: false, message: 'Validation failed', errors });
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Controllers
@@ -51,16 +56,19 @@ const sendValidationError = (res, errors) =>
  */
 const createOperator = async (req, res) => {
   try {
-    const errors = validate({ name: { required: true }, qatarId: { required: true } }, req.body);
+    const errors = validate(
+      { name: { required: true }, qatarId: { required: true } },
+      req.body
+    );
     if (errors.length) return sendValidationError(res, errors);
 
     const operator = await OperatorService.createOperator(req.body);
 
     res.status(201).json({
-      success:  true,
-      data:     operator,
+      success: true,
+      data: operator,
       authMail: process.env.AUTH_OTP_USER_EMAIL,
-      message:  'Operator created successfully',
+      message: 'Operator created successfully',
     });
   } catch (error) {
     console.error('[Operator] createOperator:', error);
@@ -84,10 +92,10 @@ const verifyOperator = async (req, res) => {
     const operator = await OperatorService.verifyOperator(req.body.qatarId);
 
     res.json({
-      success:  true,
-      data:     operator,
+      success: true,
+      data: operator,
       authMail: operator?.authMail || process.env.ADMIN_OTP_USER_EMAIL,
-      message:  'Operator verified successfully',
+      message: 'Operator verified successfully',
     });
   } catch (error) {
     console.error('[Operator] verifyOperator:', error);
@@ -106,17 +114,25 @@ const verifyOperator = async (req, res) => {
 const uploadProfilePic = async (req, res) => {
   try {
     const errors = validate(
-      { qatarId: { required: true }, fileName: { required: true }, mimeType: { required: true } },
+      {
+        qatarId: { required: true },
+        fileName: { required: true },
+        mimeType: { required: true },
+      },
       req.body
     );
     if (errors.length) return sendValidationError(res, errors);
 
     const { qatarId, fileName, mimeType } = req.body;
-    const result = await OperatorService.uploadProfilePic(qatarId, fileName, mimeType);
+    const result = await OperatorService.uploadProfilePic(
+      qatarId,
+      fileName,
+      mimeType
+    );
 
     res.json({
       success: true,
-      data:    result,
+      data: result,
       message: 'Upload URL generated successfully',
     });
   } catch (error) {
@@ -138,8 +154,8 @@ const getAllOperators = async (req, res) => {
 
     res.json({
       success: true,
-      data:    operators,
-      count:   operators.length,
+      data: operators,
+      count: operators.length,
       message: 'Operators retrieved successfully',
     });
   } catch (error) {
@@ -160,11 +176,13 @@ const getOperatorByQatarId = async (req, res) => {
     const errors = validate({ qatarId: { required: true } }, req.params);
     if (errors.length) return sendValidationError(res, errors);
 
-    const operator = await OperatorService.getOperatorByQatarId(req.params.qatarId);
+    const operator = await OperatorService.getOperatorByQatarId(
+      req.params.qatarId
+    );
 
     res.json({
       success: true,
-      data:    operator,
+      data: operator,
       message: 'Operator retrieved successfully',
     });
   } catch (error) {
@@ -186,7 +204,9 @@ const updateOperator = async (req, res) => {
     if (errors.length) return sendValidationError(res, errors);
 
     if (req.body.equipmentNumber?.trim()) {
-      const equipment = await Equipment.findOne({ regNo: req.body.equipmentNumber });
+      const equipment = await Equipment.findOne({
+        regNo: req.body.equipmentNumber,
+      });
       if (!equipment) {
         return res.status(404).json({
           success: false,
@@ -195,11 +215,14 @@ const updateOperator = async (req, res) => {
       }
     }
 
-    const operator = await OperatorService.updateOperator(req.params.qatarId, req.body);
+    const operator = await OperatorService.updateOperator(
+      req.params.qatarId,
+      req.body
+    );
 
     res.json({
       success: true,
-      data:    operator,
+      data: operator,
       message: 'Operator updated successfully',
     });
   } catch (error) {

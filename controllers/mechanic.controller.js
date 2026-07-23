@@ -16,7 +16,9 @@ const addMechanic = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Mechanic] addMechanic:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -31,7 +33,9 @@ const getMechanic = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Mechanic] getMechanic:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -41,11 +45,13 @@ const getMechanic = async (req, res) => {
  */
 const updateMechanic = async (req, res) => {
   try {
-    const { id }     = req.params;
+    const { id } = req.params;
     const updateData = req.body;
 
     if (!id) {
-      return res.status(400).json({ success: false, message: 'Mechanic ID is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Mechanic ID is required' });
     }
 
     const result = await mechanicServices.mechanicUpdate(id, updateData);
@@ -53,7 +59,9 @@ const updateMechanic = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Mechanic] updateMechanic:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -66,7 +74,9 @@ const deleteMechanic = async (req, res) => {
     const { id } = req.params;
 
     if (!id) {
-      return res.status(400).json({ success: false, message: 'Mechanic ID is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Mechanic ID is required' });
     }
 
     const result = await mechanicServices.mechanicDelete(id);
@@ -74,7 +84,9 @@ const deleteMechanic = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Mechanic] deleteMechanic:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -89,10 +101,12 @@ const deleteMechanic = async (req, res) => {
 const addToolkit = async (req, res) => {
   try {
     const { mechanicId } = req.params;
-    const toolkitData    = req.body;
+    const toolkitData = req.body;
 
     if (!mechanicId) {
-      return res.status(400).json({ success: false, message: 'Mechanic ID is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Mechanic ID is required' });
     }
 
     const result = await mechanicServices.addToolkit(mechanicId, toolkitData);
@@ -100,7 +114,9 @@ const addToolkit = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Mechanic] addToolkit:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -115,10 +131,12 @@ const addToolkit = async (req, res) => {
 const addOvertime = async (req, res) => {
   try {
     const { mechanicId } = req.params;
-    const overtimeData   = req.body;
+    const overtimeData = req.body;
 
     if (!mechanicId) {
-      return res.status(400).json({ success: false, message: 'Mechanic ID is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Mechanic ID is required' });
     }
 
     const result = await mechanicServices.addOvertime(mechanicId, overtimeData);
@@ -126,7 +144,9 @@ const addOvertime = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Mechanic] addOvertime:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -139,31 +159,47 @@ const getMechanicMonthlyOvertime = async (req, res) => {
     const { mechanicId, month, year } = req.params;
 
     if (!mechanicId) {
-      return res.status(400).json({ success: false, message: 'Mechanic ID is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Mechanic ID is required' });
     }
 
     const mechanic = await mechanicServices.getMechanicById(mechanicId);
 
     if (!mechanic) {
-      return res.status(404).json({ success: false, message: 'Mechanic not found' });
+      return res
+        .status(404)
+        .json({ success: false, message: 'Mechanic not found' });
     }
 
     if (!mechanic.monthlyOvertime || mechanic.monthlyOvertime.length === 0) {
       return res.status(200).json({
         success: true,
         message: 'No overtime data found for this mechanic',
-        data:    [],
+        data: [],
       });
     }
 
     if (month && year) {
       const MONTHS = [
-        'January', 'February', 'March',     'April',   'May',      'June',
-        'July',    'August',   'September', 'October', 'November', 'December',
+        'January',
+        'February',
+        'March',
+        'April',
+        'May',
+        'June',
+        'July',
+        'August',
+        'September',
+        'October',
+        'November',
+        'December',
       ];
 
       const monthYear = `${MONTHS[parseInt(month) - 1]} ${year}`;
-      const monthData = mechanic.monthlyOvertime.find(mo => mo.month === monthYear);
+      const monthData = mechanic.monthlyOvertime.find(
+        (mo) => mo.month === monthYear
+      );
 
       return res.status(200).json({
         success: true,
@@ -177,11 +213,13 @@ const getMechanicMonthlyOvertime = async (req, res) => {
     res.status(200).json({
       success: true,
       message: 'Monthly overtime data fetched successfully',
-      data:    mechanic.monthlyOvertime,
+      data: mechanic.monthlyOvertime,
     });
   } catch (error) {
     console.error('[Mechanic] getMechanicMonthlyOvertime:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -194,7 +232,9 @@ const cleanupMechanicOvertimeData = async (req, res) => {
     const { mechanicId } = req.params;
 
     if (!mechanicId) {
-      return res.status(400).json({ success: false, message: 'Mechanic ID is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Mechanic ID is required' });
     }
 
     const result = await mechanicServices.cleanupOldOvertimeData(mechanicId);
@@ -202,7 +242,9 @@ const cleanupMechanicOvertimeData = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Mechanic] cleanupMechanicOvertimeData:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -217,7 +259,9 @@ const cleanupAllOvertimeData = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Mechanic] cleanupAllOvertimeData:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -227,12 +271,15 @@ const cleanupAllOvertimeData = async (req, res) => {
  */
 const migrateOvertimeData = async (req, res) => {
   try {
-    const result = await mechanicServices.migrateOvertimeDataToMonthlyStructure();
+    const result =
+      await mechanicServices.migrateOvertimeDataToMonthlyStructure();
 
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Mechanic] migrateOvertimeData:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -249,7 +296,9 @@ const getDailyAttendance = async (req, res) => {
     const { zktecoPin, date } = req.params;
 
     if (!zktecoPin || !date) {
-      return res.status(400).json({ success: false, message: 'zktecoPin and date are required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'zktecoPin and date are required' });
     }
 
     const result = await mechanicServices.fetchDailyAttendance(zktecoPin, date);
@@ -257,7 +306,9 @@ const getDailyAttendance = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Mechanic] getDailyAttendance:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -270,15 +321,24 @@ const getWeeklyAttendance = async (req, res) => {
     const { zktecoPin, year, week } = req.params;
 
     if (!zktecoPin || !year || !week) {
-      return res.status(400).json({ success: false, message: 'zktecoPin, year, and week are required' });
+      return res.status(400).json({
+        success: false,
+        message: 'zktecoPin, year, and week are required',
+      });
     }
 
-    const result = await mechanicServices.fetchWeeklyAttendance(zktecoPin, year, week);
+    const result = await mechanicServices.fetchWeeklyAttendance(
+      zktecoPin,
+      year,
+      week
+    );
 
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Mechanic] getWeeklyAttendance:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -291,15 +351,24 @@ const getMonthlyAttendance = async (req, res) => {
     const { zktecoPin, year, month } = req.params;
 
     if (!zktecoPin || !year || !month) {
-      return res.status(400).json({ success: false, message: 'zktecoPin, year, and month are required' });
+      return res.status(400).json({
+        success: false,
+        message: 'zktecoPin, year, and month are required',
+      });
     }
 
-    const result = await mechanicServices.fetchMonthlyAttendance(zktecoPin, year, month);
+    const result = await mechanicServices.fetchMonthlyAttendance(
+      zktecoPin,
+      year,
+      month
+    );
 
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Mechanic] getMonthlyAttendance:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -312,15 +381,22 @@ const getYearlyAttendance = async (req, res) => {
     const { zktecoPin, year } = req.params;
 
     if (!zktecoPin || !year) {
-      return res.status(400).json({ success: false, message: 'zktecoPin and year are required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'zktecoPin and year are required' });
     }
 
-    const result = await mechanicServices.fetchYearlyAttendance(zktecoPin, year);
+    const result = await mechanicServices.fetchYearlyAttendance(
+      zktecoPin,
+      year
+    );
 
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Mechanic] getYearlyAttendance:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -330,23 +406,34 @@ const getYearlyAttendance = async (req, res) => {
  */
 const getAttendanceByDateRange = async (req, res) => {
   try {
-    const { zktecoPin }        = req.params;
+    const { zktecoPin } = req.params;
     const { startDate, endDate } = req.query;
 
     if (!zktecoPin) {
-      return res.status(400).json({ success: false, message: 'zktecoPin is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'zktecoPin is required' });
     }
 
     if (!startDate || !endDate) {
-      return res.status(400).json({ success: false, message: 'startDate and endDate are required' });
+      return res.status(400).json({
+        success: false,
+        message: 'startDate and endDate are required',
+      });
     }
 
-    const result = await mechanicServices.fetchAttendanceByDateRange(zktecoPin, startDate, endDate);
+    const result = await mechanicServices.fetchAttendanceByDateRange(
+      zktecoPin,
+      startDate,
+      endDate
+    );
 
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Mechanic] getAttendanceByDateRange:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -357,22 +444,32 @@ const getAttendanceByDateRange = async (req, res) => {
 const getAttendanceByMonths = async (req, res) => {
   try {
     const { zktecoPin } = req.params;
-    const { months }    = req.query;
+    const { months } = req.query;
 
     if (!zktecoPin) {
-      return res.status(400).json({ success: false, message: 'zktecoPin is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'zktecoPin is required' });
     }
 
     if (!months) {
-      return res.status(400).json({ success: false, message: 'months query parameter is required' });
+      return res.status(400).json({
+        success: false,
+        message: 'months query parameter is required',
+      });
     }
 
-    const result = await mechanicServices.fetchAttendanceByMonths(zktecoPin, months);
+    const result = await mechanicServices.fetchAttendanceByMonths(
+      zktecoPin,
+      months
+    );
 
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Mechanic] getAttendanceByMonths:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -383,22 +480,31 @@ const getAttendanceByMonths = async (req, res) => {
 const getAttendanceByYears = async (req, res) => {
   try {
     const { zktecoPin } = req.params;
-    const { years }     = req.query;
+    const { years } = req.query;
 
     if (!zktecoPin) {
-      return res.status(400).json({ success: false, message: 'zktecoPin is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'zktecoPin is required' });
     }
 
     if (!years) {
-      return res.status(400).json({ success: false, message: 'years query parameter is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'years query parameter is required' });
     }
 
-    const result = await mechanicServices.fetchAttendanceByYears(zktecoPin, years);
+    const result = await mechanicServices.fetchAttendanceByYears(
+      zktecoPin,
+      years
+    );
 
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Mechanic] getAttendanceByYears:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -409,22 +515,31 @@ const getAttendanceByYears = async (req, res) => {
 const getAttendanceByWeeks = async (req, res) => {
   try {
     const { zktecoPin } = req.params;
-    const { weeks }     = req.query;
+    const { weeks } = req.query;
 
     if (!zktecoPin) {
-      return res.status(400).json({ success: false, message: 'zktecoPin is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'zktecoPin is required' });
     }
 
     if (!weeks) {
-      return res.status(400).json({ success: false, message: 'weeks query parameter is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'weeks query parameter is required' });
     }
 
-    const result = await mechanicServices.fetchAttendanceByWeeks(zktecoPin, weeks);
+    const result = await mechanicServices.fetchAttendanceByWeeks(
+      zktecoPin,
+      weeks
+    );
 
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Mechanic] getAttendanceByWeeks:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -437,7 +552,9 @@ const getAllMonthsAttendance = async (req, res) => {
     const { zktecoPin } = req.params;
 
     if (!zktecoPin) {
-      return res.status(400).json({ success: false, message: 'zktecoPin is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'zktecoPin is required' });
     }
 
     const result = await mechanicServices.fetchAllMonthsAttendance(zktecoPin);
@@ -445,7 +562,9 @@ const getAllMonthsAttendance = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Mechanic] getAllMonthsAttendance:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -458,7 +577,9 @@ const getAllYearsAttendance = async (req, res) => {
     const { zktecoPin } = req.params;
 
     if (!zktecoPin) {
-      return res.status(400).json({ success: false, message: 'zktecoPin is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'zktecoPin is required' });
     }
 
     const result = await mechanicServices.fetchAllYearsAttendance(zktecoPin);
@@ -466,7 +587,9 @@ const getAllYearsAttendance = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Mechanic] getAllYearsAttendance:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 
@@ -479,7 +602,9 @@ const getAllAttendance = async (req, res) => {
     const { zktecoPin } = req.params;
 
     if (!zktecoPin) {
-      return res.status(400).json({ success: false, message: 'zktecoPin is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'zktecoPin is required' });
     }
 
     const result = await mechanicServices.fetchAllAttendance(zktecoPin);
@@ -487,7 +612,9 @@ const getAllAttendance = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[Mechanic] getAllAttendance:', error);
-    res.status(error.status || 500).json({ success: false, message: error.message });
+    res
+      .status(error.status || 500)
+      .json({ success: false, message: error.message });
   }
 };
 

@@ -1,7 +1,7 @@
 // gmail/lpo-gmail.js
 const { google } = require('googleapis');
-const fs         = require('fs');
-const path       = require('path');
+const fs = require('fs');
+const path = require('path');
 
 require('dotenv').config();
 
@@ -9,7 +9,7 @@ require('dotenv').config();
 // Constants & Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-const { GMAIL_SCOPES }                  = require('../constants/email.constants');
+const { GMAIL_SCOPES } = require('../constants/email.constants');
 const { loadImageAsBase64, getMimeType } = require('../helpers/email.helper');
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -19,13 +19,16 @@ const { loadImageAsBase64, getMimeType } = require('../helpers/email.helper');
 class OAuth2GmailClient {
   constructor() {
     this.oauth2Client = null;
-    this.gmail        = null;
+    this.gmail = null;
     this.refreshToken = process.env.SERVICE_GMAIL_REFRESH_TOKEN;
   }
 
   async initialize() {
-    const clientId     = process.env.SERVICE_GOOGLE_CLIENT_ID?.replace(/"/g, '');
-    const clientSecret = process.env.SERVICE_GOOGLE_CLEINT_SECRET?.replace(/"/g, '');
+    const clientId = process.env.SERVICE_GOOGLE_CLIENT_ID?.replace(/"/g, '');
+    const clientSecret = process.env.SERVICE_GOOGLE_CLEINT_SECRET?.replace(
+      /"/g,
+      ''
+    );
 
     if (!clientId || !clientSecret) {
       throw new Error('[Gmail] Missing Google OAuth credentials');
@@ -34,7 +37,7 @@ class OAuth2GmailClient {
     this.oauth2Client = new google.auth.OAuth2(
       clientId,
       clientSecret,
-      `${process.env.BASE_URL}/oauth2callback`,
+      `${process.env.BASE_URL}/oauth2callback`
     );
 
     if (!this.refreshToken) return false;
@@ -47,8 +50,8 @@ class OAuth2GmailClient {
   getAuthUrl() {
     return this.oauth2Client.generateAuthUrl({
       access_type: 'offline',
-      prompt:      'consent',
-      scope:       GMAIL_SCOPES,
+      prompt: 'consent',
+      scope: GMAIL_SCOPES,
     });
   }
 
@@ -59,8 +62,10 @@ class OAuth2GmailClient {
 
   async getSignature() {
     try {
-      const result        = await this.gmail.users.settings.sendAs.list({ userId: 'me' });
-      const defaultSendAs = result.data.sendAs?.find(s => s.isDefault);
+      const result = await this.gmail.users.settings.sendAs.list({
+        userId: 'me',
+      });
+      const defaultSendAs = result.data.sendAs?.find((s) => s.isDefault);
       return defaultSendAs?.signature ?? '';
     } catch {
       return '';
@@ -75,7 +80,11 @@ class OAuth2GmailClient {
           return null;
         }
         const filename = path.basename(attachment);
-        return { fileContent: fs.readFileSync(attachment), filename, mimeType: getMimeType(filename) };
+        return {
+          fileContent: fs.readFileSync(attachment),
+          filename,
+          mimeType: getMimeType(filename),
+        };
       }
 
       if (attachment.path) {
@@ -84,14 +93,20 @@ class OAuth2GmailClient {
           return null;
         }
         const filename = attachment.filename ?? path.basename(attachment.path);
-        return { fileContent: fs.readFileSync(attachment.path), filename, mimeType: attachment.mimeType ?? getMimeType(filename) };
+        return {
+          fileContent: fs.readFileSync(attachment.path),
+          filename,
+          mimeType: attachment.mimeType ?? getMimeType(filename),
+        };
       }
 
       if (attachment.content) {
         return {
-          fileContent: Buffer.isBuffer(attachment.content) ? attachment.content : Buffer.from(attachment.content),
-          filename:    attachment.filename ?? 'attachment',
-          mimeType:    attachment.mimeType ?? 'application/octet-stream',
+          fileContent: Buffer.isBuffer(attachment.content)
+            ? attachment.content
+            : Buffer.from(attachment.content),
+          filename: attachment.filename ?? 'attachment',
+          mimeType: attachment.mimeType ?? 'application/octet-stream',
         };
       }
 
@@ -103,7 +118,14 @@ class OAuth2GmailClient {
     }
   }
 
-  _buildRawEmail(to, subject, htmlContent, textContent, attachments = [], cc = '') {
+  _buildRawEmail(
+    to,
+    subject,
+    htmlContent,
+    textContent,
+    attachments = [],
+    cc = ''
+  ) {
     const boundary = `boundary_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
     const lines = [
@@ -142,7 +164,7 @@ class OAuth2GmailClient {
         'Content-Transfer-Encoding: base64',
         `Content-Disposition: attachment; filename="${filename}"`,
         '',
-        fileContent.toString('base64'),
+        fileContent.toString('base64')
       );
     }
 
@@ -150,36 +172,63 @@ class OAuth2GmailClient {
     return lines.join('\n');
   }
 
-  async sendEmail(to, subject, htmlContent, textContent, attachments = [], cc = '') {
+  async sendEmail(
+    to,
+    subject,
+    htmlContent,
+    textContent,
+    attachments = [],
+    cc = ''
+  ) {
     if (!this.gmail) {
       const initialized = await this.initialize();
-      if (!initialized) throw new Error('[Gmail] Client not initialized — refresh token required');
+      if (!initialized)
+        throw new Error(
+          '[Gmail] Client not initialized — refresh token required'
+        );
     }
 
     try {
-      const raw = this._buildRawEmail(to, subject, htmlContent, textContent, attachments, cc);
-      const encodedEmail = Buffer.from(raw).toString('base64')
+      const raw = this._buildRawEmail(
+        to,
+        subject,
+        htmlContent,
+        textContent,
+        attachments,
+        cc
+      );
+      const encodedEmail = Buffer.from(raw)
+        .toString('base64')
         .replace(/\+/g, '-')
         .replace(/\//g, '_')
         .replace(/=+$/, '');
 
       const response = await this.gmail.users.messages.send({
-        userId:      'me',
+        userId: 'me',
         requestBody: { raw: encodedEmail },
       });
 
       return {
-        success:          true,
-        messageId:        response.data.id,
-        method:           'Gmail API (OAuth2)',
+        success: true,
+        messageId: response.data.id,
+        method: 'Gmail API (OAuth2)',
         attachmentsCount: attachments.length,
       };
     } catch (error) {
-      const isAuthError = error.message.includes('invalid_grant') || error.message.includes('unauthorized');
+      const isAuthError =
+        error.message.includes('invalid_grant') ||
+        error.message.includes('unauthorized');
 
       if (isAuthError) {
         await this.oauth2Client.refreshAccessToken();
-        return this.sendEmail(to, subject, htmlContent, textContent, attachments, cc);
+        return this.sendEmail(
+          to,
+          subject,
+          htmlContent,
+          textContent,
+          attachments,
+          cc
+        );
       }
 
       throw new Error(`[Gmail] Send failed: ${error.message}`);
@@ -199,10 +248,10 @@ const gmailClient = new OAuth2GmailClient();
 
 const generateLPOTemplate = () => {
   const signatureLogo = loadImageAsBase64('signature-logo.png');
-  const sigLogo       = loadImageAsBase64('sig-logo.png');
-  const sigFacebook   = loadImageAsBase64('sig-facebook.png');
-  const sigInstagram  = loadImageAsBase64('sig-instagram.png');
-  const sigLinkedin   = loadImageAsBase64('sig-linkedin.png');
+  const sigLogo = loadImageAsBase64('sig-logo.png');
+  const sigFacebook = loadImageAsBase64('sig-facebook.png');
+  const sigInstagram = loadImageAsBase64('sig-instagram.png');
+  const sigLinkedin = loadImageAsBase64('sig-linkedin.png');
 
   return `
     <!DOCTYPE html>
@@ -227,10 +276,10 @@ const generateLPOTemplate = () => {
 
       <table cellpadding="0" cellspacing="0" border="0" style="margin-top:10px;">
         <tr>
-          <td style="padding-right:8px;">${sigLogo      ? `<img src="${sigLogo}"      width="72" height="32" alt="Logo" />`                                                                                                                          : ''}</td>
-          <td style="padding-right:8px;">${sigFacebook  ? `<a href="https://www.facebook.com/profile.php?id=100095544335543"                   target="_blank"><img src="${sigFacebook}"  width="27" height="27" alt="Facebook"  /></a>` : ''}</td>
+          <td style="padding-right:8px;">${sigLogo ? `<img src="${sigLogo}"      width="72" height="32" alt="Logo" />` : ''}</td>
+          <td style="padding-right:8px;">${sigFacebook ? `<a href="https://www.facebook.com/profile.php?id=100095544335543"                   target="_blank"><img src="${sigFacebook}"  width="27" height="27" alt="Facebook"  /></a>` : ''}</td>
           <td style="padding-right:8px;">${sigInstagram ? `<a href="https://www.instagram.com/al_ansari_transport"                             target="_blank"><img src="${sigInstagram}" width="27" height="27" alt="Instagram" /></a>` : ''}</td>
-          <td>                           ${sigLinkedin  ? `<a href="https://www.linkedin.com/in/al-ansari-transport-and-enterprises-455b53253/" target="_blank"><img src="${sigLinkedin}"  width="27" height="27" alt="LinkedIn"  /></a>` : ''}</td>
+          <td>                           ${sigLinkedin ? `<a href="https://www.linkedin.com/in/al-ansari-transport-and-enterprises-455b53253/" target="_blank"><img src="${sigLinkedin}"  width="27" height="27" alt="LinkedIn"  /></a>` : ''}</td>
         </tr>
       </table>
     </body>
@@ -243,18 +292,31 @@ const generateLPOTemplate = () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 // Replace the current function body:
-const sendLPOViaEmail = async (toList = [], client = '', recipientName = '', attachments = [], equipment = '') => {
+const sendLPOViaEmail = async (
+  toList = [],
+  client = '',
+  recipientName = '',
+  attachments = [],
+  equipment = ''
+) => {
   if (!toList.length) throw new Error('[Gmail] No recipient email provided');
 
-  const to     = toList.join(', ');
-  const ccList = JSON.parse(process.env.LPO_CC || '[]'); 
-  const cc     = ccList.join(', ');
+  const to = toList.join(', ');
+  const ccList = JSON.parse(process.env.LPO_CC || '[]');
+  const cc = ccList.join(', ');
 
-  const subject     = `M/S ${client} - MR. ${recipientName} LPO for ${equipment}`;
+  const subject = `M/S ${client} - MR. ${recipientName} LPO for ${equipment}`;
   const htmlContent = generateLPOTemplate();
   const textContent = `Please find the attached LPO for your reference...`;
 
-  return gmailClient.sendEmail(to, subject, htmlContent, textContent, attachments, cc);
+  return gmailClient.sendEmail(
+    to,
+    subject,
+    htmlContent,
+    textContent,
+    attachments,
+    cc
+  );
 };
 
 const getAuthorizationUrl = async () => {

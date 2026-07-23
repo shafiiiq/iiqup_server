@@ -11,14 +11,14 @@ const documentFileSchema = new mongoose.Schema(
     type: { type: String, enum: ['image', 'document'] },
     url: { type: String },
   },
-  { _id: false },
+  { _id: false }
 );
 
 const hireOrderItemSchema = new mongoose.Schema(
   {
     id: { type: Number, required: true },
   },
-  { _id: false, strict: false },
+  { _id: false, strict: false }
 );
 
 const approvalTrailSchema = new mongoose.Schema(
@@ -27,10 +27,13 @@ const approvalTrailSchema = new mongoose.Schema(
     role: { type: String },
     approvalDate: { type: Date, default: Date.now },
     comments: { type: String },
-    action: { type: String, enum: ['approved', 'rejected', 'forwarded', 'uploaded'] },
+    action: {
+      type: String,
+      enum: ['approved', 'rejected', 'forwarded', 'uploaded'],
+    },
     attachments: { type: [documentFileSchema], default: [] },
   },
-  { _id: false },
+  { _id: false }
 );
 
 const hireOrderSchema = new mongoose.Schema(
@@ -64,7 +67,8 @@ const hireOrderSchema = new mongoose.Schema(
     },
     note: {
       type: String,
-      default: 'The hire order copy should be submitted along with the invoice every month for the payment process.',
+      default:
+        'The hire order copy should be submitted along with the invoice every month for the payment process.',
     },
 
     signatures: {
@@ -72,7 +76,11 @@ const hireOrderSchema = new mongoose.Schema(
       purchasingManager: { type: String, default: 'ABDUL MALIK' },
       operationsManager: { type: String, default: 'SURESHKANTH' },
       authorizedSignatory: { type: String, default: 'AHAMMED KAMAL' },
-      authorizedSignatoryTitle: { type: String, enum: ['CEO', 'MANAGING DIRECTOR'], default: 'CEO' },
+      authorizedSignatoryTitle: {
+        type: String,
+        enum: ['CEO', 'MANAGING DIRECTOR'],
+        default: 'CEO',
+      },
     },
 
     pmSigned: { type: Boolean, default: false },
@@ -86,11 +94,21 @@ const hireOrderSchema = new mongoose.Schema(
 
     workflowStatus: {
       type: String,
-      enum: ['hire_order_created', 'hire_order_uploaded', 'hire_order_amended', 'purchase_approved', 'accounts_approved', 'manager_approved', 'md_approved', 'ceo_approved', 'items_available'],
+      enum: [
+        'hire_order_created',
+        'hire_order_uploaded',
+        'hire_order_amended',
+        'purchase_approved',
+        'accounts_approved',
+        'manager_approved',
+        'md_approved',
+        'ceo_approved',
+        'items_available',
+      ],
       default: 'hire_order_created',
     },
   },
-  { timestamps: true },
+  { timestamps: true }
 );
 
 hireOrderSchema.index({ hireOrderRef: 1 });

@@ -1,7 +1,7 @@
-const Message             = require('../models/messages.model');
-const Chat                = require('../models/chats.model');
-const User                = require('../models/user.model');
-const chatService         = require('./chat.service');
+const Message = require('../models/messages.model');
+const Chat = require('../models/chats.model');
+const User = require('../models/user.model');
+const chatService = require('./chat.service');
 const { putObject, getObjectUrl } = require('../aws/s3.aws');
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -11,11 +11,18 @@ const { putObject, getObjectUrl } = require('../aws/s3.aws');
 const { FILE_MESSAGE_TYPES } = require('../constants/message.contants');
 
 const shouldMarkMessageAsRead = (chat, message, userId) => {
-  const otherParticipantCount = (chat?.participants || []).filter((participant) => String(participant.userId) !== String(message?.senderId)).length;
+  const otherParticipantCount = (chat?.participants || []).filter(
+    (participant) => String(participant.userId) !== String(message?.senderId)
+  ).length;
   if (otherParticipantCount === 0) return true;
 
-  const readByUserIds = new Set((message?.readBy || []).map((entry) => String(entry.userId)));
-  return readByUserIds.has(String(userId)) && readByUserIds.size >= otherParticipantCount;
+  const readByUserIds = new Set(
+    (message?.readBy || []).map((entry) => String(entry.userId))
+  );
+  return (
+    readByUserIds.has(String(userId)) &&
+    readByUserIds.size >= otherParticipantCount
+  );
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -32,7 +39,7 @@ const shouldMarkMessageAsRead = (chat, message, userId) => {
  */
 const getMessages = async (chatId, page = 1, limit = 50, userId) => {
   try {
-    console.log('getMessages called for chatId:', chatId, 'userId:', userId)
+    console.log('getMessages called for chatId:', chatId, 'userId:', userId);
     const skip = (page - 1) * limit;
 
     const messages = await Message.find({ chatId, deletedFor: { $ne: userId } })
@@ -41,19 +48,20 @@ const getMessages = async (chatId, page = 1, limit = 50, userId) => {
       .limit(parseInt(limit))
       .lean();
 
-    console.log('Found messages count:', messages.length)
+    console.log('Found messages count:', messages.length);
     const messagesWithUrls = await Promise.all(
       messages.map(async (msg) => {
         if (!FILE_MESSAGE_TYPES.includes(msg.messageType)) return msg;
 
         msg.content = await getObjectUrl(msg.content, false);
-        if (msg.thumbnail) msg.thumbnail = await getObjectUrl(msg.thumbnail, false);
+        if (msg.thumbnail)
+          msg.thumbnail = await getObjectUrl(msg.thumbnail, false);
 
         return msg;
       })
     );
 
-    console.log('Returning messages count:', messagesWithUrls.length)
+    console.log('Returning messages count:', messagesWithUrls.length);
     return messagesWithUrls.reverse();
   } catch (error) {
     console.error('[MessageService] getMessages:', error);
@@ -67,36 +75,64 @@ const getMessages = async (chatId, page = 1, limit = 50, userId) => {
  * @param {object} messageData
  * @returns {Promise<object>}
  */
-const createGroupSystemMessage = async ({ chatId, actorId, actorName, event, updates, targetNames = [], groupName, chat }) => {
+const createGroupSystemMessage = async ({
+  chatId,
+  actorId,
+  actorName,
+  event,
+  updates,
+  targetNames = [],
+  groupName,
+  chat,
+}) => {
   try {
     if (!event) return null;
 
-    const actorProfile = actorId ? await User.findById(actorId).select('name').lean() : null;
+    const actorProfile = actorId
+      ? await User.findById(actorId).select('name').lean()
+      : null;
     const resolvedActorName = actorName || actorProfile?.name || 'Someone';
 
     let resolvedTargetNames = [...(targetNames || [])];
 
     if (event === 'added' && updates?.addParticipants?.length > 0) {
-      const ids = updates.addParticipants.map((participant) => participant.userId || participant._id).filter(Boolean);
-      const users = await User.find({ _id: { $in: ids } }).select('name').lean();
+      const ids = updates.addParticipants
+        .map((participant) => participant.userId || participant._id)
+        .filter(Boolean);
+      const users = await User.find({ _id: { $in: ids } })
+        .select('name')
+        .lean();
       resolvedTargetNames = users.map((user) => user.name || 'a member');
     }
 
     if (event === 'removed' && updates?.removeParticipants?.length > 0) {
       const ids = updates.removeParticipants.filter(Boolean);
-      const users = await User.find({ _id: { $in: ids } }).select('name').lean();
+      const users = await User.find({ _id: { $in: ids } })
+        .select('name')
+        .lean();
       resolvedTargetNames = users.map((user) => user.name || 'a member');
     }
 
     if (event === 'promoted' && updates?.promoteParticipants?.length > 0) {
       const ids = updates.promoteParticipants.filter(Boolean);
-      const users = await User.find({ _id: { $in: ids } }).select('name').lean();
+      const users = await User.find({ _id: { $in: ids } })
+        .select('name')
+        .lean();
       resolvedTargetNames = users.map((user) => user.name || 'a member');
     }
 
     if (event === 'removed' && resolvedTargetNames.length === 0) {
-      const removedMembers = await User.find({ _id: { $in: chat?.participants?.map((participant) => participant.userId) || [] } }).select('name').lean();
-      resolvedTargetNames.push(...removedMembers.map((member) => member.name || 'a member'));
+      const removedMembers = await User.find({
+        _id: {
+          $in:
+            chat?.participants?.map((participant) => participant.userId) || [],
+        },
+      })
+        .select('name')
+        .lean();
+      resolvedTargetNames.push(
+        ...removedMembers.map((member) => member.name || 'a member')
+      );
     }
 
     const content = chatService.buildGroupSystemMessage({
@@ -128,29 +164,59 @@ const createGroupSystemMessage = async ({ chatId, actorId, actorName, event, upd
 const sendMessage = async (messageData) => {
   try {
     const {
-      chatId, senderId, senderType, senderName, senderAvatar,
-      messageType, content, recieverId,
-      fileName, fileSize, duration, thumbnail, replyTo, caption
+      chatId,
+      senderId,
+      senderType,
+      senderName,
+      senderAvatar,
+      messageType,
+      content,
+      recieverId,
+      fileName,
+      fileSize,
+      duration,
+      thumbnail,
+      replyTo,
+      caption,
     } = messageData;
 
     const message = await Message.create({
-      chatId, senderId, senderType, senderName, senderAvatar,
-      messageType, content, fileName, fileSize, duration, thumbnail,
-      caption, replyTo,
-      status: 'sent', readBy: [], deliveredTo: []
+      chatId,
+      senderId,
+      senderType,
+      senderName,
+      senderAvatar,
+      messageType,
+      content,
+      fileName,
+      fileSize,
+      duration,
+      thumbnail,
+      caption,
+      replyTo,
+      status: 'sent',
+      readBy: [],
+      deliveredTo: [],
     });
 
-    const lastMessageContent = messageType === 'text' ? content : `${messageType} message`;
+    const lastMessageContent =
+      messageType === 'text' ? content : `${messageType} message`;
 
-    await chatService.updateLastMessage(chatId, lastMessageContent, senderId, senderName, messageType);
+    await chatService.updateLastMessage(
+      chatId,
+      lastMessageContent,
+      senderId,
+      senderName,
+      messageType
+    );
     await chatService.incrementUnreadCount(chatId, senderId);
 
     const PushNotificationService = require('../push/notification.push');
     const chat = await Chat.findById(chatId).lean();
     if (chat) {
       const recipientCodes = chat.participants
-        .filter(p => p.userId.toString() !== senderId.toString())
-        .map(p => p.uniqueCode)
+        .filter((p) => p.userId.toString() !== senderId.toString())
+        .map((p) => p.uniqueCode)
         .filter(Boolean);
       if (recipientCodes.length > 0) {
         await PushNotificationService.sendGeneralNotification(
@@ -184,7 +250,7 @@ const markMessagesAsDelivered = async (messageIds, userId) => {
       { _id: { $in: messageIds }, 'deliveredTo.userId': { $ne: userId } },
       {
         $push: { deliveredTo: { userId, deliveredAt: new Date() } },
-        $set:  { status: 'delivered' }
+        $set: { status: 'delivered' },
       }
     );
 
@@ -205,21 +271,34 @@ const markMessagesAsDelivered = async (messageIds, userId) => {
 const markMessagesAsRead = async (chatId, messageIds, userId) => {
   try {
     const chat = await Chat.findById(chatId).lean();
-    const messages = await Message.find({ _id: { $in: messageIds }, chatId }).lean();
+    const messages = await Message.find({
+      _id: { $in: messageIds },
+      chatId,
+    }).lean();
 
-    await Promise.all(messages.map(async (message) => {
-      const existingReads = message.readBy || [];
-      const alreadyRead = existingReads.some(entry => entry.userId?.toString() === userId.toString());
-      const nextReadBy = alreadyRead ? existingReads : [...existingReads, { userId, readAt: new Date() }];
-      const shouldMarkRead = shouldMarkMessageAsRead(chat, { ...message, readBy: nextReadBy }, userId);
+    await Promise.all(
+      messages.map(async (message) => {
+        const existingReads = message.readBy || [];
+        const alreadyRead = existingReads.some(
+          (entry) => entry.userId?.toString() === userId.toString()
+        );
+        const nextReadBy = alreadyRead
+          ? existingReads
+          : [...existingReads, { userId, readAt: new Date() }];
+        const shouldMarkRead = shouldMarkMessageAsRead(
+          chat,
+          { ...message, readBy: nextReadBy },
+          userId
+        );
 
-      await Message.findByIdAndUpdate(message._id, {
-        $set: {
-          readBy: nextReadBy,
-          status: shouldMarkRead ? 'read' : message.status,
-        },
-      });
-    }));
+        await Message.findByIdAndUpdate(message._id, {
+          $set: {
+            readBy: nextReadBy,
+            status: shouldMarkRead ? 'read' : message.status,
+          },
+        });
+      })
+    );
 
     await chatService.resetUnreadCount(chatId, userId);
 
@@ -240,15 +319,24 @@ const markMessagesAsRead = async (chatId, messageIds, userId) => {
 const deleteMessage = async (messageId, userId, deleteForEveryone = false) => {
   try {
     if (deleteForEveryone) {
-      const message = await Message.findOne({ _id: messageId, senderId: userId });
+      const message = await Message.findOne({
+        _id: messageId,
+        senderId: userId,
+      });
       if (!message) throw new Error('Unauthorized to delete this message');
 
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-      if (message.createdAt < oneHourAgo) throw new Error('Cannot delete messages older than 1 hour');
+      if (message.createdAt < oneHourAgo)
+        throw new Error('Cannot delete messages older than 1 hour');
 
-      await Message.findByIdAndUpdate(messageId, { isDeleted: true, content: 'This message was deleted' });
+      await Message.findByIdAndUpdate(messageId, {
+        isDeleted: true,
+        content: 'This message was deleted',
+      });
     } else {
-      await Message.findByIdAndUpdate(messageId, { $addToSet: { deletedFor: userId } });
+      await Message.findByIdAndUpdate(messageId, {
+        $addToSet: { deletedFor: userId },
+      });
     }
 
     return true;
@@ -264,7 +352,8 @@ const editMessage = async (messageId, userId, content) => {
     if (!message) throw new Error('Unauthorized to edit this message');
 
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    if (message.createdAt < oneHourAgo) throw new Error('Cannot edit messages older than 1 hour');
+    if (message.createdAt < oneHourAgo)
+      throw new Error('Cannot edit messages older than 1 hour');
 
     message.content = content;
     message.isEdited = true;
@@ -290,32 +379,48 @@ const updateMessageCaption = async (messageId, userId, caption) => {
   }
 };
 
-const forwardMessage = async (messageId, targetChatId, senderId, senderType, senderName, senderAvatar) => {
+const forwardMessage = async (
+  messageId,
+  targetChatId,
+  senderId,
+  senderType,
+  senderName,
+  senderAvatar
+) => {
   try {
     const original = await Message.findById(messageId).lean();
     if (!original) throw new Error('Original message not found');
 
     const forwarded = await Message.create({
-      chatId:      targetChatId,
+      chatId: targetChatId,
       senderId,
       senderType,
       senderName,
       senderAvatar,
       messageType: original.messageType,
-      content:     original.content,
-      fileName:    original.fileName,
-      fileSize:    original.fileSize,
-      duration:    original.duration,
-      thumbnail:   original.thumbnail,
-      caption:     original.caption,
-      replyTo:     original.replyTo,
-      status:      'sent',
-      readBy:      [],
+      content: original.content,
+      fileName: original.fileName,
+      fileSize: original.fileSize,
+      duration: original.duration,
+      thumbnail: original.thumbnail,
+      caption: original.caption,
+      replyTo: original.replyTo,
+      status: 'sent',
+      readBy: [],
       deliveredTo: [],
     });
 
-    const lastMessageContent = forwarded.messageType === 'text' ? forwarded.content : `${forwarded.messageType} message`;
-    await chatService.updateLastMessage(targetChatId, lastMessageContent, senderId, senderName, forwarded.messageType);
+    const lastMessageContent =
+      forwarded.messageType === 'text'
+        ? forwarded.content
+        : `${forwarded.messageType} message`;
+    await chatService.updateLastMessage(
+      targetChatId,
+      lastMessageContent,
+      senderId,
+      senderName,
+      forwarded.messageType
+    );
     await chatService.incrementUnreadCount(targetChatId, senderId);
 
     return forwarded.toObject();
@@ -337,8 +442,8 @@ const searchMessages = async (chatId, searchQuery, userId) => {
     return await Message.find({
       chatId,
       messageType: 'text',
-      content:     { $regex: searchQuery, $options: 'i' },
-      deletedFor:  { $ne: userId }
+      content: { $regex: searchQuery, $options: 'i' },
+      deletedFor: { $ne: userId },
     })
       .sort({ createdAt: -1 })
       .limit(50)
@@ -362,10 +467,10 @@ const searchMessages = async (chatId, searchQuery, userId) => {
  */
 const uploadFile = async (userEmail, fileType, mimeType) => {
   try {
-    const timestamp         = Date.now();
+    const timestamp = Date.now();
     const sanitizedFileName = `${timestamp}-${userEmail}`;
-    const key               = `chat/${fileType}/${sanitizedFileName}`;
-    const uploadUrl         = await putObject(sanitizedFileName, key, mimeType);
+    const key = `chat/${fileType}/${sanitizedFileName}`;
+    const uploadUrl = await putObject(sanitizedFileName, key, mimeType);
 
     return { uploadUrl, fileKey: key };
   } catch (error) {
@@ -417,14 +522,16 @@ const generateThumbnail = async (videoKey) => {
  */
 const getCallHistory = async (userId, page = 1, limit = 20) => {
   try {
-    const skip     = (page - 1) * limit;
-    const userChats = await Chat.find({ 'participants.userId': userId }).select('_id').lean();
-    const chatIds  = userChats.map(chat => chat._id);
+    const skip = (page - 1) * limit;
+    const userChats = await Chat.find({ 'participants.userId': userId })
+      .select('_id')
+      .lean();
+    const chatIds = userChats.map((chat) => chat._id);
 
     return await Message.find({
-      chatId:      { $in: chatIds },
+      chatId: { $in: chatIds },
       messageType: 'call',
-      $or: [{ senderId: userId }, { 'callData.receiverId': userId }]
+      $or: [{ senderId: userId }, { 'callData.receiverId': userId }],
     })
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -443,27 +550,38 @@ const getCallHistory = async (userId, page = 1, limit = 20) => {
  */
 const saveCallRecord = async (callData) => {
   try {
-    const { chatId, callerId, receiverId, duration, callType, status, senderType, messageType } = callData;
+    const {
+      chatId,
+      callerId,
+      receiverId,
+      duration,
+      callType,
+      status,
+      senderType,
+      messageType,
+    } = callData;
 
-    const chat   = await Chat.findById(chatId);
-    const caller = chat.participants.find(p => p.userId.toString() === callerId.toString());
+    const chat = await Chat.findById(chatId);
+    const caller = chat.participants.find(
+      (p) => p.userId.toString() === callerId.toString()
+    );
 
     return await Message.create({
       chatId,
-      senderId:    callerId,
-      senderName:  caller?.name || 'Unknown',
+      senderId: callerId,
+      senderName: caller?.name || 'Unknown',
       senderType,
       messageType,
-      content:     `${callType} call - ${status}`,
+      content: `${callType} call - ${status}`,
       callData: {
         receiverId,
         duration,
         callType,
         status,
         startTime: new Date(),
-        endTime:   duration ? new Date(Date.now() + duration * 1000) : new Date()
+        endTime: duration ? new Date(Date.now() + duration * 1000) : new Date(),
       },
-      status: 'sent'
+      status: 'sent',
     });
   } catch (error) {
     console.error('[MessageService] saveCallRecord:', error);
@@ -485,8 +603,8 @@ const getUnreadMessagesForUser = async (chatId, userId) => {
   try {
     return await Message.find({
       chatId,
-      senderId:       { $ne: userId },
-      'readBy.userId': { $ne: userId }
+      senderId: { $ne: userId },
+      'readBy.userId': { $ne: userId },
     }).lean();
   } catch (error) {
     console.error('[MessageService] getUnreadMessagesForUser:', error);
@@ -534,5 +652,5 @@ module.exports = {
   getCallHistory,
   saveCallRecord,
   getUnreadMessagesForUser,
-  getUnreadCount
+  getUnreadCount,
 };

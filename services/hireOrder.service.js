@@ -16,7 +16,11 @@ const buildSignatures = (signatures) => ({
 
 const createHireOrder = async (hireOrderData) => {
   try {
-    const totalAmount = calculateTotal(hireOrderData.items || [], hireOrderData.showDiscountInTotal, hireOrderData.discount);
+    const totalAmount = calculateTotal(
+      hireOrderData.items || [],
+      hireOrderData.showDiscountInTotal,
+      hireOrderData.discount
+    );
     const signatures = buildSignatures(hireOrderData.signatures);
 
     const hireOrder = new HireOrder({
@@ -36,11 +40,52 @@ const createHireOrder = async (hireOrderData) => {
 const getPendingSignatures = async (uniqueCode) => {
   try {
     const roleMap = [
-      { envKey: process.env.MANAGER, query: { managerSigned: { $ne: true }, workflowStatus: { $in: ['hire_order_uploaded', 'hire_order_amended'] } } },
-      { envKey: process.env.PURCHASE_MANAGER, query: { managerSigned: true, pmSigned: { $ne: true }, workflowStatus: { $in: ['manager_approved'] } } },
-      { envKey: process.env.ACCOUNTS, query: { managerSigned: true, pmSigned: true, accountsSigned: { $ne: true }, workflowStatus: { $in: ['purchase_approved', 'accounts_approved'] } } },
-      { envKey: process.env.CEO, query: { managerSigned: true, pmSigned: true, accountsSigned: true, ceoSigned: { $ne: true }, workflowStatus: { $in: ['accounts_approved', 'ceo_approved'] } } },
-      { envKey: process.env.MD, query: { managerSigned: true, pmSigned: true, accountsSigned: true, ceoSigned: { $ne: true }, workflowStatus: { $in: ['accounts_approved', 'md_approved'] } } },
+      {
+        envKey: process.env.MANAGER,
+        query: {
+          managerSigned: { $ne: true },
+          workflowStatus: {
+            $in: ['hire_order_uploaded', 'hire_order_amended'],
+          },
+        },
+      },
+      {
+        envKey: process.env.PURCHASE_MANAGER,
+        query: {
+          managerSigned: true,
+          pmSigned: { $ne: true },
+          workflowStatus: { $in: ['manager_approved'] },
+        },
+      },
+      {
+        envKey: process.env.ACCOUNTS,
+        query: {
+          managerSigned: true,
+          pmSigned: true,
+          accountsSigned: { $ne: true },
+          workflowStatus: { $in: ['purchase_approved', 'accounts_approved'] },
+        },
+      },
+      {
+        envKey: process.env.CEO,
+        query: {
+          managerSigned: true,
+          pmSigned: true,
+          accountsSigned: true,
+          ceoSigned: { $ne: true },
+          workflowStatus: { $in: ['accounts_approved', 'ceo_approved'] },
+        },
+      },
+      {
+        envKey: process.env.MD,
+        query: {
+          managerSigned: true,
+          pmSigned: true,
+          accountsSigned: true,
+          ceoSigned: { $ne: true },
+          workflowStatus: { $in: ['accounts_approved', 'md_approved'] },
+        },
+      },
     ];
 
     const matched = roleMap.find((entry) => entry.envKey === uniqueCode);
@@ -75,24 +120,63 @@ const signHireOrder = async (refNo, signData) => {
   try {
     const { uniqueCode, signedDate, signedFrom } = signData;
     const roleMap = {
-      MANAGER: { envKey: process.env.MANAGER, field: 'managerSigned', role: 'MANAGER' },
-      PURCHASE_MANAGER: { envKey: process.env.PURCHASE_MANAGER, field: 'pmSigned', role: 'PURCHASE_MANAGER' },
-      ACCOUNTS: { envKey: process.env.ACCOUNTS, field: 'accountsSigned', role: 'ACCOUNTS' },
+      MANAGER: {
+        envKey: process.env.MANAGER,
+        field: 'managerSigned',
+        role: 'MANAGER',
+      },
+      PURCHASE_MANAGER: {
+        envKey: process.env.PURCHASE_MANAGER,
+        field: 'pmSigned',
+        role: 'PURCHASE_MANAGER',
+      },
+      ACCOUNTS: {
+        envKey: process.env.ACCOUNTS,
+        field: 'accountsSigned',
+        role: 'ACCOUNTS',
+      },
       CEO: { envKey: process.env.CEO, field: 'ceoSigned', role: 'CEO' },
-      MANAGING_DIRECTOR: { envKey: process.env.MD, field: 'ceoSigned', role: 'MANAGING_DIRECTOR' },
+      MANAGING_DIRECTOR: {
+        envKey: process.env.MD,
+        field: 'ceoSigned',
+        role: 'MANAGING_DIRECTOR',
+      },
     };
 
-    const matched = Object.values(roleMap).find((entry) => entry.envKey === uniqueCode);
-    if (!matched) throw Object.assign(new Error('Unauthorised: your account is not recognised as an authorised signatory for hire order documents'), { status: 403 });
+    const matched = Object.values(roleMap).find(
+      (entry) => entry.envKey === uniqueCode
+    );
+    if (!matched)
+      throw Object.assign(
+        new Error(
+          'Unauthorised: your account is not recognised as an authorised signatory for hire order documents'
+        ),
+        { status: 403 }
+      );
 
     const hireOrder = await HireOrder.findOne({ hireOrderRef: refNo.trim() });
-    if (!hireOrder) throw Object.assign(new Error('Hire order not found'), { status: 404 });
-    if (hireOrder.workflowStatus === 'hire_order_created') throw Object.assign(new Error('HIRE_ORDER_NOT_UPLOADED'), { status: 403 });
-    if (hireOrder[matched.field] === true) throw Object.assign(new Error('The authorized signatory role has already been signed'), { status: 409 });
+    if (!hireOrder)
+      throw Object.assign(new Error('Hire order not found'), { status: 404 });
+    if (hireOrder.workflowStatus === 'hire_order_created')
+      throw Object.assign(new Error('HIRE_ORDER_NOT_UPLOADED'), {
+        status: 403,
+      });
+    if (hireOrder[matched.field] === true)
+      throw Object.assign(
+        new Error('The authorized signatory role has already been signed'),
+        { status: 409 }
+      );
 
     const updateFields = {
       [matched.field]: true,
-      workflowStatus: matched.role === 'MANAGER' ? 'manager_approved' : matched.role === 'PURCHASE_MANAGER' ? 'purchase_approved' : matched.role === 'ACCOUNTS' ? 'accounts_approved' : 'ceo_approved',
+      workflowStatus:
+        matched.role === 'MANAGER'
+          ? 'manager_approved'
+          : matched.role === 'PURCHASE_MANAGER'
+            ? 'purchase_approved'
+            : matched.role === 'ACCOUNTS'
+              ? 'accounts_approved'
+              : 'ceo_approved',
       $push: {
         approvalTrail: {
           approvedBy: uniqueCode,
@@ -104,13 +188,25 @@ const signHireOrder = async (refNo, signData) => {
       },
     };
 
-    if (matched.role === 'MANAGER') updateFields['signatures.operationsManager'] = signedFrom || 'System';
-    if (matched.role === 'PURCHASE_MANAGER') updateFields['signatures.purchasingManager'] = signedFrom || 'System';
-    if (matched.role === 'ACCOUNTS') updateFields['signatures.accountsDept'] = signedFrom || 'System';
-    if (matched.role === 'CEO' || matched.role === 'MANAGING_DIRECTOR') updateFields['signatures.authorizedSignatory'] = signedFrom || 'System';
+    if (matched.role === 'MANAGER')
+      updateFields['signatures.operationsManager'] = signedFrom || 'System';
+    if (matched.role === 'PURCHASE_MANAGER')
+      updateFields['signatures.purchasingManager'] = signedFrom || 'System';
+    if (matched.role === 'ACCOUNTS')
+      updateFields['signatures.accountsDept'] = signedFrom || 'System';
+    if (matched.role === 'CEO' || matched.role === 'MANAGING_DIRECTOR')
+      updateFields['signatures.authorizedSignatory'] = signedFrom || 'System';
 
-    const updated = await HireOrder.findOneAndUpdate({ hireOrderRef: refNo.trim() }, updateFields, { new: true, runValidators: true });
-    return { status: 200, message: `${matched.role} signature recorded successfully`, data: updated };
+    const updated = await HireOrder.findOneAndUpdate(
+      { hireOrderRef: refNo.trim() },
+      updateFields,
+      { new: true, runValidators: true }
+    );
+    return {
+      status: 200,
+      message: `${matched.role} signature recorded successfully`,
+      data: updated,
+    };
   } catch (error) {
     throw error;
   }
@@ -125,24 +221,36 @@ const getHireOrderByRef = async (refNo) => {
 };
 
 const getLatestHireOrderRef = async () => {
-  const latest = await HireOrder.findOne().sort({ createdAt: -1 }).select('hireOrderRef');
+  const latest = await HireOrder.findOne()
+    .sort({ createdAt: -1 })
+    .select('hireOrderRef');
   return latest?.hireOrderRef || null;
 };
 
 const updateHireOrder = async (refNo, updateData) => {
   try {
-    const existingHireOrder = await HireOrder.findOne({ hireOrderRef: refNo.trim() });
+    const existingHireOrder = await HireOrder.findOne({
+      hireOrderRef: refNo.trim(),
+    });
     if (!existingHireOrder) throw new Error('Hire order not found');
 
     if (updateData.items?.length > 0) {
-      updateData.totalAmount = updateData.items.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+      updateData.totalAmount = updateData.items.reduce(
+        (sum, item) => sum + (item.totalPrice || 0),
+        0
+      );
     }
 
     if (updateData.showDiscountInTotal && updateData.discount) {
-      updateData.totalAmount = (updateData.totalAmount || 0) - (updateData.discount || 0);
+      updateData.totalAmount =
+        (updateData.totalAmount || 0) - (updateData.discount || 0);
     }
 
-    return await HireOrder.findOneAndUpdate({ hireOrderRef: refNo.trim() }, { $set: updateData }, { new: true, runValidators: true });
+    return await HireOrder.findOneAndUpdate(
+      { hireOrderRef: refNo.trim() },
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
   } catch (error) {
     throw new Error(`Error updating hire order: ${error.message}`);
   }
@@ -167,12 +275,13 @@ const uploadHireOrder = async (hireOrderRef, uploadedBy, description) => {
           approvedBy: uploadedBy,
           role: 'WORKSHOP_MANAGER',
           approvalDate: new Date(),
-          comments: description || `Hire order document uploaded: ${hireOrderRef}`,
+          comments:
+            description || `Hire order document uploaded: ${hireOrderRef}`,
           action: 'uploaded',
         },
       },
     },
-    { new: true, runValidators: true },
+    { new: true, runValidators: true }
   );
 
   return updated;

@@ -2,6 +2,6 @@
 // Notification Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
-module.exports = { SEVEN_DAYS_MS }
+module.exports = { SEVEN_DAYS_MS };

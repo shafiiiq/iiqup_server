@@ -1,7 +1,7 @@
 // services/session.service.js
-const crypto  = require('crypto');
+const crypto = require('crypto');
 const Session = require('../models/session.model.js');
-const User    = require('../models/user.model.js');
+const User = require('../models/user.model.js');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Write
@@ -17,10 +17,18 @@ const User    = require('../models/user.model.js');
  */
 const createSession = async (userId, userModel, deviceInfo, location) => {
   const sessionToken = crypto.randomBytes(32).toString('hex');
-  const expiresAt    = new Date();
-  expiresAt.setFullYear(expiresAt.getFullYear() + 10)
+  const expiresAt = new Date();
+  expiresAt.setFullYear(expiresAt.getFullYear() + 10);
 
-  const session = new Session({ userId, userModel, sessionToken, deviceInfo, location, isActive: true, expiresAt });
+  const session = new Session({
+    userId,
+    userModel,
+    sessionToken,
+    deviceInfo,
+    location,
+    isActive: true,
+    expiresAt,
+  });
   await session.save();
   return sessionToken;
 };
@@ -35,10 +43,15 @@ const createSession = async (userId, userModel, deviceInfo, location) => {
 const logoutSession = async (sessionId, userId, currentSessionToken) => {
   try {
     const session = await Session.findOne({ _id: sessionId, userId });
-    if (!session) return { status: 404, success: false, message: 'Session not found' };
+    if (!session)
+      return { status: 404, success: false, message: 'Session not found' };
 
     if (session.sessionToken === currentSessionToken) {
-      return { status: 400, success: false, message: 'Cannot logout current session. Use logout instead.' };
+      return {
+        status: 400,
+        success: false,
+        message: 'Cannot logout current session. Use logout instead.',
+      };
     }
 
     session.isActive = false;
@@ -47,12 +60,26 @@ const logoutSession = async (sessionId, userId, currentSessionToken) => {
     const userToLogout = await User.findById(userId);
     if (userToLogout) {
       const websocket = require('../sockets/websocket.js');
-      websocket.default.forceLogoutUser(userToLogout.uniqueCode, userToLogout._id, session.sessionToken, 'Logged out from another device');
+      websocket.default.forceLogoutUser(
+        userToLogout.uniqueCode,
+        userToLogout._id,
+        session.sessionToken,
+        'Logged out from another device'
+      );
     }
 
-    return { status: 200, success: true, message: 'Session logged out successfully' };
+    return {
+      status: 200,
+      success: true,
+      message: 'Session logged out successfully',
+    };
   } catch (error) {
-    return { status: 500, success: false, message: 'Failed to logout session', error: error.message };
+    return {
+      status: 500,
+      success: false,
+      message: 'Failed to logout session',
+      error: error.message,
+    };
   }
 };
 
@@ -65,19 +92,34 @@ const logoutSession = async (sessionId, userId, currentSessionToken) => {
 const blockDevice = async (sessionId, userId) => {
   try {
     const session = await Session.findOne({ _id: sessionId, userId });
-    if (!session) return { status: 404, success: false, message: 'Session not found' };
+    if (!session)
+      return { status: 404, success: false, message: 'Session not found' };
 
     await Session.deleteOne({ _id: sessionId });
 
     const userToBlock = await User.findById(userId);
     if (userToBlock) {
       const websocket = require('../sockets/websocket.js');
-      websocket.default.forceLogoutUser(userToBlock.uniqueCode, userToBlock._id, session.sessionToken, 'Device blocked');
+      websocket.default.forceLogoutUser(
+        userToBlock.uniqueCode,
+        userToBlock._id,
+        session.sessionToken,
+        'Device blocked'
+      );
     }
 
-    return { status: 200, success: true, message: 'Device blocked successfully' };
+    return {
+      status: 200,
+      success: true,
+      message: 'Device blocked successfully',
+    };
   } catch (error) {
-    return { status: 500, success: false, message: 'Failed to block device', error: error.message };
+    return {
+      status: 500,
+      success: false,
+      message: 'Failed to block device',
+      error: error.message,
+    };
   }
 };
 
@@ -97,14 +139,29 @@ const logoutAllSessions = async (userId, currentSessionToken) => {
     const userToLogout = await User.findById(userId);
     if (userToLogout) {
       const websocket = require('../sockets/websocket.js');
-      websocket.default.forceLogoutUser(userToLogout.uniqueCode, userToLogout._id, null, 'Logged out from all devices');
+      websocket.default.forceLogoutUser(
+        userToLogout.uniqueCode,
+        userToLogout._id,
+        null,
+        'Logged out from all devices'
+      );
     }
 
-    return { status: 200, success: true, message: 'All other sessions logged out successfully', data: { loggedOutCount: result.modifiedCount } };
+    return {
+      status: 200,
+      success: true,
+      message: 'All other sessions logged out successfully',
+      data: { loggedOutCount: result.modifiedCount },
+    };
   } catch (error) {
-    return { status: 500, success: false, message: 'Failed to logout all sessions', error: error.message };
+    return {
+      status: 500,
+      success: false,
+      message: 'Failed to logout all sessions',
+      error: error.message,
+    };
   }
-}; 
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Read
@@ -118,16 +175,28 @@ const logoutAllSessions = async (userId, currentSessionToken) => {
  */
 const getUserSessions = async (userId, currentSessionToken) => {
   try {
-    const sessions = await Session.find({ userId, isActive: true }).sort({ lastActivity: -1 });
+    const sessions = await Session.find({ userId, isActive: true }).sort({
+      lastActivity: -1,
+    });
 
-    const sessionsWithCurrent = sessions.map(session => ({
+    const sessionsWithCurrent = sessions.map((session) => ({
       ...session.toObject(),
       isCurrent: session.sessionToken === currentSessionToken,
     }));
 
-    return { status: 200, success: true, message: 'Sessions retrieved successfully', data: { sessions: sessionsWithCurrent, total: sessions.length } };
+    return {
+      status: 200,
+      success: true,
+      message: 'Sessions retrieved successfully',
+      data: { sessions: sessionsWithCurrent, total: sessions.length },
+    };
   } catch (error) {
-    return { status: 500, success: false, message: 'Failed to retrieve sessions', error: error.message };
+    return {
+      status: 500,
+      success: false,
+      message: 'Failed to retrieve sessions',
+      error: error.message,
+    };
   }
 };
 
@@ -140,27 +209,52 @@ const getUserSessions = async (userId, currentSessionToken) => {
 const checkSessionStatus = async (sessionId, userId) => {
   try {
     const mongoose = require('mongoose');
-    const session = await Session.findOne({ 
-      sessionToken: sessionId, 
-      userId: mongoose.Types.ObjectId.isValid(userId) 
-        ? new mongoose.Types.ObjectId(userId) 
-        : userId 
+    const session = await Session.findOne({
+      sessionToken: sessionId,
+      userId: mongoose.Types.ObjectId.isValid(userId)
+        ? new mongoose.Types.ObjectId(userId)
+        : userId,
     });
 
     if (!session) {
-      return { status: 401, success: false, sessionStatus: 'blocked', message: 'Session was blocked from another device', action: 'redirect_to_login' };
+      return {
+        status: 401,
+        success: false,
+        sessionStatus: 'blocked',
+        message: 'Session was blocked from another device',
+        action: 'redirect_to_login',
+      };
     }
 
     if (!session.isActive) {
-      return { status: 401, success: false, sessionStatus: 'logged_out', message: 'Session was logged out from another device', action: 'redirect_to_login' };
+      return {
+        status: 401,
+        success: false,
+        sessionStatus: 'logged_out',
+        message: 'Session was logged out from another device',
+        action: 'redirect_to_login',
+      };
     }
 
     return {
-      status: 200, success: true, sessionStatus: 'active', message: 'Session is active', action: 'continue_to_work',
-      session: { id: session._id, deviceInfo: session.deviceInfo, lastActivity: session.lastActivity }
+      status: 200,
+      success: true,
+      sessionStatus: 'active',
+      message: 'Session is active',
+      action: 'continue_to_work',
+      session: {
+        id: session._id,
+        deviceInfo: session.deviceInfo,
+        lastActivity: session.lastActivity,
+      },
     };
   } catch (error) {
-    return { status: 500, success: false, message: 'Failed to check session status', error: error.message };
+    return {
+      status: 500,
+      success: false,
+      message: 'Failed to check session status',
+      error: error.message,
+    };
   }
 };
 
@@ -168,4 +262,11 @@ const checkSessionStatus = async (sessionId, userId) => {
 // Exports
 // ─────────────────────────────────────────────────────────────────────────────
 
-module.exports = { createSession, getUserSessions, checkSessionStatus, logoutSession, blockDevice, logoutAllSessions };
+module.exports = {
+  createSession,
+  getUserSessions,
+  checkSessionStatus,
+  logoutSession,
+  blockDevice,
+  logoutAllSessions,
+};

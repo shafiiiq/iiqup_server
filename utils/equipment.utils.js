@@ -4,11 +4,11 @@
 // multiple service functions. Keep side-effectful logic here, pure logic in helpers.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const mongoose          = require('mongoose');
-const equipmentModel    = require('../models/equipment.model');
+const mongoose = require('mongoose');
+const equipmentModel = require('../models/equipment.model');
 const EquipmentImageModel = require('../models/images.model');
-const OperatorModel     = require('../models/operator.model');
-const OperatorService   = require('../services/operator.service');
+const OperatorModel = require('../models/operator.model');
+const OperatorService = require('../services/operator.service');
 const { normaliseImages } = require('../helpers/equipment.helper');
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -23,7 +23,10 @@ const { normaliseImages } = require('../helpers/equipment.helper');
  */
 const safeUpdateOperator = async (operatorId, updateData) => {
   if (!operatorId || !mongoose.Types.ObjectId.isValid(operatorId)) {
-    console.log('[Operator] Skipping operator update — invalid operatorId:', operatorId);
+    console.log(
+      '[Operator] Skipping operator update — invalid operatorId:',
+      operatorId
+    );
     return null;
   }
 
@@ -64,8 +67,10 @@ const getOperatorsByIds = async (operatorIds) => {
  * @returns {Promise<Record<string, object>>}
  */
 const fetchEquipmentMapByRegNo = async (regNos) => {
-  const equipments = await equipmentModel.find({ regNo: { $in: regNos } }).lean();
-  return Object.fromEntries(equipments.map(eq => [eq.regNo, eq]));
+  const equipments = await equipmentModel
+    .find({ regNo: { $in: regNos } })
+    .lean();
+  return Object.fromEntries(equipments.map((eq) => [eq.regNo, eq]));
 };
 
 /**
@@ -75,8 +80,10 @@ const fetchEquipmentMapByRegNo = async (regNos) => {
  * @returns {Promise<Record<string, object>>}
  */
 const fetchEquipmentMapById = async (equipmentIds) => {
-  const equipments = await equipmentModel.find({ _id: { $in: equipmentIds } }).lean();
-  return Object.fromEntries(equipments.map(eq => [eq._id.toString(), eq]));
+  const equipments = await equipmentModel
+    .find({ _id: { $in: equipmentIds } })
+    .lean();
+  return Object.fromEntries(equipments.map((eq) => [eq._id.toString(), eq]));
 };
 
 /**
@@ -85,10 +92,15 @@ const fetchEquipmentMapById = async (equipmentIds) => {
  * @returns {Promise<Record<string, object[]>>}
  */
 const fetchImageMap = async (regNos) => {
-  const equipmentImages = await EquipmentImageModel.find({ equipmentNo: { $in: regNos } }).lean();
+  const equipmentImages = await EquipmentImageModel.find({
+    equipmentNo: { $in: regNos },
+  }).lean();
 
   return Object.fromEntries(
-    equipmentImages.map(img => [img.equipmentNo, normaliseImages(img.images || [])])
+    equipmentImages.map((img) => [
+      img.equipmentNo,
+      normaliseImages(img.images || []),
+    ])
   );
 };
 
@@ -101,7 +113,7 @@ const fetchImageMap = async (regNos) => {
 const fetchOperatorMapByName = async (names) => {
   if (!names.length) return {};
   const operators = await OperatorService.getOperatorsByNames(names);
-  return Object.fromEntries(operators.map(op => [op.name, op]));
+  return Object.fromEntries(operators.map((op) => [op.name, op]));
 };
 
 /**
@@ -113,7 +125,7 @@ const fetchOperatorMapByName = async (names) => {
 const fetchOperatorMapById = async (ids) => {
   if (!ids.length) return {};
   const operators = await getOperatorsByIds(ids);
-  return Object.fromEntries(operators.map(op => [op._id.toString(), op]));
+  return Object.fromEntries(operators.map((op) => [op._id.toString(), op]));
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -128,11 +140,11 @@ const fetchOperatorMapById = async (ids) => {
 const shapeOperatorDetails = (op) => {
   if (!op) return null;
   return {
-    id:         op._id || op.id,
-    name:       op.name,
-    qatarId:    op.qatarId,
-    contactNo:  op.contactNo,
-    profilePic: op.profilePic
+    id: op._id || op.id,
+    name: op.name,
+    qatarId: op.qatarId,
+    contactNo: op.contactNo,
+    profilePic: op.profilePic,
   };
 };
 
@@ -145,15 +157,15 @@ const shapeOperatorDetails = (op) => {
  * @returns {object}
  */
 const shapeEquipmentDetails = (eq, fallback = {}, images = []) => ({
-  id:      eq._id,
-  machine: eq.machine  || fallback.machine,
-  regNo:   eq.regNo    || fallback.regNo,
-  brand:   eq.brand,
-  year:    eq.year,
+  id: eq._id,
+  machine: eq.machine || fallback.machine,
+  regNo: eq.regNo || fallback.regNo,
+  brand: eq.brand,
+  year: eq.year,
   company: eq.company,
-  status:  eq.status,
-  site:    eq.site?.[0] ?? eq.site,
-  images
+  status: eq.status,
+  site: eq.site?.[0] ?? eq.site,
+  images,
 });
 
 /**
@@ -164,26 +176,31 @@ const shapeEquipmentDetails = (eq, fallback = {}, images = []) => ({
  * @param {Record<string, object>}  operatorMap     - keyed by operator name
  * @returns {object[]}
  */
-const enrichMobilizations = (mobilizations, equipmentMap, imageMap, operatorMap) =>
-  mobilizations.map(mob => {
+const enrichMobilizations = (
+  mobilizations,
+  equipmentMap,
+  imageMap,
+  operatorMap
+) =>
+  mobilizations.map((mob) => {
     const equipment = equipmentMap[mob.regNo] || {};
-    const images    = imageMap[mob.regNo]     || [];
-    const operator  = mob.operator ? operatorMap[mob.operator] : null;
+    const images = imageMap[mob.regNo] || [];
+    const operator = mob.operator ? operatorMap[mob.operator] : null;
 
     return {
       ...mob,
       equipmentDetails: {
-        id:      equipment.id,
+        id: equipment.id,
         machine: equipment.machine || mob.machine,
-        regNo:   equipment.regNo   || mob.regNo,
-        brand:   equipment.brand,
-        year:    equipment.year,
+        regNo: equipment.regNo || mob.regNo,
+        brand: equipment.brand,
+        year: equipment.year,
         company: equipment.company,
-        status:  equipment.status,
-        site:    equipment.site?.[0] ?? equipment.site
+        status: equipment.status,
+        site: equipment.site?.[0] ?? equipment.site,
       },
-      equipmentImages:  images,
-      operatorDetails:  shapeOperatorDetails(operator)
+      equipmentImages: images,
+      operatorDetails: shapeOperatorDetails(operator),
     };
   });
 
@@ -195,29 +212,43 @@ const enrichMobilizations = (mobilizations, equipmentMap, imageMap, operatorMap)
  * @param {Record<string, object>}  operatorMap       - keyed by _id string
  * @returns {object[]}
  */
-const enrichReplacements = (replacements, equipmentMapById, imageMap, operatorMap) =>
-  replacements.map(rep => {
+const enrichReplacements = (
+  replacements,
+  equipmentMapById,
+  imageMap,
+  operatorMap
+) =>
+  replacements.map((rep) => {
     const currentEquipment = equipmentMapById[rep.equipmentId.toString()] || {};
-    const currentImages    = imageMap[currentEquipment.regNo] || [];
+    const currentImages = imageMap[currentEquipment.regNo] || [];
 
     let replacedEquipmentDetails = null;
 
     if (rep.type === 'equipment' && rep.replacedEquipmentId) {
-      const replacedEq     = equipmentMapById[rep.replacedEquipmentId.toString()] || {};
+      const replacedEq =
+        equipmentMapById[rep.replacedEquipmentId.toString()] || {};
       const replacedImages = imageMap[replacedEq.regNo] || [];
 
       replacedEquipmentDetails = {
         ...shapeEquipmentDetails(replacedEq, rep, replacedImages),
-        images: replacedImages
+        images: replacedImages,
       };
     }
 
     return {
       ...rep,
-      currentEquipmentDetails:  shapeEquipmentDetails(currentEquipment, rep, currentImages),
+      currentEquipmentDetails: shapeEquipmentDetails(
+        currentEquipment,
+        rep,
+        currentImages
+      ),
       replacedEquipmentDetails,
-      currentOperatorDetails:   shapeOperatorDetails(rep.currentOperatorId  ? operatorMap[rep.currentOperatorId]  : null),
-      replacedOperatorDetails:  shapeOperatorDetails(rep.replacedOperatorId ? operatorMap[rep.replacedOperatorId] : null)
+      currentOperatorDetails: shapeOperatorDetails(
+        rep.currentOperatorId ? operatorMap[rep.currentOperatorId] : null
+      ),
+      replacedOperatorDetails: shapeOperatorDetails(
+        rep.replacedOperatorId ? operatorMap[rep.replacedOperatorId] : null
+      ),
     };
   });
 
@@ -232,5 +263,5 @@ module.exports = {
   shapeOperatorDetails,
   shapeEquipmentDetails,
   enrichMobilizations,
-  enrichReplacements
+  enrichReplacements,
 };

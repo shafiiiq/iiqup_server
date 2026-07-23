@@ -1,4 +1,4 @@
-const Mechanic   = require('../models/mechanic.model');
+const Mechanic = require('../models/mechanic.model');
 const Attendance = require('../models/attendance.model');
 const {
   getMonthYearString,
@@ -6,7 +6,7 @@ const {
   isOlderThanCutoff,
   getCutoffMonthYear,
   formatValidationError,
-  buildAttendanceResponse
+  buildAttendanceResponse,
 } = require('../helpers/mechanic.helper');
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -35,15 +35,23 @@ const findMechanicByPin = async (zktecoPin) => {
  */
 const insertMechanics = async (mechanicData) => {
   try {
-    const highest    = await Mechanic.findOne().sort({ userId: -1 }).limit(1);
+    const highest = await Mechanic.findOne().sort({ userId: -1 }).limit(1);
     const nextUserId = highest ? highest.userId + 1 : 1;
 
-    const savedMechanic = await new Mechanic({ ...mechanicData, userId: nextUserId }).save();
+    const savedMechanic = await new Mechanic({
+      ...mechanicData,
+      userId: nextUserId,
+    }).save();
 
-    return { status: 201, message: 'Mechanic added successfully', data: savedMechanic };
+    return {
+      status: 201,
+      message: 'Mechanic added successfully',
+      data: savedMechanic,
+    };
   } catch (error) {
     console.error('[MechanicService] insertMechanics:', error);
-    if (error.name === 'ValidationError') throw { status: 400, message: formatValidationError(error) };
+    if (error.name === 'ValidationError')
+      throw { status: 400, message: formatValidationError(error) };
     throw { status: 500, message: error.message || 'Error adding mechanic' };
   }
 };
@@ -55,7 +63,12 @@ const insertMechanics = async (mechanicData) => {
 const fetchMechanic = async () => {
   try {
     const mechanics = await Mechanic.find();
-    return { status: 200, message: 'Mechanics fetched successfully', count: mechanics.length, data: mechanics };
+    return {
+      status: 200,
+      message: 'Mechanics fetched successfully',
+      count: mechanics.length,
+      data: mechanics,
+    };
   } catch (error) {
     console.error('[MechanicService] fetchMechanic:', error);
     throw { status: 500, message: error.message || 'Error fetching mechanics' };
@@ -86,13 +99,22 @@ const mechanicUpdate = async (id, updateData) => {
   try {
     delete updateData.userId;
 
-    const updated = await Mechanic.findByIdAndUpdate(id, { $set: updateData }, { new: true, runValidators: true });
+    const updated = await Mechanic.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
     if (!updated) throw { status: 404, message: 'Mechanic not found' };
 
-    return { status: 200, message: 'Mechanic updated successfully', data: updated };
+    return {
+      status: 200,
+      message: 'Mechanic updated successfully',
+      data: updated,
+    };
   } catch (error) {
     console.error('[MechanicService] mechanicUpdate:', error);
-    if (error.name === 'ValidationError') throw { status: 400, message: formatValidationError(error) };
+    if (error.name === 'ValidationError')
+      throw { status: 400, message: formatValidationError(error) };
     if (error.status) throw error;
     throw { status: 500, message: error.message || 'Error updating mechanic' };
   }
@@ -134,10 +156,15 @@ const addToolkit = async (mechanicId, toolkitData) => {
     mechanic.toolkits.push(toolkitData);
     const updated = await mechanic.save();
 
-    return { status: 201, message: 'Toolkit added successfully', data: updated };
+    return {
+      status: 201,
+      message: 'Toolkit added successfully',
+      data: updated,
+    };
   } catch (error) {
     console.error('[MechanicService] addToolkit:', error);
-    if (error.name === 'ValidationError') throw { status: 400, message: formatValidationError(error) };
+    if (error.name === 'ValidationError')
+      throw { status: 400, message: formatValidationError(error) };
     if (error.status) throw error;
     throw { status: 500, message: error.message || 'Error adding toolkit' };
   }
@@ -162,44 +189,51 @@ const addOvertime = async (mechanicId, overtimeData) => {
     dateToAdd.setHours(0, 0, 0, 0);
     overtimeData.date = dateToAdd;
 
-    const monthYear     = getMonthYearString(dateToAdd);
+    const monthYear = getMonthYearString(dateToAdd);
     const formattedDate = getFormattedDateString(dateToAdd);
 
     const overtimeEntry = {
-      date:          dateToAdd,
+      date: dateToAdd,
       formattedDate,
-      regNo:         overtimeData.regNo       || [],
-      times:         overtimeData.times       || [],
-      workDetails:   overtimeData.workDetails || [],
-      totalTime:     0,
-      formattedTime: ''
+      regNo: overtimeData.regNo || [],
+      times: overtimeData.times || [],
+      workDetails: overtimeData.workDetails || [],
+      totalTime: 0,
+      formattedTime: '',
     };
 
     if (!mechanic.monthlyOvertime) mechanic.monthlyOvertime = [];
 
-    let monthIndex = mechanic.monthlyOvertime.findIndex(mo => mo.month === monthYear);
+    let monthIndex = mechanic.monthlyOvertime.findIndex(
+      (mo) => mo.month === monthYear
+    );
 
     if (monthIndex === -1) {
       mechanic.monthlyOvertime.push({
-        month:              monthYear,
-        entries:            [overtimeEntry],
-        totalMonthTime:     0,
-        formattedMonthTime: '0h 0m'
+        month: monthYear,
+        entries: [overtimeEntry],
+        totalMonthTime: 0,
+        formattedMonthTime: '0h 0m',
       });
       monthIndex = mechanic.monthlyOvertime.length - 1;
     } else {
-      const entryIndex = mechanic.monthlyOvertime[monthIndex].entries.findIndex(e => {
-        const entryDate = new Date(e.date);
-        entryDate.setHours(0, 0, 0, 0);
-        return entryDate.getTime() === dateToAdd.getTime();
-      });
+      const entryIndex = mechanic.monthlyOvertime[monthIndex].entries.findIndex(
+        (e) => {
+          const entryDate = new Date(e.date);
+          entryDate.setHours(0, 0, 0, 0);
+          return entryDate.getTime() === dateToAdd.getTime();
+        }
+      );
 
       if (entryIndex !== -1) {
-        const existing = mechanic.monthlyOvertime[monthIndex].entries[entryIndex];
-        const path     = `monthlyOvertime.${monthIndex}.entries.${entryIndex}`;
+        const existing =
+          mechanic.monthlyOvertime[monthIndex].entries[entryIndex];
+        const path = `monthlyOvertime.${monthIndex}.entries.${entryIndex}`;
 
         if (overtimeData.regNo?.length > 0) {
-          overtimeData.regNo.forEach(r => { if (!existing.regNo.includes(r)) existing.regNo.push(r); });
+          overtimeData.regNo.forEach((r) => {
+            if (!existing.regNo.includes(r)) existing.regNo.push(r);
+          });
           mechanic.markModified(`${path}.regNo`);
         }
 
@@ -217,15 +251,20 @@ const addOvertime = async (mechanicId, overtimeData) => {
       }
     }
 
-    const updated      = await mechanic.save();
+    const updated = await mechanic.save();
     const addedMonthly = updated.monthlyOvertime[monthIndex];
 
     cleanupOldOvertimeData(mechanicId);
 
-    return { status: 201, message: 'Overtime record added successfully', data: addedMonthly };
+    return {
+      status: 201,
+      message: 'Overtime record added successfully',
+      data: addedMonthly,
+    };
   } catch (error) {
     console.error('[MechanicService] addOvertime:', error);
-    if (error.name === 'ValidationError') throw { status: 400, message: formatValidationError(error) };
+    if (error.name === 'ValidationError')
+      throw { status: 400, message: formatValidationError(error) };
     if (error.status) throw error;
     throw { status: 500, message: error.message || 'Error adding overtime' };
   }
@@ -239,15 +278,16 @@ const addOvertime = async (mechanicId, overtimeData) => {
  */
 const cleanupOldOvertimeData = async (mechanicId) => {
   try {
-    const cutoff   = getCutoffMonthYear();
+    const cutoff = getCutoffMonthYear();
     const mechanic = await Mechanic.findById(mechanicId);
     if (!mechanic) return { status: 404, message: 'Mechanic not found' };
 
-    if (!mechanic.monthlyOvertime?.length) return { status: 200, message: 'Nothing to clean up' };
+    if (!mechanic.monthlyOvertime?.length)
+      return { status: 200, message: 'Nothing to clean up' };
 
     const monthsToRemove = mechanic.monthlyOvertime
-      .map(mo => mo.month)
-      .filter(month => isOlderThanCutoff(month, cutoff));
+      .map((mo) => mo.month)
+      .filter((month) => isOlderThanCutoff(month, cutoff));
 
     if (monthsToRemove.length > 0) {
       await Mechanic.updateOne(
@@ -256,10 +296,18 @@ const cleanupOldOvertimeData = async (mechanicId) => {
       );
     }
 
-    return { status: 200, message: 'Old overtime data cleaned up', data: { mechanicId } };
+    return {
+      status: 200,
+      message: 'Old overtime data cleaned up',
+      data: { mechanicId },
+    };
   } catch (error) {
     console.error('[MechanicService] cleanupOldOvertimeData:', error);
-    return { status: 500, message: 'Error cleaning up old overtime data', error: error.message };
+    return {
+      status: 500,
+      message: 'Error cleaning up old overtime data',
+      error: error.message,
+    };
   }
 };
 
@@ -269,16 +317,16 @@ const cleanupOldOvertimeData = async (mechanicId) => {
  */
 const cleanupAllOldOvertimeData = async () => {
   try {
-    const cutoff              = getCutoffMonthYear();
-    const mechanics           = await Mechanic.find({});
-    let   totalCleanedRecords = 0;
+    const cutoff = getCutoffMonthYear();
+    const mechanics = await Mechanic.find({});
+    let totalCleanedRecords = 0;
 
     for (const mechanic of mechanics) {
       if (!mechanic.monthlyOvertime?.length) continue;
 
       const monthsToRemove = mechanic.monthlyOvertime
-        .map(mo => mo.month)
-        .filter(month => isOlderThanCutoff(month, cutoff));
+        .map((mo) => mo.month)
+        .filter((month) => isOlderThanCutoff(month, cutoff));
 
       if (monthsToRemove.length > 0) {
         await Mechanic.updateOne(
@@ -290,13 +338,16 @@ const cleanupAllOldOvertimeData = async () => {
     }
 
     return {
-      status:  200,
+      status: 200,
       message: 'Old overtime data cleaned up for all mechanics',
-      data:    { monthlyRecordsRemoved: totalCleanedRecords }
+      data: { monthlyRecordsRemoved: totalCleanedRecords },
     };
   } catch (error) {
     console.error('[MechanicService] cleanupAllOldOvertimeData:', error);
-    throw { status: 500, message: error.message || 'Error cleaning up old overtime data' };
+    throw {
+      status: 500,
+      message: error.message || 'Error cleaning up old overtime data',
+    };
   }
 };
 
@@ -305,9 +356,9 @@ const cleanupAllOldOvertimeData = async () => {
  * @returns {object}
  */
 const migrateOvertimeDataToMonthlyStructure = () => ({
-  status:  200,
+  status: 200,
   message: 'No migration needed - system is already using monthly structure',
-  data:    {}
+  data: {},
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -322,14 +373,20 @@ const migrateOvertimeDataToMonthlyStructure = () => ({
  */
 const fetchDailyAttendance = async (zktecoPin, date) => {
   try {
-    const mechanic   = await findMechanicByPin(zktecoPin);
-    const attendance = await Attendance.find({ pin: zktecoPin, dateOnly: date }).sort({ punchDateTime: 1 });
+    const mechanic = await findMechanicByPin(zktecoPin);
+    const attendance = await Attendance.find({
+      pin: zktecoPin,
+      dateOnly: date,
+    }).sort({ punchDateTime: 1 });
 
     return buildAttendanceResponse(mechanic, attendance, { date });
   } catch (error) {
     console.error('[MechanicService] fetchDailyAttendance:', error);
     if (error.status) throw error;
-    throw { status: 500, message: error.message || 'Error fetching daily attendance' };
+    throw {
+      status: 500,
+      message: error.message || 'Error fetching daily attendance',
+    };
   }
 };
 
@@ -342,16 +399,21 @@ const fetchDailyAttendance = async (zktecoPin, date) => {
  */
 const fetchWeeklyAttendance = async (zktecoPin, year, week) => {
   try {
-    const mechanic   = await findMechanicByPin(zktecoPin);
-    const attendance = await Attendance
-      .find({ pin: zktecoPin, year: parseInt(year), weekNumber: parseInt(week) })
-      .sort({ punchDateTime: 1 });
+    const mechanic = await findMechanicByPin(zktecoPin);
+    const attendance = await Attendance.find({
+      pin: zktecoPin,
+      year: parseInt(year),
+      weekNumber: parseInt(week),
+    }).sort({ punchDateTime: 1 });
 
     return buildAttendanceResponse(mechanic, attendance, { year, week });
   } catch (error) {
     console.error('[MechanicService] fetchWeeklyAttendance:', error);
     if (error.status) throw error;
-    throw { status: 500, message: error.message || 'Error fetching weekly attendance' };
+    throw {
+      status: 500,
+      message: error.message || 'Error fetching weekly attendance',
+    };
   }
 };
 
@@ -364,15 +426,21 @@ const fetchWeeklyAttendance = async (zktecoPin, year, week) => {
  */
 const fetchMonthlyAttendance = async (zktecoPin, year, month) => {
   try {
-    const mechanic   = await findMechanicByPin(zktecoPin);
-    const monthYear  = `${year}-${month.padStart(2, '0')}`;
-    const attendance = await Attendance.find({ pin: zktecoPin, monthYear }).sort({ punchDateTime: 1 });
+    const mechanic = await findMechanicByPin(zktecoPin);
+    const monthYear = `${year}-${month.padStart(2, '0')}`;
+    const attendance = await Attendance.find({
+      pin: zktecoPin,
+      monthYear,
+    }).sort({ punchDateTime: 1 });
 
     return buildAttendanceResponse(mechanic, attendance, { year, month });
   } catch (error) {
     console.error('[MechanicService] fetchMonthlyAttendance:', error);
     if (error.status) throw error;
-    throw { status: 500, message: error.message || 'Error fetching monthly attendance' };
+    throw {
+      status: 500,
+      message: error.message || 'Error fetching monthly attendance',
+    };
   }
 };
 
@@ -384,14 +452,20 @@ const fetchMonthlyAttendance = async (zktecoPin, year, month) => {
  */
 const fetchYearlyAttendance = async (zktecoPin, year) => {
   try {
-    const mechanic   = await findMechanicByPin(zktecoPin);
-    const attendance = await Attendance.find({ pin: zktecoPin, year: parseInt(year) }).sort({ punchDateTime: 1 });
+    const mechanic = await findMechanicByPin(zktecoPin);
+    const attendance = await Attendance.find({
+      pin: zktecoPin,
+      year: parseInt(year),
+    }).sort({ punchDateTime: 1 });
 
     return buildAttendanceResponse(mechanic, attendance, { year });
   } catch (error) {
     console.error('[MechanicService] fetchYearlyAttendance:', error);
     if (error.status) throw error;
-    throw { status: 500, message: error.message || 'Error fetching yearly attendance' };
+    throw {
+      status: 500,
+      message: error.message || 'Error fetching yearly attendance',
+    };
   }
 };
 
@@ -404,18 +478,26 @@ const fetchYearlyAttendance = async (zktecoPin, year) => {
  */
 const fetchAttendanceByDateRange = async (zktecoPin, startDate, endDate) => {
   try {
-    if (!startDate || !endDate) throw { status: 400, message: 'Both startDate and endDate are required' };
+    if (!startDate || !endDate)
+      throw { status: 400, message: 'Both startDate and endDate are required' };
 
-    const mechanic   = await findMechanicByPin(zktecoPin);
-    const attendance = await Attendance
-      .find({ pin: zktecoPin, dateOnly: { $gte: startDate, $lte: endDate } })
-      .sort({ punchDateTime: 1 });
+    const mechanic = await findMechanicByPin(zktecoPin);
+    const attendance = await Attendance.find({
+      pin: zktecoPin,
+      dateOnly: { $gte: startDate, $lte: endDate },
+    }).sort({ punchDateTime: 1 });
 
-    return buildAttendanceResponse(mechanic, attendance, { startDate, endDate });
+    return buildAttendanceResponse(mechanic, attendance, {
+      startDate,
+      endDate,
+    });
   } catch (error) {
     console.error('[MechanicService] fetchAttendanceByDateRange:', error);
     if (error.status) throw error;
-    throw { status: 500, message: error.message || 'Error fetching attendance by date range' };
+    throw {
+      status: 500,
+      message: error.message || 'Error fetching attendance by date range',
+    };
   }
 };
 
@@ -427,17 +509,29 @@ const fetchAttendanceByDateRange = async (zktecoPin, startDate, endDate) => {
  */
 const fetchAttendanceByMonths = async (zktecoPin, months) => {
   try {
-    if (!months) throw { status: 400, message: 'Months parameter is required (format: YYYY-MM,YYYY-MM)' };
+    if (!months)
+      throw {
+        status: 400,
+        message: 'Months parameter is required (format: YYYY-MM,YYYY-MM)',
+      };
 
-    const mechanic    = await findMechanicByPin(zktecoPin);
-    const monthsArray = months.split(',').map(m => m.trim());
-    const attendance  = await Attendance.find({ pin: zktecoPin, monthYear: { $in: monthsArray } }).sort({ punchDateTime: 1 });
+    const mechanic = await findMechanicByPin(zktecoPin);
+    const monthsArray = months.split(',').map((m) => m.trim());
+    const attendance = await Attendance.find({
+      pin: zktecoPin,
+      monthYear: { $in: monthsArray },
+    }).sort({ punchDateTime: 1 });
 
-    return buildAttendanceResponse(mechanic, attendance, { months: monthsArray });
+    return buildAttendanceResponse(mechanic, attendance, {
+      months: monthsArray,
+    });
   } catch (error) {
     console.error('[MechanicService] fetchAttendanceByMonths:', error);
     if (error.status) throw error;
-    throw { status: 500, message: error.message || 'Error fetching attendance by months' };
+    throw {
+      status: 500,
+      message: error.message || 'Error fetching attendance by months',
+    };
   }
 };
 
@@ -449,17 +543,27 @@ const fetchAttendanceByMonths = async (zktecoPin, months) => {
  */
 const fetchAttendanceByYears = async (zktecoPin, years) => {
   try {
-    if (!years) throw { status: 400, message: 'Years parameter is required (format: 2025,2024,2023)' };
+    if (!years)
+      throw {
+        status: 400,
+        message: 'Years parameter is required (format: 2025,2024,2023)',
+      };
 
-    const mechanic   = await findMechanicByPin(zktecoPin);
-    const yearsArray = years.split(',').map(y => parseInt(y.trim()));
-    const attendance = await Attendance.find({ pin: zktecoPin, year: { $in: yearsArray } }).sort({ punchDateTime: 1 });
+    const mechanic = await findMechanicByPin(zktecoPin);
+    const yearsArray = years.split(',').map((y) => parseInt(y.trim()));
+    const attendance = await Attendance.find({
+      pin: zktecoPin,
+      year: { $in: yearsArray },
+    }).sort({ punchDateTime: 1 });
 
     return buildAttendanceResponse(mechanic, attendance, { years: yearsArray });
   } catch (error) {
     console.error('[MechanicService] fetchAttendanceByYears:', error);
     if (error.status) throw error;
-    throw { status: 500, message: error.message || 'Error fetching attendance by years' };
+    throw {
+      status: 500,
+      message: error.message || 'Error fetching attendance by years',
+    };
   }
 };
 
@@ -471,23 +575,36 @@ const fetchAttendanceByYears = async (zktecoPin, years) => {
  */
 const fetchAttendanceByWeeks = async (zktecoPin, weeks) => {
   try {
-    if (!weeks) throw { status: 400, message: 'Weeks parameter is required (format: 2025-1,2025-2)' };
+    if (!weeks)
+      throw {
+        status: 400,
+        message: 'Weeks parameter is required (format: 2025-1,2025-2)',
+      };
 
-    const mechanic   = await findMechanicByPin(zktecoPin);
-    const weeksArray = weeks.split(',').map(w => w.trim());
+    const mechanic = await findMechanicByPin(zktecoPin);
+    const weeksArray = weeks.split(',').map((w) => w.trim());
 
-    const queries = weeksArray.map(weekStr => {
+    const queries = weeksArray.map((weekStr) => {
       const [year, week] = weekStr.split('-');
-      return { pin: zktecoPin, year: parseInt(year), weekNumber: parseInt(week) };
+      return {
+        pin: zktecoPin,
+        year: parseInt(year),
+        weekNumber: parseInt(week),
+      };
     });
 
-    const attendance = await Attendance.find({ $or: queries }).sort({ punchDateTime: 1 });
+    const attendance = await Attendance.find({ $or: queries }).sort({
+      punchDateTime: 1,
+    });
 
     return buildAttendanceResponse(mechanic, attendance, { weeks: weeksArray });
   } catch (error) {
     console.error('[MechanicService] fetchAttendanceByWeeks:', error);
     if (error.status) throw error;
-    throw { status: 500, message: error.message || 'Error fetching attendance by weeks' };
+    throw {
+      status: 500,
+      message: error.message || 'Error fetching attendance by weeks',
+    };
   }
 };
 
@@ -498,26 +615,35 @@ const fetchAttendanceByWeeks = async (zktecoPin, weeks) => {
  */
 const fetchAllMonthsAttendance = async (zktecoPin) => {
   try {
-    const mechanic   = await findMechanicByPin(zktecoPin);
+    const mechanic = await findMechanicByPin(zktecoPin);
     const attendance = await Attendance.aggregate([
       { $match: { pin: zktecoPin } },
-      { $sort:  { punchDateTime: 1 } },
-      { $group: { _id: '$monthYear', records: { $push: '$$ROOT' }, count: { $sum: 1 } } },
-      { $sort:  { _id: -1 } }
+      { $sort: { punchDateTime: 1 } },
+      {
+        $group: {
+          _id: '$monthYear',
+          records: { $push: '$$ROOT' },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: -1 } },
     ]);
 
     return {
       status: 200,
       data: {
-        mechanic:    { name: mechanic.name, zktecoPin: mechanic.zktecoPin },
-        months:      attendance,
-        totalMonths: attendance.length
-      }
+        mechanic: { name: mechanic.name, zktecoPin: mechanic.zktecoPin },
+        months: attendance,
+        totalMonths: attendance.length,
+      },
     };
   } catch (error) {
     console.error('[MechanicService] fetchAllMonthsAttendance:', error);
     if (error.status) throw error;
-    throw { status: 500, message: error.message || 'Error fetching all months attendance' };
+    throw {
+      status: 500,
+      message: error.message || 'Error fetching all months attendance',
+    };
   }
 };
 
@@ -528,26 +654,35 @@ const fetchAllMonthsAttendance = async (zktecoPin) => {
  */
 const fetchAllYearsAttendance = async (zktecoPin) => {
   try {
-    const mechanic   = await findMechanicByPin(zktecoPin);
+    const mechanic = await findMechanicByPin(zktecoPin);
     const attendance = await Attendance.aggregate([
       { $match: { pin: zktecoPin } },
-      { $sort:  { punchDateTime: 1 } },
-      { $group: { _id: '$year', records: { $push: '$$ROOT' }, count: { $sum: 1 } } },
-      { $sort:  { _id: -1 } }
+      { $sort: { punchDateTime: 1 } },
+      {
+        $group: {
+          _id: '$year',
+          records: { $push: '$$ROOT' },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: -1 } },
     ]);
 
     return {
       status: 200,
       data: {
-        mechanic:   { name: mechanic.name, zktecoPin: mechanic.zktecoPin },
-        years:      attendance,
-        totalYears: attendance.length
-      }
+        mechanic: { name: mechanic.name, zktecoPin: mechanic.zktecoPin },
+        years: attendance,
+        totalYears: attendance.length,
+      },
     };
   } catch (error) {
     console.error('[MechanicService] fetchAllYearsAttendance:', error);
     if (error.status) throw error;
-    throw { status: 500, message: error.message || 'Error fetching all years attendance' };
+    throw {
+      status: 500,
+      message: error.message || 'Error fetching all years attendance',
+    };
   }
 };
 
@@ -558,14 +693,19 @@ const fetchAllYearsAttendance = async (zktecoPin) => {
  */
 const fetchAllAttendance = async (zktecoPin) => {
   try {
-    const mechanic   = await findMechanicByPin(zktecoPin);
-    const attendance = await Attendance.find({ pin: zktecoPin }).sort({ punchDateTime: -1 });
+    const mechanic = await findMechanicByPin(zktecoPin);
+    const attendance = await Attendance.find({ pin: zktecoPin }).sort({
+      punchDateTime: -1,
+    });
 
     return buildAttendanceResponse(mechanic, attendance);
   } catch (error) {
     console.error('[MechanicService] fetchAllAttendance:', error);
     if (error.status) throw error;
-    throw { status: 500, message: error.message || 'Error fetching all attendance' };
+    throw {
+      status: 500,
+      message: error.message || 'Error fetching all attendance',
+    };
   }
 };
 
@@ -594,5 +734,5 @@ module.exports = {
   fetchAttendanceByWeeks,
   fetchAllMonthsAttendance,
   fetchAllYearsAttendance,
-  fetchAllAttendance
+  fetchAllAttendance,
 };

@@ -1,5 +1,5 @@
 const ffmpeg = require('fluent-ffmpeg');
-const fs = require('fs'); 
+const fs = require('fs');
 const path = require('path');
 
 // Get duration of video files
@@ -9,7 +9,7 @@ const getFileDuration = (filePath) => {
       if (err) {
         console.error('Error getting video duration:', err);
         resolve(0); // Default to 0 if can't get duration
-      } else { 
+      } else {
         resolve(Math.floor(metadata.format.duration));
       }
     });
@@ -18,7 +18,12 @@ const getFileDuration = (filePath) => {
 
 // Ensure public/uploads directory exists
 const ensureUploadsDirectory = () => {
-  const uploadsPath = path.join(process.cwd(), 'public', 'uploads', 'complaints');
+  const uploadsPath = path.join(
+    process.cwd(),
+    'public',
+    'uploads',
+    'complaints'
+  );
   if (!fs.existsSync(uploadsPath)) {
     fs.mkdirSync(uploadsPath, { recursive: true });
   }
@@ -26,5 +31,5 @@ const ensureUploadsDirectory = () => {
 
 module.exports = {
   getFileDuration,
-  ensureUploadsDirectory
+  ensureUploadsDirectory,
 };

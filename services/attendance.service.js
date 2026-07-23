@@ -1,6 +1,6 @@
 // services/attendance.service.js
-const Attendance             = require('../models/attendance.model');
-const moment                 = require('moment');
+const Attendance = require('../models/attendance.model');
+const moment = require('moment');
 const PushNotificationService = require('../push/notification.push');
 const { createNotification } = require('./notification.service');
 require('dotenv').config();
@@ -16,8 +16,18 @@ const NOTIFICATION_RECIPIENTS = [
 ];
 
 const MONTHS = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 
 /**
@@ -28,7 +38,7 @@ const standardizeName = (name) => {
   return name
     .toLowerCase()
     .split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
 };
 
@@ -39,7 +49,7 @@ const formatTime = (timeString) => {
   const [hours, minutes] = timeString.split(':');
   const hour24 = parseInt(hours);
   const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
-  const ampm   = hour24 >= 12 ? 'PM' : 'AM';
+  const ampm = hour24 >= 12 ? 'PM' : 'AM';
   return `${hour12}:${minutes}${ampm}`;
 };
 
@@ -48,16 +58,16 @@ const formatTime = (timeString) => {
  * (e.g. "today (5 June)", "yesterday (4 June)", "on 3 June").
  */
 const formatDate = (dateString) => {
-  const date      = new Date(dateString);
-  const today     = new Date();
+  const date = new Date(dateString);
+  const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
 
-  const todayStr     = today.toISOString().split('T')[0];
+  const todayStr = today.toISOString().split('T')[0];
   const yesterdayStr = yesterday.toISOString().split('T')[0];
-  const label        = `${date.getDate()} ${MONTHS[date.getMonth()]}`;
+  const label = `${date.getDate()} ${MONTHS[date.getMonth()]}`;
 
-  if (dateString === todayStr)     return `today (${label})`;
+  if (dateString === todayStr) return `today (${label})`;
   if (dateString === yesterdayStr) return `yesterday (${label})`;
   return `on ${label}`;
 };
@@ -66,11 +76,13 @@ const formatDate = (dateString) => {
  * Returns the ISO week number for a given Date.
  */
 const getWeekNumber = (date) => {
-  const d      = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const d = new Date(
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+  );
   const dayNum = d.getUTCDay() || 7;
   d.setUTCDate(d.getUTCDate() + 4 - dayNum);
   const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -82,12 +94,14 @@ const getWeekNumber = (date) => {
  * chronological position among existing punches for the same employee/day.
  */
 const determinePunchType = async (pin, currentDateTime) => {
-  const dateOnly    = moment(currentDateTime).format('YYYY-MM-DD');
-  const todayPunches = await Attendance.find({ pin, dateOnly }).sort({ punchDateTime: 1 });
+  const dateOnly = moment(currentDateTime).format('YYYY-MM-DD');
+  const todayPunches = await Attendance.find({ pin, dateOnly }).sort({
+    punchDateTime: 1,
+  });
 
   if (todayPunches.length === 0) return 'IN';
 
-  const existingPunch = todayPunches.find(punch =>
+  const existingPunch = todayPunches.find((punch) =>
     moment(punch.punchDateTime).isSame(moment(currentDateTime))
   );
 
@@ -95,7 +109,9 @@ const determinePunchType = async (pin, currentDateTime) => {
 
   let insertPosition = 0;
   for (let i = 0; i < todayPunches.length; i++) {
-    if (moment(currentDateTime).isAfter(moment(todayPunches[i].punchDateTime))) {
+    if (
+      moment(currentDateTime).isAfter(moment(todayPunches[i].punchDateTime))
+    ) {
       insertPosition = i + 1;
     } else {
       break;
@@ -112,13 +128,17 @@ const determinePunchType = async (pin, currentDateTime) => {
  */
 const recalculatePunchTypes = async (pin, date) => {
   const dateOnly = moment(date).format('YYYY-MM-DD');
-  const punches  = await Attendance.find({ pin, dateOnly }).sort({ punchDateTime: 1 });
+  const punches = await Attendance.find({ pin, dateOnly }).sort({
+    punchDateTime: 1,
+  });
 
   for (let i = 0; i < punches.length; i++) {
     const correctPunchType = i % 2 === 0 ? 'IN' : 'OUT';
 
     if (punches[i].punchType !== correctPunchType) {
-      await Attendance.findByIdAndUpdate(punches[i]._id, { punchType: correctPunchType });
+      await Attendance.findByIdAndUpdate(punches[i]._id, {
+        punchType: correctPunchType,
+      });
     }
   }
 
@@ -137,49 +157,59 @@ const recalculatePunchTypes = async (pin, date) => {
  */
 const addAttendance = async (attendanceData) => {
   try {
-    const punchDateTime          = new Date();
+    const punchDateTime = new Date();
     const [hours, minutes, seconds] = attendanceData.punch_time.split(':');
-    punchDateTime.setHours(parseInt(hours), parseInt(minutes), parseInt(seconds), 0);
+    punchDateTime.setHours(
+      parseInt(hours),
+      parseInt(minutes),
+      parseInt(seconds),
+      0
+    );
 
-    const existingRecord = await Attendance.findOne({ originalId: attendanceData.id });
+    const existingRecord = await Attendance.findOne({
+      originalId: attendanceData.id,
+    });
     if (existingRecord) return null;
 
-    const punchType = await determinePunchType(attendanceData.pin, punchDateTime);
+    const punchType = await determinePunchType(
+      attendanceData.pin,
+      punchDateTime
+    );
 
     const savedAttendance = await Attendance.create({
-      originalId:    attendanceData.id,
-      pin:           attendanceData.pin,
-      empName:       attendanceData.emp_name,
-      punchTime:     attendanceData.punch_time,
+      originalId: attendanceData.id,
+      pin: attendanceData.pin,
+      empName: attendanceData.emp_name,
+      punchTime: attendanceData.punch_time,
       punchDateTime,
-      state:         attendanceData.state,
-      workCode:      attendanceData.work_code,
-      photo:         attendanceData.photo || '',
-      location:      attendanceData.location,
+      state: attendanceData.state,
+      workCode: attendanceData.work_code,
+      photo: attendanceData.photo || '',
+      location: attendanceData.location,
       punchType,
-      dateOnly:      moment(punchDateTime).format('YYYY-MM-DD'),
-      timeOnly:      attendanceData.punch_time,
-      weekNumber:    getWeekNumber(punchDateTime),
-      monthYear:     moment(punchDateTime).format('YYYY-MM'),
-      year:          punchDateTime.getFullYear(),
+      dateOnly: moment(punchDateTime).format('YYYY-MM-DD'),
+      timeOnly: attendanceData.punch_time,
+      weekNumber: getWeekNumber(punchDateTime),
+      monthYear: moment(punchDateTime).format('YYYY-MM'),
+      year: punchDateTime.getFullYear(),
     });
 
     await recalculatePunchTypes(attendanceData.pin, punchDateTime);
 
     try {
-      const name        = standardizeName(savedAttendance.empName);
-      const timeLabel   = formatTime(savedAttendance.timeOnly);
-      const dateLabel   = formatDate(savedAttendance.dateOnly);
-      const title       = `${name} Punched ${savedAttendance.punchType}`;
+      const name = standardizeName(savedAttendance.empName);
+      const timeLabel = formatTime(savedAttendance.timeOnly);
+      const dateLabel = formatDate(savedAttendance.dateOnly);
+      const title = `${name} Punched ${savedAttendance.punchType}`;
       const description = `${name} punched ${savedAttendance.punchType.toLowerCase()} at ${timeLabel} ${dateLabel}`;
 
       await createNotification({
         title,
         description,
-        priority:  'low',
-        sourceId:  'attendance',
+        priority: 'low',
+        sourceId: 'attendance',
         recipient: NOTIFICATION_RECIPIENTS,
-        time:      new Date(),
+        time: new Date(),
       });
 
       await PushNotificationService.sendGeneralNotification(
@@ -187,10 +217,13 @@ const addAttendance = async (attendanceData) => {
         title,
         description,
         'low',
-        'attendance',
+        'attendance'
       );
     } catch (error) {
-      console.error('[AttendanceService] addAttendance — notification error:', error);
+      console.error(
+        '[AttendanceService] addAttendance — notification error:',
+        error
+      );
     }
 
     return savedAttendance;
@@ -207,18 +240,20 @@ const addAttendance = async (attendanceData) => {
  */
 const fixExistingPunchTypes = async (pin = null, date = null) => {
   try {
-    const query        = {};
-    if (pin)  query.pin = pin;
+    const query = {};
+    if (pin) query.pin = pin;
     if (date) query.dateOnly = moment(date).format('YYYY-MM-DD');
 
-    const pins       = await Attendance.distinct('pin', query);
-    let totalFixed   = 0;
+    const pins = await Attendance.distinct('pin', query);
+    let totalFixed = 0;
 
     for (const employeePin of pins) {
       if (date) {
         totalFixed += await recalculatePunchTypes(employeePin, date);
       } else {
-        const dates = await Attendance.distinct('dateOnly', { pin: employeePin });
+        const dates = await Attendance.distinct('dateOnly', {
+          pin: employeePin,
+        });
         for (const dateOnly of dates) {
           totalFixed += await recalculatePunchTypes(employeePin, dateOnly);
         }
@@ -259,14 +294,14 @@ const getLiveMecAttendance = async (userId, filters = {}) => {
   try {
     const query = {};
 
-    if (filters.pin)     query.pin      = filters.pin;
-    if (filters.month)   query.monthYear = filters.month;
-    if (filters.year)    query.year      = parseInt(filters.year);
-    if (filters.empName) query.empName   = new RegExp(filters.empName, 'i');
+    if (filters.pin) query.pin = filters.pin;
+    if (filters.month) query.monthYear = filters.month;
+    if (filters.year) query.year = parseInt(filters.year);
+    if (filters.empName) query.empName = new RegExp(filters.empName, 'i');
 
     if (filters.week && filters.weekYear) {
       query.weekNumber = parseInt(filters.week);
-      query.year       = parseInt(filters.weekYear);
+      query.year = parseInt(filters.weekYear);
     }
 
     if (filters.startDate && filters.endDate) {
@@ -275,8 +310,7 @@ const getLiveMecAttendance = async (userId, filters = {}) => {
       query.dateOnly = filters.date;
     }
 
-    return await Attendance
-      .find(query)
+    return await Attendance.find(query)
       .sort({ punchDateTime: -1 })
       .limit(parseInt(filters.limit) || 100);
   } catch (error) {
@@ -292,29 +326,29 @@ const getLiveMecAttendance = async (userId, filters = {}) => {
 const getAttendanceStats = async (filters = {}) => {
   try {
     const matchStage = {};
-    if (filters.pin)   matchStage.pin      = filters.pin;
+    if (filters.pin) matchStage.pin = filters.pin;
     if (filters.month) matchStage.monthYear = filters.month;
-    if (filters.year)  matchStage.year      = parseInt(filters.year);
+    if (filters.year) matchStage.year = parseInt(filters.year);
 
     return await Attendance.aggregate([
       { $match: matchStage },
       {
         $group: {
-          _id:          { pin: '$pin', empName: '$empName', dateOnly: '$dateOnly' },
+          _id: { pin: '$pin', empName: '$empName', dateOnly: '$dateOnly' },
           totalPunches: { $sum: 1 },
-          firstPunch:   { $min: '$punchDateTime' },
-          lastPunch:    { $max: '$punchDateTime' },
-          punchTypes:   { $push: '$punchType' },
+          firstPunch: { $min: '$punchDateTime' },
+          lastPunch: { $max: '$punchDateTime' },
+          punchTypes: { $push: '$punchType' },
         },
       },
       {
         $project: {
-          pin:          '$_id.pin',
-          empName:      '$_id.empName',
-          date:         '$_id.dateOnly',
+          pin: '$_id.pin',
+          empName: '$_id.empName',
+          date: '$_id.dateOnly',
           totalPunches: 1,
-          firstPunch:   1,
-          lastPunch:    1,
+          firstPunch: 1,
+          lastPunch: 1,
           workingHours: {
             $divide: [{ $subtract: ['$lastPunch', '$firstPunch'] }, 3600000],
           },
@@ -334,7 +368,9 @@ const getAttendanceStats = async (filters = {}) => {
 const getTodayAttendance = async () => {
   try {
     const today = moment().format('YYYY-MM-DD');
-    return await Attendance.find({ dateOnly: today }).sort({ punchDateTime: -1 });
+    return await Attendance.find({ dateOnly: today }).sort({
+      punchDateTime: -1,
+    });
   } catch (error) {
     console.error('[AttendanceService] getTodayAttendance:', error);
     throw error;
@@ -346,7 +382,9 @@ const getTodayAttendance = async () => {
  */
 const getUnprocessedRecords = async () => {
   try {
-    return await Attendance.find({ notificationSent: false }).sort({ punchDateTime: 1 });
+    return await Attendance.find({ notificationSent: false }).sort({
+      punchDateTime: 1,
+    });
   } catch (error) {
     console.error('[AttendanceService] getUnprocessedRecords:', error);
     throw error;
@@ -366,14 +404,19 @@ const sendWhatsAppMessage = async (empName, punchType, time, date) => {
     const axios = require('axios');
 
     if (!process.env.WHATSAPP_ACCESS_TOKEN) {
-      throw new Error('WHATSAPP_ACCESS_TOKEN is not set in environment variables');
+      throw new Error(
+        'WHATSAPP_ACCESS_TOKEN is not set in environment variables'
+      );
     }
 
     if (!process.env.WHATSAPP_PHONE_NUMBER_ID) {
-      throw new Error('WHATSAPP_PHONE_NUMBER_ID is not set in environment variables');
+      throw new Error(
+        'WHATSAPP_PHONE_NUMBER_ID is not set in environment variables'
+      );
     }
 
-    const message = `🕒 *Attendance Alert*\n\n` +
+    const message =
+      `🕒 *Attendance Alert*\n\n` +
       `👤 Employee: ${empName}\n` +
       `📍 Status: Punched ${punchType}\n` +
       `⏰ Time: ${time}\n` +
@@ -385,7 +428,9 @@ const sendWhatsAppMessage = async (empName, punchType, time, date) => {
     ].filter(Boolean);
 
     if (recipients.length === 0) {
-      console.warn('[AttendanceService] sendWhatsAppMessage — no recipients configured');
+      console.warn(
+        '[AttendanceService] sendWhatsAppMessage — no recipients configured'
+      );
       return;
     }
 
@@ -396,24 +441,30 @@ const sendWhatsAppMessage = async (empName, punchType, time, date) => {
         `https://graph.facebook.com/v18.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`,
         {
           messaging_product: 'whatsapp',
-          to:   cleanNumber,
+          to: cleanNumber,
           type: 'text',
           text: { body: message },
         },
         {
           headers: {
-            Authorization:  `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+            Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
             'Content-Type': 'application/json',
           },
         }
       );
 
-      console.log(`[AttendanceService] sendWhatsAppMessage — sent to ${cleanNumber}:`, response.data);
+      console.log(
+        `[AttendanceService] sendWhatsAppMessage — sent to ${cleanNumber}:`,
+        response.data
+      );
     }
   } catch (error) {
     console.error('[AttendanceService] sendWhatsAppMessage:', error.message);
     if (error.response) {
-      console.error('[AttendanceService] sendWhatsAppMessage — response:', error.response.data);
+      console.error(
+        '[AttendanceService] sendWhatsAppMessage — response:',
+        error.response.data
+      );
     }
   }
 };
@@ -435,4 +486,4 @@ module.exports = {
   getUnprocessedRecords,
   // WhatsApp
   sendWhatsAppMessage,
-}; 
+};

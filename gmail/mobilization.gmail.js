@@ -1,7 +1,7 @@
 // gmail/mobilization.gmail.js
 const { google } = require('googleapis');
-const fs         = require('fs');
-const path       = require('path');
+const fs = require('fs');
+const path = require('path');
 
 require('dotenv').config();
 
@@ -9,30 +9,47 @@ require('dotenv').config();
 // Constants & Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-const { GMAIL_SCOPES }                   = require('../constants/email.constants');
-const { loadImageAsBase64, getMimeType, formatTime} = require('../helpers/email.helper');
+const { GMAIL_SCOPES } = require('../constants/email.constants');
+const {
+  loadImageAsBase64,
+  getMimeType,
+  formatTime,
+} = require('../helpers/email.helper');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MONTH_NAMES = ['', 'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTH_NAMES = [
+  '',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
 
 const ACTION_LABEL = {
-  mobilized:      'MOBILIZATION',
-  demobilized:    'DEMOBILIZATION',
+  mobilized: 'MOBILIZATION',
+  demobilized: 'DEMOBILIZATION',
   status_changed: 'STATUS CHANGE',
-  one_day_mob:    'MOBILIZATION',
-  add_shifts:     'ADDITIONAL SHIFTS ADDED',
+  one_day_mob: 'MOBILIZATION',
+  add_shifts: 'ADDITIONAL SHIFTS ADDED',
 };
 
 const ACTION_SUBJECT = (machine, regNo, site, clientCompany) => ({
-  mobilized:      `Mobilized - ${machine} (${regNo})${clientCompany ? ` - ${clientCompany}` : site ? ` - ${site}` : ''}`,
-  demobilized:    `Demobilized - ${machine} (${regNo})${site ? ` - ${site}` : ''}`,
+  mobilized: `Mobilized - ${machine} (${regNo})${clientCompany ? ` - ${clientCompany}` : site ? ` - ${site}` : ''}`,
+  demobilized: `Demobilized - ${machine} (${regNo})${site ? ` - ${site}` : ''}`,
   status_changed: `Status Changed - ${machine} (${regNo})`,
-  one_day_mob:    `Mobilization and Demobilization - ${machine} (${regNo})${clientCompany ? ` - ${clientCompany}` : site ? ` - ${site}` : ''}`,
-  add_shifts:     `Additional Shifts Added - ${machine} (${regNo})${site ? ` - ${site}` : ''}`,
+  one_day_mob: `Mobilization and Demobilization - ${machine} (${regNo})${clientCompany ? ` - ${clientCompany}` : site ? ` - ${site}` : ''}`,
+  add_shifts: `Additional Shifts Added - ${machine} (${regNo})${site ? ` - ${site}` : ''}`,
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -42,13 +59,16 @@ const ACTION_SUBJECT = (machine, regNo, site, clientCompany) => ({
 class OAuth2GmailClient {
   constructor() {
     this.oauth2Client = null;
-    this.gmail        = null;
+    this.gmail = null;
     this.refreshToken = process.env.OPERATIONS_GMAIL_REFRESH_TOKEN;
   }
 
   async initialize() {
-    const clientId     = process.env.OPERATIONS_GOOGLE_CLIENT_ID?.replace(/"/g, '');
-    const clientSecret = process.env.OPERATIONS_GOOGLE_CLEINT_SECRET?.replace(/"/g, '');
+    const clientId = process.env.OPERATIONS_GOOGLE_CLIENT_ID?.replace(/"/g, '');
+    const clientSecret = process.env.OPERATIONS_GOOGLE_CLEINT_SECRET?.replace(
+      /"/g,
+      ''
+    );
 
     if (!clientId || !clientSecret) {
       throw new Error('[Gmail] Missing Google OAuth credentials');
@@ -57,7 +77,7 @@ class OAuth2GmailClient {
     this.oauth2Client = new google.auth.OAuth2(
       clientId,
       clientSecret,
-      `${process.env.BASE_URL}/oauth2callback`,
+      `${process.env.BASE_URL}/oauth2callback`
     );
 
     if (!this.refreshToken) return false;
@@ -70,8 +90,8 @@ class OAuth2GmailClient {
   getAuthUrl() {
     return this.oauth2Client.generateAuthUrl({
       access_type: 'offline',
-      prompt:      'consent',
-      scope:       GMAIL_SCOPES,
+      prompt: 'consent',
+      scope: GMAIL_SCOPES,
     });
   }
 
@@ -82,8 +102,10 @@ class OAuth2GmailClient {
 
   async getSignature() {
     try {
-      const result        = await this.gmail.users.settings.sendAs.list({ userId: 'me' });
-      const defaultSendAs = result.data.sendAs?.find(s => s.isDefault);
+      const result = await this.gmail.users.settings.sendAs.list({
+        userId: 'me',
+      });
+      const defaultSendAs = result.data.sendAs?.find((s) => s.isDefault);
       return defaultSendAs?.signature ?? '';
     } catch {
       return '';
@@ -98,7 +120,11 @@ class OAuth2GmailClient {
           return null;
         }
         const filename = path.basename(attachment);
-        return { fileContent: fs.readFileSync(attachment), filename, mimeType: getMimeType(filename) };
+        return {
+          fileContent: fs.readFileSync(attachment),
+          filename,
+          mimeType: getMimeType(filename),
+        };
       }
 
       if (attachment.path) {
@@ -107,14 +133,20 @@ class OAuth2GmailClient {
           return null;
         }
         const filename = attachment.filename ?? path.basename(attachment.path);
-        return { fileContent: fs.readFileSync(attachment.path), filename, mimeType: attachment.mimeType ?? getMimeType(filename) };
+        return {
+          fileContent: fs.readFileSync(attachment.path),
+          filename,
+          mimeType: attachment.mimeType ?? getMimeType(filename),
+        };
       }
 
       if (attachment.content) {
         return {
-          fileContent: Buffer.isBuffer(attachment.content) ? attachment.content : Buffer.from(attachment.content),
-          filename:    attachment.filename ?? 'attachment',
-          mimeType:    attachment.mimeType ?? 'application/octet-stream',
+          fileContent: Buffer.isBuffer(attachment.content)
+            ? attachment.content
+            : Buffer.from(attachment.content),
+          filename: attachment.filename ?? 'attachment',
+          mimeType: attachment.mimeType ?? 'application/octet-stream',
         };
       }
 
@@ -126,7 +158,14 @@ class OAuth2GmailClient {
     }
   }
 
-  _buildRawEmail(to, subject, htmlContent, textContent, attachments = [], cc = '') {
+  _buildRawEmail(
+    to,
+    subject,
+    htmlContent,
+    textContent,
+    attachments = [],
+    cc = ''
+  ) {
     const boundary = `boundary_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
     const lines = [
@@ -138,8 +177,8 @@ class OAuth2GmailClient {
       `Content-Type: multipart/mixed; boundary="${boundary}"`,
       '',
       `--${boundary}`,
-      'Content-Type: multipart/alternative; boundary="alt_boundary"', 
-      '', 
+      'Content-Type: multipart/alternative; boundary="alt_boundary"',
+      '',
       '--alt_boundary',
       'Content-Type: text/plain; charset=utf-8',
       '',
@@ -154,7 +193,7 @@ class OAuth2GmailClient {
     ];
 
     for (const attachment of attachments) {
-      const resolved = this._resolveAttachment(attachment); 
+      const resolved = this._resolveAttachment(attachment);
       if (!resolved) continue;
 
       const { fileContent, filename, mimeType } = resolved;
@@ -165,7 +204,7 @@ class OAuth2GmailClient {
         'Content-Transfer-Encoding: base64',
         `Content-Disposition: attachment; filename="${filename}"`,
         '',
-        fileContent.toString('base64'),
+        fileContent.toString('base64')
       );
     }
 
@@ -173,36 +212,63 @@ class OAuth2GmailClient {
     return lines.join('\n');
   }
 
-  async sendEmail(to, subject, htmlContent, textContent, attachments = [], cc = '') {
+  async sendEmail(
+    to,
+    subject,
+    htmlContent,
+    textContent,
+    attachments = [],
+    cc = ''
+  ) {
     if (!this.gmail) {
       const initialized = await this.initialize();
-      if (!initialized) throw new Error('[Gmail] Client not initialized — refresh token required');
+      if (!initialized)
+        throw new Error(
+          '[Gmail] Client not initialized — refresh token required'
+        );
     }
 
     try {
-      const raw          = this._buildRawEmail(to, subject, htmlContent, textContent, attachments, cc);
-      const encodedEmail = Buffer.from(raw).toString('base64')
+      const raw = this._buildRawEmail(
+        to,
+        subject,
+        htmlContent,
+        textContent,
+        attachments,
+        cc
+      );
+      const encodedEmail = Buffer.from(raw)
+        .toString('base64')
         .replace(/\+/g, '-')
         .replace(/\//g, '_')
         .replace(/=+$/, '');
 
       const response = await this.gmail.users.messages.send({
-        userId:      'me',
+        userId: 'me',
         requestBody: { raw: encodedEmail },
       });
 
       return {
-        success:          true,
-        messageId:        response.data.id,
-        method:           'Gmail API (OAuth2)',
+        success: true,
+        messageId: response.data.id,
+        method: 'Gmail API (OAuth2)',
         attachmentsCount: attachments.length,
       };
     } catch (error) {
-      const isAuthError = error.message.includes('invalid_grant') || error.message.includes('unauthorized');
+      const isAuthError =
+        error.message.includes('invalid_grant') ||
+        error.message.includes('unauthorized');
 
       if (isAuthError) {
         await this.oauth2Client.refreshAccessToken();
-        return this.sendEmail(to, subject, htmlContent, textContent, attachments, cc);
+        return this.sendEmail(
+          to,
+          subject,
+          htmlContent,
+          textContent,
+          attachments,
+          cc
+        );
       }
 
       throw new Error(`[Gmail] Send failed: ${error.message}`);
@@ -220,47 +286,55 @@ const gmailClient = new OAuth2GmailClient();
 // Email Templates
 // ─────────────────────────────────────────────────────────────────────────────
 
-const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = {}) => {
+const generateMobilizationTemplate = (
+  recipientName = 'Valued Customer',
+  data = {}
+) => {
   const {
-      action             = 'mobilized',
-      regNo              = '',
-      machine            = '',
-      site               = '',
-      deployType         = 'site',
-      clientCompany      = '',
-      operators          = [],
-      withOperator       = false,
-      month              = '',
-      year               = '',
-      time               = '',
-      date               = '',
-      previousStatus     = '',
-      newStatus          = '',
-      hired              = false,
-      hiredFrom          = '',
-      rentRate           = null,
-      location           = [],
-      remarks            = '',
-      allOperators       = [],
-      previousOperators  = [],
-      lastMobilizedDate  = '',
-      lastMobilizedTime  = '',
-      demobDate          = '',
-      demobMonth         = '',
-      demobYear          = '',
-      demobTime          = '',
-      demobRemarks       = '',
-    } = data;
+    action = 'mobilized',
+    regNo = '',
+    machine = '',
+    site = '',
+    deployType = 'site',
+    clientCompany = '',
+    operators = [],
+    withOperator = false,
+    month = '',
+    year = '',
+    time = '',
+    date = '',
+    previousStatus = '',
+    newStatus = '',
+    hired = false,
+    hiredFrom = '',
+    rentRate = null,
+    location = [],
+    remarks = '',
+    allOperators = [],
+    previousOperators = [],
+    lastMobilizedDate = '',
+    lastMobilizedTime = '',
+    demobDate = '',
+    demobMonth = '',
+    demobYear = '',
+    demobTime = '',
+    demobRemarks = '',
+  } = data;
 
-  const formatDate = (d) => d
-    ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
-    : 'N/A';
+  const formatDate = (d) =>
+    d
+      ? new Date(d).toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: 'long',
+          year: 'numeric',
+        })
+      : 'N/A';
 
   const signatureLogo = loadImageAsBase64('signature-logo.png');
-  const sigLogo       = loadImageAsBase64('sig-logo.png');
-  const sigFacebook   = loadImageAsBase64('sig-facebook.png');
-  const sigInstagram  = loadImageAsBase64('sig-instagram.png');
-  const sigLinkedin   = loadImageAsBase64('sig-linkedin.png');
+  const sigLogo = loadImageAsBase64('sig-logo.png');
+  const sigFacebook = loadImageAsBase64('sig-facebook.png');
+  const sigInstagram = loadImageAsBase64('sig-instagram.png');
+  const sigLinkedin = loadImageAsBase64('sig-linkedin.png');
 
   const renderLocation = () => {
     if (Array.isArray(location)) return location.at(-1) || '';
@@ -288,50 +362,92 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
           <td style="color:#666;">Registration No.</td>
           <td><strong>${regNo}</strong></td>
         </tr>
-        ${hiredFrom ? `
+        ${
+          hiredFrom
+            ? `
         <tr>
           <td style="color:#666;">Hired From</td>
           <td>${hiredFrom}</td>
-        </tr>` : ''}
-        ${(action === 'mobilized' || action === 'one_day_mob' || action === 'add_shifts') && deployType === 'company' ? `
+        </tr>`
+            : ''
+        }
+        ${
+          (action === 'mobilized' ||
+            action === 'one_day_mob' ||
+            action === 'add_shifts') &&
+          deployType === 'company'
+            ? `
         <tr>
           <td style="color:#666;">Leased to Company</td>
           <td><strong>${clientCompany}</strong></td>
-        </tr>` : ''}
-        ${(action === 'mobilized' || action === 'one_day_mob' || action === 'add_shifts') && deployType !== 'company' ? `
+        </tr>`
+            : ''
+        }
+        ${
+          (action === 'mobilized' ||
+            action === 'one_day_mob' ||
+            action === 'add_shifts') &&
+          deployType !== 'company'
+            ? `
         <tr>
           <td style="color:#666;">Deployed to Site</td>
           <td><strong>${site}</strong></td>
-        </tr>` : ''}
-        ${action === 'demobilized' ? `
+        </tr>`
+            : ''
+        }
+        ${
+          action === 'demobilized'
+            ? `
         <tr>
           <td style="color:#666;">Removed from Site</td>
           <td>${site || 'N/A'}</td>
         </tr>
-        ${previousOperators?.filter(op => op.operatorName)?.length ? `
+        ${
+          previousOperators?.filter((op) => op.operatorName)?.length
+            ? `
         <tr style="background:#f5f5f5;">
           <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Previous Operator(s)</td>
         </tr>
-        ${previousOperators.map((op, i) => `
+        ${previousOperators
+          .map(
+            (op, i) => `
         <tr>
           <td style="color:#666;">Operator ${previousOperators.length > 1 ? i + 1 : ''}</td>
           <td><strong>${op.operatorName}</strong>${op.shiftName ? ` &nbsp;<span style="color:#888;">${op.shiftName}</span>` : op.shiftStart ? ` &nbsp;<span style="color:#888;">${formatTime(op.shiftStart)}${op.shiftEnd ? ' – ' + formatTime(op.shiftEnd) : ''}</span>` : ''}</td>
-        </tr>`).join('')}` : ''}
-        ${!previousOperators?.filter(op => op.operatorName)?.length && operators?.filter(op => op.operatorName)?.length ? `
+        </tr>`
+          )
+          .join('')}`
+            : ''
+        }
+        ${
+          !previousOperators?.filter((op) => op.operatorName)?.length &&
+          operators?.filter((op) => op.operatorName)?.length
+            ? `
         <tr style="background:#f5f5f5;">
           <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Previous Operator(s)</td>
         </tr>
-        ${operators.filter(op => op.operatorName).map((op, i) => `
+        ${operators
+          .filter((op) => op.operatorName)
+          .map(
+            (op, i) => `
         <tr>
-          <td style="color:#666;">Operator ${operators.filter(o => o.operatorName).length > 1 ? i + 1 : ''}</td>
+          <td style="color:#666;">Operator ${operators.filter((o) => o.operatorName).length > 1 ? i + 1 : ''}</td>
           <td><strong>${op.operatorName}</strong>${op.shiftName ? ` &nbsp;<span style="color:#888;">${op.shiftName}</span>` : op.shiftStart ? ` &nbsp;<span style="color:#888;">${formatTime(op.shiftStart)}${op.shiftEnd ? ' – ' + formatTime(op.shiftEnd) : ''}</span>` : ''}</td>
-        </tr>`).join('')}` : ''}` : ''}
-        ${withOperator && operators?.filter(op => op.operatorName)?.length ? `
+        </tr>`
+          )
+          .join('')}`
+            : ''
+        }`
+            : ''
+        }
+        ${
+          withOperator && operators?.filter((op) => op.operatorName)?.length
+            ? `
         <tr style="background:#f5f5f5;">
           <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Operators</td>
         </tr>
         ${(() => {
-          const filled = operators.filter(op => op.operatorName);
+          const filled = operators.filter((op) => op.operatorName);
           const isDayNight =
             filled.length === 2 &&
             filled[0]?.shiftName === 'Day Shift' &&
@@ -350,31 +466,57 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
           }
 
           // All other cases — numbered list, ignore shiftName label
-        return filled.map((op, i) => `
+          return filled
+            .map(
+              (op, i) => `
           <tr>
             <td style="color:#666;">${filled.length > 1 ? `Operator ${i + 1}` : 'Operator'}</td>
             <td><strong>${op.operatorName}</strong>${op.shiftName ? ` &nbsp;<span style="color:#888;">${op.shiftName}</span>` : op.shiftStart ? ` &nbsp;<span style="color:#888;">${formatTime(op.shiftStart)}${op.shiftEnd ? ' – ' + formatTime(op.shiftEnd) : ''}</span>` : ''}</td>
-          </tr>`).join('');
-        })()}` : ''}
-        ${action === 'add_shifts' ? `
+          </tr>`
+            )
+            .join('');
+        })()}`
+            : ''
+        }
+        ${
+          action === 'add_shifts'
+            ? `
         <tr style="background:#f5f5f5;">
           <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Newly Added Shifts</td>
         </tr>
-        ${operators.filter(op => op.operatorName).map((op, i) => `
+        ${operators
+          .filter((op) => op.operatorName)
+          .map(
+            (op, i) => `
         <tr>
-          <td style="color:#666;">New Operator ${operators.filter(o => o.operatorName).length > 1 ? i + 1 : ''}</td>
+          <td style="color:#666;">New Operator ${operators.filter((o) => o.operatorName).length > 1 ? i + 1 : ''}</td>
           <td><strong>${op.operatorName}</strong>${op.shiftName ? ` &nbsp;<span style="color:#888;">${op.shiftName}</span>` : op.shiftStart ? ` &nbsp;<span style="color:#888;">${formatTime(op.shiftStart)}${op.shiftEnd ? ' – ' + formatTime(op.shiftEnd) : ''}</span>` : ''}</td>
-        </tr>`).join('')}
-        ${allOperators.length ? `
+        </tr>`
+          )
+          .join('')}
+        ${
+          allOperators.length
+            ? `
         <tr style="background:#f5f5f5;">
           <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">All Active Operators After Update</td>
         </tr>
-        ${allOperators.filter(op => op.operatorName).map((op, i) => `
+        ${allOperators
+          .filter((op) => op.operatorName)
+          .map(
+            (op, i) => `
         <tr>
-          <td style="color:#666;">Operator ${allOperators.filter(o => o.operatorName).length > 1 ? i + 1 : ''}</td>
+          <td style="color:#666;">Operator ${allOperators.filter((o) => o.operatorName).length > 1 ? i + 1 : ''}</td>
           <td><strong>${op.operatorName}</strong>${op.shiftName ? ` &nbsp;<span style="color:#888;">${op.shiftName}</span>` : ''}</td>
-        </tr>`).join('')}` : ''}` : ''}
-        ${action === 'status_changed' ? `
+        </tr>`
+          )
+          .join('')}`
+            : ''
+        }`
+            : ''
+        }
+        ${
+          action === 'status_changed'
+            ? `
         <tr>
           <td style="color:#666;">Previous Status</td>
           <td>${previousStatus}</td>
@@ -382,7 +524,9 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
         <tr>
           <td style="color:#666;">New Status</td>
           <td><strong>${newStatus}</strong></td>
-        </tr>` : ''}
+        </tr>`
+            : ''
+        }
         <tr style="background:#f5f5f5;">
           <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">${action === 'demobilized' ? 'Demobilization Details' : 'Mobilization Details'}</td>
         </tr>
@@ -398,7 +542,9 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
           <td style="color:#666;">Time</td>
           <td>${time}</td>
         </tr>
-        ${action === 'demobilized' ? `
+        ${
+          action === 'demobilized'
+            ? `
         <tr>
           <td style="color:#666;">Last Mobilized Date</td>
           <td>${lastMobilizedDate || 'N/A'}</td>
@@ -406,8 +552,12 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
         <tr>
           <td style="color:#666;">Last Mobilized Time</td>
           <td>${lastMobilizedTime || 'N/A'}</td>
-        </tr>` : ''}
-        ${action === 'one_day_mob' ? `
+        </tr>`
+            : ''
+        }
+        ${
+          action === 'one_day_mob'
+            ? `
         <tr style="background:#f5f5f5;">
           <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Demobilization Details</td>
         </tr>
@@ -423,22 +573,38 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
           <td style="color:#666;">Demob Time</td>
           <td>${demobTime}</td>        
         </tr>
-        ${demobRemarks ? `
+        ${
+          demobRemarks
+            ? `
         <tr>
           <td style="color:#666;">Demob Remarks</td>
           <td>${demobRemarks}</td>
-        </tr>` : ''}` : ''}
-        ${remarks ? `
+        </tr>`
+            : ''
+        }`
+            : ''
+        }
+        ${
+          remarks
+            ? `
         <tr>
           <td style="color:#666;">Remarks</td>
           <td>${remarks}</td>
-        </tr>` : ''}
-        ${renderLocation() ? `
+        </tr>`
+            : ''
+        }
+        ${
+          renderLocation()
+            ? `
         <tr>
           <td style="color:#666;">Location</td>
           <td>${renderLocation()}</td>
-        </tr>` : ''}
-        ${rentRate ? `
+        </tr>`
+            : ''
+        }
+        ${
+          rentRate
+            ? `
         <tr style="background:#f5f5f5;">
           <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">${hired ? 'Hire Details' : 'Working Details'}</td>
         </tr>
@@ -449,7 +615,9 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
         <tr>
           <td style="color:#666;">Rate</td>
           <td><strong>${rentRate.rate ? `${rentRate.rate} ${rentRate.currency || 'QAR'}` : 'N/A'}</strong></td>
-        </tr>` : ''}
+        </tr>`
+            : ''
+        }
       </table>
 
       <br/>
@@ -467,10 +635,10 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
 
       <table cellpadding="0" cellspacing="0" border="0" style="margin-top:10px;">
         <tr>
-          <td style="padding-right:8px;">${sigLogo      ? `<img src="${sigLogo}"      width="72" height="32" alt="Logo" />`                                                                                                                          : ''}</td>
-          <td style="padding-right:8px;">${sigFacebook  ? `<a href="https://www.facebook.com/profile.php?id=100095544335543"                   target="_blank"><img src="${sigFacebook}"  width="27" height="27" alt="Facebook"  /></a>` : ''}</td>
+          <td style="padding-right:8px;">${sigLogo ? `<img src="${sigLogo}"      width="72" height="32" alt="Logo" />` : ''}</td>
+          <td style="padding-right:8px;">${sigFacebook ? `<a href="https://www.facebook.com/profile.php?id=100095544335543"                   target="_blank"><img src="${sigFacebook}"  width="27" height="27" alt="Facebook"  /></a>` : ''}</td>
           <td style="padding-right:8px;">${sigInstagram ? `<a href="https://www.instagram.com/al_ansari_transport"                             target="_blank"><img src="${sigInstagram}" width="27" height="27" alt="Instagram" /></a>` : ''}</td>
-          <td>                           ${sigLinkedin  ? `<a href="https://www.linkedin.com/in/al-ansari-transport-and-enterprises-455b53253/" target="_blank"><img src="${sigLinkedin}"  width="27" height="27" alt="LinkedIn"  /></a>` : ''}</td>
+          <td>                           ${sigLinkedin ? `<a href="https://www.linkedin.com/in/al-ansari-transport-and-enterprises-455b53253/" target="_blank"><img src="${sigLinkedin}"  width="27" height="27" alt="LinkedIn"  /></a>` : ''}</td>
         </tr>
       </table>
     </body>
@@ -483,11 +651,14 @@ const generateMobilizationTemplate = (recipientName = 'Valued Customer', data = 
 // ─────────────────────────────────────────────────────────────────────────────
 
 const alertMobilizationViaEmail = async (data = {}) => {
-  const toList  = JSON.parse(process.env.MOBILIZATION_TO || '[]');
-  const to      = toList.join(', ');
-  const ccList  = JSON.parse(process.env.MOBILIZATION_CC || '[]');
-  const cc      = ccList.join(', ');
-  const subject = ACTION_SUBJECT(data.machine, data.regNo, data.site, data.clientCompany)[data.action] ?? `Equipment Update – ${data.machine}`;
+  const toList = JSON.parse(process.env.MOBILIZATION_TO || '[]');
+  const to = toList.join(', ');
+  const ccList = JSON.parse(process.env.MOBILIZATION_CC || '[]');
+  const cc = ccList.join(', ');
+  const subject =
+    ACTION_SUBJECT(data.machine, data.regNo, data.site, data.clientCompany)[
+      data.action
+    ] ?? `Equipment Update – ${data.machine}`;
 
   const htmlContent = generateMobilizationTemplate('Team', data);
   const textContent = `Equipment ${data.action}: ${data.machine} (${data.regNo}). Site: ${data.site || 'N/A'}. Date: ${data.date}. Time: ${data.time}. Remarks: ${data.remarks || 'None'}.`;

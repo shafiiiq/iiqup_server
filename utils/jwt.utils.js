@@ -32,7 +32,7 @@ const generateTokens = (user) => {
       uniqueCode: user.uniqueCode,
       userType: user.userType,
       name: user.name,
-      type: 'access'
+      type: 'access',
     },
     JWT_SECRET,
     { expiresIn: '365d' }
@@ -46,10 +46,10 @@ const generateTokens = (user) => {
       uniqueCode: user.uniqueCode,
       userType: user.userType,
       name: user.name,
-      type: 'refresh'
+      type: 'refresh',
     },
     JWT_SECRET,
-    { expiresIn: '365d' } 
+    { expiresIn: '365d' }
   );
 
   return { accessToken, refreshToken };
@@ -79,12 +79,16 @@ const authMiddleware = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ message: 'Access denied. No token provided.' });
+      return res
+        .status(401)
+        .json({ message: 'Access denied. No token provided.' });
     }
 
     const token = authHeader.split(' ')[1];
     if (!token) {
-      return res.status(401).json({ message: 'Access denied. No token provided.' });
+      return res
+        .status(401)
+        .json({ message: 'Access denied. No token provided.' });
     }
 
     const decoded = verifyToken(token);
@@ -113,7 +117,9 @@ const roleCheck = (roles) => {
     const allowedRoles = Array.isArray(roles) ? roles : [roles];
 
     if (!allowedRoles.includes(userRole)) {
-      return res.status(403).json({ message: 'Access denied. Insufficient permissions.' });
+      return res
+        .status(403)
+        .json({ message: 'Access denied. Insufficient permissions.' });
     }
 
     next();
@@ -148,10 +154,10 @@ const refreshToken = (refreshToken) => {
 
     return {
       accessToken,
-      refreshToken: newRefreshToken  // Return new refresh token too
+      refreshToken: newRefreshToken, // Return new refresh token too
     };
   } catch (error) {
-    throw new Error('Invalid refresh token');
+    throw new Error('Invalid refresh token', error);
   }
 };
 
@@ -161,5 +167,5 @@ module.exports = {
   authMiddleware,
   roleCheck,
   refreshToken,
-  generateTokens
+  generateTokens,
 };

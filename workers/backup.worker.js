@@ -17,14 +17,14 @@
  *     └── backup_manifest.json
  */
 
-const cron            = require('node-cron');
+const cron = require('node-cron');
 const { MongoClient } = require('mongodb');
-const fs              = require('fs');
-const path            = require('path');
+const fs = require('fs');
+const path = require('path');
 
 // ─── Config ────────────────────────────────────────────────────────────────────
 
-const MONGO_URI   = process.env.MONGO_URI;
+const MONGO_URI = process.env.MONGO_URI;
 const BACKUP_ROOT = path.resolve(__dirname, '../backup/ansarigroup');
 const MAX_BACKUPS = 3;
 
@@ -47,7 +47,7 @@ function ensureDir(dir) {
 }
 
 function formatBytes(bytes) {
-  if (bytes < 1024)        return `${bytes} B`;
+  if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
@@ -61,13 +61,16 @@ function rotateOldBackups() {
     .readdirSync(BACKUP_ROOT, { withFileTypes: true })
     .filter((e) => e.isDirectory())
     .map((e) => ({
-      name:     e.name,
+      name: e.name,
       fullPath: path.join(BACKUP_ROOT, e.name),
-      mtime:    fs.statSync(path.join(BACKUP_ROOT, e.name)).mtime,
+      mtime: fs.statSync(path.join(BACKUP_ROOT, e.name)).mtime,
     }))
     .sort((a, b) => a.mtime - b.mtime);
 
-  const toDelete = folders.slice(0, Math.max(0, folders.length - MAX_BACKUPS + 1));
+  const toDelete = folders.slice(
+    0,
+    Math.max(0, folders.length - MAX_BACKUPS + 1)
+  );
 
   toDelete.forEach(({ name, fullPath }) => {
     try {
@@ -93,7 +96,7 @@ async function runBackup() {
   }
 
   isRunning = true;
-  const client    = new MongoClient(MONGO_URI);
+  const client = new MongoClient(MONGO_URI);
   const timestamp = getTimestamp();
 
   console.log('[BackupWorker] Starting backup...');
@@ -107,11 +110,13 @@ async function runBackup() {
   try {
     await client.connect();
 
-    const db          = client.db();
-    const dbName      = db.databaseName;
+    const db = client.db();
+    const dbName = db.databaseName;
     const collections = await db.listCollections().toArray();
 
-    console.log(`[BackupWorker] Database: ${dbName} | Collections: ${collections.length}`);
+    console.log(
+      `[BackupWorker] Database: ${dbName} | Collections: ${collections.length}`
+    );
 
     if (collections.length === 0) {
       console.log('[BackupWorker] No collections found — skipping.');
@@ -119,29 +124,49 @@ async function runBackup() {
     }
 
     const manifest = {
-      database:    dbName,
+      database: dbName,
       timestamp,
-      maxBackups:  MAX_BACKUPS,
+      maxBackups: MAX_BACKUPS,
       collections: [],
     };
 
     for (const { name: colName } of collections) {
       try {
-        const docs        = await db.collection(colName).find({}).toArray();
+        const docs = await db.collection(colName).find({}).toArray();
         const jsonContent = JSON.stringify(docs, null, 2);
-        fs.writeFileSync(path.join(backupDir, `${colName}.json`), jsonContent, 'utf8');
+        fs.writeFileSync(
+          path.join(backupDir, `${colName}.json`),
+          jsonContent,
+          'utf8'
+        );
         const size = Buffer.byteLength(jsonContent, 'utf8');
-        console.log(`[BackupWorker] ${colName}: ${docs.length} docs (${formatBytes(size)})`);
-        manifest.collections.push({ name: colName, documentCount: docs.length, sizeFormatted: formatBytes(size) });
+        console.log(
+          `[BackupWorker] ${colName}: ${docs.length} docs (${formatBytes(size)})`
+        );
+        manifest.collections.push({
+          name: colName,
+          documentCount: docs.length,
+          sizeFormatted: formatBytes(size),
+        });
       } catch (err) {
-        console.error(`[BackupWorker] Failed to back up "${colName}":`, err.message);
+        console.error(
+          `[BackupWorker] Failed to back up "${colName}":`,
+          err.message
+        );
         manifest.collections.push({ name: colName, error: err.message });
       }
     }
 
-    manifest.completedAt    = new Date().toISOString();
-    manifest.totalDocuments = manifest.collections.reduce((s, c) => s + (c.documentCount || 0), 0);
-    fs.writeFileSync(path.join(backupDir, 'backup_manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
+    manifest.completedAt = new Date().toISOString();
+    manifest.totalDocuments = manifest.collections.reduce(
+      (s, c) => s + (c.documentCount || 0),
+      0
+    );
+    fs.writeFileSync(
+      path.join(backupDir, 'backup_manifest.json'),
+      JSON.stringify(manifest, null, 2),
+      'utf8'
+    );
 
     const stored = fs
       .readdirSync(BACKUP_ROOT, { withFileTypes: true })
@@ -149,8 +174,9 @@ async function runBackup() {
       .map((e) => e.name)
       .sort();
 
-    console.log(`[BackupWorker] Backup complete — ${manifest.totalDocuments} docs | Stored: ${stored.length}/${MAX_BACKUPS} | Latest: ${timestamp}`);
-
+    console.log(
+      `[BackupWorker] Backup complete — ${manifest.totalDocuments} docs | Stored: ${stored.length}/${MAX_BACKUPS} | Latest: ${timestamp}`
+    );
   } catch (err) {
     console.error('[BackupWorker] Backup failed:', err.message);
     try {

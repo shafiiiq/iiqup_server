@@ -10,16 +10,21 @@ const reportServices = require('../services/report.service.js');
  * 'all-histories' maps to null (no type filter — return all types).
  */
 const SERVICE_TYPE_MAP = {
-  'all-histories':    null,
-  'oil-service':      'oil',
-  'normal-service':   'normal',
-  'tyre-service':     'tyre',
-  'battery-service':  'battery',
-  'major-service':    'major',
+  'all-histories': null,
+  'oil-service': 'oil',
+  'normal-service': 'normal',
+  'tyre-service': 'tyre',
+  'battery-service': 'battery',
+  'major-service': 'major',
 };
 
 const parseServiceTypes = (serviceTypesParam) =>
-  serviceTypesParam ? serviceTypesParam.split(',').map(t => t.trim()).filter(Boolean) : [];
+  serviceTypesParam
+    ? serviceTypesParam
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean)
+    : [];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Service Report CRUD Controllers
@@ -35,7 +40,11 @@ const addServiceReport = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[ReportController] addServiceReport:', error);
-    res.status(error.status || 500).json({ ok: false, message: 'Cannot add service report', error: error.message });
+    res.status(error.status || 500).json({
+      ok: false,
+      message: 'Cannot add service report',
+      error: error.message,
+    });
   }
 };
 
@@ -50,7 +59,11 @@ const getServiceReport = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[ReportController] getServiceReport:', error);
-    res.status(error.status || 500).json({ ok: false, message: 'Cannot get service report', error: error.message });
+    res.status(error.status || 500).json({
+      ok: false,
+      message: 'Cannot get service report',
+      error: error.message,
+    });
   }
 };
 
@@ -65,7 +78,11 @@ const getServiceReportWithId = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[ReportController] getServiceReportWithId:', error);
-    res.status(error.status || 500).json({ ok: false, message: 'Cannot get service report', error: error.message });
+    res.status(error.status || 500).json({
+      ok: false,
+      message: 'Cannot get service report',
+      error: error.message,
+    });
   }
 };
 
@@ -80,7 +97,11 @@ const updateServiceReportWithId = async (req, res) => {
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[ReportController] updateServiceReportWithId:', error);
-    res.status(error.status || 500).json({ ok: false, message: 'Cannot update service report', error: error.message });
+    res.status(error.status || 500).json({
+      ok: false,
+      message: 'Cannot update service report',
+      error: error.message,
+    });
   }
 };
 
@@ -95,7 +116,11 @@ const removeServiceReportWithId = async (req, res) => {
     res.status(200).json(result);
   } catch (error) {
     console.error('[ReportController] removeServiceReportWithId:', error);
-    res.status(error.status || 500).json({ ok: false, message: 'Cannot remove service report', error: error.message });
+    res.status(error.status || 500).json({
+      ok: false,
+      message: 'Cannot remove service report',
+      error: error.message,
+    });
   }
 };
 
@@ -108,13 +133,20 @@ const removeServiceReportWithId = async (req, res) => {
  */
 const getAllServiceHistories = async (req, res) => {
   try {
-    const { regNo }    = req.params;
+    const { regNo } = req.params;
     const serviceTypes = parseServiceTypes(req.query.serviceTypes);
-    const result       = await reportServices.fetchAllServiceHistories(regNo, serviceTypes);
+    const result = await reportServices.fetchAllServiceHistories(
+      regNo,
+      serviceTypes
+    );
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[ReportController] getAllServiceHistories:', error);
-    res.status(error.status || 500).json({ ok: false, message: 'Cannot get all service histories', error: error.message });
+    res.status(error.status || 500).json({
+      ok: false,
+      message: 'Cannot get all service histories',
+      error: error.message,
+    });
   }
 };
 
@@ -125,11 +157,15 @@ const getAllServiceHistories = async (req, res) => {
 const getServicesByType = async (req, res, type) => {
   try {
     const { regNo } = req.params;
-    const result    = await reportServices.fetchServicesByType(regNo, type);
+    const result = await reportServices.fetchServicesByType(regNo, type);
     res.status(result.status).json(result);
   } catch (error) {
     console.error(`[ReportController] getServicesByType (${type}):`, error);
-    res.status(error.status || 500).json({ ok: false, message: `Cannot get ${type} services`, error: error.message });
+    res.status(error.status || 500).json({
+      ok: false,
+      message: `Cannot get ${type} services`,
+      error: error.message,
+    });
   }
 };
 
@@ -139,11 +175,19 @@ const getServicesByType = async (req, res, type) => {
 const getServicesByDateRange = async (req, res) => {
   try {
     const { regNo, startDate, endDate } = req.params;
-    const result = await reportServices.fetchServicesByDateRange(regNo, startDate, endDate);
+    const result = await reportServices.fetchServicesByDateRange(
+      regNo,
+      startDate,
+      endDate
+    );
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[ReportController] getServicesByDateRange:', error);
-    res.status(error.status || 500).json({ ok: false, message: 'Cannot get services by date range', error: error.message });
+    res.status(error.status || 500).json({
+      ok: false,
+      message: 'Cannot get services by date range',
+      error: error.message,
+    });
   }
 };
 
@@ -153,11 +197,18 @@ const getServicesByDateRange = async (req, res) => {
 const getServicesByLastMonths = async (req, res) => {
   try {
     const { regNo, monthsCount } = req.params;
-    const result = await reportServices.fetchServicesByLastMonths(regNo, parseInt(monthsCount));
+    const result = await reportServices.fetchServicesByLastMonths(
+      regNo,
+      parseInt(monthsCount)
+    );
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[ReportController] getServicesByLastMonths:', error);
-    res.status(error.status || 500).json({ ok: false, message: 'Cannot get services by last months', error: error.message });
+    res.status(error.status || 500).json({
+      ok: false,
+      message: 'Cannot get services by last months',
+      error: error.message,
+    });
   }
 };
 
@@ -167,16 +218,24 @@ const getServicesByLastMonths = async (req, res) => {
 const getServicesByTypeAndDateRange = async (req, res) => {
   try {
     const { regNo, serviceType, startDate, endDate } = req.params;
-    const serviceTypes      = parseServiceTypes(req.query.serviceTypes);
+    const serviceTypes = parseServiceTypes(req.query.serviceTypes);
     const actualServiceType = SERVICE_TYPE_MAP[serviceType] ?? null;
 
     const result = await reportServices.fetchServicesByTypeAndDateRange(
-      regNo, actualServiceType, startDate, endDate, serviceTypes
+      regNo,
+      actualServiceType,
+      startDate,
+      endDate,
+      serviceTypes
     );
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[ReportController] getServicesByTypeAndDateRange:', error);
-    res.status(error.status || 500).json({ ok: false, message: 'Cannot get services by type and date range', error: error.message });
+    res.status(error.status || 500).json({
+      ok: false,
+      message: 'Cannot get services by type and date range',
+      error: error.message,
+    });
   }
 };
 
@@ -186,16 +245,23 @@ const getServicesByTypeAndDateRange = async (req, res) => {
 const getServicesByTypeAndLastMonths = async (req, res) => {
   try {
     const { regNo, serviceType, monthsCount } = req.params;
-    const serviceTypes      = parseServiceTypes(req.query.serviceTypes);
+    const serviceTypes = parseServiceTypes(req.query.serviceTypes);
     const actualServiceType = SERVICE_TYPE_MAP[serviceType] ?? null;
 
     const result = await reportServices.fetchServicesByTypeAndLastMonths(
-      regNo, actualServiceType, parseInt(monthsCount), serviceTypes
+      regNo,
+      actualServiceType,
+      parseInt(monthsCount),
+      serviceTypes
     );
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[ReportController] getServicesByTypeAndLastMonths:', error);
-    res.status(error.status || 500).json({ ok: false, message: 'Cannot get services by type and last months', error: error.message });
+    res.status(error.status || 500).json({
+      ok: false,
+      message: 'Cannot get services by type and last months',
+      error: error.message,
+    });
   }
 };
 
@@ -206,22 +272,35 @@ const getServicesByTypeAndLastMonths = async (req, res) => {
 const getAllServicesByDateRange = async (req, res) => {
   try {
     const { startDate, endDate } = req.params;
-    const result = await reportServices.fetchAllServicesByDateRange(startDate, endDate);
+    const result = await reportServices.fetchAllServicesByDateRange(
+      startDate,
+      endDate
+    );
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[ReportController] getAllServicesByDateRange:', error);
-    res.status(error.status || 500).json({ ok: false, message: 'Cannot get services by date range', error: error.message });
+    res.status(error.status || 500).json({
+      ok: false,
+      message: 'Cannot get services by date range',
+      error: error.message,
+    });
   }
 };
 
 const getAllServicesByLastMonths = async (req, res) => {
   try {
     const { monthsCount } = req.params;
-    const result = await reportServices.fetchAllServicesByLastMonths(parseInt(monthsCount));
+    const result = await reportServices.fetchAllServicesByLastMonths(
+      parseInt(monthsCount)
+    );
     res.status(result.status).json(result);
   } catch (error) {
     console.error('[ReportController] getAllServicesByLastMonths:', error);
-    res.status(error.status || 500).json({ ok: false, message: 'Cannot get services by last months', error: error.message });
+    res.status(error.status || 500).json({
+      ok: false,
+      message: 'Cannot get services by last months',
+      error: error.message,
+    });
   }
 };
 
@@ -246,18 +325,24 @@ const handleSummary = async (req, res) => {
         const result = await reportServices.fetchServicesByPeriod(type);
         return res.status(result.status).json(result);
       } catch (error) {
-        return res.status(error.status || 500).json({ ok: false, message: `Cannot get ${type} services`, error: error.message });
+        return res.status(error.status || 500).json({
+          ok: false,
+          message: `Cannot get ${type} services`,
+          error: error.message,
+        });
       }
     }
     case 'date-range':
       req.params.startDate = param1;
-      req.params.endDate   = param2;
+      req.params.endDate = param2;
       return getAllServicesByDateRange(req, res);
     case 'last-months':
       req.params.monthsCount = param1;
       return getAllServicesByLastMonths(req, res);
     default:
-      return res.status(400).json({ ok: false, message: 'Invalid summary type' });
+      return res
+        .status(400)
+        .json({ ok: false, message: 'Invalid summary type' });
   }
 };
 
@@ -269,17 +354,17 @@ const handleHistory = async (req, res) => {
   const { type, param1, param2, param3 } = req.params;
 
   // ── Single-type shortcuts ──────────────────────────────────────────────────
-  if (type === 'all')    return getAllServiceHistories(req, res);
-  if (type === 'oil')    return getServicesByType(req, res, 'oil');
+  if (type === 'all') return getAllServiceHistories(req, res);
+  if (type === 'oil') return getServicesByType(req, res, 'oil');
   if (type === 'normal') return getServicesByType(req, res, 'normal');
-  if (type === 'tyre')   return getServicesByType(req, res, 'tyre');
-  if (type === 'battery')return getServicesByType(req, res, 'battery');
-  if (type === 'major')  return getServicesByType(req, res, 'major');
+  if (type === 'tyre') return getServicesByType(req, res, 'tyre');
+  if (type === 'battery') return getServicesByType(req, res, 'battery');
+  if (type === 'major') return getServicesByType(req, res, 'major');
 
   // ── Untyped date range / last-months ─────────────────────────────────────
   if (type === 'date-range') {
     req.params.startDate = param1;
-    req.params.endDate   = param2;
+    req.params.endDate = param2;
     return getServicesByDateRange(req, res);
   }
   if (type === 'last-months') {
@@ -292,14 +377,17 @@ const handleHistory = async (req, res) => {
     req.params.serviceType = type;
     if (param1 === 'date-range') {
       req.params.startDate = param2;
-      req.params.endDate   = param3;
+      req.params.endDate = param3;
       return getServicesByTypeAndDateRange(req, res);
     }
     if (param1 === 'last-months') {
       req.params.monthsCount = param2;
       return getServicesByTypeAndLastMonths(req, res);
     }
-    return res.status(400).json({ ok: false, message: 'Missing date-range or last-months parameter' });
+    return res.status(400).json({
+      ok: false,
+      message: 'Missing date-range or last-months parameter',
+    });
   }
 
   return res.status(400).json({ ok: false, message: 'Invalid history type' });

@@ -1,7 +1,7 @@
 // services/chat.service.js
-const Chat     = require('../models/chats.model');
-const Message  = require('../models/messages.model');
-const User     = require('../models/user.model');
+const Chat = require('../models/chats.model');
+const Message = require('../models/messages.model');
+const User = require('../models/user.model');
 const mongoose = require('mongoose');
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -10,7 +10,12 @@ const mongoose = require('mongoose');
 
 const toAvatar = (name) => name?.substring(0, 2).toUpperCase() || 'UN';
 
-const buildGroupSystemMessage = ({ event, actorName, targetNames = [], groupName }) => {
+const buildGroupSystemMessage = ({
+  event,
+  actorName,
+  targetNames = [],
+  groupName,
+}) => {
   const actor = actorName || 'Someone';
   const targets = (targetNames || []).filter(Boolean);
 
@@ -20,19 +25,23 @@ const buildGroupSystemMessage = ({ event, actorName, targetNames = [], groupName
     case 'added':
       if (targets.length === 0) return `${actor} added members`;
       if (targets.length === 1) return `${actor} added ${targets[0]}`;
-      if (targets.length === 2) return `${actor} added ${targets[0]} and ${targets[1]}`;
+      if (targets.length === 2)
+        return `${actor} added ${targets[0]} and ${targets[1]}`;
       return `${actor} added ${targets.slice(0, -1).join(', ')} and ${targets[targets.length - 1]}`;
     case 'removed':
       if (targets.length === 0) return `${actor} removed a member`;
       if (targets.length === 1) return `${actor} removed ${targets[0]}`;
-      if (targets.length === 2) return `${actor} removed ${targets[0]} and ${targets[1]}`;
+      if (targets.length === 2)
+        return `${actor} removed ${targets[0]} and ${targets[1]}`;
       return `${actor} removed ${targets.slice(0, -1).join(', ')} and ${targets[targets.length - 1]}`;
     case 'left':
       return `${actor} left the group`;
     case 'promoted':
       if (targets.length === 0) return `${actor} promoted a member to admin`;
-      if (targets.length === 1) return `${actor} promoted ${targets[0]} to admin`;
-      if (targets.length === 2) return `${actor} promoted ${targets[0]} and ${targets[1]} to admin`;
+      if (targets.length === 1)
+        return `${actor} promoted ${targets[0]} to admin`;
+      if (targets.length === 2)
+        return `${actor} promoted ${targets[0]} and ${targets[1]} to admin`;
       return `${actor} promoted ${targets.slice(0, -1).join(', ')} and ${targets[targets.length - 1]} to admin`;
     default:
       return `${actor} updated the group`;
@@ -40,18 +49,22 @@ const buildGroupSystemMessage = ({ event, actorName, targetNames = [], groupName
 };
 
 const enrichParticipants = async (participants) => {
-  const ids         = participants.map(p => p.userId);
-  const userDetails = await User.find({ _id: { $in: ids } }).select('name email').lean();
+  const ids = participants.map((p) => p.userId);
+  const userDetails = await User.find({ _id: { $in: ids } })
+    .select('name email')
+    .lean();
 
-  return participants.map(p => {
-    const user = userDetails.find(u => u._id.toString() === p.userId.toString());
+  return participants.map((p) => {
+    const user = userDetails.find(
+      (u) => u._id.toString() === p.userId.toString()
+    );
     return {
-      userId:     p.userId,
-      userType:   p.userType || 'office',
+      userId: p.userId,
+      userType: p.userType || 'office',
       uniqueCode: p.uniqueCode,
-      name:       user?.name || 'Unknown',
-      avatar:     toAvatar(user?.name),
-      isAdmin:    Boolean(p.isAdmin),
+      name: user?.name || 'Unknown',
+      avatar: toAvatar(user?.name),
+      isAdmin: Boolean(p.isAdmin),
     };
   });
 };
@@ -66,15 +79,22 @@ const enrichParticipants = async (participants) => {
  */
 const getUserChats = async (userId, userType, teamType = null) => {
   try {
-    console.log('getUserChats called for userId:', userId, 'userType:', userType, 'teamType:', teamType)
-    const userIdString = String(userId || '')
-    const isObjectId = mongoose.Types.ObjectId.isValid(userIdString)
+    console.log(
+      'getUserChats called for userId:',
+      userId,
+      'userType:',
+      userType,
+      'teamType:',
+      teamType
+    );
+    const userIdString = String(userId || '');
+    const isObjectId = mongoose.Types.ObjectId.isValid(userIdString);
     const participantMatch = isObjectId
       ? { userId: new mongoose.Types.ObjectId(userIdString) }
-      : { uniqueCode: userIdString }
+      : { uniqueCode: userIdString };
 
     if (userType) {
-      participantMatch.userType = userType
+      participantMatch.userType = userType;
     }
 
     const query = {
@@ -85,7 +105,7 @@ const getUserChats = async (userId, userType, teamType = null) => {
           },
         },
       ],
-    }
+    };
 
     if (teamType && teamType !== 'all') {
       query.$and.push({ teamType });
@@ -93,13 +113,14 @@ const getUserChats = async (userId, userType, teamType = null) => {
 
     const chats = await Chat.find(query).sort({ lastMessageTime: -1 }).lean();
 
-    console.log('Found chats count:', chats.length)
-    return chats.map(chat => ({
+    console.log('Found chats count:', chats.length);
+    return chats.map((chat) => ({
       ...chat,
-      unreadCount:  chat.unreadCount?.[userId.toString()] || 0,
-      participants: chat.participants.filter(p => isObjectId
-        ? p.userId.toString() !== userId.toString()
-        : p.uniqueCode !== userIdString
+      unreadCount: chat.unreadCount?.[userId.toString()] || 0,
+      participants: chat.participants.filter((p) =>
+        isObjectId
+          ? p.userId.toString() !== userId.toString()
+          : p.uniqueCode !== userIdString
       ),
     }));
   } catch (error) {
@@ -115,9 +136,9 @@ const getUserChats = async (userId, userType, teamType = null) => {
 const getOrCreateIndividualChat = async ({ user1, user2, teamType }) => {
   try {
     const existingChat = await Chat.findOne({
-      type:                    'individual',
+      type: 'individual',
       teamType,
-      'participants.userId':   { $all: [user1.userId, user2.userId] },
+      'participants.userId': { $all: [user1.userId, user2.userId] },
     }).lean();
 
     if (existingChat) return existingChat;
@@ -128,27 +149,27 @@ const getOrCreateIndividualChat = async ({ user1, user2, teamType }) => {
     ]);
 
     const newChat = await Chat.create({
-      type:            'individual',
+      type: 'individual',
       teamType,
       participants: [
         {
-          userId:     user1.userId,
-          userType:   user1.userType,
+          userId: user1.userId,
+          userType: user1.userType,
           uniqueCode: user1.uniqueCode,
-          name:       user1Details.name,
-          avatar:     toAvatar(user1Details.name),
+          name: user1Details.name,
+          avatar: toAvatar(user1Details.name),
         },
         {
-          userId:     user2.userId,
-          userType:   user2.userType,
+          userId: user2.userId,
+          userType: user2.userType,
           uniqueCode: user2.uniqueCode,
-          name:       user2Details.name,
-          avatar:     toAvatar(user2Details.name),
+          name: user2Details.name,
+          avatar: toAvatar(user2Details.name),
         },
       ],
-      lastMessage:     '',
+      lastMessage: '',
       lastMessageTime: new Date(),
-      unreadCount:     {},
+      unreadCount: {},
     });
 
     return newChat;
@@ -161,19 +182,25 @@ const getOrCreateIndividualChat = async ({ user1, user2, teamType }) => {
 /**
  * Creates a new group chat with enriched participant details.
  */
-const createGroupChat = async ({ name, teamType, participants, avatar, creatorId }) => {
+const createGroupChat = async ({
+  name,
+  teamType,
+  participants,
+  avatar,
+  creatorId,
+}) => {
   try {
     const enrichedParticipants = await enrichParticipants(participants);
 
     const groupChat = await Chat.create({
-      type:            'group',
+      type: 'group',
       name,
       teamType,
-      participants:    enrichedParticipants,
-      avatar:          avatar || '👥',
-      lastMessage:     'Group created',
+      participants: enrichedParticipants,
+      avatar: avatar || '👥',
+      lastMessage: 'Group created',
       lastMessageTime: new Date(),
-      unreadCount:     {},
+      unreadCount: {},
     });
 
     return groupChat;
@@ -189,7 +216,7 @@ const createGroupChat = async ({ name, teamType, participants, avatar, creatorId
 const getChatById = async (chatId, userId) => {
   try {
     const chat = await Chat.findOne({
-      _id:                   chatId,
+      _id: chatId,
       'participants.userId': userId,
     }).lean();
 
@@ -207,42 +234,56 @@ const getChatById = async (chatId, userId) => {
 const updateGroupChat = async (chatId, userId, updates) => {
   try {
     const chat = await Chat.findOne({
-      _id:                   chatId,
-      type:                  'group',
+      _id: chatId,
+      type: 'group',
       'participants.userId': userId,
     });
 
     if (!chat) return null;
 
-    const currentUserParticipant = chat.participants.find(p => p.userId.toString() === userId.toString());
+    const currentUserParticipant = chat.participants.find(
+      (p) => p.userId.toString() === userId.toString()
+    );
     const isAdmin = currentUserParticipant?.isAdmin;
 
     if (!isAdmin) {
       throw new Error('Only group admins can manage members');
     }
 
-    if (updates.name)   chat.name   = updates.name;
+    if (updates.name) chat.name = updates.name;
     if (updates.avatar) chat.avatar = updates.avatar;
 
     if (updates.addParticipants?.length > 0) {
-      const existingIds = new Set(chat.participants.map(p => p.userId.toString()));
+      const existingIds = new Set(
+        chat.participants.map((p) => p.userId.toString())
+      );
       const newParticipants = await enrichParticipants(
         updates.addParticipants
-          .filter(participant => !existingIds.has(String(participant.userId || participant._id)))
-          .map(participant => ({ ...participant, isAdmin: false }))
+          .filter(
+            (participant) =>
+              !existingIds.has(String(participant.userId || participant._id))
+          )
+          .map((participant) => ({ ...participant, isAdmin: false }))
       );
       chat.participants.push(...newParticipants);
     }
 
     if (updates.removeParticipants?.length > 0) {
       chat.participants = chat.participants.filter(
-        p => !updates.removeParticipants.some(id => String(id) === String(p.userId))
+        (p) =>
+          !updates.removeParticipants.some(
+            (id) => String(id) === String(p.userId)
+          )
       );
     }
 
     if (updates.promoteParticipants?.length > 0) {
-      chat.participants = chat.participants.map(participant => {
-        if (updates.promoteParticipants.some(id => String(id) === String(participant.userId))) {
+      chat.participants = chat.participants.map((participant) => {
+        if (
+          updates.promoteParticipants.some(
+            (id) => String(id) === String(participant.userId)
+          )
+        ) {
           return { ...participant, isAdmin: true };
         }
         return participant;
@@ -270,13 +311,17 @@ const leaveGroupChat = async (chatId, userId) => {
 
     if (!chat) return null;
 
-    const currentParticipant = chat.participants.find(p => p.userId.toString() === userId.toString());
+    const currentParticipant = chat.participants.find(
+      (p) => p.userId.toString() === userId.toString()
+    );
     if (!currentParticipant) return null;
 
-    chat.participants = chat.participants.filter(p => p.userId.toString() !== userId.toString());
+    chat.participants = chat.participants.filter(
+      (p) => p.userId.toString() !== userId.toString()
+    );
 
     if (chat.participants.length > 0) {
-      const hasAdmin = chat.participants.some(p => p.isAdmin);
+      const hasAdmin = chat.participants.some((p) => p.isAdmin);
       if (!hasAdmin) {
         chat.participants[0].isAdmin = true;
       }
@@ -311,7 +356,7 @@ const deleteChatForUser = async (chatId, userId) => {
 const verifyUserAccess = async (chatId, userId) => {
   try {
     const chat = await Chat.findOne({
-      _id:                   chatId,
+      _id: chatId,
       'participants.userId': userId,
     });
 
@@ -329,12 +374,18 @@ const verifyUserAccess = async (chatId, userId) => {
 /**
  * Updates the last message preview and sender on a chat.
  */
-const updateLastMessage = async (chatId, messageContent, senderId, senderName, messageType) => {
+const updateLastMessage = async (
+  chatId,
+  messageContent,
+  senderId,
+  senderName,
+  messageType
+) => {
   try {
     await Chat.findByIdAndUpdate(chatId, {
-      lastMessage:       messageContent,
-      lastMessageType:   messageType || 'text',
-      lastMessageTime:   new Date(),
+      lastMessage: messageContent,
+      lastMessageType: messageType || 'text',
+      lastMessageTime: new Date(),
       lastMessageSender: { userId: senderId, name: senderName },
     });
   } catch (error) {
@@ -352,9 +403,10 @@ const incrementUnreadCount = async (chatId, senderId) => {
 
     if (!chat) throw new Error('Chat not found');
 
-    chat.participants.forEach(participant => {
+    chat.participants.forEach((participant) => {
       if (participant.userId.toString() !== senderId.toString()) {
-        const current = chat.unreadCount.get(participant.userId.toString()) || 0;
+        const current =
+          chat.unreadCount.get(participant.userId.toString()) || 0;
         chat.unreadCount.set(participant.userId.toString(), current + 1);
       }
     });
