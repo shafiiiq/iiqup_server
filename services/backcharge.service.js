@@ -42,18 +42,25 @@ const notify = async (
 };
 
 /**
- * Converts flat scopeOfWork / scopeLine2Text fields into the structured { combinedText, lines } shape.
- * @param {string} line1
- * @param {string} line2
- * @returns {object}
+ * Converts flat text inputs into the structured { combinedText, lines } shape.
+ * The Backcharge form/doc now supports one scope line and up to four workshop summary lines.
+ *
+ * @param {...string} lines
+ * @returns {{combinedText: string, lines: Array<{lineNumber: number, text: string}>}}
  */
-const buildTextLines = (line1, line2) => ({
-  combinedText: (line1 || '') + (line2 ? ' ' + line2 : ''),
-  lines: [
-    ...(line1 ? [{ lineNumber: 1, text: line1 }] : []),
-    ...(line2 ? [{ lineNumber: 2, text: line2 }] : []),
-  ],
-});
+const buildTextLines = (...lines) => {
+  const normalized = lines
+    .filter((line) => typeof line === 'string' && line.trim() !== '')
+    .map((line) => line.trim());
+
+  return {
+    combinedText: normalized.join(' '),
+    lines: normalized.map((text, index) => ({
+      lineNumber: index + 1,
+      text,
+    })),
+  };
+};
 
 /**
  * Resolves the supplier code for a new backcharge:
@@ -416,7 +423,9 @@ const addBackcharge = async (data) => {
       scopeOfWork: buildTextLines(data.scopeOfWork, data.scopeLine2Text),
       workshopComments: buildTextLines(
         data.workshopComments,
-        data.workSummaryLine2
+        data.workSummaryLine2,
+        data.workSummaryLine3,
+        data.workSummaryLine4
       ),
       sparePartsTable: data.tableRows || [],
       workDate: data.workDate || '',
@@ -467,12 +476,21 @@ const updateBackcharge = async (id, updateData) => {
       delete updateData.scopeLine2Text;
     }
 
-    if ('workshopComments' in updateData || 'workSummaryLine2' in updateData) {
+    if (
+      'workshopComments' in updateData ||
+      'workSummaryLine2' in updateData ||
+      'workSummaryLine3' in updateData ||
+      'workSummaryLine4' in updateData
+    ) {
       updateData.workshopComments = buildTextLines(
         updateData.workshopComments,
-        updateData.workSummaryLine2
+        updateData.workSummaryLine2,
+        updateData.workSummaryLine3,
+        updateData.workSummaryLine4
       );
       delete updateData.workSummaryLine2;
+      delete updateData.workSummaryLine3;
+      delete updateData.workSummaryLine4;
     }
 
     if (
