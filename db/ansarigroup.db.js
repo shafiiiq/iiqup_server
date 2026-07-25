@@ -8,7 +8,7 @@ require('dotenv').config();
 // ─────────────────────────────────────────────────────────────────────────────
 
 module.exports = mongoose
-  .connect(process.env.LOCAL_MONGO_URI)
+  .connect(process.env.MONGO_URI)
   .then(async (result) => {
     console.log('[DB] connected');
     await fixDuplicateIndexes();
