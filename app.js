@@ -134,6 +134,21 @@ app.use('/s3', s3Router);
 app.use('/chat', authMiddleware, chatRouter);
 app.use('/explorer', authMiddleware, explorerRouter);
 
+// ── Global error handler ───────────────────────────────────────────────────
+app.use((err, req, res, next) => {
+  if (err && err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({
+      success: false,
+      message: 'File is too large. Please try a smaller file or contact support.',
+    });
+  }
+  console.error('[Unhandled Error]', err);
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || 'Something went wrong. Please try again.',
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Exports
 // ─────────────────────────────────────────────────────────────────────────────
