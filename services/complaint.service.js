@@ -282,7 +282,7 @@ const assignMechanic = async (complaintId, mechanicsArray, assignedBy) => {
   }
 };
 
-/**
+/*
  * Mechanic submits an item/tool request (Step 3).
  * @param {string} complaintId
  * @param {object} requestData
