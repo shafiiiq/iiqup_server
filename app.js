@@ -53,7 +53,7 @@ require('./db/ansarigroup.db');
 
 // ── Background Workers ─────────────────────────────────────────────────────────
 
-require('./workers/backup.worker');
+require('./workers/backup.worker'); 
 
 // ── CORS configuration ─────────────────────────────────────────────────────────
 
@@ -62,7 +62,7 @@ const corsOptions = {
     'https://iiqup.vercel.app',
     'https://ansarigroup.online',
     'https://www.ansarigroup.online',
-    'http://localhost:3000',
+    'http://192.168.100.248:3000',
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [

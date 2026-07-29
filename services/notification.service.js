@@ -435,7 +435,7 @@ const getCategoryNotificationsService = async (
 
 const formatUserSpecificTabLabel = (sourceId) => {
   if (!sourceId) return 'General';
-  if (mongoose.Types.ObjectId.isValid(sourceId)) return 'Related Item';
+  if (mongoose.Types.ObjectId.isValid(sourceId)) return `Related Item (${sourceId.slice(-4)})`;
 
   const knownLabels = {
     lpo_approval: 'LPO Approval',
@@ -459,7 +459,7 @@ const formatUserSpecificTabLabel = (sourceId) => {
 const getUserSpecificTabsService = async (uniqueCode) => {
   try {
     const groups = await Notification.aggregate([
-      { $match: { visibleTo: uniqueCode } },
+      { $match: { $or: [{ targetUsers: uniqueCode }, { visibleTo: uniqueCode }] } },
       { $group: { _id: '$sourceId' } },
       { $project: { sourceId: '$_id', _id: 0 } },
     ]);

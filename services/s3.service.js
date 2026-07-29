@@ -1,4 +1,5 @@
 const { getObjectUrl, putObject, objectExists } = require('../aws/s3.aws');
+const { processVideoForStreaming } = require('./video.processor');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Read
@@ -49,10 +50,12 @@ const fetchPresignedURL = async (s3Key, isLong, isAuthSign = false) => {
  */
 const uploadToS3 = async (fileBuffer, s3Key, mimeType) => {
   try {
+    const processedBuffer = await processVideoForStreaming(fileBuffer, mimeType);
+
     const uploadUrl = await putObject('upload', s3Key, mimeType);
     const uploadResponse = await fetch(uploadUrl, {
       method: 'PUT',
-      body: fileBuffer,
+      body: processedBuffer,
       headers: { 'Content-Type': mimeType },
     });
 

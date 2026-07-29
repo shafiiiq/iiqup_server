@@ -23,6 +23,7 @@ router.get('/get-lpo-of-stock', controller.getLposForStock);
 router.get('/get-lpo-of-all-equipments', controller.getLposForAllEquipments);
 router.post('/add-lpo', controller.addLPO);
 router.post('/upload-lpo', controller.uploadLPO);
+router.post('/get-quotation-upload-url', controller.getQuotationUploadUrl);
 router.put('/update-lpo/:refNo(*)', controller.updateLPO);
 router.delete('/delete-lpo/:refNo', controller.deleteLPO);
 

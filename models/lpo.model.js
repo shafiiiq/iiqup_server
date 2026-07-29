@@ -170,7 +170,8 @@ const lpoSchema = new mongoose.Schema(
     workingHrs: { type: String },
     runningKm: { type: String },
     quoteNo: { type: String },
-    requestText: { type: String },
+    requestText: { type: String },// Quotation
+    quotation: { type: documentFileSchema, default: null },
 
     // Vendor
     company: {

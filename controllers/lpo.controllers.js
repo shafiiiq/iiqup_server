@@ -256,6 +256,42 @@ const getLatestLPORef = async (req, res) => {
 };
 
 /**
+ * POST /lpo/get-quotation-upload-url
+ * Generates a pre-signed S3 URL for a quotation attachment (no DB write).
+ */
+const getQuotationUploadUrl = async (req, res) => {
+  try {
+    const { fileName, lpoRef, contentType } = req.body;
+
+    if (!fileName || !lpoRef) {
+      return res.status(400).json({
+        success: false,
+        message: 'fileName and lpoRef are required',
+      });
+    }
+
+    const mimeType = contentType || 'application/octet-stream';
+    const s3Key = `lpos/${lpoRef}/quotations/${Date.now()}-${fileName}`;
+    const uploadUrl = await putObject(fileName, s3Key, mimeType);
+
+    res.status(200).json({
+      success: true,
+      uploadUrl,
+      data: {
+        fileName,
+        originalName: fileName,
+        filePath: s3Key,
+        mimeType,
+        uploadDate: new Date(),
+      },
+    });
+  } catch (error) {
+    console.error('[LPO] getQuotationUploadUrl:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
  * PUT /lpo/:refNo
  * Updates or amends an LPO by reference number.
  */
@@ -891,6 +927,7 @@ module.exports = {
   getLposForStock,
   getLposForAllEquipments,
   // Approvals
+  getQuotationUploadUrl,
   uploadLPO,
   purchaseApproval,
   managerApproval,
