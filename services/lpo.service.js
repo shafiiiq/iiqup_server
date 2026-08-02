@@ -115,14 +115,14 @@ const notify = async (
     time: new Date(),
   });
 
-  // await PushNotificationService.sendGeneralNotification(
-  //   recipient,
-  //   title,
-  //   description,
-  //   priority,
-  //   'normal',
-  //   notification.data._id.toString()
-  // );
+  await PushNotificationService.sendGeneralNotification(
+    recipient,
+    title,
+    description,
+    priority,
+    'normal',
+    notification.data._id.toString()
+  );
 };
 
 const roleScreenMap = (role, isMD) => {
@@ -1108,6 +1108,7 @@ const signLPO = async (lpoRef, signData) => {
           navigateText: 'View and Sign',
           navigteToId: lpoRef,
           hasButton: true,
+          forYou: process.env.SUPER_ADMIN
         },
         JSON.parse(process.env.OFFICE_HERO),
         title,

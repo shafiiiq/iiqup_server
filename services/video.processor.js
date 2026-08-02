@@ -36,7 +36,12 @@ const processVideoForStreaming = async (buffer, mimeType) => {
         .run();
     });
 
-    return fs.readFileSync(outputPath);
+    const result = fs.readFileSync(outputPath);
+    console.log('[VideoProcessor] processVideoForStreaming success', {
+      originalSize: buffer.length,
+      processedSize: result.length,
+    });
+    return result;
   } catch (error) {
     console.error(
       '[VideoProcessor] processVideoForStreaming failed, uploading original buffer instead',
