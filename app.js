@@ -8,37 +8,37 @@ const socketIo = require('socket.io');
 require('dotenv').config();
 
 // ── Middleware ─────────────────────────────────────────────────────────────────
-const { authMiddleware } = require('./utils/jwt.utils');
+const { authMiddleware } = require('./middlewares/jwt.middleware');
 
 // ── WebSocket ──────────────────────────────────────────────────────────────────
-const websocket = require('./sockets/websocket');
+const websocket = require('./socket/socket');
 const setupWebSocket = websocket.default.setupWebSocket;
 
 // ── Routes ─────────────────────────────────────────────────────────────────────
-const equipmentRouter = require('./routes/equipment.router');
-const serviceReportRouter = require('./routes/report.router');
-const userRouter = require('./routes/user.router');
-const serviceHistoryRouter = require('./routes/history.router.');
-const stocksRouter = require('./routes/stock.router');
-const documentsRouter = require('./routes/document.router');
-const dashboardRouter = require('./routes/dashboard.router');
-const toolkitsRouter = require('./routes/toolkit.router');
-const mechanicsRouter = require('./routes/mechanic.router');
-const otpRouter = require('./routes/otp.router');
-const notificationRouter = require('./routes/notification.router');
-const lpoRouter = require('./routes/lpo.router.');
-const hireOrderRouter = require('./routes/hireOrder.router');
-const operatorRouter = require('./routes/operator.router');
-const complaintsRouter = require('./routes/complaint.router');
-const oauthRouter = require('./routes/oauth.router');
-const s3Router = require('./routes/s3.router');
-const fuelsRouter = require('./routes/fuel.router');
-const ztechRouter = require('./routes/ztech.router');
-const attendanceRouter = require('./routes/attendance.router');
-const backchargeRouter = require('./routes/backcharge.router');
-const chatRouter = require('./routes/chat.router');
-const explorerRouter = require('./routes/explorer.router');
-const webPushRouter = require('./routes/webpush.router');
+const equipmentRouter = require('./features/equipment/equipment.router');
+const serviceReportRouter = require('./features/equipment/report/report.router');
+const userRouter = require('./features/user/user.router');
+const serviceHistoryRouter = require('./features/equipment/history/history.router');
+const stocksRouter = require('./features/stock/stock.router');
+const documentsRouter = require('./features/document/document.router');
+const dashboardRouter = require('./features/dashboard/dashboard.router');
+const toolkitsRouter = require('./features/toolkit/toolkit.router');
+const mechanicsRouter = require('./features/mechanic/mechanic.router');
+const otpRouter = require('./features/otp/otp.router');
+const notificationRouter = require('./features/notification/notification.router');
+const lpoRouter = require('./features/lpo/lpo.router');
+const hireOrderRouter = require('./features/hro/hro.router');
+const operatorRouter = require('./features/operator/operator.router');
+const complaintsRouter = require('./features/complaint/complaint.router');
+const oauthRouter = require('./features/oauth/oauth.router');
+const s3Router = require('./features/s3/s3.router');
+const fuelsRouter = require('./features/fuel/fuel.router');
+const ztechRouter = require('./features/attendance/hardware/ztech.router');
+const attendanceRouter = require('./features/attendance/attendance.router');
+const backchargeRouter = require('./features/backcharge/backcharge.router');
+const chatRouter = require('./features/chat/chat.router');
+const explorerRouter = require('./features/explorer/explorer.router');
+const webPushRouter = require('./features/notification/webpush/webpush.router');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // App Initialisation
@@ -49,11 +49,12 @@ const server = http.createServer(app);
 
 // ── Database connection ────────────────────────────────────────────────────────
 
-require('./db/ansarigroup.db');
+require('./config/db/ansarigroup.db');
 
 // ── Background Workers ─────────────────────────────────────────────────────────
 
-require('./workers/backup.worker'); 
+require('./config/db/workers/backup.worker'); 
+
 
 // ── CORS configuration ─────────────────────────────────────────────────────────
 

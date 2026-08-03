@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-require('../utils/suppress.utils');
+require('./utils/suppress.utils');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Module Dependencies
