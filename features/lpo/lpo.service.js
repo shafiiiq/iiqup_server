@@ -1,3 +1,7 @@
+const logger = require('../../shared/logger/logger');
+
+const AppError = require('../../shared/errors/AppError.js');
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
 const LPO = require('./lpo.model');
 const { createNotification } = require('../notification/notification.service');
 const PushNotificationService = require('../notification/notification.push');
@@ -261,7 +265,7 @@ const uploadLPO = async (
   try {
     const LpoData = await LPO.findOne({ lpoRef });
     if (!LpoData)
-      throw Object.assign(new Error('LPO not found'), { status: 404 });
+      throw Object.assign(new Error('LPO not found'), { status: HTTP.NOT_FOUND });
 
     const validStatuses = isAmendment
       ? [
@@ -280,7 +284,7 @@ const uploadLPO = async (
         new Error(
           `Invalid workflow status for LPO ${isAmendment ? 'amendment' : 'upload'}`
         ),
-        { status: 400 }
+        { status: HTTP.BAD_REQUEST }
       );
     }
 
@@ -360,7 +364,7 @@ const uploadLPO = async (
       data: lpoUpdated,
     };
   } catch (error) {
-    console.error('[LPOService] uploadLPO:', error);
+    logger.error('[LPOService] uploadLPO:', error);
     throw error;
   }
 };
@@ -514,12 +518,12 @@ const purchaseApproval = async (lpoRef, approvalData) => {
     } = approvalData;
 
     const lpo = await LPO.findOne({ lpoRef });
-    if (!lpo) throw { status: 404, message: 'LPO not found' };
+    if (!lpo) throw new AppError('LPO not found', HTTP.NOT_FOUND);
 
     const validStatuses = ['lpo_uploaded', 'lpo_amended'];
     if (!validStatuses.includes(lpo.workflowStatus)) {
       throw {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         message: `Invalid workflow status. Expected 'lpo_uploaded' or 'lpo_amended', got '${lpo.workflowStatus}'`,
       };
     }
@@ -557,7 +561,7 @@ const purchaseApproval = async (lpoRef, approvalData) => {
     const lpoUpdated = await LPO.findOneAndUpdate({ lpoRef }, updateFields, {
       new: true,
     });
-    if (!lpoUpdated) throw { status: 404, message: 'Failed to update LPO' };
+    if (!lpoUpdated) throw new AppError('Failed to update LPO', HTTP.NOT_FOUND);
 
     const isAmendment = lpoUpdated.isAmendmented;
     const title = isAmendment
@@ -584,14 +588,14 @@ const purchaseApproval = async (lpoRef, approvalData) => {
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: `Purchase Manager approval ${signed ? 'and signing ' : ''}completed successfully`,
       data: lpoUpdated,
       signed,
       authorised,
     };
   } catch (error) {
-    console.error('[LPOService] purchaseApproval:', error);
+    logger.error('[LPOService] purchaseApproval:', error);
     throw error;
   }
 };
@@ -633,7 +637,7 @@ const managerApproval = async (
     const lpoUpdated = await LPO.findOneAndUpdate({ lpoRef }, updateFields, {
       new: true,
     });
-    if (!lpoUpdated) throw { status: 404, message: 'LPO not found' };
+    if (!lpoUpdated) throw { status: HTTP.NOT_FOUND, message: 'LPO not found' };
 
     const isAmendment = lpoUpdated.isAmendmented;
     const signatoryTitle =
@@ -669,7 +673,7 @@ const managerApproval = async (
       description = `Manager ${signedLabel}approved amendment LPO. MD approval needed.`;
       source = 'md_approval';
     } else {
-      throw { status: 400, message: 'Invalid authorized signatory position' };
+      throw { status: HTTP.BAD_REQUEST, message: 'Invalid authorized signatory position' };
     }
 
     await notify(
@@ -689,12 +693,12 @@ const managerApproval = async (
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: 'MANAGER approval completed',
       data: lpoUpdated,
     };
   } catch (error) {
-    console.error('[LPOService] managerApproval:', error);
+    logger.error('[LPOService] managerApproval:', error);
     throw error;
   }
 };
@@ -744,7 +748,7 @@ const ceoApproval = async (
     const lpoUpdated = await LPO.findOneAndUpdate({ lpoRef }, updateFields, {
       new: true,
     });
-    if (!lpoUpdated) throw { status: 404, message: 'LPO not found' };
+    if (!lpoUpdated) throw { status: HTTP.NOT_FOUND, message: 'LPO not found' };
 
     const isAmendment = lpoUpdated.isAmendmented;
     const signatoryTitle =
@@ -771,12 +775,12 @@ const ceoApproval = async (
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: `${approverType} approval completed`,
       data: lpoUpdated,
     };
   } catch (error) {
-    console.error('[LPOService] ceoApproval:', error);
+    logger.error('[LPOService] ceoApproval:', error);
     throw error;
   }
 };
@@ -818,7 +822,7 @@ const accountsApproval = async (
     const lpoUpdated = await LPO.findOneAndUpdate({ lpoRef }, updateFields, {
       new: true,
     });
-    if (!lpoUpdated) throw { status: 404, message: 'LPO not found' };
+    if (!lpoUpdated) throw { status: HTTP.NOT_FOUND, message: 'LPO not found' };
 
     const isAmendment = lpoUpdated.isAmendmented;
     const title = isAmendment
@@ -845,12 +849,12 @@ const accountsApproval = async (
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: 'ACCOUNTS approval completed',
       data: lpoUpdated,
     };
   } catch (error) {
-    console.error('[LPOService] accountsApproval:', error);
+    logger.error('[LPOService] accountsApproval:', error);
     throw error;
   }
 };
@@ -880,7 +884,7 @@ const markItemsAvailable = async (lpoRef, markedBy) => {
       { new: true }
     );
 
-    if (!lpoUpdated) throw { status: 404, message: 'LPO not found' };
+    if (!lpoUpdated) throw { status: HTTP.NOT_FOUND, message: 'LPO not found' };
 
     const title = `LPO Approved - ${lpoRef}`;
     const description = 'All requested items can now be procured';
@@ -893,12 +897,12 @@ const markItemsAvailable = async (lpoRef, markedBy) => {
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: 'Items marked as available',
       data: lpoUpdated,
     };
   } catch (error) {
-    console.error('[LPOService] markItemsAvailable:', error);
+    logger.error('[LPOService] markItemsAvailable:', error);
     throw error;
   }
 };
@@ -983,17 +987,17 @@ const signLPO = async (lpoRef, signData) => {
 
   if (!matched || matched.envKey !== uniqueCode) {
     throw {
-      status: 403,
+      status: HTTP.FORBIDDEN,
       message:
         'Unauthorised: your account is not recognised as an authorised signatory for LPO documents',
     };
   }
 
   const lpo = await LPO.findOne({ lpoRef });
-  if (!lpo) throw { status: 404, message: `LPO not found: ${lpoRef}` };
+  if (!lpo) throw { status: HTTP.NOT_FOUND, message: `LPO not found: ${lpoRef}` };
 
   if (lpo.workflowStatus === 'lpo_created') {
-    throw { status: 403, message: 'LPO_NOT_UPLOADED' };
+    throw { status: HTTP.FORBIDDEN, message: 'LPO_NOT_UPLOADED' };
   }
 
   // ── Role-specific restrictions ─────────────────────────────────────────────
@@ -1002,7 +1006,7 @@ const signLPO = async (lpoRef, signData) => {
     lpo.signatures?.authorizedSignatoryTitle !== 'CEO'
   ) {
     throw {
-      status: 403,
+      status: HTTP.FORBIDDEN,
       message: 'Only the designated CEO is authorised to sign this LPO',
     };
   }
@@ -1012,7 +1016,7 @@ const signLPO = async (lpoRef, signData) => {
     lpo.signatures?.authorizedSignatoryTitle !== 'MANAGING DIRECTOR'
   ) {
     throw {
-      status: 403,
+      status: HTTP.FORBIDDEN,
       message:
         'Only the designated Managing Director is authorised to sign this LPO',
     };
@@ -1021,7 +1025,7 @@ const signLPO = async (lpoRef, signData) => {
   // ── Already signed guard ───────────────────────────────────────────────────
   if (lpo[matched.field] === true) {
     throw {
-      status: 409,
+      status: HTTP.CONFLICT,
       message: `The authorized signatory role has already been signed`,
     };
   }
@@ -1088,7 +1092,7 @@ const signLPO = async (lpoRef, signData) => {
   const updated = await LPO.findOneAndUpdate({ lpoRef }, updateFields, {
     new: true,
   });
-  if (!updated) throw { status: 500, message: 'Failed to update LPO record' };
+  if (!updated) throw { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to update LPO record' };
 
   // ── Notifications ──────────────────────────────────────────────────────────
 
@@ -1168,7 +1172,7 @@ const signLPO = async (lpoRef, signData) => {
   }
 
   return {
-    status: 200,
+    status: HTTP.OK,
     message: `${matched.role} signature recorded successfully`,
     data: updated,
     role: matched.role,
@@ -1181,11 +1185,12 @@ const signLPO = async (lpoRef, signData) => {
 
 /**
  * Returns all LPO records sorted by creation date descending.
- * @returns {Promise<object[]>}
+ * @param {object} pagination
+ * @returns {Promise<object>}
  */
-const getAllLPOs = async () => {
+const getAllLPOs = async (pagination) => {
   try {
-    return await LPO.find({}).sort({ createdAt: -1 });
+    return await paginate(LPO, {}, pagination, { sort: { createdAt: -1 } });
   } catch (error) {
     throw new Error(`[LPOService] getAllLPOs:${error.message}`, {
       cause: error,
@@ -1200,7 +1205,7 @@ const getAllLPOs = async () => {
  */
 const getLPOByRef = async (refNo) => {
   try {
-    console.log('refNo', refNo);
+    logger.info('refNo', refNo);
     const lpo = await LPO.findOne({ lpoRef: refNo });
     if (!lpo) throw new Error('LPO not found');
     return lpo;
@@ -1477,7 +1482,7 @@ const getLposByRegNo = async (regNo) => {
       equipments: { $elemMatch: { $regex: regex } },
     }).sort({ createdAt: -1 });
   } catch (error) {
-    console.error('[LPOService] getLposByRegNo:', error);
+    logger.error('[LPOService] getLposByRegNo:', error);
     throw new Error(
       `Error fetching LPOs by registration number: ${error.message}`
     );

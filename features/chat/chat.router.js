@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const controller = require('./chat.controller');
+const paginationMiddleware = require('../../shared/pagination/pagination.middleware');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Chat Routes
@@ -18,7 +19,11 @@ router.post('/chats/:chatId/leave', controller.leaveGroupChat);
 router.delete('/chats/:chatId', controller.deleteChat);
 
 // ── Messages ──────────────────────────────────────────────────────────────────
-router.get('/chats/:chatId/messages', controller.getMessages);
+router.get(
+  '/chats/:chatId/messages',
+  paginationMiddleware,
+  controller.getMessages
+);
 router.post('/chats/:chatId/read', controller.markAsRead);
 router.post('/messages/text', controller.sendTextMessage);
 router.delete('/messages/:messageId', controller.deleteMessage);
@@ -27,13 +32,13 @@ router.put('/messages/:messageId/caption', controller.updateCaption);
 router.post('/messages/:messageId/forward', controller.forwardMessage);
 
 // ── Uploads ───────────────────────────────────────────────────────────────────
-router.post('/upload/audio', controller.uploadVoiceMessage);
+router.post('/upload/audio', controller.uploadVoicexMessage);
 router.post('/upload/image', controller.uploadImage);
 router.post('/upload/video', controller.uploadVideo);
 router.post('/upload/document', controller.uploadDocument);
 
 // ── Calls ─────────────────────────────────────────────────────────────────────
-router.get('/calls/history', controller.getCallHistory);
+router.get('/calls/history', paginationMiddleware, controller.getCallHistory);
 router.post('/calls/record', controller.saveCallRecord);
 
 module.exports = router;

@@ -1,3 +1,6 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
 // services/fuel.service.js
 const fuelsModel = require('./fuel.model');
 const equipmentModel = require('../equipment/equipment.model');
@@ -81,7 +84,7 @@ const getEquipmentFuelConsumption = async (filters = {}) => {
       .lean();
 
     if (!allEquipment?.length) {
-      return { status: 200, ok: true, message: 'No equipment found', data: [] };
+      return { status: HTTP.OK, ok: true, message: 'No equipment found', data: [] };
     }
 
     const equipmentConsumption = [];
@@ -139,15 +142,15 @@ const getEquipmentFuelConsumption = async (filters = {}) => {
     equipmentConsumption.sort((a, b) => b.totalLiters - a.totalLiters);
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'Fuel consumption retrieved successfully',
       data: equipmentConsumption,
     };
   } catch (err) {
-    console.error('[FuelsService] getEquipmentFuelConsumption:', err);
+    logger.error('[FuelsService] getEquipmentFuelConsumption:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Error retrieving fuel consumption',
       error: err.message,

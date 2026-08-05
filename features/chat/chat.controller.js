@@ -1,3 +1,7 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
+const { sendSuccess, sendError } = require('../../shared/response/response.util');
 // controllers/chat.controller.js
 const chatService = require('./chat.service');
 const messageService = require('./message/message.service');
@@ -21,14 +25,14 @@ const getUserChats = async (req, res) => {
 
     const chats = await chatService.getUserChats(userId, userType, teamType);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Chats retrieved successfully',
       data: chats,
     });
   } catch (error) {
-    console.error('[Chat] getUserChats:', error);
-    res.status(500).json({
+    logger.error('[Chat] getUserChats:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to retrieve chats',
       error: error.message,
@@ -48,7 +52,7 @@ const getOrCreateIndividualChat = async (req, res) => {
 
     if (!targetUserId || !targetUserType || !targetUniqueCode || !teamType) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Missing required fields' });
     }
 
@@ -62,14 +66,14 @@ const getOrCreateIndividualChat = async (req, res) => {
       teamType,
     });
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Chat retrieved successfully',
       data: chat,
     });
   } catch (error) {
-    console.error('[Chat] getOrCreateIndividualChat:', error);
-    res.status(500).json({
+    logger.error('[Chat] getOrCreateIndividualChat:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to get or create chat',
       error: error.message,
@@ -91,7 +95,7 @@ const createGroupChat = async (req, res) => {
       'Someone';
 
     if (!teamType || !participants || participants.length < 2) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'Team type and at least 2 participants are required',
       });
@@ -153,14 +157,14 @@ const createGroupChat = async (req, res) => {
       }
     });
 
-    res.status(201).json({
+    sendSuccess(res, {
       success: true,
       message: 'Group chat created successfully',
       data: groupChat,
     });
   } catch (error) {
-    console.error('[Chat] createGroupChat:', error);
-    res.status(500).json({
+    logger.error('[Chat] createGroupChat:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to create group chat',
       error: error.message,
@@ -181,18 +185,18 @@ const getChatDetails = async (req, res) => {
 
     if (!chat) {
       return res
-        .status(404)
+        .status(HTTP.NOT_FOUND)
         .json({ success: false, message: 'Chat not found or access denied' });
     }
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Chat details retrieved successfully',
       data: chat,
     });
   } catch (error) {
-    console.error('[Chat] getChatDetails:', error);
-    res.status(500).json({
+    logger.error('[Chat] getChatDetails:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to retrieve chat details',
       error: error.message,
@@ -212,7 +216,7 @@ const getChatPresence = async (req, res) => {
     const chat = await chatService.getChatById(chatId, userId);
     if (!chat) {
       return res
-        .status(404)
+        .status(HTTP.NOT_FOUND)
         .json({ success: false, message: 'Chat not found or access denied' });
     }
 
@@ -226,14 +230,14 @@ const getChatPresence = async (req, res) => {
         lastSeen: undefined,
       }));
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Chat presence retrieved successfully',
       data: presence,
     });
   } catch (error) {
-    console.error('[Chat] getChatPresence:', error);
-    res.status(500).json({
+    logger.error('[Chat] getChatPresence:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to retrieve chat presence',
       error: error.message,
@@ -259,7 +263,7 @@ const updateGroupChat = async (req, res) => {
 
     if (!updatedChat) {
       return res
-        .status(404)
+        .status(HTTP.NOT_FOUND)
         .json({ success: false, message: 'Chat not found or unauthorized' });
     }
 
@@ -338,17 +342,17 @@ const updateGroupChat = async (req, res) => {
       );
     }
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Group chat updated successfully',
       data: updatedChat,
     });
   } catch (error) {
-    console.error('[Chat] updateGroupChat:', error);
+    logger.error('[Chat] updateGroupChat:', error);
     if (error.message?.includes('Only group admins')) {
-      return res.status(403).json({ success: false, message: error.message });
+      return sendError(res, { success: false, message: error.message });
     }
-    res.status(500).json({
+    sendError(res, {
       success: false,
       message: 'Failed to update group chat',
       error: error.message,
@@ -369,7 +373,7 @@ const leaveGroupChat = async (req, res) => {
 
     if (!updatedChat) {
       return res
-        .status(404)
+        .status(HTTP.NOT_FOUND)
         .json({ success: false, message: 'Chat not found or unauthorized' });
     }
 
@@ -397,14 +401,14 @@ const leaveGroupChat = async (req, res) => {
       );
     }
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Left group successfully',
       data: updatedChat,
     });
   } catch (error) {
-    console.error('[Chat] leaveGroupChat:', error);
-    res.status(500).json({
+    logger.error('[Chat] leaveGroupChat:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to leave group',
       error: error.message,
@@ -419,13 +423,13 @@ const deleteChat = async (req, res) => {
 
     await chatService.deleteChatForUser(chatId, userId);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Chat deleted successfully',
     });
   } catch (error) {
-    console.error('[Chat] deleteChat:', error);
-    res.status(500).json({
+    logger.error('[Chat] deleteChat:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to delete chat',
       error: error.message,
@@ -445,31 +449,30 @@ const getMessages = async (req, res) => {
   try {
     const { chatId } = req.params;
     const userId = req.user.id;
-    const { page = 1, limit = 50 } = req.query;
 
     const hasAccess = await chatService.verifyUserAccess(chatId, userId);
 
     if (!hasAccess) {
       return res
-        .status(403)
+        .status(HTTP.FORBIDDEN)
         .json({ success: false, message: 'Access denied to this chat' });
     }
 
-    const messages = await messageService.getMessages(
+    const result = await messageService.getMessages(
       chatId,
-      page,
-      limit,
+      req.pagination,
       userId
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Messages retrieved successfully',
-      data: messages,
+      data: result.data,
+      pagination: result.pagination,
     });
   } catch (error) {
-    console.error('[Chat] getMessages:', error);
-    res.status(500).json({
+    logger.error('[Chat] getMessages:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to retrieve messages',
       error: error.message,
@@ -488,7 +491,7 @@ const sendTextMessage = async (req, res) => {
 
     if (!chatId || !content) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Chat ID and content are required' });
     }
 
@@ -525,14 +528,14 @@ const sendTextMessage = async (req, res) => {
       notification.data._id.toString()
     );
 
-    res.status(201).json({
+    sendSuccess(res, {
       success: true,
       message: 'Message sent successfully',
       data: message,
     });
   } catch (error) {
-    console.error('[Chat] sendTextMessage:', error);
-    res.status(500).json({
+    logger.error('[Chat] sendTextMessage:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to send message',
       error: error.message,
@@ -557,7 +560,7 @@ const markAsRead = async (req, res) => {
 
     if (unreadMessages.length === 0) {
       return res
-        .status(200)
+        .status(HTTP.OK)
         .json({ success: true, message: 'No unread messages' });
     }
 
@@ -578,13 +581,13 @@ const markAsRead = async (req, res) => {
       }
     });
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Messages marked as read',
     });
   } catch (error) {
-    console.error('[Chat] markAsRead:', error);
-    res.status(500).json({
+    logger.error('[Chat] markAsRead:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to mark messages as read',
       error: error.message,
@@ -604,13 +607,13 @@ const deleteMessage = async (req, res) => {
 
     await messageService.deleteMessage(messageId, userId, deleteForEveryone);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Message deleted successfully',
     });
   } catch (error) {
-    console.error('[Chat] deleteMessage:', error);
-    res.status(500).json({
+    logger.error('[Chat] deleteMessage:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to delete message',
       error: error.message,
@@ -626,7 +629,7 @@ const editMessage = async (req, res) => {
 
     if (!content) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Content is required' });
     }
 
@@ -636,14 +639,14 @@ const editMessage = async (req, res) => {
       content
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Message edited successfully',
       data: updatedMessage,
     });
   } catch (error) {
-    console.error('[Chat] editMessage:', error);
-    res.status(500).json({
+    logger.error('[Chat] editMessage:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to edit message',
       error: error.message,
@@ -659,7 +662,7 @@ const updateCaption = async (req, res) => {
 
     if (caption === undefined) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Caption is required' });
     }
 
@@ -669,14 +672,14 @@ const updateCaption = async (req, res) => {
       caption
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Caption updated successfully',
       data: updatedMessage,
     });
   } catch (error) {
-    console.error('[Chat] updateCaption:', error);
-    res.status(500).json({
+    logger.error('[Chat] updateCaption:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to update caption',
       error: error.message,
@@ -692,7 +695,7 @@ const forwardMessage = async (req, res) => {
 
     if (!targetChatId) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Target chat ID is required' });
     }
 
@@ -701,7 +704,7 @@ const forwardMessage = async (req, res) => {
       .lean();
     if (!sender) {
       return res
-        .status(404)
+        .status(HTTP.NOT_FOUND)
         .json({ success: false, message: 'Authenticated user not found' });
     }
 
@@ -727,14 +730,14 @@ const forwardMessage = async (req, res) => {
       });
     }
 
-    res.status(201).json({
+    sendSuccess(res, {
       success: true,
       message: 'Message forwarded successfully',
       data: forwardedMessage,
     });
   } catch (error) {
-    console.error('[Chat] forwardMessage:', error);
-    res.status(500).json({
+    logger.error('[Chat] forwardMessage:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to forward message',
       error: error.message,
@@ -756,7 +759,7 @@ const uploadVoiceMessage = async (req, res) => {
     const { chatId, file } = req.body;
 
     if (!chatId || !file) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'Chat ID and voice file are required',
       });
@@ -769,7 +772,7 @@ const uploadVoiceMessage = async (req, res) => {
       file.mimetype
     );
 
-    res.status(201).json({
+    sendSuccess(res, {
       success: true,
       message: 'Voice message upload URL generated successfully',
       uploadUrl,
@@ -777,8 +780,8 @@ const uploadVoiceMessage = async (req, res) => {
       messageType: 'Voice Record',
     });
   } catch (error) {
-    console.error('[Chat] uploadVoiceMessage:', error);
-    res.status(500).json({
+    logger.error('[Chat] uploadVoiceMessage:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to upload voice message',
       error: error.message,
@@ -796,7 +799,7 @@ const uploadImage = async (req, res) => {
     const { chatId, file } = req.body;
 
     if (!chatId || !file) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'Chat ID and image file are required',
       });
@@ -809,7 +812,7 @@ const uploadImage = async (req, res) => {
       file.mimetype
     );
 
-    res.status(201).json({
+    sendSuccess(res, {
       success: true,
       message: 'Image upload URL generated successfully',
       uploadUrl,
@@ -817,8 +820,8 @@ const uploadImage = async (req, res) => {
       messageType: 'Image',
     });
   } catch (error) {
-    console.error('[Chat] uploadImage:', error);
-    res.status(500).json({
+    logger.error('[Chat] uploadImage:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to upload image',
       error: error.message,
@@ -836,7 +839,7 @@ const uploadVideo = async (req, res) => {
     const { chatId, file } = req.body;
 
     if (!chatId || !file) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'Chat ID and video file are required',
       });
@@ -850,7 +853,7 @@ const uploadVideo = async (req, res) => {
     );
     await messageService.generateThumbnail(fileKey);
 
-    res.status(201).json({
+    sendSuccess(res, {
       success: true,
       message: 'Video upload URL generated successfully',
       uploadUrl,
@@ -858,8 +861,8 @@ const uploadVideo = async (req, res) => {
       messageType: 'Video',
     });
   } catch (error) {
-    console.error('[Chat] uploadVideo:', error);
-    res.status(500).json({
+    logger.error('[Chat] uploadVideo:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to upload video',
       error: error.message,
@@ -877,7 +880,7 @@ const uploadDocument = async (req, res) => {
     const { chatId, file } = req.body;
 
     if (!chatId || !file) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'Chat ID and document file are required',
       });
@@ -890,7 +893,7 @@ const uploadDocument = async (req, res) => {
       file.mimetype
     );
 
-    res.status(201).json({
+    sendSuccess(res, {
       success: true,
       message: 'Document upload URL generated successfully',
       uploadUrl,
@@ -898,8 +901,8 @@ const uploadDocument = async (req, res) => {
       messageType: 'Document',
     });
   } catch (error) {
-    console.error('[Chat] uploadDocument:', error);
-    res.status(500).json({
+    logger.error('[Chat] uploadDocument:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to upload document',
       error: error.message,
@@ -918,22 +921,21 @@ const uploadDocument = async (req, res) => {
 const getCallHistory = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { page = 1, limit = 20 } = req.query;
 
-    const callHistory = await messageService.getCallHistory(
+    const result = await messageService.getCallHistory(
       userId,
-      page,
-      limit
+      req.pagination
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Call history retrieved successfully',
-      data: callHistory,
+      data: result.data,
+      pagination: result.pagination,
     });
   } catch (error) {
-    console.error('[Chat] getCallHistory:', error);
-    res.status(500).json({
+    logger.error('[Chat] getCallHistory:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to retrieve call history',
       error: error.message,
@@ -951,7 +953,7 @@ const saveCallRecord = async (req, res) => {
     const { chatId, receiverId, duration, callType, status } = req.body;
 
     if (!chatId || !receiverId || !callType) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'Chat ID, receiver ID, and call type are required',
       });
@@ -966,14 +968,14 @@ const saveCallRecord = async (req, res) => {
       status,
     });
 
-    res.status(201).json({
+    sendSuccess(res, {
       success: true,
       message: 'Call record saved successfully',
       data: callRecord,
     });
   } catch (error) {
-    console.error('[Chat] saveCallRecord:', error);
-    res.status(500).json({
+    logger.error('[Chat] saveCallRecord:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to save call record',
       error: error.message,

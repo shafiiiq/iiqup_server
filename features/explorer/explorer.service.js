@@ -1,5 +1,9 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
 // services/explorer.service.js
 const Explorer = require('./explorer.model');
+const { paginate } = require('../../shared/pagination/pagination.util');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Read
@@ -7,15 +11,22 @@ const Explorer = require('./explorer.model');
 
 /**
  * Returns all active releases sorted by release date descending.
- * @returns {Promise<Array>}
+ * @param {object} pagination
+ * @returns {Promise<object>}
  */
-const getAllReleases = async () => {
+const getAllReleases = async (pagination) => {
   try {
-    return await Explorer.find({ isActive: true })
-      .sort({ releaseDate: -1, createdAt: -1 })
-      .select('-__v');
+    return await paginate(
+      Explorer,
+      { isActive: true },
+      pagination,
+      {
+        sort: { releaseDate: -1, createdAt: -1 },
+        projection: '-__v',
+      }
+    );
   } catch (error) {
-    console.error('[ExplorerService] getAllReleases:', error);
+    logger.error('[ExplorerService] getAllReleases:', error);
     throw error;
   }
 };
@@ -30,7 +41,7 @@ const getLatestRelease = async () => {
       .sort({ releaseDate: -1 })
       .select('-__v');
   } catch (error) {
-    console.error('[ExplorerService] getLatestRelease:', error);
+    logger.error('[ExplorerService] getLatestRelease:', error);
     throw error;
   }
 };
@@ -44,7 +55,7 @@ const getReleaseById = async (id) => {
   try {
     return await Explorer.findById(id).select('-__v');
   } catch (error) {
-    console.error('[ExplorerService] getReleaseById:', error);
+    logger.error('[ExplorerService] getReleaseById:', error);
     throw error;
   }
 };
@@ -64,7 +75,7 @@ const createRelease = async (releaseData) => {
     await release.save();
     return release;
   } catch (error) {
-    console.error('[ExplorerService] createRelease:', error);
+    logger.error('[ExplorerService] createRelease:', error);
     throw error;
   }
 };
@@ -93,7 +104,7 @@ const addFeatureToRelease = async (releaseId, featureData) => {
 
     return release;
   } catch (error) {
-    console.error('[ExplorerService] addFeatureToRelease:', error);
+    logger.error('[ExplorerService] addFeatureToRelease:', error);
     throw error;
   }
 };
@@ -119,7 +130,7 @@ const updateFeature = async (releaseId, featureId, updateData) => {
 
     return release;
   } catch (error) {
-    console.error('[ExplorerService] updateFeature:', error);
+    logger.error('[ExplorerService] updateFeature:', error);
     throw error;
   }
 };
@@ -151,7 +162,7 @@ const updateFeatureStatus = async (releaseId, featureId, status) => {
 
     return release;
   } catch (error) {
-    console.error('[ExplorerService] updateFeatureStatus:', error);
+    logger.error('[ExplorerService] updateFeatureStatus:', error);
     throw error;
   }
 };
@@ -177,7 +188,7 @@ const reorderFeatures = async (releaseId, featureIds) => {
 
     return release;
   } catch (error) {
-    console.error('[ExplorerService] reorderFeatures:', error);
+    logger.error('[ExplorerService] reorderFeatures:', error);
     throw error;
   }
 };
@@ -203,7 +214,7 @@ const deleteFeature = async (releaseId, featureId) => {
 
     return release;
   } catch (error) {
-    console.error('[ExplorerService] deleteFeature:', error);
+    logger.error('[ExplorerService] deleteFeature:', error);
     throw error;
   }
 };
@@ -219,7 +230,7 @@ const deleteRelease = async (id) => {
     if (!release) throw new Error('Release not found');
     return release;
   } catch (error) {
-    console.error('[ExplorerService] deleteRelease:', error);
+    logger.error('[ExplorerService] deleteRelease:', error);
     throw error;
   }
 };

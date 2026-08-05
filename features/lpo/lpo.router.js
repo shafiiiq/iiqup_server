@@ -2,9 +2,10 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const controller = require('./lpo.controller');
+const paginationMiddleware = require('../../shared/pagination/pagination.middleware');
 const upload = multer({ storage: multer.memoryStorage() });
 
-router.get('/get-all-lpo', controller.getAllLPOs);
+router.get('/get-all-lpo', paginationMiddleware, controller.getAllLPOs);
 router.get('/get-lpo-by-ref/:refNo(*)', controller.getLPOByRef);
 router.get('/get-company-details', controller.getCompanyDetails);
 router.get('/check-latest-lpo-ref', controller.getLatestLPORef);

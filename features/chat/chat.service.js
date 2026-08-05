@@ -1,3 +1,6 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
 // services/chat.service.js
 const Chat = require('./chats.model');
 const Message = require('./message/messages.model');
@@ -79,7 +82,7 @@ const enrichParticipants = async (participants) => {
  */
 const getUserChats = async (userId, userType, teamType = null) => {
   try {
-    console.log(
+    logger.info(
       'getUserChats called for userId:',
       userId,
       'userType:',
@@ -113,7 +116,7 @@ const getUserChats = async (userId, userType, teamType = null) => {
 
     const chats = await Chat.find(query).sort({ lastMessageTime: -1 }).lean();
 
-    console.log('Found chats count:', chats.length);
+    logger.info('Found chats count:', chats.length);
     return chats.map((chat) => ({
       ...chat,
       unreadCount: chat.unreadCount?.[userId.toString()] || 0,
@@ -124,7 +127,7 @@ const getUserChats = async (userId, userType, teamType = null) => {
       ),
     }));
   } catch (error) {
-    console.error('[ChatService] getUserChats:', error);
+    logger.error('[ChatService] getUserChats:', error);
     throw error;
   }
 };
@@ -174,7 +177,7 @@ const getOrCreateIndividualChat = async ({ user1, user2, teamType }) => {
 
     return newChat;
   } catch (error) {
-    console.error('[ChatService] getOrCreateIndividualChat:', error);
+    logger.error('[ChatService] getOrCreateIndividualChat:', error);
     throw error;
   }
 };
@@ -205,7 +208,7 @@ const createGroupChat = async ({
 
     return groupChat;
   } catch (error) {
-    console.error('[ChatService] createGroupChat:', error);
+    logger.error('[ChatService] createGroupChat:', error);
     throw error;
   }
 };
@@ -222,7 +225,7 @@ const getChatById = async (chatId, userId) => {
 
     return chat;
   } catch (error) {
-    console.error('[ChatService] getChatById:', error);
+    logger.error('[ChatService] getChatById:', error);
     throw error;
   }
 };
@@ -293,7 +296,7 @@ const updateGroupChat = async (chatId, userId, updates) => {
     await chat.save();
     return chat;
   } catch (error) {
-    console.error('[ChatService] updateGroupChat:', error);
+    logger.error('[ChatService] updateGroupChat:', error);
     throw error;
   }
 };
@@ -330,7 +333,7 @@ const leaveGroupChat = async (chatId, userId) => {
     await chat.save();
     return chat;
   } catch (error) {
-    console.error('[ChatService] leaveGroupChat:', error);
+    logger.error('[ChatService] leaveGroupChat:', error);
     throw error;
   }
 };
@@ -345,7 +348,7 @@ const deleteChatForUser = async (chatId, userId) => {
 
     return true;
   } catch (error) {
-    console.error('[ChatService] deleteChatForUser:', error);
+    logger.error('[ChatService] deleteChatForUser:', error);
     throw error;
   }
 };
@@ -362,7 +365,7 @@ const verifyUserAccess = async (chatId, userId) => {
 
     return !!chat;
   } catch (error) {
-    console.error('[ChatService] verifyUserAccess:', error);
+    logger.error('[ChatService] verifyUserAccess:', error);
     return false;
   }
 };
@@ -389,7 +392,7 @@ const updateLastMessage = async (
       lastMessageSender: { userId: senderId, name: senderName },
     });
   } catch (error) {
-    console.error('[ChatService] updateLastMessage:', error);
+    logger.error('[ChatService] updateLastMessage:', error);
     throw error;
   }
 };
@@ -413,7 +416,7 @@ const incrementUnreadCount = async (chatId, senderId) => {
 
     await chat.save();
   } catch (error) {
-    console.error('[ChatService] incrementUnreadCount:', error);
+    logger.error('[ChatService] incrementUnreadCount:', error);
     throw error;
   }
 };
@@ -427,7 +430,7 @@ const resetUnreadCount = async (chatId, userId) => {
       [`unreadCount.${userId}`]: 0,
     });
   } catch (error) {
-    console.error('[ChatService] resetUnreadCount:', error);
+    logger.error('[ChatService] resetUnreadCount:', error);
     throw error;
   }
 };

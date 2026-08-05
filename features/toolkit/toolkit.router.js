@@ -2,13 +2,14 @@ const express = require('express');
 const router = express.Router();
 
 const controller = require('./toolkit.controller');
+const paginationMiddleware = require('../../shared/pagination/pagination.middleware');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Toolkit Routes
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── CRUD ──────────────────────────────────────────────────────────────────────
-router.get('/get-toolkits', controller.getToolKits);
+router.get('/get-toolkits', paginationMiddleware, controller.getToolKits);
 router.post('/add-toolkits', controller.addToolKits);
 router.put('/update-toolkit/:id', controller.updatetoolKits);
 router.delete('/delete-toolkit/:id', controller.deletetoolKits);
@@ -29,7 +30,7 @@ router.get(
 router.put('/reduce-stock/:toolkitId/:variantId', controller.reduceStock);
 
 // ── Search & scan ─────────────────────────────────────────────────────────────
-router.get('/search-toolkits', controller.searchToolkits);
+router.get('/search-toolkits', paginationMiddleware, controller.searchToolkits);
 router.get('/scan/:objectId', controller.scanToolkitByBarcode);
 
 module.exports = router;

@@ -1,3 +1,5 @@
+const logger = require('../../../shared/logger/logger');
+
 // gmail/mobilization.gmail.js
 const { google } = require('googleapis');
 const fs = require('fs');
@@ -116,7 +118,7 @@ class OAuth2GmailClient {
     try {
       if (typeof attachment === 'string') {
         if (!fs.existsSync(attachment)) {
-          console.warn(`[Gmail] Attachment not found: ${attachment}`);
+          logger.warn(`[Gmail] Attachment not found: ${attachment}`);
           return null;
         }
         const filename = path.basename(attachment);
@@ -129,7 +131,7 @@ class OAuth2GmailClient {
 
       if (attachment.path) {
         if (!fs.existsSync(attachment.path)) {
-          console.warn(`[Gmail] Attachment not found: ${attachment.path}`);
+          logger.warn(`[Gmail] Attachment not found: ${attachment.path}`);
           return null;
         }
         const filename = attachment.filename ?? path.basename(attachment.path);
@@ -150,10 +152,10 @@ class OAuth2GmailClient {
         };
       }
 
-      console.warn('[Gmail] Invalid attachment format:', attachment);
+      logger.warn('[Gmail] Invalid attachment format:', attachment);
       return null;
     } catch (error) {
-      console.warn(`[Gmail] Error resolving attachment: ${error.message}`);
+      logger.warn(`[Gmail] Error resolving attachment: ${error.message}`);
       return null;
     }
   }

@@ -1,11 +1,15 @@
+const logger = require('../../../shared/logger/logger');
+
+const HTTP = require('../../../shared/constants/httpStatus.constant.js');
+const { sendSuccess, sendError } = require('../../../shared/response/response.util');
 const service = require('./ztech.service');
 
 const handshake = async (req, res) => {
   try {
-    res.status(200).send('OK');
+    res.status(HTTP.OK).send('OK');
   } catch (error) {
-    console.error('[ZKTeco] Error handling GET /iclock/cdata:', error);
-    res.status(500).send('Error');
+    logger.error('[ZKTeco] Error handling GET /iclock/cdata:', error);
+    res.status(HTTP.INTERNAL_SERVER_ERROR).send('Error');
   }
 };
 
@@ -19,23 +23,23 @@ const receiveAttendanceData = async (req, res) => {
       }
     }
 
-    res.status(200).send('OK');
+    res.status(HTTP.OK).send('OK');
   } catch (error) {
-    console.error('[ZKTeco] Error handling POST /iclock/cdata:', error);
-    res.status(500).send('Error');
+    logger.error('[ZKTeco] Error handling POST /iclock/cdata:', error);
+    res.status(HTTP.INTERNAL_SERVER_ERROR).send('Error');
   }
 };
 
 const ping = async (req, res) => {
-  res.status(200).send('OK');
+  res.status(HTTP.OK).send('OK');
 };
 
 const getRequest = async (req, res) => {
-  res.status(200).send('OK');
+  res.status(HTTP.OK).send('OK');
 };
 
 const deviceCmd = async (req, res) => {
-  res.status(200).send('OK');
+  res.status(HTTP.OK).send('OK');
 };
 
 const addZktecoPin = async (req, res) => {
@@ -43,7 +47,7 @@ const addZktecoPin = async (req, res) => {
     const { _id, zktecoPin } = req.body;
 
     if (!_id || !zktecoPin) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'Both _id and zktecoPin are required',
       });
@@ -52,20 +56,20 @@ const addZktecoPin = async (req, res) => {
     const updatedMechanic = await service.setZktecoPin(_id, zktecoPin);
 
     if (!updatedMechanic) {
-      return res.status(404).json({
+      return sendError(res, {
         success: false,
         message: 'Mechanic not found',
       });
     }
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'ZKTeco PIN added successfully',
       data: updatedMechanic,
     });
   } catch (error) {
-    console.error('[ZKTeco] Error adding ZKTeco PIN:', error);
-    res.status(500).json({
+    logger.error('[ZKTeco] Error adding ZKTeco PIN:', error);
+    sendError(res, {
       success: false,
       message: error.message,
     });

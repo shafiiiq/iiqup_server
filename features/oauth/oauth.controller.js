@@ -1,3 +1,7 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
+const { sendSuccess, sendError } = require('../../shared/response/response.util');
 // controllers/oauth.controller.js
 const oauthServices = require('./oauth.service');
 
@@ -15,17 +19,17 @@ const verifyRefresh = async (req, res) => {
 
     if (!refreshToken) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'refreshToken is required' });
     }
 
     const result = await oauthServices.authRefresh(refreshToken);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[OAuth] verifyRefresh:', error);
+    logger.error('[OAuth] verifyRefresh:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };

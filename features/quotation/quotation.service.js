@@ -1,3 +1,7 @@
+const logger = require('../../shared/logger/logger');
+
+const AppError = require('../../shared/errors/AppError.js');
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
 const Quotation = require('./quotation.model');
 const { createNotification } = require('../notification/notification.service');
 const { default: wsUtils } = require('../../socket/socket');
@@ -266,7 +270,7 @@ const uploadQuotation = async (
   try {
     const QuotationData = await Quotation.findOne({ quotationRef });
     if (!QuotationData)
-      throw Object.assign(new Error('Quotation not found'), { status: 404 });
+      throw Object.assign(new Error('Quotation not found'), { status: HTTP.NOT_FOUND });
 
     const validStatuses = isAmendment
       ? [
@@ -285,7 +289,7 @@ const uploadQuotation = async (
         new Error(
           `Invalid workflow status for Quotation ${isAmendment ? 'amendment' : 'upload'}`
         ),
-        { status: 400 }
+        { status: HTTP.BAD_REQUEST }
       );
     }
 
@@ -368,7 +372,7 @@ const uploadQuotation = async (
       data: quotationUpdated,
     };
   } catch (error) {
-    console.error('[QuotationService] uploadQuotation:', error);
+    logger.error('[QuotationService] uploadQuotation:', error);
     throw error;
   }
 };
@@ -524,12 +528,12 @@ const purchaseApproval = async (quotationRef, approvalData) => {
     } = approvalData;
 
     const quotation = await Quotation.findOne({ quotationRef });
-    if (!quotation) throw { status: 404, message: 'Quotation not found' };
+    if (!quotation) throw new AppError('Quotation not found', HTTP.NOT_FOUND);
 
     const validStatuses = ['quotation_uploaded', 'quotation_amended'];
     if (!validStatuses.includes(quotation.workflowStatus)) {
       throw {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         message: `Invalid workflow status. Expected 'quotation_uploaded' or 'quotation_amended', got '${quotation.workflowStatus}'`,
       };
     }
@@ -570,7 +574,7 @@ const purchaseApproval = async (quotationRef, approvalData) => {
       { new: true }
     );
     if (!quotationUpdated)
-      throw { status: 404, message: 'Failed to update Quotation' };
+      throw new AppError('Failed to update Quotation', HTTP.NOT_FOUND);
 
     const isAmendment = quotationUpdated.isAmendmented;
     const title = isAmendment
@@ -597,14 +601,14 @@ const purchaseApproval = async (quotationRef, approvalData) => {
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: `Purchase Manager approval ${signed ? 'and signing ' : ''}completed successfully`,
       data: quotationUpdated,
       signed,
       authorised,
     };
   } catch (error) {
-    console.error('[QuotationService] purchaseApproval:', error);
+    logger.error('[QuotationService] purchaseApproval:', error);
     throw error;
   }
 };
@@ -649,7 +653,7 @@ const managerApproval = async (
       { new: true }
     );
     if (!quotationUpdated)
-      throw { status: 404, message: 'Quotation not found' };
+      throw { status: HTTP.NOT_FOUND, message: 'Quotation not found' };
 
     const isAmendment = quotationUpdated.isAmendmented;
     const signatoryTitle =
@@ -685,7 +689,7 @@ const managerApproval = async (
       description = `Manager ${signedLabel}approved amendment Quotation. MD approval needed.`;
       source = 'md_approval';
     } else {
-      throw { status: 400, message: 'Invalid authorized signatory position' };
+      throw { status: HTTP.BAD_REQUEST, message: 'Invalid authorized signatory position' };
     }
 
     await notify(
@@ -705,12 +709,12 @@ const managerApproval = async (
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: 'MANAGER approval completed',
       data: quotationUpdated,
     };
   } catch (error) {
-    console.error('[QuotationService] managerApproval:', error);
+    logger.error('[QuotationService] managerApproval:', error);
     throw error;
   }
 };
@@ -764,7 +768,7 @@ const ceoApproval = async (
       { new: true }
     );
     if (!quotationUpdated)
-      throw { status: 404, message: 'Quotation not found' };
+      throw { status: HTTP.NOT_FOUND, message: 'Quotation not found' };
 
     const isAmendment = quotationUpdated.isAmendmented;
     const signatoryTitle =
@@ -793,12 +797,12 @@ const ceoApproval = async (
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: `${approverType} approval completed`,
       data: quotationUpdated,
     };
   } catch (error) {
-    console.error('[QuotationService] ceoApproval:', error);
+    logger.error('[QuotationService] ceoApproval:', error);
     throw error;
   }
 };
@@ -843,7 +847,7 @@ const accountsApproval = async (
       { new: true }
     );
     if (!quotationUpdated)
-      throw { status: 404, message: 'Quotation not found' };
+      throw { status: HTTP.NOT_FOUND, message: 'Quotation not found' };
 
     const isAmendment = quotationUpdated.isAmendmented;
     const title = isAmendment
@@ -870,12 +874,12 @@ const accountsApproval = async (
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: 'ACCOUNTS approval completed',
       data: quotationUpdated,
     };
   } catch (error) {
-    console.error('[QuotationService] accountsApproval:', error);
+    logger.error('[QuotationService] accountsApproval:', error);
     throw error;
   }
 };
@@ -906,7 +910,7 @@ const markItemsAvailable = async (quotationRef, markedBy) => {
     );
 
     if (!quotationUpdated)
-      throw { status: 404, message: 'Quotation not found' };
+      throw { status: HTTP.NOT_FOUND, message: 'Quotation not found' };
 
     const title = `Quotation Approved - ${quotationRef}`;
     const description = 'All requested items can now be procured';
@@ -919,12 +923,12 @@ const markItemsAvailable = async (quotationRef, markedBy) => {
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: 'Items marked as available',
       data: quotationUpdated,
     };
   } catch (error) {
-    console.error('[QuotationService] markItemsAvailable:', error);
+    logger.error('[QuotationService] markItemsAvailable:', error);
     throw error;
   }
 };
@@ -1009,7 +1013,7 @@ const signQuotation = async (quotationRef, signData) => {
 
   if (!matched || matched.envKey !== uniqueCode) {
     throw {
-      status: 403,
+      status: HTTP.FORBIDDEN,
       message:
         'Unauthorised: your account is not recognised as an authorised signatory for Quotation documents',
     };
@@ -1017,10 +1021,10 @@ const signQuotation = async (quotationRef, signData) => {
 
   const quotation = await Quotation.findOne({ quotationRef });
   if (!quotation)
-    throw { status: 404, message: `Quotation not found: ${quotationRef}` };
+    throw { status: HTTP.NOT_FOUND, message: `Quotation not found: ${quotationRef}` };
 
   if (quotation.workflowStatus === 'quotation_created') {
-    throw { status: 403, message: 'Quotation_NOT_UPLOADED' };
+    throw { status: HTTP.FORBIDDEN, message: 'Quotation_NOT_UPLOADED' };
   }
 
   // ── Role-specific restrictions ─────────────────────────────────────────────
@@ -1029,7 +1033,7 @@ const signQuotation = async (quotationRef, signData) => {
     quotation.signatures?.authorizedSignatoryTitle !== 'CEO'
   ) {
     throw {
-      status: 403,
+      status: HTTP.FORBIDDEN,
       message: 'Only the designated CEO is authorised to sign this Quotation',
     };
   }
@@ -1039,7 +1043,7 @@ const signQuotation = async (quotationRef, signData) => {
     quotation.signatures?.authorizedSignatoryTitle !== 'MANAGING DIRECTOR'
   ) {
     throw {
-      status: 403,
+      status: HTTP.FORBIDDEN,
       message:
         'Only the designated Managing Director is authorised to sign this Quotation',
     };
@@ -1048,7 +1052,7 @@ const signQuotation = async (quotationRef, signData) => {
   // ── Already signed guard ───────────────────────────────────────────────────
   if (quotation[matched.field] === true) {
     throw {
-      status: 409,
+      status: HTTP.CONFLICT,
       message: `The authorized signatory role has already been signed`,
     };
   }
@@ -1119,7 +1123,7 @@ const signQuotation = async (quotationRef, signData) => {
     { new: true }
   );
   if (!updated)
-    throw { status: 500, message: 'Failed to update Quotation record' };
+    throw { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to update Quotation record' };
 
   // ── Notifications ──────────────────────────────────────────────────────────
 
@@ -1198,7 +1202,7 @@ const signQuotation = async (quotationRef, signData) => {
   }
 
   return {
-    status: 200,
+    status: HTTP.OK,
     message: `${matched.role} signature recorded successfully`,
     data: updated,
     role: matched.role,
@@ -1211,11 +1215,12 @@ const signQuotation = async (quotationRef, signData) => {
 
 /**
  * Returns all Quotation records sorted by creation date descending.
- * @returns {Promise<object[]>}
+ * @param {object} pagination
+ * @returns {Promise<object>}
  */
-const getAllQuotations = async () => {
+const getAllQuotations = async (pagination) => {
   try {
-    return await Quotation.find({}).sort({ createdAt: -1 });
+    return await paginate(Quotation, {}, pagination, { sort: { createdAt: -1 } });
   } catch (error) {
     throw new Error(`[QuotationService] getAllQuotations:${error.message}`, {
       cause: error,
@@ -1230,7 +1235,7 @@ const getAllQuotations = async () => {
  */
 const getQuotationByRef = async (refNo) => {
   try {
-    console.log('refNo', refNo);
+    logger.info('refNo', refNo);
     const quotation = await Quotation.findOne({ quotationRef: refNo });
     if (!quotation) throw new Error('Quotation not found');
     return quotation;
@@ -1324,7 +1329,7 @@ const getPendingSignatures = async (uniqueCode) => {
       .sort({ createdAt: -1 })
       .lean();
   } catch (error) {
-    console.error('[QuotationService] getPendingSignatures:', error);
+    logger.error('[QuotationService] getPendingSignatures:', error);
     throw new Error(
       `Error fetching pending Quotation signatures: ${error.message}`
     );
@@ -1425,7 +1430,7 @@ const getLatestQuotationRef = async () => {
     const match = latestQuotation.quotationRef.match(/^ATE(\d+)\/SP/);
     return match ? match[1] : null;
   } catch (error) {
-    console.error('[QuotationService] getLatestQuotationRef:', error);
+    logger.error('[QuotationService] getLatestQuotationRef:', error);
     throw new Error(
       `Error fetching latest Quotation reference: ${error.message}`
     );
@@ -1476,7 +1481,7 @@ const getQuotationsByDateRange = async (startDate, endDate) => {
       createdAt: { $gte: new Date(startDate), $lte: new Date(endDate) },
     }).sort({ createdAt: -1 });
   } catch (error) {
-    console.error('[QuotationService] getQuotationsByDateRange:', error);
+    logger.error('[QuotationService] getQuotationsByDateRange:', error);
     throw new Error(
       `Error fetching Quotations by date range: ${error.message}`
     );
@@ -1513,7 +1518,7 @@ const getQuotationsByRegNo = async (regNo) => {
       equipments: { $elemMatch: { $regex: regex } },
     }).sort({ createdAt: -1 });
   } catch (error) {
-    console.error('[QuotationService] getQuotationsByRegNo:', error);
+    logger.error('[QuotationService] getQuotationsByRegNo:', error);
     throw new Error(
       `Error fetching Quotations by registration number: ${error.message}`
     );
@@ -1547,7 +1552,7 @@ const getQuotationsForAllEquipments = async () => {
       equipment: { $regex: /^For all equipment$/i },
     }).sort({ createdAt: -1 });
   } catch (error) {
-    console.error('[QuotationService] getQuotationsForAllEquipments:', error);
+    logger.error('[QuotationService] getQuotationsForAllEquipments:', error);
     throw new Error(
       `Error fetching all equipment Quotations: ${error.message}`
     );

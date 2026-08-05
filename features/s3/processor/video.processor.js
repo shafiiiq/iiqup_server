@@ -1,3 +1,5 @@
+const logger = require('../../../shared/logger/logger');
+
 // services/video.processor.js
 const ffmpegPath = require('ffmpeg-static');
 const ffmpeg = require('fluent-ffmpeg');
@@ -37,13 +39,13 @@ const processVideoForStreaming = async (buffer, mimeType) => {
     });
 
     const result = fs.readFileSync(outputPath);
-    console.log('[VideoProcessor] processVideoForStreaming success', {
+    logger.info('[VideoProcessor] processVideoForStreaming success', {
       originalSize: buffer.length,
       processedSize: result.length,
     });
     return result;
   } catch (error) {
-    console.error(
+    logger.error(
       '[VideoProcessor] processVideoForStreaming failed, uploading original buffer instead',
       error
     );

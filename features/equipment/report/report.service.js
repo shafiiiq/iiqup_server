@@ -1,3 +1,7 @@
+const logger = require('../../../shared/logger/logger');
+
+const AppError = require('../../../shared/errors/AppError.js');
+const HTTP = require('../../../shared/constants/httpStatus.constant.js');
 // services/report.service.js
 const ServiceHistoryModel = require('../history/history.model');
 const ServiceReportModel = require('./report.model');
@@ -186,15 +190,15 @@ const insertServiceReport = async (data) => {
     wsUtils.sendDashboardUpdate('serviceReport');
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'Service report created successfully',
       data: { serviceReport: report },
     };
   } catch (error) {
-    console.error('[ReportService] insertServiceReport:', error);
+    logger.error('[ReportService] insertServiceReport:', error);
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: `Error creating service report: ${error.message}`,
       error: error.message,
@@ -214,7 +218,7 @@ const updateServiceReportWith = async (id, updateData) => {
       { new: true, runValidators: true }
     );
     if (!updated)
-      throw { ok: false, message: 'Service report not found', status: 404 };
+      throw { ok: false, message: 'Service report not found', status: HTTP.NOT_FOUND };
 
     // ── Sync history record ───────────────────────────────────────────────────
     let updatedHistory = null;
@@ -242,7 +246,7 @@ const updateServiceReportWith = async (id, updateData) => {
       );
 
       if (!updatedHistory) {
-        console.warn(
+        logger.warn(
           '[ReportService] updateServiceReportWith — history not found for historyId:',
           updated.historyId
         );
@@ -250,18 +254,18 @@ const updateServiceReportWith = async (id, updateData) => {
     }
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'Service report and history updated successfully',
       data: { serviceReport: updated, serviceHistory: updatedHistory },
     };
   } catch (error) {
-    console.error('[ReportService] updateServiceReportWith:', error);
+    logger.error('[ReportService] updateServiceReportWith:', error);
     throw {
       ok: false,
       message: 'Failed to update service report',
       error: error.message || error,
-      status: error.status || 500,
+      status: error.status || HTTP.INTERNAL_SERVER_ERROR,
     };
   }
 };
@@ -273,7 +277,7 @@ const deleteServiceReportWith = async (id) => {
   try {
     const report = await ServiceReportModel.findById(id);
     if (!report)
-      throw { ok: false, message: 'Service report not found', status: 404 };
+      throw { ok: false, message: 'Service report not found', status: HTTP.NOT_FOUND };
 
     const { historyId } = report;
 
@@ -305,12 +309,12 @@ const deleteServiceReportWith = async (id) => {
       },
     };
   } catch (error) {
-    console.error('[ReportService] deleteServiceReportWith:', error);
+    logger.error('[ReportService] deleteServiceReportWith:', error);
     throw {
       ok: false,
       message: 'Failed to delete service report',
       error: error.message || error,
-      status: error.status || 500,
+      status: error.status || HTTP.INTERNAL_SERVER_ERROR,
     };
   }
 };
@@ -328,11 +332,11 @@ const fetchServiceReport = async (regNo, date) => {
       regNo,
       date: toISODate(date),
     });
-    return { status: 200, ok: true, data };
+    return { status: HTTP.OK, ok: true, data };
   } catch (error) {
-    console.error('[ReportService] fetchServiceReport:', error);
+    logger.error('[ReportService] fetchServiceReport:', error);
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: error.message || 'Error fetching report',
     };
@@ -346,12 +350,12 @@ const fetchServiceReportWith = async (id) => {
   try {
     const report = await ServiceReportModel.findById(id);
     if (!report)
-      throw { status: 404, ok: false, message: 'Service report not found' };
-    return { status: 200, ok: true, data: report };
+      throw { status: HTTP.NOT_FOUND, ok: false, message: 'Service report not found' };
+    return { status: HTTP.OK, ok: true, data: report };
   } catch (error) {
-    console.error('[ReportService] fetchServiceReportWith:', error);
+    logger.error('[ReportService] fetchServiceReportWith:', error);
     throw {
-      status: error.status || 500,
+      status: error.status || HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: error.message || 'Error fetching report',
     };
@@ -371,11 +375,11 @@ const fetchAllServiceHistories = async (regNo, serviceTypes = []) => {
     if (serviceTypes?.length) query.serviceType = { $in: serviceTypes };
 
     const data = await ServiceReportModel.find(query).sort({ date: -1 });
-    return { status: 200, ok: true, data };
+    return { status: HTTP.OK, ok: true, data };
   } catch (error) {
-    console.error('[ReportService] fetchAllServiceHistories:', error);
+    logger.error('[ReportService] fetchAllServiceHistories:', error);
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: error.message || 'Error fetching all service histories',
     };
@@ -390,14 +394,14 @@ const fetchServicesByType = async (regNo, serviceType) => {
     const data = await ServiceReportModel.find({ regNo, serviceType }).sort({
       date: -1,
     });
-    return { status: 200, ok: true, data };
+    return { status: HTTP.OK, ok: true, data };
   } catch (error) {
-    console.error(
+    logger.error(
       `[ReportService] fetchServicesByType (${serviceType}):`,
       error
     );
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: error.message || `Error fetching ${serviceType} services`,
     };
@@ -452,7 +456,7 @@ const fetchServicesByPeriod = async (period) => {
     const grouped = groupReports(reports);
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       period,
       dateRange: { from, to },
@@ -465,9 +469,9 @@ const fetchServicesByPeriod = async (period) => {
       data: { all: reports, ...grouped },
     };
   } catch (error) {
-    console.error(`[ReportService] fetchServicesByPeriod (${period}):`, error);
+    logger.error(`[ReportService] fetchServicesByPeriod (${period}):`, error);
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: error.message || `Error fetching ${period} services`,
     };
@@ -483,11 +487,11 @@ const fetchServicesByDateRange = async (regNo, startDate, endDate) => {
       regNo,
       date: { $gte: toISODate(startDate), $lte: toISODate(endDate) },
     }).sort({ date: -1 });
-    return { status: 200, ok: true, data };
+    return { status: HTTP.OK, ok: true, data };
   } catch (error) {
-    console.error('[ReportService] fetchServicesByDateRange:', error);
+    logger.error('[ReportService] fetchServicesByDateRange:', error);
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: error.message || 'Error fetching services by date range',
     };
@@ -512,11 +516,11 @@ const fetchServicesByLastMonths = async (regNo, monthsCount) => {
       regNo,
       date: { $gte: from, $lte: to },
     }).sort({ date: -1 });
-    return { status: 200, ok: true, data };
+    return { status: HTTP.OK, ok: true, data };
   } catch (error) {
-    console.error('[ReportService] fetchServicesByLastMonths:', error);
+    logger.error('[ReportService] fetchServicesByLastMonths:', error);
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: error.message || 'Error fetching services by last months',
     };
@@ -537,7 +541,7 @@ const fetchAllServicesByDateRange = async (startDate, endDate) => {
     const grouped = groupReports(reports);
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       period: 'custom',
       dateRange: { from, to },
@@ -545,9 +549,9 @@ const fetchAllServicesByDateRange = async (startDate, endDate) => {
       data: { all: reports, ...grouped },
     };
   } catch (error) {
-    console.error('[ReportService] fetchAllServicesByDateRange:', error);
+    logger.error('[ReportService] fetchAllServicesByDateRange:', error);
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: error.message || 'Error fetching services by date range',
     };
@@ -575,7 +579,7 @@ const fetchAllServicesByLastMonths = async (monthsCount) => {
     const grouped = groupReports(reports);
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       period: `last-${monthsCount}-months`,
       dateRange: { from, to },
@@ -583,9 +587,9 @@ const fetchAllServicesByLastMonths = async (monthsCount) => {
       data: { all: reports, ...grouped },
     };
   } catch (error) {
-    console.error('[ReportService] fetchAllServicesByLastMonths:', error);
+    logger.error('[ReportService] fetchAllServicesByLastMonths:', error);
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: error.message || 'Error fetching services by last months',
     };
@@ -612,11 +616,11 @@ const fetchServicesByTypeAndDateRange = async (
     else if (serviceType) query.serviceType = serviceType;
 
     const data = await ServiceReportModel.find(query).sort({ date: -1 });
-    return { status: 200, ok: true, data };
+    return { status: HTTP.OK, ok: true, data };
   } catch (error) {
-    console.error('[ReportService] fetchServicesByTypeAndDateRange:', error);
+    logger.error('[ReportService] fetchServicesByTypeAndDateRange:', error);
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message:
         error.message || 'Error fetching services by type and date range',
@@ -649,11 +653,11 @@ const fetchServicesByTypeAndLastMonths = async (
     else if (serviceType) query.serviceType = serviceType;
 
     const data = await ServiceReportModel.find(query).sort({ date: -1 });
-    return { status: 200, ok: true, data };
+    return { status: HTTP.OK, ok: true, data };
   } catch (error) {
-    console.error('[ReportService] fetchServicesByTypeAndLastMonths:', error);
+    logger.error('[ReportService] fetchServicesByTypeAndLastMonths:', error);
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message:
         error.message || 'Error fetching services by type and last months',

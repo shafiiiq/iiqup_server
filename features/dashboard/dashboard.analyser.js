@@ -1,3 +1,5 @@
+const logger = require('../../shared/logger/logger');
+
 // ─── Dashboard Analyser ───────────────────────────────────────────────────────
 // Reads from REGISTRY. Zero hardcoded model names.
 // All analysis is keyed by registry entry — new models auto-appear everywhere.
@@ -549,7 +551,7 @@ const fetchEquipmentStats = async () => {
     cache.set(cacheKey, result, 60_000);
     return result;
   } catch (error) {
-    console.error('[DashboardService] fetchEquipmentStats:', error);
+    logger.error('[DashboardService] fetchEquipmentStats:', error);
     return { status: 500, message: error.message };
   }
 };
@@ -644,7 +646,7 @@ const fetchRealTimeStats = async () => {
     cache.set(cacheKey, result, 60_000);
     return result;
   } catch (error) {
-    console.error('[DashboardService] fetchRealTimeStats:', error);
+    logger.error('[DashboardService] fetchRealTimeStats:', error);
     return { status: 500, message: error.message };
   }
 };
@@ -679,7 +681,7 @@ const fetchLatest5 = async () => {
     cache.set(cacheKey, result, 30_000);
     return result;
   } catch (error) {
-    console.error('[DashboardService] fetchLatest5:', error);
+    logger.error('[DashboardService] fetchLatest5:', error);
     return { status: 500, message: error.message };
   }
 };

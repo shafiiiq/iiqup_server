@@ -1,3 +1,7 @@
+const logger = require('../../shared/logger/logger');
+
+const AppError = require('../../shared/errors/AppError.js');
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
 // services/complaint.service.js
 const Complaint = require('./complaint.model');
 const Equipment = require('../equipment/equipment.model');
@@ -144,7 +148,7 @@ const createComplaint = async (complaint) => {
     const equipment = await Equipment.findOne({ regNo: complaint.regNo });
     if (!equipment)
       throw {
-        status: 404,
+        status: HTTP.NOT_FOUND,
         message: `Equipment with regNo ${complaint.regNo} not found`,
       };
 
@@ -195,7 +199,7 @@ const createComplaint = async (complaint) => {
 
     return complaintData;
   } catch (error) {
-    console.error('[ComplaintService] createComplaint:', error);
+    logger.error('[ComplaintService] createComplaint:', error);
     throw error;
   }
 };
@@ -234,7 +238,7 @@ const assignMechanic = async (complaintId, mechanicsArray, assignedBy) => {
       },
       { new: true }
     );
-    if (!complaint) throw { status: 404, message: 'Complaint not found' };
+    if (!complaint) throw new AppError('Complaint not found', HTTP.NOT_FOUND);
 
     await Promise.all(
       mechanicsArray.map((m) =>
@@ -272,12 +276,12 @@ const assignMechanic = async (complaintId, mechanicsArray, assignedBy) => {
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: `${mechanicsArray.length} mechanic(s) assigned successfully`,
       data: complaint,
     };
   } catch (error) {
-    console.error('[ComplaintService] assignMechanic:', error);
+    logger.error('[ComplaintService] assignMechanic:', error);
     throw error;
   }
 };
@@ -305,7 +309,7 @@ const mechanicRequestItems = async (complaintId, requestData, mechanicId) => {
       },
       { new: true }
     );
-    if (!complaint) throw { status: 404, message: 'Complaint not found' };
+    if (!complaint) throw { status: HTTP.NOT_FOUND, message: 'Complaint not found' };
 
     const equipment = await Equipment.findOne({ regNo: complaint.regNo });
     const mechanicNames =
@@ -333,12 +337,12 @@ const mechanicRequestItems = async (complaintId, requestData, mechanicId) => {
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: 'Item request submitted successfully',
       data: complaint,
     };
   } catch (error) {
-    console.error('[ComplaintService] mechanicRequestItems:', error);
+    logger.error('[ComplaintService] mechanicRequestItems:', error);
     throw error;
   }
 };
@@ -394,7 +398,7 @@ const forwardToWorkshop = async (
       updateObj,
       { new: true }
     );
-    if (!complaint) throw { status: 404, message: 'Complaint not found' };
+    if (!complaint) throw { status: HTTP.NOT_FOUND, message: 'Complaint not found' };
 
     const equipment = await Equipment.findOne({ regNo: complaint.regNo });
     const lastRequest =
@@ -428,7 +432,7 @@ const forwardToWorkshop = async (
 
     return complaint;
   } catch (error) {
-    console.error('[ComplaintService] forwardToWorkshop:', error);
+    logger.error('[ComplaintService] forwardToWorkshop:', error);
     throw error;
   }
 };
@@ -464,7 +468,7 @@ const forwardToWorkshopWithoutLPO = async (
       },
       { new: true }
     );
-    if (!complaint) throw { status: 404, message: 'Complaint not found' };
+    if (!complaint) throw { status: HTTP.NOT_FOUND, message: 'Complaint not found' };
 
     const equipment = await Equipment.findOne({ regNo: complaint.regNo });
     const title = `Approval Needed! - ${equipment.machine} - ${equipment.regNo}`;
@@ -493,7 +497,7 @@ const forwardToWorkshopWithoutLPO = async (
 
     return complaint;
   } catch (error) {
-    console.error('[ComplaintService] forwardToWorkshopWithoutLPO:', error);
+    logger.error('[ComplaintService] forwardToWorkshopWithoutLPO:', error);
     throw error;
   }
 };
@@ -507,9 +511,9 @@ const forwardToWorkshopWithoutLPO = async (
 const approveItemWithoutLPO = async (complaintId, approvedBy) => {
   try {
     const existing = await Complaint.findById(complaintId);
-    if (!existing) throw { status: 404, message: 'Complaint not found' };
+    if (!existing) throw { status: HTTP.NOT_FOUND, message: 'Complaint not found' };
     if (existing.workflowStatus !== 'sent_to_workshop_without_lpo')
-      throw { status: 400, message: 'Already Approved' };
+      throw { status: HTTP.BAD_REQUEST, message: 'Already Approved' };
 
     const complaint = await Complaint.findByIdAndUpdate(
       complaintId,
@@ -525,7 +529,7 @@ const approveItemWithoutLPO = async (complaintId, approvedBy) => {
       },
       { new: true }
     );
-    if (!complaint) throw { status: 404, message: 'Complaint not found' };
+    if (!complaint) throw { status: HTTP.NOT_FOUND, message: 'Complaint not found' };
 
     const equipment = await Equipment.findOne({ regNo: complaint.regNo });
     const title = `Item Approved - ${equipment.machine} - ${equipment.regNo}`;
@@ -548,7 +552,7 @@ const approveItemWithoutLPO = async (complaintId, approvedBy) => {
 
     return complaint;
   } catch (error) {
-    console.error('[ComplaintService] approveItemWithoutLPO:', error);
+    logger.error('[ComplaintService] approveItemWithoutLPO:', error);
     throw error;
   }
 };
@@ -585,7 +589,7 @@ const createLPOForComplaint = async (complaintId, lpoData, createdBy) => {
       },
       { new: true }
     );
-    if (!complaint) throw { status: 404, message: 'Complaint not found' };
+    if (!complaint) throw { status: HTTP.NOT_FOUND, message: 'Complaint not found' };
 
     const officeMain = JSON.parse(process.env.OFFICE_MAIN);
     const title = `LPO ${lpo.lpoRef} Created`;
@@ -606,12 +610,12 @@ const createLPOForComplaint = async (complaintId, lpoData, createdBy) => {
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: 'LPO created successfully',
       data: { complaint, lpo },
     };
   } catch (error) {
-    console.error('[ComplaintService] createLPOForComplaint:', error);
+    logger.error('[ComplaintService] createLPOForComplaint:', error);
     throw error;
   }
 };
@@ -637,7 +641,7 @@ const uploadLPOForComplaint = async (
   try {
     const complaint = await Complaint.findById(complaintId);
     if (!complaint)
-      throw Object.assign(new Error('Complaint not found'), { status: 404 });
+      throw Object.assign(new Error('Complaint not found'), { status: HTTP.NOT_FOUND });
 
     const validStatuses = isAmendment
       ? [
@@ -657,7 +661,7 @@ const uploadLPOForComplaint = async (
         new Error(
           `Invalid workflow status for LPO ${isAmendment ? 'amendment' : 'upload'}`
         ),
-        { status: 400 }
+        { status: HTTP.BAD_REQUEST }
       );
     }
 
@@ -741,7 +745,7 @@ const uploadLPOForComplaint = async (
       data: updatedComplaint,
     };
   } catch (error) {
-    console.error('[ComplaintService] uploadLPOForComplaint:', error);
+    logger.error('[ComplaintService] uploadLPOForComplaint:', error);
     throw error;
   }
 };
@@ -767,10 +771,10 @@ const purchaseApproval = async (complaintId, approvalData) => {
     } = approvalData;
 
     const existing = await Complaint.findById(complaintId);
-    if (!existing) throw { status: 404, message: 'Complaint not found' };
+    if (!existing) throw { status: HTTP.NOT_FOUND, message: 'Complaint not found' };
     if (!['lpo_uploaded', 'lpo_amended'].includes(existing.workflowStatus)) {
       throw {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         message: `Invalid workflow status. Expected 'lpo_uploaded' or 'lpo_amended', got '${existing.workflowStatus}'`,
       };
     }
@@ -812,7 +816,7 @@ const purchaseApproval = async (complaintId, approvalData) => {
       { new: true }
     );
     if (!complaint)
-      throw { status: 404, message: 'Failed to update complaint' };
+      throw { status: HTTP.NOT_FOUND, message: 'Failed to update complaint' };
 
     if (complaint.lpoDetails?.lpoId)
       await LPO.updateOne(
@@ -847,14 +851,14 @@ const purchaseApproval = async (complaintId, approvalData) => {
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: `Purchase Manager approval ${signed ? 'and signing ' : ''}completed successfully`,
       data: complaint,
       signed,
       authorised,
     };
   } catch (error) {
-    console.error('[ComplaintService] purchaseApproval:', error);
+    logger.error('[ComplaintService] purchaseApproval:', error);
     throw error;
   }
 };
@@ -915,7 +919,7 @@ const managerApproval = async (
       updateFields,
       { new: true }
     );
-    if (!complaint) throw { status: 404, message: 'Complaint not found' };
+    if (!complaint) throw { status: HTTP.NOT_FOUND, message: 'Complaint not found' };
 
     if (complaint.lpoDetails?.lpoId)
       await LPO.updateOne(
@@ -930,7 +934,7 @@ const managerApproval = async (
     const isMD = sigTitle === 'MANAGING DIRECTOR';
 
     if (!isCEO && !isMD)
-      throw { status: 404, message: 'Invalid auth position' };
+      throw { status: HTTP.NOT_FOUND, message: 'Invalid auth position' };
 
     const prefix = isAmendment ? 'Amendment! ' : '';
     const target = isCEO ? process.env.CEO : process.env.MD;
@@ -962,12 +966,12 @@ const managerApproval = async (
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: 'MANAGER approval completed',
       data: complaint,
     };
   } catch (error) {
-    console.error('[ComplaintService] managerApproval:', error);
+    logger.error('[ComplaintService] managerApproval:', error);
     throw error;
   }
 };
@@ -1036,7 +1040,7 @@ const ceoApproval = async (
       updateFields,
       { new: true }
     );
-    if (!complaint) throw { status: 404, message: 'Complaint not found' };
+    if (!complaint) throw { status: HTTP.NOT_FOUND, message: 'Complaint not found' };
 
     if (complaint.lpoDetails?.lpoId) {
       await LPO.updateOne(
@@ -1073,12 +1077,12 @@ const ceoApproval = async (
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: `${approverType} approval completed`,
       data: complaint,
     };
   } catch (error) {
-    console.error(
+    logger.error(
       `[ComplaintService] ceoApproval (${authUser || 'CEO'}):`,
       error
     );
@@ -1142,7 +1146,7 @@ const accountsApproval = async (
       updateFields,
       { new: true }
     );
-    if (!complaint) throw { status: 404, message: 'Complaint not found' };
+    if (!complaint) throw { status: HTTP.NOT_FOUND, message: 'Complaint not found' };
 
     if (complaint.lpoDetails?.lpoId)
       await LPO.updateOne(
@@ -1175,12 +1179,12 @@ const accountsApproval = async (
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: 'ACCOUNTS approval completed',
       data: complaint,
     };
   } catch (error) {
-    console.error('[ComplaintService] accountsApproval:', error);
+    logger.error('[ComplaintService] accountsApproval:', error);
     throw error;
   }
 };
@@ -1209,7 +1213,7 @@ const markItemsAvailable = async (complaintId, markedBy) => {
       },
       { new: true }
     );
-    if (!complaint) throw { status: 404, message: 'Complaint not found' };
+    if (!complaint) throw { status: HTTP.NOT_FOUND, message: 'Complaint not found' };
 
     const officeHero = JSON.parse(process.env.OFFICE_HERO);
     await notify(
@@ -1227,12 +1231,12 @@ const markItemsAvailable = async (complaintId, markedBy) => {
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: 'Items marked as available',
       data: complaint,
     };
   } catch (error) {
-    console.error('[ComplaintService] markItemsAvailable:', error);
+    logger.error('[ComplaintService] markItemsAvailable:', error);
     throw error;
   }
 };
@@ -1255,7 +1259,7 @@ const addSolutionToComplaint = async (
 ) => {
   try {
     const existing = await Complaint.findById(complaintId);
-    if (!existing) throw { status: 404, message: 'Complaint not found' };
+    if (!existing) throw { status: HTTP.NOT_FOUND, message: 'Complaint not found' };
 
     const solutionFiles = filesData.map((file) => ({
       fileName: file.fileName,
@@ -1340,15 +1344,17 @@ const addSolutionToComplaint = async (
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: 'Work completed successfully',
       data: complaint,
     };
   } catch (error) {
-    console.error('[ComplaintService] addSolutionToComplaint:', error);
+    logger.error('[ComplaintService] addSolutionToComplaint:', error);
     throw error;
   }
 };
+
+const { paginate } = require('../../shared/pagination/pagination.util');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Read
@@ -1357,13 +1363,19 @@ const addSolutionToComplaint = async (
 /**
  * Returns all complaints for a given uniqueCode.
  * @param {string} uniqueCode
- * @returns {Promise<Array>}
+ * @param {object} pagination
+ * @returns {Promise<object>}
  */
-const getComplaintsByUser = async (uniqueCode) => {
+const getComplaintsByUser = async (uniqueCode, pagination) => {
   try {
-    return await Complaint.find({ uniqueCode }).sort({ createdAt: -1 });
+    return await paginate(
+      Complaint,
+      { uniqueCode },
+      pagination,
+      { sort: { createdAt: -1 } }
+    );
   } catch (error) {
-    console.error('[ComplaintService] getComplaintsByUser:', error);
+    logger.error('[ComplaintService] getComplaintsByUser:', error);
     throw error;
   }
 };
@@ -1377,21 +1389,21 @@ const getComplaintById = async (id) => {
   try {
     return await Complaint.findById(id);
   } catch (error) {
-    console.error('[ComplaintService] getComplaintById:', error);
+    logger.error('[ComplaintService] getComplaintById:', error);
     throw error;
   }
 };
 
 /**
  * Returns all complaints sorted by creation date descending.
+ * @param {object} pagination
  * @returns {Promise<object>}
  */
-const getFullComplaints = async () => {
+const getFullComplaints = async (pagination) => {
   try {
-    const result = await Complaint.find({}).sort({ createdAt: -1 });
-    return { status: 200, data: result };
+    return await paginate(Complaint, {}, pagination, { sort: { createdAt: -1 } });
   } catch (error) {
-    console.error('[ComplaintService] getFullComplaints:', error);
+    logger.error('[ComplaintService] getFullComplaints:', error);
     throw error;
   }
 };
@@ -1399,13 +1411,19 @@ const getFullComplaints = async () => {
 /**
  * Returns complaints filtered by workflow status.
  * @param {string} workflowStatus
- * @returns {Promise<Array>}
+ * @param {object} pagination
+ * @returns {Promise<object>}
  */
-const getComplaintsByStatus = async (workflowStatus) => {
+const getComplaintsByStatus = async (workflowStatus, pagination) => {
   try {
-    return await Complaint.find({ workflowStatus }).sort({ createdAt: -1 });
+    return await paginate(
+      Complaint,
+      { workflowStatus },
+      pagination,
+      { sort: { createdAt: -1 } }
+    );
   } catch (error) {
-    console.error('[ComplaintService] getComplaintsByStatus:', error);
+    logger.error('[ComplaintService] getComplaintsByStatus:', error);
     throw error;
   }
 };
@@ -1413,18 +1431,24 @@ const getComplaintsByStatus = async (workflowStatus) => {
 /**
  * Returns complaints assigned to a mechanic by their email.
  * @param {string} email
- * @returns {Promise<Array>}
+ * @param {object} pagination
+ * @returns {Promise<object>}
  */
-const getComplaintsByMechanic = async (email) => {
+const getComplaintsByMechanic = async (email, pagination) => {
   try {
     const mechanic = await Mechanic.findOne({ email });
     if (!mechanic) throw new Error('Mechanic not found');
 
-    return await Complaint.find({
-      assignedMechanic: { $elemMatch: { mechanicId: mechanic.userId } },
-    }).sort({ createdAt: -1 });
+    return await paginate(
+      Complaint,
+      {
+        assignedMechanic: { $elemMatch: { mechanicId: mechanic.userId } },
+      },
+      pagination,
+      { sort: { createdAt: -1 } }
+    );
   } catch (error) {
-    console.error('[ComplaintService] getComplaintsByMechanic:', error);
+    logger.error('[ComplaintService] getComplaintsByMechanic:', error);
     throw error;
   }
 };

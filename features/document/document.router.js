@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const controller = require('./document.controller');
+const paginationMiddleware = require('../../shared/pagination/pagination.middleware');
 const { authMiddleware } = require('../../middlewares/jwt.middleware');
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -9,13 +10,14 @@ const { authMiddleware } = require('../../middlewares/jwt.middleware');
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── CRUD ──────────────────────────────────────────────────────────────────────
-router.get('/get-all-documents', authMiddleware, controller.getAllDocuments);
+router.get('/get-all-documents', authMiddleware, paginationMiddleware, controller.getAllDocuments);
 router.get(
   '/get-all-documents-types',
   authMiddleware,
+  paginationMiddleware,
   controller.getAllDocumentsTypes
 );
-router.get('/get-documents/:type/:id', authMiddleware, controller.getDocuments);
+router.get('/get-documents/:type/:id', authMiddleware, paginationMiddleware, controller.getDocuments);
 router.post('/upload-document', authMiddleware, controller.uploadDocument);
 router.put('/rename-file/:documentId', authMiddleware, controller.renameFile);
 router.delete('/delete/:documentId', authMiddleware, controller.deleteDocument);

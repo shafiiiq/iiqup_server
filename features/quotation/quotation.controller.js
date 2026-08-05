@@ -1,3 +1,7 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
+const { sendSuccess, sendError } = require('../../shared/response/response.util');
 // controllers/quotation.controller.js
 const quotationService = require('./quotation.service');
 const { putObject } = require('../../config/aws/s3.aws');
@@ -51,7 +55,7 @@ const addQuotation = async (req, res) => {
       !quotationData.equipments ||
       !quotationData.quoteNo
     ) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message:
           'Missing required fields: quotationRef, date, equipments, quoteNo',
@@ -63,7 +67,7 @@ const addQuotation = async (req, res) => {
       !quotationData.company?.attention ||
       !quotationData.company?.designation
     ) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message:
           'Missing required company fields: vendor, attention, designation',
@@ -75,7 +79,7 @@ const addQuotation = async (req, res) => {
       !Array.isArray(quotationData.items) ||
       quotationData.items.length === 0
     ) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'items array is required and cannot be empty',
       });
@@ -109,14 +113,14 @@ const addQuotation = async (req, res) => {
 
     const quotation = await quotationService.createQuotation(quotationData);
 
-    res.status(201).json({
+    sendSuccess(res, {
       success: true,
       message: 'Quotation created successfully',
       data: quotation,
     });
   } catch (error) {
-    console.error('[Quotation] addQuotation:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[Quotation] addQuotation:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -126,17 +130,18 @@ const addQuotation = async (req, res) => {
  */
 const getAllQuotations = async (req, res) => {
   try {
-    const quotations = await quotationService.getAllQuotations();
+    const result = await quotationService.getAllQuotations(req.pagination);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Quotations retrieved successfully',
-      data: quotations,
-      count: quotations.length,
+      data: result.data,
+      pagination: result.pagination,
+      count: result.data.length,
     });
   } catch (error) {
-    console.error('[Quotation] getAllQuotations:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[Quotation] getAllQuotations:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -150,21 +155,21 @@ const getQuotationByRef = async (req, res) => {
 
     if (!refNo) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Reference number is required' });
     }
 
     const quotation = await quotationService.getQuotationByRef(refNo);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Quotation retrieved successfully',
       data: quotation,
     });
   } catch (error) {
-    console.error('[Quotation] getQuotationByRef:', error);
-    const status = error.message === 'Quotation not found' ? 404 : 500;
-    res.status(status).json({ success: false, message: error.message });
+    logger.error('[Quotation] getQuotationByRef:', error);
+    const status = error.message === 'Quotation not found' ? HTTP.NOT_FOUND : HTTP.INTERNAL_SERVER_ERROR;
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -177,25 +182,25 @@ const getPendingSignatures = async (req, res) => {
   try {
     const { uniqueCode } = req.body;
 
-    console.log('uniqueCode', uniqueCode);
+    logger.info('uniqueCode', uniqueCode);
 
     if (!uniqueCode) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'uniqueCode is required' });
     }
 
     const pending = await quotationService.getPendingSignatures(uniqueCode);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Pending Quotation signatures retrieved successfully',
       data: pending,
       count: pending.length,
     });
   } catch (error) {
-    console.error('[Quotation] getPendingSignatures:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[Quotation] getPendingSignatures:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -210,21 +215,21 @@ const getSignedByUser = async (req, res) => {
 
     if (!uniqueCode) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'uniqueCode is required' });
     }
 
     const signed = await quotationService.getSignedByUser(uniqueCode);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Signed Quotations retrieved successfully',
       data: signed,
       count: signed.length,
     });
   } catch (error) {
-    console.error('[Quotation] getSignedByUser:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[Quotation] getSignedByUser:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -236,14 +241,14 @@ const getLatestQuotation = async (req, res) => {
   try {
     const latestQuotation = await quotationService.getLatestQuotation();
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Latest Quotation retrieved successfully',
       data: latestQuotation || null,
     });
   } catch (error) {
-    console.error('[Quotation] getLatestQuotation:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[Quotation] getLatestQuotation:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -255,14 +260,14 @@ const getLatestQuotationRef = async (req, res) => {
   try {
     const latestRef = await quotationService.getLatestQuotationRef();
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Latest Quotation reference retrieved successfully',
       data: { latestRef: latestRef || 'No Quotation found' },
     });
   } catch (error) {
-    console.error('[Quotation] getLatestQuotationRef:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[Quotation] getLatestQuotationRef:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -277,7 +282,7 @@ const updateQuotation = async (req, res) => {
 
     if (!refNo) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Reference number is required' });
     }
 
@@ -287,7 +292,7 @@ const updateQuotation = async (req, res) => {
       updateData
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: updateData.isAmendmented
         ? 'Quotation amended successfully'
@@ -295,9 +300,9 @@ const updateQuotation = async (req, res) => {
       data: quotation,
     });
   } catch (error) {
-    console.error('[Quotation] updateQuotation:', error);
-    const status = error.message === 'Quotation not found' ? 404 : 500;
-    res.status(status).json({ success: false, message: error.message });
+    logger.error('[Quotation] updateQuotation:', error);
+    const status = error.message === 'Quotation not found' ? HTTP.NOT_FOUND : HTTP.INTERNAL_SERVER_ERROR;
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -311,21 +316,21 @@ const deleteQuotation = async (req, res) => {
 
     if (!refNo) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Reference number is required' });
     }
 
     const quotation = await quotationService.deleteQuotation(refNo);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Quotation deleted successfully',
       data: quotation,
     });
   } catch (error) {
-    console.error('[Quotation] deleteQuotation:', error);
-    const status = error.message === 'Quotation not found' ? 404 : 500;
-    res.status(status).json({ success: false, message: error.message });
+    logger.error('[Quotation] deleteQuotation:', error);
+    const status = error.message === 'Quotation not found' ? HTTP.NOT_FOUND : HTTP.INTERNAL_SERVER_ERROR;
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -341,15 +346,15 @@ const getCompanyDetails = async (req, res) => {
   try {
     const companyDetails = await quotationService.getAllCompanyDetails();
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Company details retrieved successfully',
       data: companyDetails,
       count: companyDetails.length,
     });
   } catch (error) {
-    console.error('[Quotation] getCompanyDetails:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[Quotation] getCompanyDetails:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -362,7 +367,7 @@ const getQuotationsByDateRange = async (req, res) => {
     const { startDate, endDate } = req.query;
 
     if (!startDate || !endDate) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'startDate and endDate are required',
       });
@@ -373,15 +378,15 @@ const getQuotationsByDateRange = async (req, res) => {
       endDate
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Quotations retrieved successfully',
       data: quotations,
       count: quotations.length,
     });
   } catch (error) {
-    console.error('[Quotation] getQuotationsByDateRange:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[Quotation] getQuotationsByDateRange:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -395,22 +400,22 @@ const getQuotationsByCompany = async (req, res) => {
 
     if (!vendorName) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Vendor name is required' });
     }
 
     const quotations =
       await quotationService.getQuotationsByCompany(vendorName);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Quotations retrieved successfully',
       data: quotations,
       count: quotations.length,
     });
   } catch (error) {
-    console.error('[Quotation] getQuotationsByCompany:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[Quotation] getQuotationsByCompany:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -424,20 +429,20 @@ const getQuotationsByRegNo = async (req, res) => {
 
     if (!regNo) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Registration number is required' });
     }
 
     const quotations = await quotationService.getQuotationsByRegNo(regNo);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: `Quotations for registration number ${regNo} retrieved successfully`,
       data: quotations,
     });
   } catch (error) {
-    console.error('[Quotation] getQuotationsByRegNo:', error);
-    res.status(500).json({
+    logger.error('[Quotation] getQuotationsByRegNo:', error);
+    sendError(res, {
       success: false,
       message: 'Error retrieving Quotations by registration number',
       error: error.message,
@@ -453,14 +458,14 @@ const getQuotationsForStock = async (req, res) => {
   try {
     const quotations = await quotationService.getQuotationsForStock();
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Stock Quotations retrieved successfully',
       data: quotations,
     });
   } catch (error) {
-    console.error('[Quotation] getQuotationsForStock:', error);
-    res.status(500).json({
+    logger.error('[Quotation] getQuotationsForStock:', error);
+    sendError(res, {
       success: false,
       message: 'Error retrieving stock Quotations',
       error: error.message,
@@ -476,14 +481,14 @@ const getQuotationsForAllEquipments = async (req, res) => {
   try {
     const quotations = await quotationService.getQuotationsForAllEquipments();
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'All equipment Quotations retrieved successfully',
       data: quotations,
     });
   } catch (error) {
-    console.error('[Quotation] getQuotationsForAllEquipments:', error);
-    res.status(500).json({
+    logger.error('[Quotation] getQuotationsForAllEquipments:', error);
+    sendError(res, {
       success: false,
       message: 'Error retrieving all equipment Quotations',
       error: error.message,
@@ -505,7 +510,7 @@ const uploadQuotation = async (req, res) => {
       req.body;
 
     if (!uploadedBy || !quotationRef) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'uploadedBy and quotationRef are required',
       });
@@ -535,15 +540,15 @@ const uploadQuotation = async (req, res) => {
       isAmendment
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: `Pre-signed URL generated successfully${isAmendment ? ' (Amendment)' : ''}`,
       uploadUrl,
       data: { quotation: result, uploadData: quotationFileData },
     });
   } catch (error) {
-    console.error('[Quotation] uploadQuotation:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Quotation] uploadQuotation:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to upload Quotation',
     });
@@ -562,12 +567,12 @@ const purchaseApproval = async (req, res) => {
 
     if (!approvedBy) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'approvedBy is required' });
     }
 
     if (signed && (!approvedDate || !approvedFrom)) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'approvedDate and approvedFrom are required for signing',
       });
@@ -578,14 +583,14 @@ const purchaseApproval = async (req, res) => {
       buildApprovedCreds(req.body)
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Purchase approval recorded successfully',
       data: result,
     });
   } catch (error) {
-    console.error('[Quotation] purchaseApproval:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Quotation] purchaseApproval:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to approve purchase',
     });
@@ -603,7 +608,7 @@ const managerApproval = async (req, res) => {
 
     if (!approvedBy) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'approvedBy is required' });
     }
 
@@ -614,14 +619,14 @@ const managerApproval = async (req, res) => {
       buildApprovedCreds(req.body)
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Manager approval recorded successfully',
       data: result,
     });
   } catch (error) {
-    console.error('[Quotation] managerApproval:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Quotation] managerApproval:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to get manager approval',
     });
@@ -639,7 +644,7 @@ const ceoApproval = async (req, res) => {
 
     if (!approvedBy) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'approvedBy is required' });
     }
 
@@ -651,14 +656,14 @@ const ceoApproval = async (req, res) => {
       authUser
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'CEO approval recorded successfully',
       data: result,
     });
   } catch (error) {
-    console.error('[Quotation] ceoApproval:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Quotation] ceoApproval:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to get CEO approval',
     });
@@ -676,7 +681,7 @@ const accountsApproval = async (req, res) => {
 
     if (!approvedBy) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'approvedBy is required' });
     }
 
@@ -687,14 +692,14 @@ const accountsApproval = async (req, res) => {
       buildApprovedCreds(req.body)
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Accounts approval recorded successfully',
       data: result,
     });
   } catch (error) {
-    console.error('[Quotation] accountsApproval:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Quotation] accountsApproval:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to record accounts approval',
     });
@@ -712,7 +717,7 @@ const markItemsAvailable = async (req, res) => {
 
     if (!markedBy) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'markedBy is required' });
     }
 
@@ -721,14 +726,14 @@ const markItemsAvailable = async (req, res) => {
       markedBy
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Items marked as available successfully',
       data: result,
     });
   } catch (error) {
-    console.error('[Quotation] markItemsAvailable:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Quotation] markItemsAvailable:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to mark items as available',
     });
@@ -754,7 +759,7 @@ const signQuotation = async (req, res) => {
     } = req.body;
 
     if (!uniqueCode || !signedDate || !signedFrom) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'uniqueCode, signedDate, and signedFrom are required',
       });
@@ -773,7 +778,7 @@ const signQuotation = async (req, res) => {
 
     // Out-of-order prompt — return 202 so frontend can ask user
     if (result.requireOverride) {
-      return res.status(202).json({
+      return sendError(res, {
         success: false,
         requireOverride: true,
         message: result.message,
@@ -781,15 +786,15 @@ const signQuotation = async (req, res) => {
       });
     }
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: result.message,
       data: result.data,
     });
   } catch (error) {
-    console.error('[Quotation] signQuotation:', error);
+    logger.error('[Quotation] signQuotation:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message || 'Signing failed' });
   }
 };
@@ -817,7 +822,7 @@ const sendQuotationViaEmail = async (req, res) => {
     const extraFiles = req.files?.attachments || [];
 
     if (!emails?.length || !pdfFile) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'At least one email and PDF are required',
       });
@@ -858,10 +863,10 @@ const sendQuotationViaEmail = async (req, res) => {
       cleanEquipment
     );
 
-    res.status(200).json({ success: true, data: result });
+    sendSuccess(res, { success: true, data: result });
   } catch (error) {
-    console.error('[Quotation] sendQuotationViaEmail:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[Quotation] sendQuotationViaEmail:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -876,20 +881,20 @@ const updateVendorEmail = async (req, res) => {
 
     if (!email || !email.includes('@')) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Valid email required' });
     }
 
     const result = await quotationService.saveVendorEmail(vendorCode, email);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: `Email updated for vendor code ${vendorCode}`,
       modifiedCount: result.modifiedCount,
     });
   } catch (error) {
-    console.error('[Quotation] updateVendorEmail:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[Quotation] updateVendorEmail:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 

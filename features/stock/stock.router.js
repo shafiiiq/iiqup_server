@@ -2,15 +2,16 @@ const express = require('express');
 const router = express.Router();
 
 const controller = require('./stock.controller');
+const paginationMiddleware = require('../../shared/pagination/pagination.middleware');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Stock Routes
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── CRUD ──────────────────────────────────────────────────────────────────────
-router.get('/get-all-stocks', controller.getStocks);
+router.get('/get-all-stocks', paginationMiddleware, controller.getStocks);
 router.get('/get-stock/:stockId', controller.getStockById);
-router.get('/get-stocks-by-type/:type', controller.getStocksByType);
+router.get('/get-stocks-by-type/:type', paginationMiddleware, controller.getStocksByType);
 router.get(
   '/get-stocks-by-equipment/:equipmentNumber',
   controller.getStocksByEquipment

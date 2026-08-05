@@ -1,3 +1,7 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
+const { sendSuccess, sendError } = require('../../shared/response/response.util');
 // services/fuel.controller.js
 const fuelServices = require('./fuel.service');
 
@@ -20,10 +24,10 @@ const getEquipmentFuelConsumption = async (req, res) => {
 
     const result = await fuelServices.getEquipmentFuelConsumption(filters);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[FuelController] getEquipmentFuelConsumption:', error);
-    res.status(error.status || 500).json({ ok: false, message: error.message });
+    logger.error('[FuelController] getEquipmentFuelConsumption:', error);
+    sendError(res, { ok: false, message: error.message });
   }
 };
 

@@ -1,3 +1,7 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
+const { sendSuccess, sendError } = require('../../shared/response/response.util');
 // controllers/toolkit.controller.js
 const toolkitServices = require('./toolkit.service');
 
@@ -13,11 +17,11 @@ const addToolKits = async (req, res) => {
   try {
     const result = await toolkitServices.insertToolkit(req.body);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Toolkit] addToolKits:', error);
+    logger.error('[Toolkit] addToolKits:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -28,13 +32,13 @@ const addToolKits = async (req, res) => {
  */
 const getToolKits = async (req, res) => {
   try {
-    const result = await toolkitServices.fetchToolkits();
+    const result = await toolkitServices.fetchToolkits(req.pagination);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Toolkit] getToolKits:', error);
+    logger.error('[Toolkit] getToolKits:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -50,17 +54,17 @@ const updatetoolKits = async (req, res) => {
 
     if (!id) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Toolkit ID is required' });
     }
 
     const result = await toolkitServices.updateToolkit(id, updateData);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Toolkit] updatetoolKits:', error);
+    logger.error('[Toolkit] updatetoolKits:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -75,17 +79,17 @@ const deletetoolKits = async (req, res) => {
 
     if (!id) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Toolkit ID is required' });
     }
 
     const result = await toolkitServices.deleteToolkit(id);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Toolkit] deletetoolKits:', error);
+    logger.error('[Toolkit] deletetoolKits:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -100,17 +104,17 @@ const searchToolkits = async (req, res) => {
 
     if (!q) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Search query is required' });
     }
 
-    const result = await toolkitServices.searchToolkits(q);
+    const result = await toolkitServices.searchToolkits(q, req.pagination);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Toolkit] searchToolkits:', error);
+    logger.error('[Toolkit] searchToolkits:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -129,7 +133,7 @@ const updateVariant = async (req, res) => {
     const updateData = req.body;
 
     if (!toolkitId || !variantId) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'toolkitId and variantId are required',
       });
@@ -141,11 +145,11 @@ const updateVariant = async (req, res) => {
       updateData
     );
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Toolkit] updateVariant:', error);
+    logger.error('[Toolkit] updateVariant:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -159,7 +163,7 @@ const deleteVariant = async (req, res) => {
     const { toolkitId, variantId } = req.params;
 
     if (!toolkitId || !variantId) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'toolkitId and variantId are required',
       });
@@ -167,11 +171,11 @@ const deleteVariant = async (req, res) => {
 
     const result = await toolkitServices.deleteVariant(toolkitId, variantId);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Toolkit] deleteVariant:', error);
+    logger.error('[Toolkit] deleteVariant:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -191,7 +195,7 @@ const reduceStock = async (req, res) => {
       req.body;
 
     if (!toolkitId || !variantId) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'toolkitId and variantId are required',
       });
@@ -199,7 +203,7 @@ const reduceStock = async (req, res) => {
 
     if (!quantity || quantity <= 0) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Valid quantity is required' });
     }
 
@@ -214,11 +218,11 @@ const reduceStock = async (req, res) => {
       assignedDate
     );
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Toolkit] reduceStock:', error);
+    logger.error('[Toolkit] reduceStock:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -232,7 +236,7 @@ const getStockHistory = async (req, res) => {
     const { toolkitId, variantId } = req.params;
 
     if (!toolkitId || !variantId) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'toolkitId and variantId are required',
       });
@@ -240,11 +244,11 @@ const getStockHistory = async (req, res) => {
 
     const result = await toolkitServices.getStockHistory(toolkitId, variantId);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Toolkit] getStockHistory:', error);
+    logger.error('[Toolkit] getStockHistory:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -259,17 +263,17 @@ const getToolkitStockHistory = async (req, res) => {
 
     if (!toolkitId) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Toolkit ID is required' });
     }
 
     const result = await toolkitServices.getToolkitStockHistory(toolkitId);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Toolkit] getToolkitStockHistory:', error);
+    logger.error('[Toolkit] getToolkitStockHistory:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -284,17 +288,17 @@ const scanToolkitByBarcode = async (req, res) => {
 
     if (!objectId) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Barcode data is required' });
     }
 
     const result = await toolkitServices.scanToolkitByBarcode(objectId);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Toolkit] scanToolkitByBarcode:', error);
+    logger.error('[Toolkit] scanToolkitByBarcode:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };

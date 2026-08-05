@@ -1,3 +1,6 @@
+const logger = require('../../../shared/logger/logger');
+
+const HTTP = require('../../../shared/constants/httpStatus.constant.js');
 const Mechanic = require('../../mechanic/mechanic.model');
 const attendanceController = require('../attendance.controller');
 
@@ -37,7 +40,7 @@ const parseZKTecoAttendanceData = (dataString) => {
 
     return records.length > 0 ? records : null;
   } catch (error) {
-    console.error('[ZKTeco] Error parsing attendance data:', error);
+    logger.error('[ZKTeco] Error parsing attendance data:', error);
     return null;
   }
 };

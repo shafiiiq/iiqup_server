@@ -1,3 +1,6 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
 const serviceHistoryModel = require('../equipment/history/history.model.js');
 const serviceReportModel = require('../equipment/report/report.model.js');
 const maintananceHistoryModel = require('../models/maintenance.model.js');
@@ -205,13 +208,13 @@ const fetchDailyCounts = async () => {
       now.getDate()
     );
     const counts = await getCountsForPeriod(todayStart);
-    const result = { status: 200, data: { counts, total: sumCounts(counts) } };
+    const result = { status: HTTP.OK, data: { counts, total: sumCounts(counts) } };
 
     cache.set(cacheKey, result, 60000); // 1 min
     return result;
   } catch (error) {
-    console.error('[DashboardService] fetchDailyCounts:', error);
-    return { status: 500, message: error.message };
+    logger.error('[DashboardService] fetchDailyCounts:', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message };
   }
 };
 
@@ -229,13 +232,13 @@ const fetchWeeklyCounts = async () => {
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
     const counts = await getCountsForPeriod(oneWeekAgo);
-    const result = { status: 200, data: { counts, total: sumCounts(counts) } };
+    const result = { status: HTTP.OK, data: { counts, total: sumCounts(counts) } };
 
-    cache.set(cacheKey, result, 120000); // 2 min
+    cache.set(cacheKey, result, 1HTTP.OK00); // 2 min
     return result;
   } catch (error) {
-    console.error('[DashboardService] fetchWeeklyCounts:', error);
-    return { status: 500, message: error.message };
+    logger.error('[DashboardService] fetchWeeklyCounts:', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message };
   }
 };
 
@@ -253,13 +256,13 @@ const fetchMonthlyCounts = async () => {
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
 
     const counts = await getCountsForPeriod(oneMonthAgo);
-    const result = { status: 200, data: { counts, total: sumCounts(counts) } };
+    const result = { status: HTTP.OK, data: { counts, total: sumCounts(counts) } };
 
     cache.set(cacheKey, result, 300000); // 5 min
     return result;
   } catch (error) {
-    console.error('[DashboardService] fetchMonthlyCounts:', error);
-    return { status: 500, message: error.message };
+    logger.error('[DashboardService] fetchMonthlyCounts:', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message };
   }
 };
 
@@ -277,13 +280,13 @@ const fetchYearlyCounts = async () => {
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
     const counts = await getCountsForPeriod(oneYearAgo);
-    const result = { status: 200, data: { counts, total: sumCounts(counts) } };
+    const result = { status: HTTP.OK, data: { counts, total: sumCounts(counts) } };
 
     cache.set(cacheKey, result, 600000); // 10 min
     return result;
   } catch (error) {
-    console.error('[DashboardService] fetchYearlyCounts:', error);
-    return { status: 500, message: error.message };
+    logger.error('[DashboardService] fetchYearlyCounts:', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message };
   }
 };
 
@@ -311,15 +314,15 @@ const fetchDailyUpdates = async () => {
     const counts = await getCountsForPeriod(todayStart);
     const updatesByCollection = await getLimitedDataForPeriod(todayStart, 50);
     const result = {
-      status: 200,
+      status: HTTP.OK,
       data: buildUpdatesPayload(updatesByCollection, counts),
     };
 
     cache.set(cacheKey, result, 60000); // 1 min
     return result;
   } catch (error) {
-    console.error('[DashboardService] fetchDailyUpdates:', error);
-    return { status: 500, message: error.message };
+    logger.error('[DashboardService] fetchDailyUpdates:', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message };
   }
 };
 
@@ -339,15 +342,15 @@ const fetchWeeklyUpdates = async () => {
     const counts = await getCountsForPeriod(oneWeekAgo);
     const updatesByCollection = await getLimitedDataForPeriod(oneWeekAgo, 50);
     const result = {
-      status: 200,
+      status: HTTP.OK,
       data: buildUpdatesPayload(updatesByCollection, counts),
     };
 
-    cache.set(cacheKey, result, 120000); // 2 min
+    cache.set(cacheKey, result, 1HTTP.OK00); // 2 min
     return result;
   } catch (error) {
-    console.error('[DashboardService] fetchWeeklyUpdates:', error);
-    return { status: 500, message: error.message };
+    logger.error('[DashboardService] fetchWeeklyUpdates:', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message };
   }
 };
 
@@ -367,20 +370,20 @@ const fetchMonthlyUpdates = async () => {
     const counts = await getCountsForPeriod(oneMonthAgo);
     const updatesByCollection = await getLimitedDataForPeriod(oneMonthAgo, 100);
     const result = {
-      status: 200,
+      status: HTTP.OK,
       data: buildUpdatesPayload(updatesByCollection, counts),
     };
 
     cache.set(cacheKey, result, 300000); // 5 min
     return result;
   } catch (error) {
-    console.error('[DashboardService] fetchMonthlyUpdates:', error);
-    return { status: 500, message: error.message };
+    logger.error('[DashboardService] fetchMonthlyUpdates:', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message };
   }
 };
 
 /**
- * Returns counts and the 200 most-recent documents per collection for the last 365 days.
+ * Returns counts and the HTTP.OK most-recent documents per collection for the last 365 days.
  * @returns {Promise<object>}
  */
 const fetchYearlyUpdates = async () => {
@@ -393,17 +396,17 @@ const fetchYearlyUpdates = async () => {
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
 
     const counts = await getCountsForPeriod(oneYearAgo);
-    const updatesByCollection = await getLimitedDataForPeriod(oneYearAgo, 200);
+    const updatesByCollection = await getLimitedDataForPeriod(oneYearAgo, HTTP.OK);
     const result = {
-      status: 200,
+      status: HTTP.OK,
       data: buildUpdatesPayload(updatesByCollection, counts),
     };
 
     cache.set(cacheKey, result, 600000); // 10 min
     return result;
   } catch (error) {
-    console.error('[DashboardService] fetchYearlyUpdates:', error);
-    return { status: 500, message: error.message };
+    logger.error('[DashboardService] fetchYearlyUpdates:', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message };
   }
 };
 
@@ -441,15 +444,15 @@ const fetchLast5DaysComparison = async () => {
     }
 
     const result = {
-      status: 200,
+      status: HTTP.OK,
       data: { period: 'last-5-days', comparison: comparisonData.reverse() },
     };
 
     cache.set(cacheKey, result, 300000); // 5 min
     return result;
   } catch (error) {
-    console.error('[DashboardService] fetchLast5DaysComparison:', error);
-    return { status: 500, message: error.message };
+    logger.error('[DashboardService] fetchLast5DaysComparison:', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message };
   }
 };
 
@@ -490,15 +493,15 @@ const fetchLast5MonthsComparison = async () => {
     }
 
     const result = {
-      status: 200,
+      status: HTTP.OK,
       data: { period: 'last-5-months', comparison: comparisonData.reverse() },
     };
 
     cache.set(cacheKey, result, 600000); // 10 min
     return result;
   } catch (error) {
-    console.error('[DashboardService] fetchLast5MonthsComparison:', error);
-    return { status: 500, message: error.message };
+    logger.error('[DashboardService] fetchLast5MonthsComparison:', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message };
   }
 };
 
@@ -528,15 +531,15 @@ const fetchLast5YearsComparison = async () => {
     }
 
     const result = {
-      status: 200,
+      status: HTTP.OK,
       data: { period: 'last-5-years', comparison: comparisonData.reverse() },
     };
 
     cache.set(cacheKey, result, 1800000); // 30 min
     return result;
   } catch (error) {
-    console.error('[DashboardService] fetchLast5YearsComparison:', error);
-    return { status: 500, message: error.message };
+    logger.error('[DashboardService] fetchLast5YearsComparison:', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message };
   }
 };
 
@@ -550,7 +553,7 @@ const fetchLast5YearsComparison = async () => {
  */
 const clearCache = () => {
   cache.clear();
-  return { status: 200, message: 'Cache cleared successfully' };
+  return { status: HTTP.OK, message: 'Cache cleared successfully' };
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

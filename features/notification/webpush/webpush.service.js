@@ -1,3 +1,4 @@
+const HTTP = require('../../../shared/constants/httpStatus.constant.js');
 const webpush = require('web-push');
 const User = require('../../user/user.model');
 

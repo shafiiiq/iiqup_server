@@ -1,3 +1,5 @@
+const logger = require('../../../shared/logger/logger');
+
 // services/signature.service.js
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
@@ -44,7 +46,7 @@ const decryptAndVerifyDeviceData = (encryptedData, iv, originalData) => {
     decrypted += decipher.final('utf8');
     return decrypted.trim() === String(originalData).trim();
   } catch (error) {
-    console.error(
+    logger.error(
       '[SignatureService] decryptAndVerifyDeviceData:',
       error.message
     );
@@ -158,7 +160,7 @@ const activateSignatureAccess = async (
       data: { signType, deviceTrusted: true },
     };
   } catch (error) {
-    console.error('[SignatureService] activateSignatureAccess:', error);
+    logger.error('[SignatureService] activateSignatureAccess:', error);
     throw error;
   }
 };
@@ -220,7 +222,7 @@ const verifyTrustedDevice = async (userId, signType, deviceInfo) => {
 
     return { status: 200, data: { isActivated: true, isTrusted: true } };
   } catch (error) {
-    console.error('[SignatureService] verifyTrustedDevice:', error);
+    logger.error('[SignatureService] verifyTrustedDevice:', error);
     throw error;
   }
 };

@@ -1,3 +1,5 @@
+const logger = require('../../shared/logger/logger');
+
 const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');
 const path = require('path');
@@ -7,7 +9,7 @@ const getFileDuration = (filePath) => {
   return new Promise((resolve, reject) => {
     ffmpeg.ffprobe(filePath, (err, metadata) => {
       if (err) {
-        console.error('Error getting video duration:', err);
+        logger.error('Error getting video duration:', err);
         resolve(0); // Default to 0 if can't get duration
       } else {
         resolve(Math.floor(metadata.format.duration));

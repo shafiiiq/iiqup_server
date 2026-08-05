@@ -1,3 +1,5 @@
+const logger = require('../../shared/logger/logger');
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Equipment Helpers
 // Pure functions — no side effects, no DB calls, no external dependencies.
@@ -271,7 +273,7 @@ const buildOperatorUpdateData = (cleanData) => {
     delete updateData.operator;
     delete updateData.operatorId;
   } else if (cleanData.operator) {
-    console.warn('Operator provided without operatorId - this is deprecated');
+    logger.warn('Operator provided without operatorId - this is deprecated');
     updateData.$push = {
       certificationBody: {
         operatorName: cleanData.operator,

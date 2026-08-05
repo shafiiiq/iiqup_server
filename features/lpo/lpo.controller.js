@@ -1,3 +1,7 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
+const { sendSuccess, sendError } = require('../../shared/response/response.util');
 // controllers/lpo.controller.js
 const lpoService = require('./lpo.service');
 const { putObject } = require('../../config/aws/s3.aws');
@@ -49,7 +53,7 @@ const addLPO = async (req, res) => {
       !lpoData.equipments ||
       !lpoData.quoteNo
     ) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'Missing required fields: lpoRef, date, equipments, quoteNo',
       });
@@ -60,7 +64,7 @@ const addLPO = async (req, res) => {
       !lpoData.company?.attention ||
       !lpoData.company?.designation
     ) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message:
           'Missing required company fields: vendor, attention, designation',
@@ -72,7 +76,7 @@ const addLPO = async (req, res) => {
       !Array.isArray(lpoData.items) ||
       lpoData.items.length === 0
     ) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'items array is required and cannot be empty',
       });
@@ -98,14 +102,14 @@ const addLPO = async (req, res) => {
 
     const lpo = await lpoService.createLPO(lpoData);
 
-    res.status(201).json({
+    sendSuccess(res, {
       success: true,
       message: 'LPO created successfully',
       data: lpo,
     });
   } catch (error) {
-    console.error('[LPO] addLPO:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[LPO] addLPO:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -115,17 +119,18 @@ const addLPO = async (req, res) => {
  */
 const getAllLPOs = async (req, res) => {
   try {
-    const lpos = await lpoService.getAllLPOs();
+    const result = await lpoService.getAllLPOs(req.pagination);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'LPOs retrieved successfully',
-      data: lpos,
-      count: lpos.length,
+      data: result.data,
+      pagination: result.pagination,
+      count: result.data.length,
     });
   } catch (error) {
-    console.error('[LPO] getAllLPOs:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[LPO] getAllLPOs:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -139,21 +144,21 @@ const getLPOByRef = async (req, res) => {
 
     if (!refNo) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Reference number is required' });
     }
 
     const lpo = await lpoService.getLPOByRef(refNo);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'LPO retrieved successfully',
       data: lpo,
     });
   } catch (error) {
-    console.error('[LPO] getLPOByRef:', error);
-    const status = error.message === 'LPO not found' ? 404 : 500;
-    res.status(status).json({ success: false, message: error.message });
+    logger.error('[LPO] getLPOByRef:', error);
+    const status = error.message === 'LPO not found' ? HTTP.NOT_FOUND : HTTP.INTERNAL_SERVER_ERROR;
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -166,25 +171,25 @@ const getPendingSignatures = async (req, res) => {
   try {
     const { uniqueCode } = req.body;
 
-    console.log('uniqueCode', uniqueCode);
+    logger.info('uniqueCode', uniqueCode);
 
     if (!uniqueCode) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'uniqueCode is required' });
     }
 
     const pending = await lpoService.getPendingSignatures(uniqueCode);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Pending LPO signatures retrieved successfully',
       data: pending,
       count: pending.length,
     });
   } catch (error) {
-    console.error('[LPO] getPendingSignatures:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[LPO] getPendingSignatures:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -199,21 +204,21 @@ const getSignedByUser = async (req, res) => {
 
     if (!uniqueCode) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'uniqueCode is required' });
     }
 
     const signed = await lpoService.getSignedByUser(uniqueCode);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Signed LPOs retrieved successfully',
       data: signed,
       count: signed.length,
     });
   } catch (error) {
-    console.error('[LPO] getSignedByUser:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[LPO] getSignedByUser:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -225,14 +230,14 @@ const getLatestLPO = async (req, res) => {
   try {
     const latestLPO = await lpoService.getLatestLPO();
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Latest LPO retrieved successfully',
       data: latestLPO || null,
     });
   } catch (error) {
-    console.error('[LPO] getLatestLPO:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[LPO] getLatestLPO:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -244,14 +249,14 @@ const getLatestLPORef = async (req, res) => {
   try {
     const latestRef = await lpoService.getLatestLPORef();
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Latest LPO reference retrieved successfully',
       data: { latestRef: latestRef || 'No LPO found' },
     });
   } catch (error) {
-    console.error('[LPO] getLatestLPORef:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[LPO] getLatestLPORef:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -264,7 +269,7 @@ const getQuotationUploadUrl = async (req, res) => {
     const { fileName, lpoRef, contentType } = req.body;
 
     if (!fileName || !lpoRef) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'fileName and lpoRef are required',
       });
@@ -274,7 +279,7 @@ const getQuotationUploadUrl = async (req, res) => {
     const s3Key = `lpos/${lpoRef}/quotations/${Date.now()}-${fileName}`;
     const uploadUrl = await putObject(fileName, s3Key, mimeType);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       uploadUrl,
       data: {
@@ -286,8 +291,8 @@ const getQuotationUploadUrl = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[LPO] getQuotationUploadUrl:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[LPO] getQuotationUploadUrl:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -302,14 +307,14 @@ const updateLPO = async (req, res) => {
 
     if (!refNo) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Reference number is required' });
     }
 
     const decodedRefNo = decodeURIComponent(refNo);
     const lpo = await lpoService.updateLPO(decodedRefNo, updateData);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: updateData.isAmendmented
         ? 'LPO amended successfully'
@@ -317,9 +322,9 @@ const updateLPO = async (req, res) => {
       data: lpo,
     });
   } catch (error) {
-    console.error('[LPO] updateLPO:', error);
-    const status = error.message === 'LPO not found' ? 404 : 500;
-    res.status(status).json({ success: false, message: error.message });
+    logger.error('[LPO] updateLPO:', error);
+    const status = error.message === 'LPO not found' ? HTTP.NOT_FOUND : HTTP.INTERNAL_SERVER_ERROR;
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -333,21 +338,21 @@ const deleteLPO = async (req, res) => {
 
     if (!refNo) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Reference number is required' });
     }
 
     const lpo = await lpoService.deleteLPO(refNo);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'LPO deleted successfully',
       data: lpo,
     });
   } catch (error) {
-    console.error('[LPO] deleteLPO:', error);
-    const status = error.message === 'LPO not found' ? 404 : 500;
-    res.status(status).json({ success: false, message: error.message });
+    logger.error('[LPO] deleteLPO:', error);
+    const status = error.message === 'LPO not found' ? HTTP.NOT_FOUND : HTTP.INTERNAL_SERVER_ERROR;
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -363,15 +368,15 @@ const getCompanyDetails = async (req, res) => {
   try {
     const companyDetails = await lpoService.getAllCompanyDetails();
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Company details retrieved successfully',
       data: companyDetails,
       count: companyDetails.length,
     });
   } catch (error) {
-    console.error('[LPO] getCompanyDetails:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[LPO] getCompanyDetails:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -384,7 +389,7 @@ const getLPOsByDateRange = async (req, res) => {
     const { startDate, endDate } = req.query;
 
     if (!startDate || !endDate) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'startDate and endDate are required',
       });
@@ -392,15 +397,15 @@ const getLPOsByDateRange = async (req, res) => {
 
     const lpos = await lpoService.getLPOsByDateRange(startDate, endDate);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'LPOs retrieved successfully',
       data: lpos,
       count: lpos.length,
     });
   } catch (error) {
-    console.error('[LPO] getLPOsByDateRange:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[LPO] getLPOsByDateRange:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -414,21 +419,21 @@ const getLPOsByCompany = async (req, res) => {
 
     if (!vendorName) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Vendor name is required' });
     }
 
     const lpos = await lpoService.getLPOsByCompany(vendorName);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'LPOs retrieved successfully',
       data: lpos,
       count: lpos.length,
     });
   } catch (error) {
-    console.error('[LPO] getLPOsByCompany:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[LPO] getLPOsByCompany:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -442,20 +447,20 @@ const getLposByRegNo = async (req, res) => {
 
     if (!regNo) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Registration number is required' });
     }
 
     const lpos = await lpoService.getLposByRegNo(regNo);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: `LPOs for registration number ${regNo} retrieved successfully`,
       data: lpos,
     });
   } catch (error) {
-    console.error('[LPO] getLposByRegNo:', error);
-    res.status(500).json({
+    logger.error('[LPO] getLposByRegNo:', error);
+    sendError(res, {
       success: false,
       message: 'Error retrieving LPOs by registration number',
       error: error.message,
@@ -471,14 +476,14 @@ const getLposForStock = async (req, res) => {
   try {
     const lpos = await lpoService.getLposForStock();
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Stock LPOs retrieved successfully',
       data: lpos,
     });
   } catch (error) {
-    console.error('[LPO] getLposForStock:', error);
-    res.status(500).json({
+    logger.error('[LPO] getLposForStock:', error);
+    sendError(res, {
       success: false,
       message: 'Error retrieving stock LPOs',
       error: error.message,
@@ -494,14 +499,14 @@ const getLposForAllEquipments = async (req, res) => {
   try {
     const lpos = await lpoService.getLposForAllEquipments();
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'All equipment LPOs retrieved successfully',
       data: lpos,
     });
   } catch (error) {
-    console.error('[LPO] getLposForAllEquipments:', error);
-    res.status(500).json({
+    logger.error('[LPO] getLposForAllEquipments:', error);
+    sendError(res, {
       success: false,
       message: 'Error retrieving all equipment LPOs',
       error: error.message,
@@ -522,7 +527,7 @@ const uploadLPO = async (req, res) => {
     const { uploadedBy, lpoRef, description, fileName, isAmendment } = req.body;
 
     if (!uploadedBy || !lpoRef) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'uploadedBy and lpoRef are required',
       });
@@ -551,15 +556,15 @@ const uploadLPO = async (req, res) => {
       isAmendment
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: `Pre-signed URL generated successfully${isAmendment ? ' (Amendment)' : ''}`,
       uploadUrl,
       data: { lpo: result, uploadData: lpoFileData },
     });
   } catch (error) {
-    console.error('[LPO] uploadLPO:', error);
-    res.status(error.status || 500).json({
+    logger.error('[LPO] uploadLPO:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to upload LPO',
     });
@@ -578,12 +583,12 @@ const purchaseApproval = async (req, res) => {
 
     if (!approvedBy) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'approvedBy is required' });
     }
 
     if (signed && (!approvedDate || !approvedFrom)) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'approvedDate and approvedFrom are required for signing',
       });
@@ -594,14 +599,14 @@ const purchaseApproval = async (req, res) => {
       buildApprovedCreds(req.body)
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Purchase approval recorded successfully',
       data: result,
     });
   } catch (error) {
-    console.error('[LPO] purchaseApproval:', error);
-    res.status(error.status || 500).json({
+    logger.error('[LPO] purchaseApproval:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to approve purchase',
     });
@@ -619,7 +624,7 @@ const managerApproval = async (req, res) => {
 
     if (!approvedBy) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'approvedBy is required' });
     }
 
@@ -630,14 +635,14 @@ const managerApproval = async (req, res) => {
       buildApprovedCreds(req.body)
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Manager approval recorded successfully',
       data: result,
     });
   } catch (error) {
-    console.error('[LPO] managerApproval:', error);
-    res.status(error.status || 500).json({
+    logger.error('[LPO] managerApproval:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to get manager approval',
     });
@@ -655,7 +660,7 @@ const ceoApproval = async (req, res) => {
 
     if (!approvedBy) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'approvedBy is required' });
     }
 
@@ -667,14 +672,14 @@ const ceoApproval = async (req, res) => {
       authUser
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'CEO approval recorded successfully',
       data: result,
     });
   } catch (error) {
-    console.error('[LPO] ceoApproval:', error);
-    res.status(error.status || 500).json({
+    logger.error('[LPO] ceoApproval:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to get CEO approval',
     });
@@ -692,7 +697,7 @@ const accountsApproval = async (req, res) => {
 
     if (!approvedBy) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'approvedBy is required' });
     }
 
@@ -703,14 +708,14 @@ const accountsApproval = async (req, res) => {
       buildApprovedCreds(req.body)
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Accounts approval recorded successfully',
       data: result,
     });
   } catch (error) {
-    console.error('[LPO] accountsApproval:', error);
-    res.status(error.status || 500).json({
+    logger.error('[LPO] accountsApproval:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to record accounts approval',
     });
@@ -728,20 +733,20 @@ const markItemsAvailable = async (req, res) => {
 
     if (!markedBy) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'markedBy is required' });
     }
 
     const result = await lpoService.markItemsAvailable(lpoRef, markedBy);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Items marked as available successfully',
       data: result,
     });
   } catch (error) {
-    console.error('[LPO] markItemsAvailable:', error);
-    res.status(error.status || 500).json({
+    logger.error('[LPO] markItemsAvailable:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to mark items as available',
     });
@@ -767,7 +772,7 @@ const signLPO = async (req, res) => {
     } = req.body;
 
     if (!uniqueCode || !signedDate || !signedFrom) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'uniqueCode, signedDate, and signedFrom are required',
       });
@@ -786,7 +791,7 @@ const signLPO = async (req, res) => {
 
     // Out-of-order prompt — return 202 so frontend can ask user
     if (result.requireOverride) {
-      return res.status(202).json({
+      return sendError(res, {
         success: false,
         requireOverride: true,
         message: result.message,
@@ -794,15 +799,15 @@ const signLPO = async (req, res) => {
       });
     }
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: result.message,
       data: result.data,
     });
   } catch (error) {
-    console.error('[LPO] signLPO:', error);
+    logger.error('[LPO] signLPO:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message || 'Signing failed' });
   }
 };
@@ -830,7 +835,7 @@ const sendLpoViaEmail = async (req, res) => {
     const extraFiles = req.files?.attachments || [];
 
     if (!emails?.length || !pdfFile) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'At least one email and PDF are required',
       });
@@ -871,10 +876,10 @@ const sendLpoViaEmail = async (req, res) => {
       cleanEquipment
     );
 
-    res.status(200).json({ success: true, data: result });
+    sendSuccess(res, { success: true, data: result });
   } catch (error) {
-    console.error('[LPO] sendLpoViaEmail:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[LPO] sendLpoViaEmail:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -889,20 +894,20 @@ const updateVendorEmail = async (req, res) => {
 
     if (!email || !email.includes('@')) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Valid email required' });
     }
 
     const result = await lpoService.saveVendorEmail(vendorCode, email);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: `Email updated for vendor code ${vendorCode}`,
       modifiedCount: result.modifiedCount,
     });
   } catch (error) {
-    console.error('[LPO] updateVendorEmail:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[LPO] updateVendorEmail:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 

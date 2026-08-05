@@ -1,3 +1,6 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
 // services/otp.service.js
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
@@ -44,7 +47,7 @@ const generateAndSendOTP = async (email, demo_opr = false, name) => {
   try {
     if (!email || !email.match(/^\S+@\S+\.\S+$/)) {
       return {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         success: false,
         message: 'Valid email address is required',
       };
@@ -54,7 +57,7 @@ const generateAndSendOTP = async (email, demo_opr = false, name) => {
     if (!user) user = await Mechanic.findOne({ authMail: email });
     if (!user)
       return {
-        status: 404,
+        status: HTTP.NOT_FOUND,
         success: false,
         message: 'No user found with this email address',
       };
@@ -62,7 +65,7 @@ const generateAndSendOTP = async (email, demo_opr = false, name) => {
     const otp = generateSecureOTP();
     const hashedOTP = await hashOTP(otp);
 
-    console.log(`Generated OTP for ${email}: ${otp} (hashed: ${hashedOTP})`); // Debug log
+    logger.info(`Generated OTP for ${email}: ${otp} (hashed: ${hashedOTP})`); // Debug log
 
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + OTP_EXPIRY_MINUTES);
@@ -94,7 +97,7 @@ const generateAndSendOTP = async (email, demo_opr = false, name) => {
     const exposeOTP = isDemoAccount || isDevelopment;
 
     return {
-      status: 200,
+      status: HTTP.OK,
       success: true,
       message: 'OTP sent successfully to your email',
       otp: exposeOTP ? otp : null,
@@ -105,9 +108,9 @@ const generateAndSendOTP = async (email, demo_opr = false, name) => {
       },
     };
   } catch (error) {
-    console.error('Error generating OTP:', error);
+    logger.error('Error generating OTP:', error);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       success: false,
       message: 'Failed to generate OTP',
       error: error.message,
@@ -126,17 +129,17 @@ const generateAndSendOTP = async (email, demo_opr = false, name) => {
 const verifyOTP = async (email, otp, type, qatarId = null) => {
   try {
     if (!otp || otp.length !== OTP_LENGTH) {
-      return { status: 400, success: false, message: 'Invalid OTP format' };
+      return { status: HTTP.BAD_REQUEST, success: false, message: 'Invalid OTP format' };
     }
 
     const otpRecord = await OTP.findOne({ email });
     if (!otpRecord)
-      return { status: 404, success: false, message: 'Invalid OTP' };
+      return { status: HTTP.NOT_FOUND, success: false, message: 'Invalid OTP' };
 
     if (otpRecord.expiresAt < new Date()) {
       await OTP.deleteOne({ email });
       return {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         success: false,
         message: 'OTP has expired. Please request a new one.',
       };
@@ -144,7 +147,7 @@ const verifyOTP = async (email, otp, type, qatarId = null) => {
 
     if (otpRecord.verified) {
       return {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         success: false,
         message: 'OTP has already been used',
       };
@@ -153,7 +156,7 @@ const verifyOTP = async (email, otp, type, qatarId = null) => {
     if (otpRecord.attempts >= MAX_OTP_ATTEMPTS) {
       await OTP.deleteOne({ email });
       return {
-        status: 429,
+        status: HTTP.TOO_MANY_REQUESTS,
         success: false,
         message:
           'Maximum verification attempts exceeded. Please request a new OTP.',
@@ -167,7 +170,7 @@ const verifyOTP = async (email, otp, type, qatarId = null) => {
       await otpRecord.save();
       const remaining = MAX_OTP_ATTEMPTS - otpRecord.attempts;
       return {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         success: false,
         message: `Invalid OTP. ${remaining} attempt(s) remaining.`,
       };
@@ -192,7 +195,7 @@ const verifyOTP = async (email, otp, type, qatarId = null) => {
     }
 
     if (!user)
-      return { status: 404, success: false, message: 'User not found' };
+      return { status: HTTP.NOT_FOUND, success: false, message: 'User not found' };
 
     const _auth_tokens = generateTokens({
       _id: user._id,
@@ -218,7 +221,7 @@ const verifyOTP = async (email, otp, type, qatarId = null) => {
     await OTP.deleteOne({ email });
 
     return {
-      status: 200,
+      status: HTTP.OK,
       success: true,
       message: 'OTP verified successfully',
       authorized: true,
@@ -239,9 +242,9 @@ const verifyOTP = async (email, otp, type, qatarId = null) => {
       },
     };
   } catch (error) {
-    console.error('Error verifying OTP:', error);
+    logger.error('Error verifying OTP:', error);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       success: false,
       message: 'Failed to verify OTP',
       error: error.message,
@@ -261,7 +264,7 @@ const resetPasswordWithOTP = async (email, otp, newPassword) => {
     const otpRecord = await OTP.findOne({ email });
     if (!otpRecord)
       return {
-        status: 404,
+        status: HTTP.NOT_FOUND,
         success: false,
         message: 'No OTP found for this email address',
       };
@@ -269,7 +272,7 @@ const resetPasswordWithOTP = async (email, otp, newPassword) => {
     if (otpRecord.expiresAt < new Date()) {
       await OTP.deleteOne({ email });
       return {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         success: false,
         message: 'OTP has expired. Please request a new one.',
       };
@@ -277,7 +280,7 @@ const resetPasswordWithOTP = async (email, otp, newPassword) => {
 
     if (otpRecord.verified) {
       return {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         success: false,
         message: 'OTP has already been used',
       };
@@ -286,7 +289,7 @@ const resetPasswordWithOTP = async (email, otp, newPassword) => {
     if (otpRecord.attempts >= MAX_OTP_ATTEMPTS) {
       await OTP.deleteOne({ email });
       return {
-        status: 429,
+        status: HTTP.TOO_MANY_REQUESTS,
         success: false,
         message:
           'Maximum verification attempts exceeded. Please request a new OTP.',
@@ -300,7 +303,7 @@ const resetPasswordWithOTP = async (email, otp, newPassword) => {
       await otpRecord.save();
       const remaining = MAX_OTP_ATTEMPTS - otpRecord.attempts;
       return {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         success: false,
         message: `Invalid OTP. ${remaining} attempt(s) remaining.`,
       };
@@ -316,20 +319,20 @@ const resetPasswordWithOTP = async (email, otp, newPassword) => {
     ).select('-password');
 
     if (!updatedUser)
-      return { status: 404, success: false, message: 'User not found' };
+      return { status: HTTP.NOT_FOUND, success: false, message: 'User not found' };
 
     await OTP.deleteOne({ email });
 
     return {
-      status: 200,
+      status: HTTP.OK,
       success: true,
       message: 'Password reset successfully',
       data: { _id: updatedUser._id, email: updatedUser.authMail },
     };
   } catch (error) {
-    console.error('Error resetting password:', error);
+    logger.error('Error resetting password:', error);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       success: false,
       message: 'Failed to reset password',
       error: error.message,

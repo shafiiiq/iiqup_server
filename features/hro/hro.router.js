@@ -2,10 +2,11 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const controller = require('./hro.controller');
+const paginationMiddleware = require('../../shared/pagination/pagination.middleware');
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-router.get('/get-all-hire-orders', controller.getAllHireOrders);
+router.get('/get-all-hire-orders', paginationMiddleware, controller.getAllHireOrders);
 router.get('/get-hire-order-by-ref/:refNo(*)', controller.getHireOrderByRef);
 router.get('/check-latest-hire-order-ref', controller.getLatestHireOrderRef);
 router.post('/add-hire-order', controller.addHireOrder);

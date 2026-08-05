@@ -1,3 +1,6 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
 // ─────────────────────────────────────────────────────────────────────────────
 // Stock Service
 // Flat named async functions — no prototype objects, no class syntax.
@@ -52,7 +55,7 @@ const _sendNotification = async (
       notification.data._id.toString()
     );
   } catch (err) {
-    console.error('[StockService] Notification failed:', err.message);
+    logger.error('[StockService] Notification failed:', err.message);
   }
 };
 
@@ -77,7 +80,7 @@ const insertStocks = async (data) => {
       data.stockCount === ''
     ) {
       return {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message:
           'Missing required fields: product, type, serialNumber, rate, and stockCount are required',
@@ -86,7 +89,7 @@ const insertStocks = async (data) => {
 
     if (data.type === 'equipment' && !data.equipments) {
       return {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message:
           'Equipment number and name are required when type is equipment',
@@ -98,7 +101,7 @@ const insertStocks = async (data) => {
     });
     if (existingStock) {
       return {
-        status: 409,
+        status: HTTP.CONFLICT,
         ok: false,
         message: 'Stock with this serial number already exists',
       };
@@ -143,17 +146,17 @@ const insertStocks = async (data) => {
     wsUtils.sendDashboardUpdate('stocks');
 
     return {
-      status: 201,
+      status: HTTP.CREATED,
       ok: true,
       message: 'Stock added successfully',
       data: newStock,
     };
   } catch (err) {
-    console.error('[StockService] insertStocks:', err);
+    logger.error('[StockService] insertStocks:', err);
 
     if (err.code === 11000) {
       return {
-        status: 409,
+        status: HTTP.CONFLICT,
         ok: false,
         message:
           'Duplicate serial number. Stock with this serial number already exists.',
@@ -164,14 +167,14 @@ const insertStocks = async (data) => {
         .map((e) => e.message)
         .join(', ');
       return {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message: `Validation error: ${messages}`,
       };
     }
 
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Internal server error while adding stock',
       error: err.message,
@@ -181,22 +184,26 @@ const insertStocks = async (data) => {
 
 /**
  * Returns all stock records sorted by newest first.
+ * @param {object} pagination
  * @returns {Promise<object>}
  */
-const fetchStocks = async () => {
+const fetchStocks = async (pagination) => {
   try {
-    const stocks = await Stock.find({}).sort({ createdAt: -1 }).lean();
+    const result = await paginate(Stock, {}, pagination, {
+      sort: { createdAt: -1 },
+    });
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'Stocks fetched successfully',
-      data: stocks,
-      count: stocks.length,
+      data: result.data,
+      pagination: result.pagination,
+      count: result.data.length,
     };
   } catch (err) {
-    console.error('[StockService] fetchStocks:', err);
+    logger.error('[StockService] fetchStocks:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Internal server error while fetching stocks',
       error: err.message,
@@ -207,30 +214,37 @@ const fetchStocks = async () => {
 /**
  * Returns stock records filtered by type ('stock' | 'equipment').
  * @param {string} type
+ * @param {object} pagination
  * @returns {Promise<object>}
  */
-const fetchStocksByType = async (type) => {
+const fetchStocksByType = async (type, pagination) => {
   try {
     if (!['stock', 'equipment'].includes(type)) {
       return {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message: 'Invalid type. Must be either "stock" or "equipment"',
       };
     }
 
-    const stocks = await Stock.findByType(type).sort({ createdAt: -1 }).lean();
+    const result = await paginate(
+      Stock,
+      { type },
+      pagination,
+      { sort: { createdAt: -1 } }
+    );
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: `${type} stocks fetched successfully`,
-      data: stocks,
-      count: stocks.length,
+      data: result.data,
+      pagination: result.pagination,
+      count: result.data.length,
     };
   } catch (err) {
-    console.error('[StockService] fetchStocksByType:', err);
+    logger.error('[StockService] fetchStocksByType:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Internal server error while fetching stocks by type',
       error: err.message,
@@ -247,7 +261,7 @@ const fetchStocksByEquipment = async (equipmentNumber) => {
   try {
     if (!equipmentNumber) {
       return {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message: 'Equipment number is required',
       };
@@ -257,16 +271,16 @@ const fetchStocksByEquipment = async (equipmentNumber) => {
       .sort({ createdAt: -1 })
       .lean();
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'Equipment stocks fetched successfully',
       data: stocks,
       count: stocks.length,
     };
   } catch (err) {
-    console.error('[StockService] fetchStocksByEquipment:', err);
+    logger.error('[StockService] fetchStocksByEquipment:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Internal server error while fetching equipment stocks',
       error: err.message,
@@ -282,21 +296,21 @@ const fetchStocksByEquipment = async (equipmentNumber) => {
 const deleteStock = async (stockId) => {
   try {
     if (!stockId)
-      return { status: 400, ok: false, message: 'Stock ID is required' };
+      return { status: HTTP.BAD_REQUEST, ok: false, message: 'Stock ID is required' };
 
     const deleted = await Stock.findByIdAndDelete(stockId);
-    if (!deleted) return { status: 404, ok: false, message: 'Stock not found' };
+    if (!deleted) return { status: HTTP.NOT_FOUND, ok: false, message: 'Stock not found' };
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'Stock deleted successfully',
       data: deleted,
     };
   } catch (err) {
-    console.error('[StockService] deleteStock:', err);
+    logger.error('[StockService] deleteStock:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Internal server error while deleting stock',
       error: err.message,
@@ -312,28 +326,28 @@ const deleteStock = async (stockId) => {
 const getStockById = async (stockId) => {
   try {
     if (!stockId)
-      return { status: 400, ok: false, message: 'Stock ID is required' };
+      return { status: HTTP.BAD_REQUEST, ok: false, message: 'Stock ID is required' };
 
     const stock = await Stock.findById(stockId).lean();
     if (!stock)
       return {
-        status: 404,
+        status: HTTP.NOT_FOUND,
         ok: false,
         success: false,
         message: 'Stock not found',
       };
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       success: true,
       message: 'Stock fetched successfully',
       data: stock,
     };
   } catch (err) {
-    console.error('[StockService] getStockById:', err);
+    logger.error('[StockService] getStockById:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Internal server error while fetching stock',
       error: err.message,
@@ -351,10 +365,10 @@ const getStockById = async (stockId) => {
 const getStockMovements = async (stockId, limit = 50, offset = 0) => {
   try {
     if (!stockId)
-      return { status: 400, ok: false, message: 'Stock ID is required' };
+      return { status: HTTP.BAD_REQUEST, ok: false, message: 'Stock ID is required' };
 
     const stock = await Stock.findById(stockId).lean();
-    if (!stock) return { status: 404, ok: false, message: 'Stock not found' };
+    if (!stock) return { status: HTTP.NOT_FOUND, ok: false, message: 'Stock not found' };
 
     const allMovements = [...(stock.movements || [])].sort(
       (a, b) => new Date(b.date) - new Date(a.date)
@@ -363,7 +377,7 @@ const getStockMovements = async (stockId, limit = 50, offset = 0) => {
     const paginated = allMovements.slice(offset, offset + limit);
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       data: paginated,
       total: allMovements.length,
@@ -371,9 +385,9 @@ const getStockMovements = async (stockId, limit = 50, offset = 0) => {
       offset,
     };
   } catch (err) {
-    console.error('[StockService] getStockMovements:', err);
+    logger.error('[StockService] getStockMovements:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Internal server error while fetching movements',
       error: err.message,
@@ -394,10 +408,10 @@ const getStockMovements = async (stockId, limit = 50, offset = 0) => {
 const updateProduct = async (stockId, updateData) => {
   try {
     if (!stockId)
-      return { status: 400, ok: false, message: 'Stock ID is required' };
+      return { status: HTTP.BAD_REQUEST, ok: false, message: 'Stock ID is required' };
 
     const current = await Stock.findById(stockId);
-    if (!current) return { status: 404, ok: false, message: 'Stock not found' };
+    if (!current) return { status: HTTP.NOT_FOUND, ok: false, message: 'Stock not found' };
 
     const updated = await Stock.findByIdAndUpdate(
       stockId,
@@ -430,15 +444,15 @@ const updateProduct = async (stockId, updateData) => {
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'Stock updated successfully',
       data: updated,
     };
   } catch (err) {
-    console.error('[StockService] updateProduct:', err);
+    logger.error('[StockService] updateProduct:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Internal server error while updating stock',
       error: err.message,
@@ -456,11 +470,11 @@ const updateProduct = async (stockId, updateData) => {
 const updateStock = async (stockId, updateData) => {
   try {
     if (!stockId)
-      return { status: 400, ok: false, message: 'Stock ID is required' };
+      return { status: HTTP.BAD_REQUEST, ok: false, message: 'Stock ID is required' };
 
     const currentStock = await Stock.findById(stockId);
     if (!currentStock)
-      return { status: 404, ok: false, message: 'Stock not found' };
+      return { status: HTTP.NOT_FOUND, ok: false, message: 'Stock not found' };
 
     const officeHero = JSON.parse(process.env.OFFICE_HERO);
     const movementTypes = ['add', 'deduct', 'adjustment', 'initial'];
@@ -475,7 +489,7 @@ const updateStock = async (stockId, updateData) => {
         (!updateData.equipmentName || !updateData.mechanicName)
       ) {
         return {
-          status: 400,
+          status: HTTP.BAD_REQUEST,
           ok: false,
           message:
             'Equipment name and mechanic name are required for deductions',
@@ -608,7 +622,7 @@ const updateStock = async (stockId, updateData) => {
           message
         )
         .catch((e) =>
-          console.error('[StockService] Low stock notification failed:', e)
+          logger.error('[StockService] Low stock notification failed:', e)
         );
 
       await PushNotificationService.sendGeneralNotification(
@@ -628,37 +642,37 @@ const updateStock = async (stockId, updateData) => {
     }
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'Stock updated successfully',
       data: updatedStock,
     };
   } catch (err) {
-    console.error('[StockService] updateStock:', err);
+    logger.error('[StockService] updateStock:', err);
 
     if (err.name === 'ValidationError') {
       const messages = Object.values(err.errors)
         .map((e) => e.message)
         .join(', ');
       return {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message: `Validation error: ${messages}`,
       };
     }
     if (err.name === 'CastError') {
-      return { status: 400, ok: false, message: 'Invalid stock ID format' };
+      return { status: HTTP.BAD_REQUEST, ok: false, message: 'Invalid stock ID format' };
     }
     if (err.code === 11000) {
       return {
-        status: 409,
+        status: HTTP.CONFLICT,
         ok: false,
         message: 'Duplicate entry — this stock item already exists',
       };
     }
 
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Internal server error while updating stock',
       error: err.message,
@@ -770,7 +784,7 @@ const getMovementsWithStock = async () => {
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'Movements with stock information retrieved successfully',
       data: results,
@@ -784,9 +798,9 @@ const getMovementsWithStock = async () => {
       },
     };
   } catch (err) {
-    console.error('[StockService] getMovementsWithStock:', err);
+    logger.error('[StockService] getMovementsWithStock:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Error retrieving movements with stock information',
       error: err.message,
@@ -802,11 +816,11 @@ const getMovementsWithStock = async () => {
 const getStockMovementsByEquipment = async (equipmentId) => {
   try {
     const movements = await Stock.getMovementsByEquipment(equipmentId);
-    return { status: 200, ok: true, data: movements };
+    return { status: HTTP.OK, ok: true, data: movements };
   } catch (err) {
-    console.error('[StockService] getStockMovementsByEquipment:', err);
+    logger.error('[StockService] getStockMovementsByEquipment:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Error retrieving stock movements for equipment',
       error: err.message,
@@ -822,11 +836,11 @@ const getStockMovementsByEquipment = async (equipmentId) => {
 const getStockMovementsByMechanic = async (mechanicId) => {
   try {
     const movements = await Stock.getMovementsByMechanic(mechanicId);
-    return { status: 200, ok: true, data: movements };
+    return { status: HTTP.OK, ok: true, data: movements };
   } catch (err) {
-    console.error('[StockService] getStockMovementsByMechanic:', err);
+    logger.error('[StockService] getStockMovementsByMechanic:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Error retrieving stock movements for mechanic',
       error: err.message,
@@ -890,7 +904,7 @@ const getStockAccountabilityReport = async (startDate, endDate) => {
     const totalValue = result.reduce((sum, item) => sum + item.totalValue, 0);
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       data: result,
       summary: {
@@ -900,9 +914,9 @@ const getStockAccountabilityReport = async (startDate, endDate) => {
       },
     };
   } catch (err) {
-    console.error('[StockService] getStockAccountabilityReport:', err);
+    logger.error('[StockService] getStockAccountabilityReport:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Error generating stock accountability report',
       error: err.message,
@@ -919,7 +933,7 @@ const scanStockByBarcode = async (objectId) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(objectId)) {
       return {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         ok: false,
         success: false,
         message: 'Invalid barcode format. Please scan a valid stock barcode.',
@@ -932,7 +946,7 @@ const scanStockByBarcode = async (objectId) => {
     });
     if (!stock) {
       return {
-        status: 404,
+        status: HTTP.NOT_FOUND,
         ok: false,
         success: false,
         message:
@@ -964,7 +978,7 @@ const scanStockByBarcode = async (objectId) => {
       : null;
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       success: true,
       message: 'Stock scanned successfully',
@@ -984,9 +998,9 @@ const scanStockByBarcode = async (objectId) => {
       },
     };
   } catch (err) {
-    console.error('[StockService] scanStockByBarcode:', err);
+    logger.error('[StockService] scanStockByBarcode:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       success: false,
       message: 'Error scanning stock barcode',

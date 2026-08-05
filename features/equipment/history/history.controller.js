@@ -1,3 +1,7 @@
+const logger = require('../../../shared/logger/logger');
+
+const HTTP = require('../../../shared/constants/httpStatus.constant.js');
+const { sendSuccess, sendError } = require('../../../shared/response/response.util');
 // controllers/history.controller.js
 const service = require('./history.service');
 
@@ -9,7 +13,7 @@ const VALID_TYPES = ['oil', 'normal', 'tyre', 'battery', 'major'];
 
 const validateType = (type, res) => {
   if (!type || !VALID_TYPES.includes(type)) {
-    res.status(400).json({
+    sendError(res, {
       ok: false,
       message: `Invalid service type. Must be one of: ${VALID_TYPES.join(', ')}`,
     });
@@ -31,14 +35,14 @@ const getServiceHistory = async (req, res) => {
     const { regNo } = req.params;
     if (!regNo)
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ ok: false, message: 'Registration number is required' });
 
     const result = await service.fetchServiceHistory(regNo);
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[HistoryController] getServiceHistory:', error);
-    res.status(500).json({ ok: false, message: error.message });
+    logger.error('[HistoryController] getServiceHistory:', error);
+    sendError(res, { ok: false, message: error.message });
   }
 };
 
@@ -51,15 +55,15 @@ const getServiceHistoryByType = async (req, res) => {
     const { regNo, type } = req.params;
     if (!regNo)
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ ok: false, message: 'Registration number is required' });
     if (!validateType(type, res)) return;
 
     const result = await service.fetchServiceHistoryByType(regNo, type);
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[HistoryController] getServiceHistoryByType:', error);
-    res.status(500).json({ ok: false, message: error.message });
+    logger.error('[HistoryController] getServiceHistoryByType:', error);
+    sendError(res, { ok: false, message: error.message });
   }
 };
 
@@ -71,14 +75,14 @@ const getServiceHistoryById = async (req, res) => {
   try {
     const { id, type } = req.params;
     if (!id)
-      return res.status(400).json({ ok: false, message: 'ID is required' });
+      return sendError(res, { ok: false, message: 'ID is required' });
     if (!validateType(type, res)) return;
 
     const result = await service.fetchServiceHistoryById(id);
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[HistoryController] getServiceHistoryById:', error);
-    res.status(500).json({ ok: false, message: error.message });
+    logger.error('[HistoryController] getServiceHistoryById:', error);
+    sendError(res, { ok: false, message: error.message });
   }
 };
 
@@ -92,10 +96,10 @@ const addServiceHistory = async (req, res) => {
     if (!validateType(serviceType, res)) return;
 
     const result = await service.insertServiceHistory(req.body);
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[HistoryController] addServiceHistory:', error);
-    res.status(500).json({ ok: false, message: error.message });
+    logger.error('[HistoryController] addServiceHistory:', error);
+    sendError(res, { ok: false, message: error.message });
   }
 };
 
@@ -109,10 +113,10 @@ const addBatchServiceHistory = async (req, res) => {
     if (!validateType(type, res)) return;
 
     const result = await service.insertBatchServiceHistory(req.body);
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[HistoryController] addBatchServiceHistory:', error);
-    res.status(500).json({ ok: false, message: error.message });
+    logger.error('[HistoryController] addBatchServiceHistory:', error);
+    sendError(res, { ok: false, message: error.message });
   }
 };
 
@@ -124,14 +128,14 @@ const deleteServiceHistory = async (req, res) => {
   try {
     const { id, type } = req.params;
     if (!id)
-      return res.status(400).json({ ok: false, message: 'ID is required' });
+      return sendError(res, { ok: false, message: 'ID is required' });
     if (!validateType(type, res)) return;
 
     const result = await service.deleteServiceHistory(id);
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[HistoryController] deleteServiceHistory:', error);
-    res.status(500).json({ ok: false, message: error.message });
+    logger.error('[HistoryController] deleteServiceHistory:', error);
+    sendError(res, { ok: false, message: error.message });
   }
 };
 
@@ -148,14 +152,14 @@ const getLatestFullService = async (req, res) => {
     const { regNo } = req.params;
     if (!regNo)
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ ok: false, message: 'Registration number is required' });
 
     const result = await service.fetchLatestFullService(regNo);
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[HistoryController] getLatestFullService:', error);
-    res.status(500).json({ ok: false, message: error.message });
+    logger.error('[HistoryController] getLatestFullService:', error);
+    sendError(res, { ok: false, message: error.message });
   }
 };
 
@@ -166,10 +170,10 @@ const getLatestFullService = async (req, res) => {
 const getFullServiceNotification = async (req, res) => {
   try {
     const result = await service.fetchFullServiceNotification();
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[HistoryController] getFullServiceNotification:', error);
-    res.status(500).json({ ok: false, message: error.message });
+    logger.error('[HistoryController] getFullServiceNotification:', error);
+    sendError(res, { ok: false, message: error.message });
   }
 };
 
@@ -180,10 +184,10 @@ const getFullServiceNotification = async (req, res) => {
 const addNextFullService = async (req, res) => {
   try {
     const result = await service.insertFullService(req.body);
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[HistoryController] addNextFullService:', error);
-    res.status(500).json({ ok: false, message: error.message });
+    logger.error('[HistoryController] addNextFullService:', error);
+    sendError(res, { ok: false, message: error.message });
   }
 };
 

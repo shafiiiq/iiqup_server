@@ -1,3 +1,5 @@
+const logger = require('../../../shared/logger/logger');
+
 // services/permission.service.js
 const { default: mongoose } = require('mongoose');
 const User = require('../user.model');
@@ -86,7 +88,7 @@ const submitOvertimeRequest = async (mechanicId, purpose, data) => {
         notification.data._id.toString()
       );
     } catch (notificationError) {
-      console.error(
+      logger.error(
         '[PermissionService] submitOvertimeRequest notification:',
         notificationError
       );
@@ -109,7 +111,7 @@ const submitOvertimeRequest = async (mechanicId, purpose, data) => {
       },
     };
   } catch (error) {
-    console.error('[PermissionService] submitOvertimeRequest:', error);
+    logger.error('[PermissionService] submitOvertimeRequest:', error);
     return {
       status: 500,
       message: 'Internal server error',
@@ -156,7 +158,7 @@ const submitRequest = async (data) => {
       data: { submittedAt: new Date() },
     };
   } catch (error) {
-    console.error('[PermissionService] submitRequest:', error);
+    logger.error('[PermissionService] submitRequest:', error);
     return {
       status: 500,
       message: 'Internal server error',
@@ -205,7 +207,7 @@ const approveRequest = async (uniqueCode, dataId, purpose) => {
           await updatedUser.save();
         }
       } catch (e) {
-        console.error('[PermissionService] approveRequest cleanup:', e);
+        logger.error('[PermissionService] approveRequest cleanup:', e);
       }
 
       try {
@@ -232,7 +234,7 @@ const approveRequest = async (uniqueCode, dataId, purpose) => {
           notification.data._id.toString()
         );
       } catch (notificationError) {
-        console.error(
+        logger.error(
           '[PermissionService] approveRequest notification:',
           notificationError
         );
@@ -244,7 +246,7 @@ const approveRequest = async (uniqueCode, dataId, purpose) => {
         data: response.data,
       };
     } catch (error) {
-      console.error('[PermissionService] approveRequest processing:', error);
+      logger.error('[PermissionService] approveRequest processing:', error);
       return {
         status: 500,
         message: 'Failed to process the request',
@@ -252,7 +254,7 @@ const approveRequest = async (uniqueCode, dataId, purpose) => {
       };
     }
   } catch (error) {
-    console.error('[PermissionService] approveRequest:', error);
+    logger.error('[PermissionService] approveRequest:', error);
     return {
       status: 500,
       message: 'Internal server error',
@@ -288,7 +290,7 @@ const getPendingRequests = async (uniqueCode, purpose) => {
       data: requests,
     };
   } catch (error) {
-    console.error('[PermissionService] getPendingRequests:', error);
+    logger.error('[PermissionService] getPendingRequests:', error);
     throw error;
   }
 };

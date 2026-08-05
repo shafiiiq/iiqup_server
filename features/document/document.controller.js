@@ -1,4 +1,9 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
+const { sendSuccess, sendError } = require('../../shared/response/response.util');
 const documentServices = require('./document.service');
+const paginationMiddleware = require('../../shared/pagination/pagination.middleware');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -34,21 +39,21 @@ const uploadDocument = async (req, res) => {
     } = req.body;
 
     if (!sourceId || !sourceType || !documentType) {
-      return res.status(400).json({
-        status: 400,
+      return sendSuccess(res, {
+        status: HTTP.BAD_REQUEST,
         message: 'Source ID, Source Type, and Document Type are required',
       });
     }
 
     if (!fileName) {
       return res
-        .status(400)
-        .json({ status: 400, message: 'File name is required' });
+        .status(HTTP.BAD_REQUEST)
+        .json({ status: HTTP.BAD_REQUEST, message: 'File name is required' });
     }
 
     if (!VALID_SOURCE_TYPES.includes(sourceType)) {
-      return res.status(400).json({
-        status: 400,
+      return sendSuccess(res, {
+        status: HTTP.BAD_REQUEST,
         message: `Invalid source type. Must be: ${VALID_SOURCE_TYPES.join(', ')}`,
       });
     }
@@ -64,8 +69,8 @@ const uploadDocument = async (req, res) => {
       expiry
     );
 
-    res.status(200).json({
-      status: 200,
+    sendSuccess(res, {
+      status: HTTP.OK,
       message: 'Presigned URL generated successfully',
       uploadUrl: result.uploadUrl,
       document: {
@@ -75,9 +80,9 @@ const uploadDocument = async (req, res) => {
       },
     });
   } catch (err) {
-    console.error('[Document] uploadDocument:', err);
-    res.status(500).json({
-      status: 500,
+    logger.error('[Document] uploadDocument:', err);
+    sendSuccess(res, {
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: 'Failed to generate upload URL',
       error: err.message,
     });
@@ -94,23 +99,23 @@ const getDocuments = async (req, res) => {
 
     if (!type || !id) {
       return res
-        .status(400)
-        .json({ status: 400, message: 'Type and ID are required' });
+        .status(HTTP.BAD_REQUEST)
+        .json({ status: HTTP.BAD_REQUEST, message: 'Type and ID are required' });
     }
 
     if (!VALID_SOURCE_TYPES.includes(type)) {
-      return res.status(400).json({
-        status: 400,
+      return sendSuccess(res, {
+        status: HTTP.BAD_REQUEST,
         message: `Invalid type. Must be: ${VALID_SOURCE_TYPES.join(', ')}`,
       });
     }
 
-    const result = await documentServices.getDocuments(type, id);
-    res.status(result.status).json(result);
+    const result = await documentServices.getDocuments(type, id, req.pagination);
+    sendSuccess(res, result);
   } catch (err) {
-    console.error('[Document] getDocuments:', err);
-    res.status(500).json({
-      status: 500,
+    logger.error('[Document] getDocuments:', err);
+    sendSuccess(res, {
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: 'Internal server error',
       error: err.message,
     });
@@ -123,12 +128,12 @@ const getDocuments = async (req, res) => {
  */
 const getAllDocuments = async (req, res) => {
   try {
-    const result = await documentServices.getAllDocuments();
-    res.status(result.status).json(result);
+    const result = await documentServices.getAllDocuments(req.pagination);
+    sendSuccess(res, result);
   } catch (err) {
-    console.error('[Document] getAllDocuments:', err);
-    res.status(500).json({
-      status: 500,
+    logger.error('[Document] getAllDocuments:', err);
+    sendSuccess(res, {
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: 'Internal server error',
       error: err.message,
     });
@@ -141,12 +146,12 @@ const getAllDocuments = async (req, res) => {
  */
 const getAllDocumentsTypes = async (req, res) => {
   try {
-    const result = await documentServices.getAllDocumentsTypes();
-    res.status(result.status).json(result);
+    const result = await documentServices.getAllDocumentsTypes(req.pagination);
+    sendSuccess(res, result);
   } catch (err) {
-    console.error('[Document] getAllDocumentsTypes:', err);
-    res.status(500).json({
-      status: 500,
+    logger.error('[Document] getAllDocumentsTypes:', err);
+    sendSuccess(res, {
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: 'Internal server error',
       error: err.message,
     });
@@ -163,16 +168,16 @@ const downloadDocument = async (req, res) => {
 
     if (!documentId) {
       return res
-        .status(400)
-        .json({ status: 400, message: 'Document ID is required' });
+        .status(HTTP.BAD_REQUEST)
+        .json({ status: HTTP.BAD_REQUEST, message: 'Document ID is required' });
     }
 
     const result = await documentServices.getDocumentById(documentId);
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (err) {
-    console.error('[Document] downloadDocument:', err);
-    res.status(500).json({
-      status: 500,
+    logger.error('[Document] downloadDocument:', err);
+    sendSuccess(res, {
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: 'Failed to download document',
       error: err.message,
     });
@@ -189,16 +194,16 @@ const viewDocument = async (req, res) => {
 
     if (!documentId) {
       return res
-        .status(400)
-        .json({ status: 400, message: 'Document ID is required' });
+        .status(HTTP.BAD_REQUEST)
+        .json({ status: HTTP.BAD_REQUEST, message: 'Document ID is required' });
     }
 
     const result = await documentServices.getDocumentById(documentId);
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (err) {
-    console.error('[Document] viewDocument:', err);
-    res.status(500).json({
-      status: 500,
+    logger.error('[Document] viewDocument:', err);
+    sendSuccess(res, {
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: 'Failed to view document',
       error: err.message,
     });
@@ -220,16 +225,16 @@ const mergePDFs = async (req, res) => {
       !Array.isArray(documentIds) ||
       documentIds.length < 2
     ) {
-      return res.status(400).json({
-        status: 400,
+      return sendSuccess(res, {
+        status: HTTP.BAD_REQUEST,
         message:
           'Source ID, Source Type, and at least 2 document IDs are required',
       });
     }
 
     if (!category || !documentType) {
-      return res.status(400).json({
-        status: 400,
+      return sendSuccess(res, {
+        status: HTTP.BAD_REQUEST,
         message: 'Category and Document Type are required',
       });
     }
@@ -241,11 +246,11 @@ const mergePDFs = async (req, res) => {
       category,
       documentType
     );
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (err) {
-    console.error('[Document] mergePDFs:', err);
-    res.status(500).json({
-      status: 500,
+    logger.error('[Document] mergePDFs:', err);
+    sendSuccess(res, {
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: 'Failed to merge PDFs',
       error: err.message,
     });
@@ -262,23 +267,23 @@ const splitPDF = async (req, res) => {
       req.body;
 
     if (!sourceId || !sourceType || !documentId) {
-      return res.status(400).json({
-        status: 400,
+      return sendSuccess(res, {
+        status: HTTP.BAD_REQUEST,
         message: 'Source ID, Source Type, and Document ID are required',
       });
     }
 
     if (!splitOptions || !Array.isArray(splitOptions.pages)) {
-      return res.status(400).json({
-        status: 400,
+      return sendSuccess(res, {
+        status: HTTP.BAD_REQUEST,
         message: 'Split options with page numbers array is required',
       });
     }
 
     if (!category) {
       return res
-        .status(400)
-        .json({ status: 400, message: 'Category is required' });
+        .status(HTTP.BAD_REQUEST)
+        .json({ status: HTTP.BAD_REQUEST, message: 'Category is required' });
     }
 
     const result = await documentServices.splitPDF(
@@ -288,11 +293,11 @@ const splitPDF = async (req, res) => {
       splitOptions,
       category
     );
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (err) {
-    console.error('[Document] splitPDF:', err);
-    res.status(500).json({
-      status: 500,
+    logger.error('[Document] splitPDF:', err);
+    sendSuccess(res, {
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: 'Failed to split PDF',
       error: err.message,
     });
@@ -309,26 +314,26 @@ const renameFile = async (req, res) => {
     const { newFileName } = req.body;
 
     if (!documentId || !newFileName) {
-      return res.status(400).json({
-        status: 400,
+      return sendSuccess(res, {
+        status: HTTP.BAD_REQUEST,
         message: 'Document ID and new file name are required',
       });
     }
 
     if (!/^[a-zA-Z0-9-_ ]+$/.test(newFileName)) {
-      return res.status(400).json({
-        status: 400,
+      return sendSuccess(res, {
+        status: HTTP.BAD_REQUEST,
         message:
           'Invalid file name. Only letters, numbers, spaces, hyphens and underscores are allowed',
       });
     }
 
     const result = await documentServices.renameFile(documentId, newFileName);
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (err) {
-    console.error('[Document] renameFile:', err);
-    res.status(500).json({
-      status: 500,
+    logger.error('[Document] renameFile:', err);
+    sendSuccess(res, {
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: 'Failed to rename file',
       error: err.message,
     });
@@ -345,16 +350,16 @@ const deleteDocument = async (req, res) => {
 
     if (!documentId) {
       return res
-        .status(400)
-        .json({ status: 400, message: 'Document ID is required' });
+        .status(HTTP.BAD_REQUEST)
+        .json({ status: HTTP.BAD_REQUEST, message: 'Document ID is required' });
     }
 
     const result = await documentServices.deleteDocument(documentId);
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (err) {
-    console.error('[Document] deleteDocument:', err);
-    res.status(500).json({
-      status: 500,
+    logger.error('[Document] deleteDocument:', err);
+    sendSuccess(res, {
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: 'Failed to delete document',
       error: err.message,
     });

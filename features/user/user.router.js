@@ -5,6 +5,7 @@ const bcrypt = require('bcrypt');
 const User = require('./user.model');
 
 const controller = require('./user.controller');
+const paginationMiddleware = require('../../shared/pagination/pagination.middleware');
 const { authMiddleware } = require('../../middlewares/jwt.middleware');
 const PushNotificationService = require('../notification/notification.push');
 
@@ -13,8 +14,8 @@ const PushNotificationService = require('../notification/notification.push');
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── CRUD ──────────────────────────────────────────────────────────────────────
-router.get('/allusers', authMiddleware, controller.getUsers);
-router.get('/get-all-users', authMiddleware, controller.getAllUsers);
+router.get('/allusers', authMiddleware, paginationMiddleware, controller.getUsers);
+router.get('/get-all-users', authMiddleware, paginationMiddleware, controller.getAllUsers);
 router.get('/get-user-roles', authMiddleware, controller.getUserRoles);
 router.post('/addusers', controller.addUsers);
 router.put('/updateuser/:id', authMiddleware, controller.updateUser);

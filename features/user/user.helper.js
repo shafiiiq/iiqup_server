@@ -1,3 +1,5 @@
+const logger = require('../../shared/logger/logger');
+
 // helpers/user.helper.js
 const fs = require('fs');
 
@@ -84,7 +86,7 @@ const cleanupFiles = (files) => {
     try {
       if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
     } catch (error) {
-      console.error(
+      logger.error(
         `[UserHelper] cleanupFiles: failed to delete ${file.filename}:`,
         error.message
       );

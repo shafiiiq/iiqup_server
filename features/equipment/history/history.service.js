@@ -1,3 +1,6 @@
+const logger = require('../../../shared/logger/logger');
+
+const HTTP = require('../../../shared/constants/httpStatus.constant.js');
 // services/history.service.js
 const ServiceHistoryModel = require('./history.model');
 const NotificationModel = require('../../notification/notification.model');
@@ -225,7 +228,7 @@ const insertServiceHistory = async (data) => {
       date: data.date,
     });
     if (conflict) {
-      return { status: 409, ok: false, message: 'data is already added' };
+      return { status: HTTP.CONFLICT, ok: false, message: 'data is already added' };
     }
 
     // ── Build and save history ────────────────────────────────────────────────
@@ -242,18 +245,18 @@ const insertServiceHistory = async (data) => {
     wsUtils.sendDashboardUpdate('serviceHistory');
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'Service history added successfully',
       data: history,
     };
   } catch (error) {
     if (error.code === 11000) {
-      return { status: 409, ok: false, message: 'data is already added' };
+      return { status: HTTP.CONFLICT, ok: false, message: 'data is already added' };
     }
-    console.error('[HistoryService] insertServiceHistory:', error);
+    logger.error('[HistoryService] insertServiceHistory:', error);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Failed to insert service history',
       error: error.message,
@@ -284,24 +287,24 @@ const insertBatchServiceHistory = async (body) => {
   const { type, sharedData, records } = body;
 
   // ── Input guards ──────────────────────────────────────────────────────────
-  if (!type) return { status: 400, ok: false, message: 'type is required' };
+  if (!type) return { status: HTTP.BAD_REQUEST, ok: false, message: 'type is required' };
   if (!VALID_TYPES.includes(type))
     return {
-      status: 400,
+      status: HTTP.BAD_REQUEST,
       ok: false,
       message: `Invalid type. Must be one of: ${VALID_TYPES.join(', ')}`,
     };
   if (!sharedData?.regNo)
-    return { status: 400, ok: false, message: 'sharedData.regNo is required' };
+    return { status: HTTP.BAD_REQUEST, ok: false, message: 'sharedData.regNo is required' };
   if (!sharedData?.machine)
     return {
-      status: 400,
+      status: HTTP.BAD_REQUEST,
       ok: false,
       message: 'sharedData.machine is required',
     };
   if (!Array.isArray(records) || !records.length)
     return {
-      status: 400,
+      status: HTTP.BAD_REQUEST,
       ok: false,
       message: 'records array is required and must not be empty',
     };
@@ -310,7 +313,7 @@ const insertBatchServiceHistory = async (body) => {
   const preflightErrors = await preflightCheck(type, records, sharedData);
   if (preflightErrors.length > 0) {
     return {
-      status: 422,
+      status: HTTP.UNPROCESSABLE_ENTITY,
       ok: false,
       message: `Batch rejected — ${preflightErrors.length} issue${preflightErrors.length > 1 ? 's' : ''} must be fixed before submitting`,
       errors: preflightErrors,
@@ -365,7 +368,7 @@ const insertBatchServiceHistory = async (body) => {
           record.serviceHrs,
           record.nextServiceHrs
         ).catch((err) =>
-          console.warn(
+          logger.warn(
             '[HistoryService] notification error (non-fatal):',
             err.message
           )
@@ -377,9 +380,9 @@ const insertBatchServiceHistory = async (body) => {
   } catch (err) {
     await session.abortTransaction();
     session.endSession();
-    console.error('[HistoryService] batch transaction aborted:', err);
+    logger.error('[HistoryService] batch transaction aborted:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: `Batch failed — all changes rolled back. Error: ${err.message}. Fix the issue and resubmit safely.`,
       data: { succeeded: [], failed: [{ index: -1, reason: err.message }] },
@@ -392,7 +395,7 @@ const insertBatchServiceHistory = async (body) => {
   wsUtils.sendDashboardUpdate('serviceHistory');
 
   return {
-    status: 200,
+    status: HTTP.OK,
     ok: true,
     message: `All ${succeeded.length} record${succeeded.length !== 1 ? 's' : ''} inserted successfully`,
     summary: { total: records.length, succeeded: succeeded.length, failed: 0 },
@@ -412,10 +415,10 @@ const fetchServiceHistory = async (regNo) => {
     const records = await ServiceHistoryModel.find({
       regNo: String(regNo),
     }).sort({ date: -1 });
-    return { status: 200, ok: true, data: records };
+    return { status: HTTP.OK, ok: true, data: records };
   } catch (error) {
-    console.error('[HistoryService] fetchServiceHistory:', error);
-    return { status: 500, ok: false, message: error.message };
+    logger.error('[HistoryService] fetchServiceHistory:', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message };
   }
 };
 
@@ -428,10 +431,10 @@ const fetchServiceHistoryByType = async (regNo, type) => {
       regNo: String(regNo),
       serviceType: type,
     }).sort({ date: -1 });
-    return { status: 200, ok: true, data: records };
+    return { status: HTTP.OK, ok: true, data: records };
   } catch (error) {
-    console.error('[HistoryService] fetchServiceHistoryByType:', error);
-    return { status: 500, ok: false, message: error.message };
+    logger.error('[HistoryService] fetchServiceHistoryByType:', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message };
   }
 };
 
@@ -441,17 +444,17 @@ const fetchServiceHistoryByType = async (regNo, type) => {
 const fetchServiceHistoryById = async (id) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return { status: 400, ok: false, message: 'Invalid history ID' };
+      return { status: HTTP.BAD_REQUEST, ok: false, message: 'Invalid history ID' };
     }
 
     const record = await ServiceHistoryModel.findById(id);
     if (!record)
-      return { status: 404, ok: false, message: 'History record not found' };
+      return { status: HTTP.NOT_FOUND, ok: false, message: 'History record not found' };
 
-    return { status: 200, ok: true, data: record };
+    return { status: HTTP.OK, ok: true, data: record };
   } catch (error) {
-    console.error('[HistoryService] fetchServiceHistoryById:', error);
-    return { status: 500, ok: false, message: error.message };
+    logger.error('[HistoryService] fetchServiceHistoryById:', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message };
   }
 };
 
@@ -465,10 +468,10 @@ const fetchLatestFullService = async (regNo) => {
       fullService: true,
     }).sort({ date: -1 });
 
-    return { status: 200, ok: true, data: record || null };
+    return { status: HTTP.OK, ok: true, data: record || null };
   } catch (error) {
-    console.error('[HistoryService] fetchLatestFullService:', error);
-    return { status: 500, ok: false, message: error.message };
+    logger.error('[HistoryService] fetchLatestFullService:', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message };
   }
 };
 
@@ -484,7 +487,7 @@ const deleteServiceHistory = async (id) => {
     const record = await ServiceHistoryModel.findById(id);
     if (!record)
       return {
-        status: 404,
+        status: HTTP.NOT_FOUND,
         ok: false,
         message: `History record with ID ${id} not found`,
       };
@@ -499,7 +502,7 @@ const deleteServiceHistory = async (id) => {
     }
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'History record and linked report deleted successfully',
       data: {
@@ -519,9 +522,9 @@ const deleteServiceHistory = async (id) => {
       },
     };
   } catch (error) {
-    console.error('[HistoryService] deleteServiceHistory:', error);
+    logger.error('[HistoryService] deleteServiceHistory:', error);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Failed to delete history record',
       error: error.message,
@@ -540,7 +543,7 @@ const insertFullService = async (data) => {
   try {
     if (!data?.regNo)
       return {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message: 'Registration number is required',
       };
@@ -568,13 +571,13 @@ const insertFullService = async (data) => {
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'Full service notification sent successfully',
     };
   } catch (error) {
-    console.error('[HistoryService] insertFullService:', error);
-    return { status: 500, ok: false, message: error.message };
+    logger.error('[HistoryService] insertFullService:', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message };
   }
 };
 
@@ -584,10 +587,10 @@ const insertFullService = async (data) => {
 const fetchFullServiceNotification = async () => {
   try {
     const notifications = await NotificationModel.find({});
-    return { status: 200, ok: true, data: notifications };
+    return { status: HTTP.OK, ok: true, data: notifications };
   } catch (error) {
-    console.error('[HistoryService] fetchFullServiceNotification:', error);
-    return { status: 500, ok: false, message: error.message };
+    logger.error('[HistoryService] fetchFullServiceNotification:', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message };
   }
 };
 

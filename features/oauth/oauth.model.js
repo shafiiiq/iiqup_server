@@ -1,3 +1,5 @@
+const logger = require('../../shared/logger/logger');
+
 // models/oauth.model.js
 const mongoose = require('mongoose');
 const crypto = require('crypto');
@@ -69,7 +71,7 @@ const encrypt = (text) => {
     // Return IV + Encrypted data (both in hex)
     return iv.toString('hex') + ':' + encrypted;
   } catch (error) {
-    console.error('Encryption failed:', error.message);
+    logger.error('Encryption failed:', error.message);
     return null;
   }
 };
@@ -94,7 +96,7 @@ const decrypt = (encryptedData) => {
 
     return decrypted;
   } catch (error) {
-    console.error('Decryption failed:', error.message);
+    logger.error('Decryption failed:', error.message);
     return null;
   }
 };

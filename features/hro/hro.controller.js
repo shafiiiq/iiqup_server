@@ -1,3 +1,7 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
+const { sendSuccess, sendError } = require('../../shared/response/response.util');
 const hireOrderService = require('./hro.service');
 const { sendLPOViaEmail } = require('../lpo/lpo.gmail');
 
@@ -12,7 +16,7 @@ const addHireOrder = async (req, res) => {
       !hireOrderData.company?.attention ||
       !hireOrderData.company?.designation
     ) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'Missing required hire order fields',
       });
@@ -23,7 +27,7 @@ const addHireOrder = async (req, res) => {
       !Array.isArray(hireOrderData.items) ||
       hireOrderData.items.length === 0
     ) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'items array is required and cannot be empty',
       });
@@ -35,35 +39,36 @@ const addHireOrder = async (req, res) => {
       hireOrderData.columns.length === 0
     ) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'columns array is required' });
     }
 
     const hireOrder = await hireOrderService.createHireOrder(hireOrderData);
 
-    res.status(201).json({
+    sendSuccess(res, {
       success: true,
       message: 'Hire order created successfully',
       data: hireOrder,
     });
   } catch (error) {
-    console.error('[HireOrder] addHireOrder:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[HireOrder] addHireOrder:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
 const getAllHireOrders = async (req, res) => {
   try {
-    const hireOrders = await hireOrderService.getAllHireOrders();
-    res.status(200).json({
+    const result = await hireOrderService.getAllHireOrders(req.pagination);
+    sendSuccess(res, {
       success: true,
       message: 'Hire orders retrieved successfully',
-      data: hireOrders,
-      count: hireOrders.length,
+      data: result.data,
+      pagination: result.pagination,
+      count: result.data.length,
     });
   } catch (error) {
-    console.error('[HireOrder] getAllHireOrders:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[HireOrder] getAllHireOrders:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -72,35 +77,35 @@ const getHireOrderByRef = async (req, res) => {
     const refNo = req.params.refNo;
     if (!refNo)
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Reference number is required' });
 
     const hireOrder = await hireOrderService.getHireOrderByRef(
       decodeURIComponent(refNo)
     );
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Hire order retrieved successfully',
       data: hireOrder,
     });
   } catch (error) {
-    console.error('[HireOrder] getHireOrderByRef:', error);
-    const status = error.message === 'Hire order not found' ? 404 : 500;
-    res.status(status).json({ success: false, message: error.message });
+    logger.error('[HireOrder] getHireOrderByRef:', error);
+    const status = error.message === 'Hire order not found' ? HTTP.NOT_FOUND : HTTP.INTERNAL_SERVER_ERROR;
+    sendError(res, { success: false, message: error.message });
   }
 };
 
 const getLatestHireOrderRef = async (req, res) => {
   try {
     const latestRef = await hireOrderService.getLatestHireOrderRef();
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Latest hire order reference retrieved successfully',
       data: { latestRef: latestRef || 'No hire order found' },
     });
   } catch (error) {
-    console.error('[HireOrder] getLatestHireOrderRef:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[HireOrder] getLatestHireOrderRef:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -110,22 +115,22 @@ const updateHireOrder = async (req, res) => {
     const updateData = req.body;
     if (!refNo)
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Reference number is required' });
 
     const hireOrder = await hireOrderService.updateHireOrder(
       decodeURIComponent(refNo),
       updateData
     );
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Hire order updated successfully',
       data: hireOrder,
     });
   } catch (error) {
-    console.error('[HireOrder] updateHireOrder:', error);
-    const status = error.message === 'Hire order not found' ? 404 : 500;
-    res.status(status).json({ success: false, message: error.message });
+    logger.error('[HireOrder] updateHireOrder:', error);
+    const status = error.message === 'Hire order not found' ? HTTP.NOT_FOUND : HTTP.INTERNAL_SERVER_ERROR;
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -134,21 +139,21 @@ const deleteHireOrder = async (req, res) => {
     const { refNo } = req.params;
     if (!refNo)
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Reference number is required' });
 
     const hireOrder = await hireOrderService.deleteHireOrder(
       decodeURIComponent(refNo)
     );
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Hire order deleted successfully',
       data: hireOrder,
     });
   } catch (error) {
-    console.error('[HireOrder] deleteHireOrder:', error);
-    const status = error.message === 'Hire order not found' ? 404 : 500;
-    res.status(status).json({ success: false, message: error.message });
+    logger.error('[HireOrder] deleteHireOrder:', error);
+    const status = error.message === 'Hire order not found' ? HTTP.NOT_FOUND : HTTP.INTERNAL_SERVER_ERROR;
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -157,7 +162,7 @@ const uploadHireOrder = async (req, res) => {
     const { hireOrderRef, uploadedBy, description } = req.body;
     if (!hireOrderRef)
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'hireOrderRef is required' });
 
     const hireOrder = await hireOrderService.uploadHireOrder(
@@ -165,14 +170,14 @@ const uploadHireOrder = async (req, res) => {
       uploadedBy || 'WORKSHOP_MANAGER',
       description || 'Hire order document generated from system'
     );
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Hire order sent for approval',
       data: hireOrder,
     });
   } catch (error) {
-    console.error('[HireOrder] uploadHireOrder:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[HireOrder] uploadHireOrder:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -181,19 +186,19 @@ const getPendingSignatures = async (req, res) => {
     const { uniqueCode } = req.body;
     if (!uniqueCode)
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'uniqueCode is required' });
 
     const pending = await hireOrderService.getPendingSignatures(uniqueCode);
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Pending hire order signatures retrieved successfully',
       data: pending,
       count: pending.length,
     });
   } catch (error) {
-    console.error('[HireOrder] getPendingSignatures:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[HireOrder] getPendingSignatures:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -202,19 +207,19 @@ const getSignedByUser = async (req, res) => {
     const { uniqueCode } = req.body;
     if (!uniqueCode)
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'uniqueCode is required' });
 
     const signed = await hireOrderService.getSignedByUser(uniqueCode);
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Signed hire orders retrieved successfully',
       data: signed,
       count: signed.length,
     });
   } catch (error) {
-    console.error('[HireOrder] getSignedByUser:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[HireOrder] getSignedByUser:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -223,7 +228,7 @@ const signHireOrder = async (req, res) => {
     const { refNo } = req.params;
     const { uniqueCode, signedDate, signedFrom } = req.body;
     if (!uniqueCode || !signedDate || !signedFrom)
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'uniqueCode, signedDate, and signedFrom are required',
       });
@@ -233,12 +238,12 @@ const signHireOrder = async (req, res) => {
       { uniqueCode, signedDate, signedFrom }
     );
     res
-      .status(200)
+      .status(HTTP.OK)
       .json({ success: true, message: result.message, data: result.data });
   } catch (error) {
-    console.error('[HireOrder] signHireOrder:', error);
+    logger.error('[HireOrder] signHireOrder:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message || 'Signing failed' });
   }
 };
@@ -265,14 +270,14 @@ const sendHireOrderViaEmail = async (req, res) => {
       equipment
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Hire order sent successfully',
       data: { hireOrderRef },
     });
   } catch (error) {
-    console.error('[HireOrder] sendHireOrderViaEmail:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[HireOrder] sendHireOrderViaEmail:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 

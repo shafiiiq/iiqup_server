@@ -1,3 +1,5 @@
+const logger = require('../../shared/logger/logger');
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Equipment Utils
 // Utilities that touch the DB or external services, but are shared across
@@ -23,7 +25,7 @@ const { normaliseImages } = require('./equipment.helper');
  */
 const safeUpdateOperator = async (operatorId, updateData) => {
   if (!operatorId || !mongoose.Types.ObjectId.isValid(operatorId)) {
-    console.log(
+    logger.info(
       '[Operator] Skipping operator update — invalid operatorId:',
       operatorId
     );
@@ -37,7 +39,7 @@ const safeUpdateOperator = async (operatorId, updateData) => {
       { new: true }
     );
   } catch (err) {
-    console.error('safeUpdateOperator failed:', err.message);
+    logger.error('safeUpdateOperator failed:', err.message);
     return null;
   }
 };
@@ -51,7 +53,7 @@ const getOperatorsByIds = async (operatorIds) => {
   try {
     return await OperatorModel.find({ _id: { $in: operatorIds } }).lean();
   } catch (err) {
-    console.error('getOperatorsByIds failed:', err.message);
+    logger.error('getOperatorsByIds failed:', err.message);
     throw err;
   }
 };

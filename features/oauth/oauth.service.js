@@ -1,3 +1,6 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
 // services/oauth.service.js
 const nodemailer = require('nodemailer');
 const jwt = require('jsonwebtoken');
@@ -109,7 +112,7 @@ const testOAuthSetup = async () => {
 
     return { success: true, message: 'OAuth setup is working' };
   } catch (error) {
-    console.error('[OAuthService] testOAuthSetup:', error.message);
+    logger.error('[OAuthService] testOAuthSetup:', error.message);
     return { success: false, error: error.message };
   }
 };
@@ -136,7 +139,7 @@ const authRefresh = async (refreshToken) => {
   try {
     if (!refreshToken) {
       return {
-        status: 401,
+        status: HTTP.UNAUTHORIZED,
         success: false,
         message: 'Refresh token is required',
       };
@@ -160,7 +163,7 @@ const authRefresh = async (refreshToken) => {
 
     if (decoded.type !== 'refresh') {
       return {
-        status: 403,
+        status: HTTP.FORBIDDEN,
         success: false,
         message: 'Invalid token type (must be refresh)',
       };
@@ -176,19 +179,19 @@ const authRefresh = async (refreshToken) => {
     });
 
     return {
-      status: 200,
+      status: HTTP.OK,
       success: true,
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
     };
   } catch (error) {
-    console.error('[OAuthService] authRefresh:', error.message);
+    logger.error('[OAuthService] authRefresh:', error.message);
 
     let message = 'Invalid refresh token';
     if (error.name === 'TokenExpiredError') message = 'Refresh token expired';
     if (error.name === 'JsonWebTokenError') message = 'Malformed refresh token';
 
-    return { status: 403, success: false, message };
+    return { status: HTTP.FORBIDDEN, success: false, message };
   }
 };
 

@@ -1,3 +1,7 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
+const { sendSuccess, sendError } = require('../../shared/response/response.util');
 const moment = require('moment-timezone');
 
 const attendanceService = require('./attendance.service');
@@ -19,7 +23,7 @@ const convertToQatarTime = (timeString) => {
     const utcDateTime = moment.tz(`${today} ${timeString}`, 'UTC');
     return utcDateTime.tz('Asia/Qatar').format('HH:mm:ss');
   } catch (error) {
-    console.error(
+    logger.error(
       '[Attendance] Error converting time to Qatar timezone:',
       error
     );
@@ -46,7 +50,7 @@ const sendToServer = async (attendanceData) => {
     const mechanic = await Mechanic.findOne({ zktecoPin: parsedPin });
 
     if (!mechanic && parsedPin !== 15 && parsedPin !== 1) {
-      console.log(`[Attendance] No mechanic found for PIN: ${parsedPin}`);
+      logger.info(`[Attendance] No mechanic found for PIN: ${parsedPin}`);
       return;
     }
 
@@ -78,7 +82,7 @@ const sendToServer = async (attendanceData) => {
 
     await attendanceService.addAttendance(newAttendance);
   } catch (error) {
-    console.error('[Attendance] Error saving attendance:', error);
+    logger.error('[Attendance] Error saving attendance:', error);
   }
 };
 
@@ -95,20 +99,20 @@ const storeToProcess = async (req, res) => {
     const saved = await attendanceService.addAttendance(req.body);
 
     if (!saved) {
-      return res.status(200).json({
+      return sendSuccess(res, {
         success: true,
         message: 'Attendance record already exists',
         duplicate: true,
       });
     }
 
-    res.status(201).json({
+    sendSuccess(res, {
       success: true,
       message: 'Attendance record created successfully',
       data: saved,
     });
   } catch (error) {
-    res.status(400).json({ success: false, message: error.message });
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -121,7 +125,7 @@ const addZktecoPin = async (req, res) => {
     const { _id, zktecoPin } = req.body;
 
     if (!_id || !zktecoPin) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'Both _id and zktecoPin are required',
       });
@@ -130,20 +134,20 @@ const addZktecoPin = async (req, res) => {
     const updatedMechanic = await service.setZktecoPin(_id, zktecoPin);
 
     if (!updatedMechanic) {
-      return res.status(404).json({
+      return sendError(res, {
         success: false,
         message: 'Mechanic not found',
       });
     }
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'ZKTeco PIN added successfully',
       data: updatedMechanic,
     });
   } catch (error) {
-    console.error('[ZKTeco] Error adding ZKTeco PIN:', error);
-    res.status(500).json({
+    logger.error('[ZKTeco] Error adding ZKTeco PIN:', error);
+    sendError(res, {
       success: false,
       message: error.message,
     });
@@ -161,13 +165,13 @@ const getLiveAttendance = async (req, res) => {
       req.query
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       data: attendances,
       count: attendances.length,
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -179,13 +183,13 @@ const getTodayAttendance = async (req, res) => {
   try {
     const todayAttendance = await attendanceService.getTodayAttendance();
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       data: todayAttendance,
       count: todayAttendance.length,
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -197,13 +201,13 @@ const getAttendanceStats = async (req, res) => {
   try {
     const stats = await attendanceService.getAttendanceStats(req.query);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       data: stats,
       count: stats.length,
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -253,14 +257,14 @@ const getDailyReport = async (req, res) => {
       }
     });
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       date: targetDate,
       data: Object.values(employeeReport),
       count: Object.keys(employeeReport).length,
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -273,7 +277,7 @@ const getEmployeeMonthlyAttendance = async (req, res) => {
     const { pin, month, year } = req.query;
 
     if (!pin || !month || !year) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'PIN, month, and year are required',
       });
@@ -285,7 +289,7 @@ const getEmployeeMonthlyAttendance = async (req, res) => {
       monthYear,
     });
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       data: attendances,
       count: attendances.length,
@@ -293,7 +297,7 @@ const getEmployeeMonthlyAttendance = async (req, res) => {
       month: monthYear,
     });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    sendError(res, { success: false, message: error.message });
   }
 };
 

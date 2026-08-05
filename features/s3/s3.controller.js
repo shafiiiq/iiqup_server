@@ -1,3 +1,7 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
+const { sendSuccess, sendError } = require('../../shared/response/response.util');
 // controllers/s3.controller.js
 const s3Services = require('../../shared/services/s3.service');
 
@@ -13,27 +17,27 @@ const getS3Config = async (req, res) => {
   try {
     const { key, isLong, isAuthSign } = req.body;
 
-    console.log('[S3] getS3Config request', { key, isLong, isAuthSign });
+    logger.info('[S3] getS3Config request', { key, isLong, isAuthSign });
 
     if (!key) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'key is required' });
     }
 
     const result = await s3Services.fetchPresignedURL(key, isLong, isAuthSign);
 
-    console.log('[S3] getS3Config result', {
+    logger.info('[S3] getS3Config result', {
       key,
       status: result.status,
       ok: result.ok,
       message: result.message,
     });
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[S3] getS3Config:', error);
+    logger.error('[S3] getS3Config:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };

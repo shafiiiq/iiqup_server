@@ -2,19 +2,24 @@ const express = require('express');
 const router = express.Router();
 
 const controller = require('./equipment.controller');
+const paginationMiddleware = require('../../shared/pagination/pagination.middleware');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Equipment Routes
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── CRUD ──────────────────────────────────────────────────────────────────────
-router.get('/get-equipments', controller.getEquipments);
+router.get('/get-equipments', paginationMiddleware, controller.getEquipments);
 router.get('/get-equipment/:regNo', controller.getEquipmentsByReg);
 router.get('/equipment-count', controller.getEquipmentCount);
 router.get('/equipment-stats', controller.getEquipmentStats);
-router.get('/get-equipments-by-status', controller.getEquipmentsByStatus);
+router.get(
+  '/get-equipments-by-status',
+  paginationMiddleware,
+  controller.getEquipmentsByStatus
+);
 router.post('/add-equipment', controller.addEquipment);
-router.post('/search-equipments', controller.searchEquipments);
+router.post('/search-equipments', paginationMiddleware, controller.searchEquipments);
 router.put('/update-equipment/:regNo', controller.updateEquipments);
 router.put('/status-update/:id', controller.updateStatus);
 router.delete('/delete-equipment/:regNo', controller.deleteEquipments);
@@ -31,6 +36,7 @@ router.post('/change-equipment-status', controller.changeEquipmentStatus);
 router.get('/all-mobilizations', controller.getAllMobilizations);
 router.get(
   '/mobilization-history/:equipmentId',
+  paginationMiddleware,
   controller.getMobilizationHistory
 );
 router.get('/filtered-mobilizations', controller.getFilteredMobilizations);
@@ -43,6 +49,7 @@ router.post('/add-shifts', controller.addShifts);
 router.get('/all-replacements', controller.getAllReplacements);
 router.get(
   '/replacement-history/:equipmentId',
+  paginationMiddleware,
   controller.getReplacementHistory
 );
 router.get('/filtered-replacements', controller.getFilteredReplacements);

@@ -1,3 +1,5 @@
+const logger = require('../../shared/logger/logger');
+
 // gmail/otp.gmail.js
 const nodemailer = require('nodemailer');
 const { createSecureOAuthTransporter } = require('../oauth/oauth.service');
@@ -108,7 +110,7 @@ const sendOTPEmail = async (email, otp, username = '', demo_opr = false) => {
   for (const method of methods) {
     if (!method.enabled) continue;
 
-    console.log(`[OTP Email] Trying method: ${method.name} for ${email}`);
+    logger.info(`[OTP Email] Trying method: ${method.name} for ${email}`);
 
     try {
       const transporter = await method.create();
@@ -136,7 +138,7 @@ const sendOTPEmail = async (email, otp, username = '', demo_opr = false) => {
         },
       });
 
-      console.log(
+      logger.info(
         `[OTP Email] Sent via ${method.name}; messageId=${info.messageId}; accepted=${info.accepted?.join(',')}; rejected=${info.rejected?.join(',')}`
       );
 
@@ -151,7 +153,7 @@ const sendOTPEmail = async (email, otp, username = '', demo_opr = false) => {
       };
     } catch (error) {
       const message = error?.message || String(error);
-      console.error(`[OTP Email] ${method.name} failed:`, message);
+      logger.error(`[OTP Email] ${method.name} failed:`, message);
       errors.push(`${method.name}: ${message}`);
     }
   }

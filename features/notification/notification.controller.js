@@ -1,3 +1,7 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
+const { sendSuccess, sendError } = require('../../shared/response/response.util');
 // controllers/notification.controller.js
 const notificationsService = require('./notification.service');
 const {
@@ -16,28 +20,22 @@ const PushNotificationService = require('./notification.push');
  */
 const getAllNotifications = async (req, res) => {
   try {
-    const { uniqueCode, page = 1, limit = 100 } = req.body;
+    const { uniqueCode } = req.body;
 
     const result = await notificationsService.getAllNotificationsService(
       uniqueCode,
-      parseInt(page),
-      parseInt(limit)
+      req.pagination
     );
 
-    res.status(200).json({
-      status: 200,
+    sendSuccess(res, {
+      status: HTTP.OK,
       message: 'Notifications retrieved successfully',
-      data: result.notifications,
-      pagination: {
-        currentPage: result.currentPage,
-        totalPages: result.totalPages,
-        totalCount: result.totalCount,
-        hasMore: result.hasNextPage,
-      },
+      data: result.data,
+      pagination: result.pagination,
     });
   } catch (error) {
-    console.error('[Notification] getAllNotifications:', error);
-    res.status(500).json({ status: 500, message: error.message });
+    logger.error('[Notification] getAllNotifications:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message });
   }
 };
 
@@ -51,21 +49,21 @@ const getNotificationStats = async (req, res) => {
 
     if (!uniqueCode) {
       return res
-        .status(400)
-        .json({ status: 400, message: 'uniqueCode is required' });
+        .status(HTTP.BAD_REQUEST)
+        .json({ status: HTTP.BAD_REQUEST, message: 'uniqueCode is required' });
     }
 
     const stats =
       await notificationsService.getNotificationStatsService(uniqueCode);
 
-    res.status(200).json({
-      status: 200,
+    sendSuccess(res, {
+      status: HTTP.OK,
       message: 'Stats retrieved successfully',
       data: stats,
     });
   } catch (error) {
-    console.error('[Notification] getNotificationStats:', error);
-    res.status(500).json({ status: 500, message: error.message });
+    logger.error('[Notification] getNotificationStats:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message });
   }
 };
 
@@ -80,8 +78,8 @@ const markAsRead = async (req, res) => {
 
     if (!uniqueCode) {
       return res
-        .status(400)
-        .json({ status: 400, message: 'uniqueCode is required' });
+        .status(HTTP.BAD_REQUEST)
+        .json({ status: HTTP.BAD_REQUEST, message: 'uniqueCode is required' });
     }
 
     const result = await notificationsService.markNotificationAsRead(
@@ -89,10 +87,10 @@ const markAsRead = async (req, res) => {
       uniqueCode
     );
 
-    res.status(200).json({ status: 200, message: result.message });
+    sendSuccess(res, { status: HTTP.OK, message: result.message });
   } catch (error) {
-    console.error('[Notification] markAsRead:', error);
-    res.status(500).json({ status: 500, message: error.message });
+    logger.error('[Notification] markAsRead:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message });
   }
 };
 
@@ -107,130 +105,106 @@ const deleteNotification = async (req, res) => {
     await Notification.findByIdAndDelete(id);
 
     res
-      .status(200)
-      .json({ status: 200, message: 'Notification deleted successfully' });
+      .status(HTTP.OK)
+      .json({ status: HTTP.OK, message: 'Notification deleted successfully' });
   } catch (error) {
-    console.error('[Notification] deleteNotification:', error);
-    res.status(500).json({ status: 500, message: error.message });
+    logger.error('[Notification] deleteNotification:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message });
   }
 };
 
 const getUnreadNotifications = async (req, res) => {
   try {
-    const { uniqueCode, page = 1, limit = 100 } = req.body;
+    const { uniqueCode } = req.body;
     if (!uniqueCode)
       return res
-        .status(400)
-        .json({ status: 400, message: 'uniqueCode is required' });
+        .status(HTTP.BAD_REQUEST)
+        .json({ status: HTTP.BAD_REQUEST, message: 'uniqueCode is required' });
     const result = await notificationsService.getUnreadNotificationsService(
       uniqueCode,
-      parseInt(page),
-      parseInt(limit)
+      req.pagination
     );
-    res.status(200).json({
-      status: 200,
+    sendSuccess(res, {
+      status: HTTP.OK,
       message: 'Unread notifications retrieved successfully',
-      data: result.notifications,
-      pagination: {
-        currentPage: result.currentPage,
-        totalPages: result.totalPages,
-        totalCount: result.totalCount,
-        hasMore: result.hasNextPage,
-      },
+      data: result.data,
+      pagination: result.pagination,
     });
   } catch (error) {
-    console.error('[Notification] getUnreadNotifications:', error);
-    res.status(500).json({ status: 500, message: error.message });
+    logger.error('[Notification] getUnreadNotifications:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message });
   }
 };
 
 const getForYouNotifications = async (req, res) => {
   try {
-    const { uniqueCode, page = 1, limit = 100 } = req.body;
+    const { uniqueCode } = req.body;
     if (!uniqueCode)
       return res
-        .status(400)
-        .json({ status: 400, message: 'uniqueCode is required' });
+        .status(HTTP.BAD_REQUEST)
+        .json({ status: HTTP.BAD_REQUEST, message: 'uniqueCode is required' });
     const result = await notificationsService.getForYouNotificationsService(
       uniqueCode,
-      parseInt(page),
-      parseInt(limit)
+      req.pagination
     );
-    res.status(200).json({
-      status: 200,
+    sendSuccess(res, {
+      status: HTTP.OK,
       message: 'For you notifications retrieved successfully',
-      data: result.notifications,
-      pagination: {
-        currentPage: result.currentPage,
-        totalPages: result.totalPages,
-        totalCount: result.totalCount,
-        hasMore: result.hasNextPage,
-      },
+      data: result.data,
+      pagination: result.pagination,
     });
   } catch (error) {
-    console.error('[Notification] getForYouNotifications:', error);
-    res.status(500).json({ status: 500, message: error.message });
+    logger.error('[Notification] getForYouNotifications:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message });
   }
 };
 
 const getHighPriorityNotifications = async (req, res) => {
   try {
-    const { uniqueCode, page = 1, limit = 100 } = req.body;
+    const { uniqueCode } = req.body;
     if (!uniqueCode)
       return res
-        .status(400)
-        .json({ status: 400, message: 'uniqueCode is required' });
+        .status(HTTP.BAD_REQUEST)
+        .json({ status: HTTP.BAD_REQUEST, message: 'uniqueCode is required' });
     const result =
       await notificationsService.getHighPriorityNotificationsService(
         uniqueCode,
-        parseInt(page),
-        parseInt(limit)
+        req.pagination
       );
-    res.status(200).json({
-      status: 200,
+    sendSuccess(res, {
+      status: HTTP.OK,
       message: 'High priority notifications retrieved successfully',
-      data: result.notifications,
-      pagination: {
-        currentPage: result.currentPage,
-        totalPages: result.totalPages,
-        totalCount: result.totalCount,
-        hasMore: result.hasNextPage,
-      },
+      data: result.data,
+      pagination: result.pagination,
     });
   } catch (error) {
-    console.error('[Notification] getHighPriorityNotifications:', error);
-    res.status(500).json({ status: 500, message: error.message });
+    logger.error('[Notification] getHighPriorityNotifications:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message });
   }
 };
 
 const getUserSpecificNotifications = async (req, res) => {
   try {
-    const { uniqueCode, sourceId, page = 1, limit = 100 } = req.body;
+    const { uniqueCode, sourceId } = req.body;
     if (!uniqueCode)
       return res
-        .status(400)
-        .json({ status: 400, message: 'uniqueCode is required' });
+        .status(HTTP.BAD_REQUEST)
+        .json({ status: HTTP.BAD_REQUEST, message: 'uniqueCode is required' });
     const result =
       await notificationsService.getUserSpecificNotificationsService(
         uniqueCode,
         sourceId,
-        parseInt(page),
-        parseInt(limit)
+        req.pagination
       );
-    res.status(200).json({
-      status: 200,
+    sendSuccess(res, {
+      status: HTTP.OK,
       message: 'User specific notifications retrieved successfully',
-      data: result.notifications,
-      pagination: {
-        currentPage: result.currentPage,
-        totalPages: result.totalPages,
-        totalCount: result.totalCount,
-        hasMore: result.hasNextPage,
-      },
+      data: result.data,
+      pagination: result.pagination,
     });
   } catch (error) {
-    console.error('[Notification] getUserSpecificNotifications:', error);
-    res.status(500).json({ status: 500, message: error.message });
+    logger.error('[Notification] getUserSpecificNotifications:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message });
   }
 };
 
@@ -239,18 +213,18 @@ const getUserSpecificTabs = async (req, res) => {
     const { uniqueCode } = req.body;
     if (!uniqueCode)
       return res
-        .status(400)
-        .json({ status: 400, message: 'uniqueCode is required' });
+        .status(HTTP.BAD_REQUEST)
+        .json({ status: HTTP.BAD_REQUEST, message: 'uniqueCode is required' });
     const tabs =
       await notificationsService.getUserSpecificTabsService(uniqueCode);
-    res.status(200).json({
-      status: 200,
+    sendSuccess(res, {
+      status: HTTP.OK,
       message: 'User specific tabs retrieved successfully',
       data: tabs,
     });
   } catch (error) {
-    console.error('[Notification] getUserSpecificTabs:', error);
-    res.status(500).json({ status: 500, message: error.message });
+    logger.error('[Notification] getUserSpecificTabs:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message });
   }
 };
 
@@ -259,48 +233,42 @@ const getModelCategories = async (req, res) => {
     const { uniqueCode } = req.body;
     if (!uniqueCode)
       return res
-        .status(400)
-        .json({ status: 400, message: 'uniqueCode is required' });
+        .status(HTTP.BAD_REQUEST)
+        .json({ status: HTTP.BAD_REQUEST, message: 'uniqueCode is required' });
     const categories =
       await notificationsService.getModelCategoriesService(uniqueCode);
-    res.status(200).json({
-      status: 200,
+    sendSuccess(res, {
+      status: HTTP.OK,
       message: 'Model categories retrieved successfully',
       data: categories,
     });
   } catch (error) {
-    console.error('[Notification] getModelCategories:', error);
-    res.status(500).json({ status: 500, message: error.message });
+    logger.error('[Notification] getModelCategories:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message });
   }
 };
 
 const getCategoryNotifications = async (req, res) => {
   try {
-    const { uniqueCode, category, page = 1, limit = 100 } = req.body;
+    const { uniqueCode, category } = req.body;
     if (!uniqueCode || !category)
       return res
-        .status(400)
-        .json({ status: 400, message: 'uniqueCode and category are required' });
+        .status(HTTP.BAD_REQUEST)
+        .json({ status: HTTP.BAD_REQUEST, message: 'uniqueCode and category are required' });
     const result = await notificationsService.getCategoryNotificationsService(
       uniqueCode,
       category,
-      parseInt(page),
-      parseInt(limit)
+      req.pagination
     );
-    res.status(200).json({
-      status: 200,
+    sendSuccess(res, {
+      status: HTTP.OK,
       message: 'Category notifications retrieved successfully',
-      data: result.notifications,
-      pagination: {
-        currentPage: result.currentPage,
-        totalPages: result.totalPages,
-        totalCount: result.totalCount,
-        hasMore: result.hasNextPage,
-      },
+      data: result.data,
+      pagination: result.pagination,
     });
   } catch (error) {
-    console.error('[Notification] getCategoryNotifications:', error);
-    res.status(500).json({ status: 500, message: error.message });
+    logger.error('[Notification] getCategoryNotifications:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message });
   }
 };
 
@@ -311,12 +279,10 @@ const searchNotifications = async (req, res) => {
       searchTerm,
       filter = 'all',
       category = 'all',
-      page = 1,
-      limit = 50,
     } = req.body;
     if (!uniqueCode || !searchTerm)
-      return res.status(400).json({
-        status: 400,
+      return sendSuccess(res, {
+        status: HTTP.BAD_REQUEST,
         message: 'uniqueCode and searchTerm are required',
       });
     const result = await notificationsService.searchNotificationsService(
@@ -324,23 +290,17 @@ const searchNotifications = async (req, res) => {
       searchTerm,
       filter,
       category,
-      parseInt(page),
-      parseInt(limit)
+      req.pagination
     );
-    res.status(200).json({
-      status: 200,
+    sendSuccess(res, {
+      status: HTTP.OK,
       message: 'Search results retrieved successfully',
-      data: result.notifications,
-      pagination: {
-        currentPage: result.currentPage,
-        totalPages: result.totalPages,
-        totalCount: result.totalCount,
-        hasMore: result.hasNextPage,
-      },
+      data: result.data,
+      pagination: result.pagination,
     });
   } catch (error) {
-    console.error('[Notification] searchNotifications:', error);
-    res.status(500).json({ status: 500, message: error.message });
+    logger.error('[Notification] searchNotifications:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message });
   }
 };
 
@@ -355,14 +315,14 @@ const searchNotifications = async (req, res) => {
 const getPendingNotifications = async (req, res) => {
   try {
     const { uniqueCode, since, limit = 100 } = req.body;
-    console.log(
+    logger.info(
       '[Notification] getPendingNotifications request body:',
       req.body
     );
 
     if (!uniqueCode) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, error: 'uniqueCode is required' });
     }
 
@@ -418,25 +378,25 @@ const getPendingNotifications = async (req, res) => {
       });
 
       const dispatchResults = await Promise.allSettled(dispatchPromises);
-      console.log(
+      logger.info(
         '[Notification] dispatched pending notifications:',
         dispatchResults.map((r) => r.status)
       );
     } catch (err) {
-      console.error(
+      logger.error(
         '[Notification] error dispatching pending notifications:',
         err
       );
     }
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       notifications: result.notifications,
       meta: result.meta,
     });
   } catch (error) {
-    console.error('[Notification] getPendingNotifications:', error);
-    res.status(500).json({
+    logger.error('[Notification] getPendingNotifications:', error);
+    sendError(res, {
       success: false,
       error: 'Failed to fetch pending notifications',
       message: error.message,
@@ -453,7 +413,7 @@ const markNotificationAsDelivered = async (req, res) => {
     const { notificationId, uniqueCode } = req.body;
 
     if (!notificationId || !uniqueCode) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         error: 'notificationId and uniqueCode are required',
       });
@@ -464,13 +424,13 @@ const markNotificationAsDelivered = async (req, res) => {
       uniqueCode
     );
     if (!result.success && result.message === 'Invalid notification ID') {
-      return res.status(400).json(result);
+      return sendSuccess(res, result);
     }
 
     res.json(result);
   } catch (error) {
-    console.error('[Notification] markNotificationAsDelivered:', error);
-    res.status(500).json({ success: false, error: error.message });
+    logger.error('[Notification] markNotificationAsDelivered:', error);
+    sendError(res, { success: false, error: error.message });
   }
 };
 

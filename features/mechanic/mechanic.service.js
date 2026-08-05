@@ -1,3 +1,7 @@
+const logger = require('../../shared/logger/logger');
+
+const AppError = require('../../shared/errors/AppError.js');
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
 const Mechanic = require('./mechanic.model');
 const Attendance = require('../attendance/attendance.model');
 const {
@@ -14,13 +18,13 @@ const {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Finds a mechanic by ZKTeco PIN or throws a 404.
+ * Finds a mechanic by ZKTeco PIN or throws a HTTP.NOT_FOUND.
  * @param {string} zktecoPin
  * @returns {Promise<object>}
  */
 const findMechanicByPin = async (zktecoPin) => {
   const mechanic = await Mechanic.findOne({ zktecoPin: parseInt(zktecoPin) });
-  if (!mechanic) throw { status: 404, message: 'Mechanic not found' };
+  if (!mechanic) throw new AppError('Mechanic not found', HTTP.NOT_FOUND);
   return mechanic;
 };
 
@@ -44,15 +48,15 @@ const insertMechanics = async (mechanicData) => {
     }).save();
 
     return {
-      status: 201,
+      status: HTTP.CREATED,
       message: 'Mechanic added successfully',
       data: savedMechanic,
     };
   } catch (error) {
-    console.error('[MechanicService] insertMechanics:', error);
+    logger.error('[MechanicService] insertMechanics:', error);
     if (error.name === 'ValidationError')
-      throw { status: 400, message: formatValidationError(error) };
-    throw { status: 500, message: error.message || 'Error adding mechanic' };
+      throw { status: HTTP.BAD_REQUEST, message: formatValidationError(error) };
+    throw { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message || 'Error adding mechanic' };
   }
 };
 
@@ -64,14 +68,14 @@ const fetchMechanic = async () => {
   try {
     const mechanics = await Mechanic.find();
     return {
-      status: 200,
+      status: HTTP.OK,
       message: 'Mechanics fetched successfully',
       count: mechanics.length,
       data: mechanics,
     };
   } catch (error) {
-    console.error('[MechanicService] fetchMechanic:', error);
-    throw { status: 500, message: error.message || 'Error fetching mechanics' };
+    logger.error('[MechanicService] fetchMechanic:', error);
+    throw { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message || 'Error fetching mechanics' };
   }
 };
 
@@ -84,8 +88,8 @@ const getMechanicById = async (id) => {
   try {
     return await Mechanic.findById(id);
   } catch (error) {
-    console.error('[MechanicService] getMechanicById:', error);
-    throw { status: 500, message: error.message || 'Error fetching mechanic' };
+    logger.error('[MechanicService] getMechanicById:', error);
+    throw { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message || 'Error fetching mechanic' };
   }
 };
 
@@ -104,19 +108,19 @@ const mechanicUpdate = async (id, updateData) => {
       { $set: updateData },
       { new: true, runValidators: true }
     );
-    if (!updated) throw { status: 404, message: 'Mechanic not found' };
+    if (!updated) throw new AppError('Mechanic not found', HTTP.NOT_FOUND);
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: 'Mechanic updated successfully',
       data: updated,
     };
   } catch (error) {
-    console.error('[MechanicService] mechanicUpdate:', error);
+    logger.error('[MechanicService] mechanicUpdate:', error);
     if (error.name === 'ValidationError')
-      throw { status: 400, message: formatValidationError(error) };
+      throw { status: HTTP.BAD_REQUEST, message: formatValidationError(error) };
     if (error.status) throw error;
-    throw { status: 500, message: error.message || 'Error updating mechanic' };
+    throw { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message || 'Error updating mechanic' };
   }
 };
 
@@ -128,13 +132,13 @@ const mechanicUpdate = async (id, updateData) => {
 const mechanicDelete = async (id) => {
   try {
     const deleted = await Mechanic.findByIdAndDelete(id);
-    if (!deleted) throw { status: 404, message: 'Mechanic not found' };
+    if (!deleted) throw new AppError('Mechanic not found', HTTP.NOT_FOUND);
 
-    return { status: 200, message: 'Mechanic deleted successfully' };
+    return { status: HTTP.OK, message: 'Mechanic deleted successfully' };
   } catch (error) {
-    console.error('[MechanicService] mechanicDelete:', error);
+    logger.error('[MechanicService] mechanicDelete:', error);
     if (error.status) throw error;
-    throw { status: 500, message: error.message || 'Error deleting mechanic' };
+    throw { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message || 'Error deleting mechanic' };
   }
 };
 
@@ -151,22 +155,22 @@ const mechanicDelete = async (id) => {
 const addToolkit = async (mechanicId, toolkitData) => {
   try {
     const mechanic = await Mechanic.findById(mechanicId);
-    if (!mechanic) throw { status: 404, message: 'Mechanic not found' };
+    if (!mechanic) throw { status: HTTP.NOT_FOUND, message: 'Mechanic not found' };
 
     mechanic.toolkits.push(toolkitData);
     const updated = await mechanic.save();
 
     return {
-      status: 201,
+      status: HTTP.CREATED,
       message: 'Toolkit added successfully',
       data: updated,
     };
   } catch (error) {
-    console.error('[MechanicService] addToolkit:', error);
+    logger.error('[MechanicService] addToolkit:', error);
     if (error.name === 'ValidationError')
-      throw { status: 400, message: formatValidationError(error) };
+      throw { status: HTTP.BAD_REQUEST, message: formatValidationError(error) };
     if (error.status) throw error;
-    throw { status: 500, message: error.message || 'Error adding toolkit' };
+    throw { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message || 'Error adding toolkit' };
   }
 };
 
@@ -183,7 +187,7 @@ const addToolkit = async (mechanicId, toolkitData) => {
 const addOvertime = async (mechanicId, overtimeData) => {
   try {
     const mechanic = await Mechanic.findById(mechanicId);
-    if (!mechanic) throw { status: 404, message: 'Mechanic not found' };
+    if (!mechanic) throw { status: HTTP.NOT_FOUND, message: 'Mechanic not found' };
 
     const dateToAdd = new Date(overtimeData.date);
     dateToAdd.setHours(0, 0, 0, 0);
@@ -257,16 +261,16 @@ const addOvertime = async (mechanicId, overtimeData) => {
     cleanupOldOvertimeData(mechanicId);
 
     return {
-      status: 201,
+      status: HTTP.CREATED,
       message: 'Overtime record added successfully',
       data: addedMonthly,
     };
   } catch (error) {
-    console.error('[MechanicService] addOvertime:', error);
+    logger.error('[MechanicService] addOvertime:', error);
     if (error.name === 'ValidationError')
-      throw { status: 400, message: formatValidationError(error) };
+      throw { status: HTTP.BAD_REQUEST, message: formatValidationError(error) };
     if (error.status) throw error;
-    throw { status: 500, message: error.message || 'Error adding overtime' };
+    throw { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message || 'Error adding overtime' };
   }
 };
 
@@ -280,10 +284,10 @@ const cleanupOldOvertimeData = async (mechanicId) => {
   try {
     const cutoff = getCutoffMonthYear();
     const mechanic = await Mechanic.findById(mechanicId);
-    if (!mechanic) return { status: 404, message: 'Mechanic not found' };
+    if (!mechanic) return { status: HTTP.NOT_FOUND, message: 'Mechanic not found' };
 
     if (!mechanic.monthlyOvertime?.length)
-      return { status: 200, message: 'Nothing to clean up' };
+      return { status: HTTP.OK, message: 'Nothing to clean up' };
 
     const monthsToRemove = mechanic.monthlyOvertime
       .map((mo) => mo.month)
@@ -297,14 +301,14 @@ const cleanupOldOvertimeData = async (mechanicId) => {
     }
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: 'Old overtime data cleaned up',
       data: { mechanicId },
     };
   } catch (error) {
-    console.error('[MechanicService] cleanupOldOvertimeData:', error);
+    logger.error('[MechanicService] cleanupOldOvertimeData:', error);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: 'Error cleaning up old overtime data',
       error: error.message,
     };
@@ -338,14 +342,14 @@ const cleanupAllOldOvertimeData = async () => {
     }
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: 'Old overtime data cleaned up for all mechanics',
       data: { monthlyRecordsRemoved: totalCleanedRecords },
     };
   } catch (error) {
-    console.error('[MechanicService] cleanupAllOldOvertimeData:', error);
+    logger.error('[MechanicService] cleanupAllOldOvertimeData:', error);
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: error.message || 'Error cleaning up old overtime data',
     };
   }
@@ -356,7 +360,7 @@ const cleanupAllOldOvertimeData = async () => {
  * @returns {object}
  */
 const migrateOvertimeDataToMonthlyStructure = () => ({
-  status: 200,
+  status: HTTP.OK,
   message: 'No migration needed - system is already using monthly structure',
   data: {},
 });
@@ -381,10 +385,10 @@ const fetchDailyAttendance = async (zktecoPin, date) => {
 
     return buildAttendanceResponse(mechanic, attendance, { date });
   } catch (error) {
-    console.error('[MechanicService] fetchDailyAttendance:', error);
+    logger.error('[MechanicService] fetchDailyAttendance:', error);
     if (error.status) throw error;
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: error.message || 'Error fetching daily attendance',
     };
   }
@@ -408,10 +412,10 @@ const fetchWeeklyAttendance = async (zktecoPin, year, week) => {
 
     return buildAttendanceResponse(mechanic, attendance, { year, week });
   } catch (error) {
-    console.error('[MechanicService] fetchWeeklyAttendance:', error);
+    logger.error('[MechanicService] fetchWeeklyAttendance:', error);
     if (error.status) throw error;
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: error.message || 'Error fetching weekly attendance',
     };
   }
@@ -435,10 +439,10 @@ const fetchMonthlyAttendance = async (zktecoPin, year, month) => {
 
     return buildAttendanceResponse(mechanic, attendance, { year, month });
   } catch (error) {
-    console.error('[MechanicService] fetchMonthlyAttendance:', error);
+    logger.error('[MechanicService] fetchMonthlyAttendance:', error);
     if (error.status) throw error;
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: error.message || 'Error fetching monthly attendance',
     };
   }
@@ -460,10 +464,10 @@ const fetchYearlyAttendance = async (zktecoPin, year) => {
 
     return buildAttendanceResponse(mechanic, attendance, { year });
   } catch (error) {
-    console.error('[MechanicService] fetchYearlyAttendance:', error);
+    logger.error('[MechanicService] fetchYearlyAttendance:', error);
     if (error.status) throw error;
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: error.message || 'Error fetching yearly attendance',
     };
   }
@@ -479,7 +483,7 @@ const fetchYearlyAttendance = async (zktecoPin, year) => {
 const fetchAttendanceByDateRange = async (zktecoPin, startDate, endDate) => {
   try {
     if (!startDate || !endDate)
-      throw { status: 400, message: 'Both startDate and endDate are required' };
+      throw { status: HTTP.BAD_REQUEST, message: 'Both startDate and endDate are required' };
 
     const mechanic = await findMechanicByPin(zktecoPin);
     const attendance = await Attendance.find({
@@ -492,10 +496,10 @@ const fetchAttendanceByDateRange = async (zktecoPin, startDate, endDate) => {
       endDate,
     });
   } catch (error) {
-    console.error('[MechanicService] fetchAttendanceByDateRange:', error);
+    logger.error('[MechanicService] fetchAttendanceByDateRange:', error);
     if (error.status) throw error;
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: error.message || 'Error fetching attendance by date range',
     };
   }
@@ -511,7 +515,7 @@ const fetchAttendanceByMonths = async (zktecoPin, months) => {
   try {
     if (!months)
       throw {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         message: 'Months parameter is required (format: YYYY-MM,YYYY-MM)',
       };
 
@@ -526,10 +530,10 @@ const fetchAttendanceByMonths = async (zktecoPin, months) => {
       months: monthsArray,
     });
   } catch (error) {
-    console.error('[MechanicService] fetchAttendanceByMonths:', error);
+    logger.error('[MechanicService] fetchAttendanceByMonths:', error);
     if (error.status) throw error;
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: error.message || 'Error fetching attendance by months',
     };
   }
@@ -545,7 +549,7 @@ const fetchAttendanceByYears = async (zktecoPin, years) => {
   try {
     if (!years)
       throw {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         message: 'Years parameter is required (format: 2025,2024,2023)',
       };
 
@@ -558,10 +562,10 @@ const fetchAttendanceByYears = async (zktecoPin, years) => {
 
     return buildAttendanceResponse(mechanic, attendance, { years: yearsArray });
   } catch (error) {
-    console.error('[MechanicService] fetchAttendanceByYears:', error);
+    logger.error('[MechanicService] fetchAttendanceByYears:', error);
     if (error.status) throw error;
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: error.message || 'Error fetching attendance by years',
     };
   }
@@ -577,7 +581,7 @@ const fetchAttendanceByWeeks = async (zktecoPin, weeks) => {
   try {
     if (!weeks)
       throw {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         message: 'Weeks parameter is required (format: 2025-1,2025-2)',
       };
 
@@ -599,10 +603,10 @@ const fetchAttendanceByWeeks = async (zktecoPin, weeks) => {
 
     return buildAttendanceResponse(mechanic, attendance, { weeks: weeksArray });
   } catch (error) {
-    console.error('[MechanicService] fetchAttendanceByWeeks:', error);
+    logger.error('[MechanicService] fetchAttendanceByWeeks:', error);
     if (error.status) throw error;
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: error.message || 'Error fetching attendance by weeks',
     };
   }
@@ -630,7 +634,7 @@ const fetchAllMonthsAttendance = async (zktecoPin) => {
     ]);
 
     return {
-      status: 200,
+      status: HTTP.OK,
       data: {
         mechanic: { name: mechanic.name, zktecoPin: mechanic.zktecoPin },
         months: attendance,
@@ -638,10 +642,10 @@ const fetchAllMonthsAttendance = async (zktecoPin) => {
       },
     };
   } catch (error) {
-    console.error('[MechanicService] fetchAllMonthsAttendance:', error);
+    logger.error('[MechanicService] fetchAllMonthsAttendance:', error);
     if (error.status) throw error;
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: error.message || 'Error fetching all months attendance',
     };
   }
@@ -669,7 +673,7 @@ const fetchAllYearsAttendance = async (zktecoPin) => {
     ]);
 
     return {
-      status: 200,
+      status: HTTP.OK,
       data: {
         mechanic: { name: mechanic.name, zktecoPin: mechanic.zktecoPin },
         years: attendance,
@@ -677,10 +681,10 @@ const fetchAllYearsAttendance = async (zktecoPin) => {
       },
     };
   } catch (error) {
-    console.error('[MechanicService] fetchAllYearsAttendance:', error);
+    logger.error('[MechanicService] fetchAllYearsAttendance:', error);
     if (error.status) throw error;
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: error.message || 'Error fetching all years attendance',
     };
   }
@@ -700,10 +704,10 @@ const fetchAllAttendance = async (zktecoPin) => {
 
     return buildAttendanceResponse(mechanic, attendance);
   } catch (error) {
-    console.error('[MechanicService] fetchAllAttendance:', error);
+    logger.error('[MechanicService] fetchAllAttendance:', error);
     if (error.status) throw error;
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: error.message || 'Error fetching all attendance',
     };
   }

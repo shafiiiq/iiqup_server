@@ -1,7 +1,11 @@
+const logger = require('../../../shared/logger/logger');
+
+const HTTP = require('../../../shared/constants/httpStatus.constant.js');
 const Message = require('./messages.model');
 const Chat = require('../chats.model');
 const User = require('../../user/user.model');
 const chatService = require('../chat.service');
+const { paginate } = require('../../../shared/pagination/pagination.util');
 const { putObject, getObjectUrl } = require('../../../config/aws/s3.aws');
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -37,20 +41,23 @@ const shouldMarkMessageAsRead = (chat, message, userId) => {
  * @param {string} userId
  * @returns {Promise<object[]>}
  */
-const getMessages = async (chatId, page = 1, limit = 50, userId) => {
+const getMessages = async (
+  chatId,
+  pagination = { page: 1, limit: 50, skip: 0 },
+  userId
+) => {
   try {
-    console.log('getMessages called for chatId:', chatId, 'userId:', userId);
-    const skip = (page - 1) * limit;
+    logger.info('getMessages called for chatId:', chatId, 'userId:', userId);
 
-    const messages = await Message.find({ chatId, deletedFor: { $ne: userId } })
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit))
-      .lean();
+    const result = await paginate(
+      Message,
+      { chatId, deletedFor: { $ne: userId } },
+      pagination,
+      { sort: { createdAt: -1 } }
+    );
 
-    console.log('Found messages count:', messages.length);
     const messagesWithUrls = await Promise.all(
-      messages.map(async (msg) => {
+      result.data.map(async (msg) => {
         if (!FILE_MESSAGE_TYPES.includes(msg.messageType)) return msg;
 
         msg.content = await getObjectUrl(msg.content, false);
@@ -61,10 +68,13 @@ const getMessages = async (chatId, page = 1, limit = 50, userId) => {
       })
     );
 
-    console.log('Returning messages count:', messagesWithUrls.length);
-    return messagesWithUrls.reverse();
+    logger.info('Returning messages count:', messagesWithUrls.length);
+    return {
+      data: messagesWithUrls.reverse(),
+      pagination: result.pagination,
+    };
   } catch (error) {
-    console.error('[MessageService] getMessages:', error);
+    logger.error('[MessageService] getMessages:', error);
     throw error;
   }
 };
@@ -156,7 +166,7 @@ const createGroupSystemMessage = async ({
 
     return systemMessage;
   } catch (error) {
-    console.error('[MessageService] createGroupSystemMessage:', error);
+    logger.error('[MessageService] createGroupSystemMessage:', error);
     return null;
   }
 };
@@ -233,7 +243,7 @@ const sendMessage = async (messageData) => {
 
     return message;
   } catch (error) {
-    console.error('[MessageService] sendMessage:', error);
+    logger.error('[MessageService] sendMessage:', error);
     throw error;
   }
 };
@@ -256,7 +266,7 @@ const markMessagesAsDelivered = async (messageIds, userId) => {
 
     return true;
   } catch (error) {
-    console.error('[MessageService] markMessagesAsDelivered:', error);
+    logger.error('[MessageService] markMessagesAsDelivered:', error);
     throw error;
   }
 };
@@ -304,7 +314,7 @@ const markMessagesAsRead = async (chatId, messageIds, userId) => {
 
     return true;
   } catch (error) {
-    console.error('[MessageService] markMessagesAsRead:', error);
+    logger.error('[MessageService] markMessagesAsRead:', error);
     throw error;
   }
 };
@@ -341,7 +351,7 @@ const deleteMessage = async (messageId, userId, deleteForEveryone = false) => {
 
     return true;
   } catch (error) {
-    console.error('[MessageService] deleteMessage:', error);
+    logger.error('[MessageService] deleteMessage:', error);
     throw error;
   }
 };
@@ -360,7 +370,7 @@ const editMessage = async (messageId, userId, content) => {
     await message.save();
     return message.toObject();
   } catch (error) {
-    console.error('[MessageService] editMessage:', error);
+    logger.error('[MessageService] editMessage:', error);
     throw error;
   }
 };
@@ -374,7 +384,7 @@ const updateMessageCaption = async (messageId, userId, caption) => {
     await message.save();
     return message.toObject();
   } catch (error) {
-    console.error('[MessageService] updateMessageCaption:', error);
+    logger.error('[MessageService] updateMessageCaption:', error);
     throw error;
   }
 };
@@ -425,7 +435,7 @@ const forwardMessage = async (
 
     return forwarded.toObject();
   } catch (error) {
-    console.error('[MessageService] forwardMessage:', error);
+    logger.error('[MessageService] forwardMessage:', error);
     throw error;
   }
 };
@@ -449,7 +459,7 @@ const searchMessages = async (chatId, searchQuery, userId) => {
       .limit(50)
       .lean();
   } catch (error) {
-    console.error('[MessageService] searchMessages:', error);
+    logger.error('[MessageService] searchMessages:', error);
     throw error;
   }
 };
@@ -474,7 +484,7 @@ const uploadFile = async (userEmail, fileType, mimeType) => {
 
     return { uploadUrl, fileKey: key };
   } catch (error) {
-    console.error('[MessageService] uploadFile:', error);
+    logger.error('[MessageService] uploadFile:', error);
     throw error;
   }
 };
@@ -489,7 +499,7 @@ const getFileUrl = async (fileKey, isLongExpiry = false) => {
   try {
     return await getObjectUrl(fileKey, isLongExpiry);
   } catch (error) {
-    console.error('[MessageService] getFileUrl:', error);
+    logger.error('[MessageService] getFileUrl:', error);
     throw error;
   }
 };
@@ -504,7 +514,7 @@ const generateThumbnail = async (videoKey) => {
     // TODO: Implement thumbnail generation with ffmpeg / AWS Lambda
     return null;
   } catch (error) {
-    console.error('[MessageService] generateThumbnail:', error);
+    logger.error('[MessageService] generateThumbnail:', error);
     return null;
   }
 };
@@ -520,25 +530,32 @@ const generateThumbnail = async (videoKey) => {
  * @param {number} limit
  * @returns {Promise<object[]>}
  */
-const getCallHistory = async (userId, page = 1, limit = 20) => {
+const getCallHistory = async (
+  userId,
+  pagination = { page: 1, limit: 20, skip: 0 }
+) => {
   try {
-    const skip = (page - 1) * limit;
     const userChats = await Chat.find({ 'participants.userId': userId })
       .select('_id')
       .lean();
     const chatIds = userChats.map((chat) => chat._id);
 
-    return await Message.find({
+    const query = {
       chatId: { $in: chatIds },
       messageType: 'call',
       $or: [{ senderId: userId }, { 'callData.receiverId': userId }],
-    })
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit))
-      .lean();
+    };
+
+    const result = await paginate(Message, query, pagination, {
+      sort: { createdAt: -1 },
+    });
+
+    return {
+      data: result.data,
+      pagination: result.pagination,
+    };
   } catch (error) {
-    console.error('[MessageService] getCallHistory:', error);
+    logger.error('[MessageService] getCallHistory:', error);
     throw error;
   }
 };
@@ -584,7 +601,7 @@ const saveCallRecord = async (callData) => {
       status: 'sent',
     });
   } catch (error) {
-    console.error('[MessageService] saveCallRecord:', error);
+    logger.error('[MessageService] saveCallRecord:', error);
     throw error;
   }
 };
@@ -607,7 +624,7 @@ const getUnreadMessagesForUser = async (chatId, userId) => {
       'readBy.userId': { $ne: userId },
     }).lean();
   } catch (error) {
-    console.error('[MessageService] getUnreadMessagesForUser:', error);
+    logger.error('[MessageService] getUnreadMessagesForUser:', error);
     throw error;
   }
 };
@@ -625,7 +642,7 @@ const getUnreadCount = async (userId) => {
       return total + (chat.unreadCount?.get(userId.toString()) || 0);
     }, 0);
   } catch (error) {
-    console.error('[MessageService] getUnreadCount:', error);
+    logger.error('[MessageService] getUnreadCount:', error);
     throw error;
   }
 };

@@ -1,3 +1,6 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
 // ─────────────────────────────────────────────────────────────────────────────
 // Equipment Service
 // Flat named async functions — no prototype objects, no class syntax.
@@ -8,6 +11,7 @@ const equipmentModel = require('./equipment.model');
 const mobilizationModel = require('./mobilization/mobilizations.model');
 const replacementsModel = require('./replacement/replacement.model');
 const EquipmentImageModel = require('./images/images.model');
+const { paginate } = require('../../shared/pagination/pagination.util');
 
 const { createNotification } = require('../notification/notification.service');
 const PushNotificationService = require('../notification/notification.push');
@@ -86,7 +90,7 @@ const _sendNotification = async ({
       notification.data._id.toString()
     );
   } catch (err) {
-    console.error('[EquipmentService] Notification failed:', err.message);
+    logger.error('[EquipmentService] Notification failed:', err.message);
   }
 };
 
@@ -126,12 +130,12 @@ const insertEquipment = async (data) => {
   try {
     const existing = await equipmentModel.findOne({ regNo: data.regNo });
     if (existing) {
-      return { status: 500, ok: false, message: 'Equipment already exists' };
+      return { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: 'Equipment already exists' };
     }
 
     if (data.company === 'HIRED' && !data.hiredFrom) {
       return {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message: 'hiredFrom is required when company is HIRED',
       };
@@ -158,15 +162,15 @@ const insertEquipment = async (data) => {
     wsUtils.sendDashboardUpdate('equipment');
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'Equipment added successfully',
       data: equipment,
     };
   } catch (err) {
-    console.error('[EquipmentService] insertEquipment:', err);
+    logger.error('[EquipmentService] insertEquipment:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Missing data or an error occurred',
       error: err.message,
@@ -187,13 +191,11 @@ const insertEquipment = async (data) => {
  * @returns {Promise<object>}
  */
 const fetchEquipments = async (
-  page = 1,
-  limit = DEFAULT_PAGE_LIMITS.FETCH,
+  pagination = { page: 1, limit: DEFAULT_PAGE_LIMITS.FETCH, skip: 0 },
   hiredFilter = null,
   statusFilter = null
 ) => {
   try {
-    const skip = (page - 1) * limit;
     const statusQuery = Array.isArray(statusFilter)
       ? { status: { $in: statusFilter } }
       : statusFilter
@@ -205,35 +207,20 @@ const fetchEquipments = async (
       ...statusQuery,
     };
 
-    const [totalCount, equipments] = await Promise.all([
-      equipmentModel.countDocuments(query),
-      equipmentModel
-        .find(query)
-        .sort({ year: -1, createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-    ]);
-
-    const { totalPages, hasNextPage } = getPaginationMeta(
-      totalCount,
-      page,
-      limit
-    );
+    const result = await paginate(equipmentModel, query, pagination, {
+      sort: { year: -1, createdAt: -1 },
+    });
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
-      equipments,
-      currentPage: page,
-      totalPages,
-      totalCount,
-      hasNextPage,
+      data: result.data,
+      pagination: result.pagination,
     };
   } catch (err) {
-    console.error('[EquipmentService] fetchEquipments:', err);
+    logger.error('[EquipmentService] fetchEquipments:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: err.message || 'Error fetching equipments',
     };
@@ -250,46 +237,29 @@ const fetchEquipments = async (
  */
 const fetchEquipmentsByStatus = async (
   status,
-  page = 1,
-  limit = DEFAULT_PAGE_LIMITS.FETCH,
+  pagination = { page: 1, limit: DEFAULT_PAGE_LIMITS.FETCH, skip: 0 },
   hiredFilter = null
 ) => {
   try {
-    const skip = (page - 1) * limit;
     const query = {
       ...buildHiredQuery(hiredFilter),
       ...(status && status !== 'all' ? buildStatusQuery(status) : {}),
     };
 
-    const [totalCount, equipments] = await Promise.all([
-      equipmentModel.countDocuments(query),
-      equipmentModel
-        .find(query)
-        .sort({ year: -1, createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-    ]);
-
-    const { totalPages, hasNextPage } = getPaginationMeta(
-      totalCount,
-      page,
-      limit
-    );
+    const result = await paginate(equipmentModel, query, pagination, {
+      sort: { year: -1, createdAt: -1 },
+    });
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
-      equipments,
-      currentPage: page,
-      totalPages,
-      totalCount,
-      hasNextPage,
+      data: result.data,
+      pagination: result.pagination,
     };
   } catch (err) {
-    console.error('[EquipmentService] fetchEquipmentsByStatus:', err);
+    logger.error('[EquipmentService] fetchEquipmentsByStatus:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: err.message || 'Error fetching equipments by status',
     };
@@ -307,47 +277,30 @@ const fetchEquipmentsByStatus = async (
  */
 const searchEquipments = async (
   searchTerm,
-  page = 1,
-  limit = DEFAULT_PAGE_LIMITS.FETCH,
+  pagination = { page: 1, limit: DEFAULT_PAGE_LIMITS.FETCH, skip: 0 },
   searchField = 'all',
   hiredFilter = null
 ) => {
   try {
-    const skip = (page - 1) * limit;
     const query = {
       ...buildHiredQuery(hiredFilter),
       ...buildSearchQuery(searchTerm, searchField),
     };
 
-    const [totalCount, equipments] = await Promise.all([
-      equipmentModel.countDocuments(query),
-      equipmentModel
-        .find(query)
-        .sort({ year: -1, createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-    ]);
-
-    const { totalPages, hasNextPage } = getPaginationMeta(
-      totalCount,
-      page,
-      limit
-    );
+    const result = await paginate(equipmentModel, query, pagination, {
+      sort: { year: -1, createdAt: -1 },
+    });
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
-      equipments,
-      currentPage: page,
-      totalPages,
-      totalCount,
-      hasNextPage,
+      data: result.data,
+      pagination: result.pagination,
     };
   } catch (err) {
-    console.error('[EquipmentService] searchEquipments:', err);
+    logger.error('[EquipmentService] searchEquipments:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: err.message || 'Error searching equipments',
     };
@@ -362,11 +315,11 @@ const searchEquipments = async (
 const fetchEquipmentByReg = async (regNo) => {
   try {
     const data = await equipmentModel.find({ regNo });
-    return { status: 200, ok: true, data };
+    return { status: HTTP.OK, ok: true, data };
   } catch (err) {
-    console.error('[EquipmentService] fetchEquipmentByReg:', err);
+    logger.error('[EquipmentService] fetchEquipmentByReg:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: err.message || 'Error fetching equipment',
     };
@@ -417,7 +370,7 @@ const fetchEquipmentStats = async (hiredFilter = null) => {
     });
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       stats: {
         statusBreakdown,
@@ -431,9 +384,9 @@ const fetchEquipmentStats = async (hiredFilter = null) => {
       },
     };
   } catch (err) {
-    console.error('[EquipmentService] fetchEquipmentStats:', err);
+    logger.error('[EquipmentService] fetchEquipmentStats:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: err.message || 'Error fetching equipment statistics',
     };
@@ -449,7 +402,7 @@ const fetchUniqueSites = async () => {
     const sites = await equipmentModel.distinct('site');
     return sites.filter((s) => s?.trim()).sort();
   } catch (err) {
-    console.error('[EquipmentService] fetchUniqueSites:', err);
+    logger.error('[EquipmentService] fetchUniqueSites:', err);
     throw err;
   }
 };
@@ -481,7 +434,7 @@ const updateEquipment = async (
         regNo: equipmentNumber,
       });
       if (!equipment)
-        return { status: 404, ok: false, message: 'Equipment not found' };
+        return { status: HTTP.NOT_FOUND, ok: false, message: 'Equipment not found' };
 
       const result = await equipmentModel.findOneAndUpdate(
         { regNo: equipmentNumber },
@@ -497,7 +450,7 @@ const updateEquipment = async (
       });
 
       return {
-        status: 200,
+        status: HTTP.OK,
         ok: true,
         message: 'Equipment updated successfully',
         data: result,
@@ -507,7 +460,7 @@ const updateEquipment = async (
     // ── Standard update ───────────────────────────────────────────────────────
     const equipment = await equipmentModel.findOne({ regNo });
     if (!equipment)
-      return { status: 404, ok: false, message: 'Equipment not found' };
+      return { status: HTTP.NOT_FOUND, ok: false, message: 'Equipment not found' };
 
     if (
       updatedData.company === 'HIRED' &&
@@ -515,7 +468,7 @@ const updateEquipment = async (
       !equipment.hiredFrom
     ) {
       return {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message: 'hiredFrom is required when company is HIRED',
       };
@@ -660,14 +613,14 @@ const updateEquipment = async (
     wsUtils.sendDashboardUpdate('equipment');
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'Equipment updated successfully',
       data: result,
     };
   } catch (err) {
-    console.error('[EquipmentService] updateEquipment:', err);
-    return { status: 500, ok: false, message: 'Unable to update equipment' };
+    logger.error('[EquipmentService] updateEquipment:', err);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: 'Unable to update equipment' };
   }
 };
 
@@ -714,16 +667,16 @@ const changeEquipmentStatus = async (data) => {
     ]);
 
     if (!updatedEquipment)
-      return { status: 404, ok: false, message: 'Equipment not found' };
+      return { status: HTTP.NOT_FOUND, ok: false, message: 'Equipment not found' };
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'Equipment status changed successfully',
       data: { statusChange, updatedEquipment },
     };
   } catch (err) {
-    console.error('[EquipmentService] changeEquipmentStatus:', err);
+    logger.error('[EquipmentService] changeEquipmentStatus:', err);
     throw err;
   }
 };
@@ -737,7 +690,7 @@ const deleteEquipment = async (regNo) => {
   try {
     const equipment = await equipmentModel.findOne({ regNo });
     if (!equipment)
-      return { status: 404, ok: false, message: 'Equipment not found' };
+      return { status: HTTP.NOT_FOUND, ok: false, message: 'Equipment not found' };
 
     const deleted = await equipmentModel.findOneAndDelete({
       regNo: equipment.regNo,
@@ -751,14 +704,14 @@ const deleteEquipment = async (regNo) => {
     });
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'Equipment deleted successfully',
       data: deleted,
     };
   } catch (err) {
-    console.error('[EquipmentService] deleteEquipment:', err);
-    return { status: 500, ok: false, message: 'Unable to delete equipment' };
+    logger.error('[EquipmentService] deleteEquipment:', err);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: 'Unable to delete equipment' };
   }
 };
 
@@ -785,7 +738,7 @@ const addEquipmentImage = async (
   try {
     if (!imagePath || !imageLabel) {
       return {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         success: false,
         message: 'Image path and label are required',
       };
@@ -809,7 +762,7 @@ const addEquipmentImage = async (
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       success: true,
       message:
         equipment.images.length === 1
@@ -826,8 +779,8 @@ const addEquipmentImage = async (
       },
     };
   } catch (err) {
-    console.error('[EquipmentService] addEquipmentImage:', err);
-    const status = err.name === 'ValidationError' ? 400 : 500;
+    logger.error('[EquipmentService] addEquipmentImage:', err);
+    const status = err.name === 'ValidationError' ? HTTP.BAD_REQUEST : HTTP.INTERNAL_SERVER_ERROR;
     const message =
       err.name === 'ValidationError'
         ? `Validation error: ${err.message}`
@@ -845,21 +798,21 @@ const getEquipmentImages = async (regNo) => {
   try {
     const equipment = await EquipmentImageModel.findOne({ equipmentNo: regNo });
     if (!equipment)
-      return { status: 404, success: false, message: 'Equipment not found' };
+      return { status: HTTP.NOT_FOUND, success: false, message: 'Equipment not found' };
 
     const result = equipment.toObject();
     result.images = normaliseImages(result.images || []);
 
     return {
-      status: 200,
+      status: HTTP.OK,
       success: true,
       message: 'Equipment details retrieved successfully',
       data: result,
     };
   } catch (err) {
-    console.error('[EquipmentService] getEquipmentImages:', err);
+    logger.error('[EquipmentService] getEquipmentImages:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       success: false,
       message: 'Failed to retrieve equipment details',
       error: err.message,
@@ -885,7 +838,7 @@ const getBulkEquipmentImages = async (regNos) => {
     });
 
     return {
-      status: 200,
+      status: HTTP.OK,
       success: true,
       message: 'Bulk equipment images retrieved successfully',
       data: result,
@@ -893,9 +846,9 @@ const getBulkEquipmentImages = async (regNos) => {
       totalFound: Object.values(result).filter((r) => r.success).length,
     };
   } catch (err) {
-    console.error('[EquipmentService] getBulkEquipmentImages:', err);
+    logger.error('[EquipmentService] getBulkEquipmentImages:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       success: false,
       message: 'Failed to retrieve bulk equipment images',
       error: err.message,
@@ -1057,7 +1010,7 @@ const mobilizeEquipment = async (data) => {
     );
 
     if (!updatedEquipment)
-      return { status: 404, ok: false, message: 'Equipment not found' };
+      return { status: HTTP.NOT_FOUND, ok: false, message: 'Equipment not found' };
 
     if (withOperator && operators?.length) {
       await Promise.all(
@@ -1144,7 +1097,7 @@ const mobilizeEquipment = async (data) => {
         demobYear,
         demobTime: demobTime || time,
         demobRemarks: demobRemarks || '',
-      }).catch((e) => console.error('One day mob email failed:', e));
+      }).catch((e) => logger.error('One day mob email failed:', e));
     } else {
       await _sendNotification({
         title: `${machine} (${regNo}) Mobilized`,
@@ -1159,20 +1112,20 @@ const mobilizeEquipment = async (data) => {
       await alertMobilizationViaEmail({
         ...emailBase,
         action: 'mobilized',
-      }).catch((e) => console.error('Mobilization email failed:', e));
+      }).catch((e) => logger.error('Mobilization email failed:', e));
     }
 
     analyser.clearCache();
     wsUtils.sendDashboardUpdate('mobilization');
 
     return {
-      status: 201,
+      status: HTTP.CREATED,
       ok: true,
       message: 'Equipment mobilized successfully',
       data: { mobilization, updatedEquipment },
     };
   } catch (err) {
-    console.error('[EquipmentService] mobilizeEquipment:', err);
+    logger.error('[EquipmentService] mobilizeEquipment:', err);
     throw err;
   }
 };
@@ -1275,7 +1228,7 @@ const demobilizeEquipment = async (data) => {
     ]);
 
     if (!updatedEquipment)
-      return { status: 404, ok: false, message: 'Equipment not found' };
+      return { status: HTTP.NOT_FOUND, ok: false, message: 'Equipment not found' };
 
     // Unassign ALL operators
     await Promise.all(
@@ -1314,19 +1267,19 @@ const demobilizeEquipment = async (data) => {
       previousOperators: currentEquipment?.certificationBody || [],
       lastMobilizedDate,
       lastMobilizedTime,
-    }).catch((e) => console.error('Demobilization email failed:', e));
+    }).catch((e) => logger.error('Demobilization email failed:', e));
 
     analyser.clearCache();
     wsUtils.sendDashboardUpdate('mobilization');
 
     return {
-      status: 201,
+      status: HTTP.CREATED,
       ok: true,
       message: 'Equipment demobilized successfully',
       data: { demobilization, updatedEquipment },
     };
   } catch (err) {
-    console.error('[EquipmentService] demobilizeEquipment:', err);
+    logger.error('[EquipmentService] demobilizeEquipment:', err);
     throw err;
   }
 };
@@ -1347,7 +1300,7 @@ const addShifts = async (data) => {
 
     const currentEquipment = await equipmentModel.findById(equipmentId);
     if (!currentEquipment)
-      return { status: 404, ok: false, message: 'Equipment not found' };
+      return { status: HTTP.NOT_FOUND, ok: false, message: 'Equipment not found' };
 
     const existingShifts = currentEquipment.certificationBody || [];
 
@@ -1416,19 +1369,19 @@ const addShifts = async (data) => {
       hiredFrom: currentEquipment.hiredFrom || '',
       rentRate: currentEquipment.rentRate || null,
       location: currentEquipment.location ? [currentEquipment.location] : [],
-    }).catch((e) => console.error('Add shifts email failed:', e));
+    }).catch((e) => logger.error('Add shifts email failed:', e));
 
     analyser.clearCache();
     wsUtils.sendDashboardUpdate('equipment');
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'Shifts added successfully',
       data: updatedEquipment,
     };
   } catch (err) {
-    console.error('[EquipmentService] addShifts:', err);
+    logger.error('[EquipmentService] addShifts:', err);
     throw err;
   }
 };
@@ -1440,28 +1393,24 @@ const addShifts = async (data) => {
  * @param {number} limit
  * @returns {Promise<object>}
  */
-const getMobilizationHistory = async (equipmentId, page, limit) => {
+const getMobilizationHistory = async (
+  equipmentId,
+  pagination = { page: 1, limit: 20, skip: 0 }
+) => {
   try {
-    const skip = (page - 1) * limit;
+    const query = { equipmentId };
+    const result = await paginate(mobilizationModel, query, pagination, {
+      sort: { date: -1, createdAt: -1 },
+    });
 
-    const [history, totalCount] = await Promise.all([
-      mobilizationModel
-        .find({ equipmentId })
-        .sort({ date: -1, createdAt: -1 })
-        .skip(skip)
-        .limit(limit),
-      mobilizationModel.countDocuments({ equipmentId }),
-    ]);
-
-    const { totalPages, hasNextPage } = getPaginationMeta(
-      totalCount,
-      page,
-      limit
-    );
-
-    return { history, currentPage: page, totalPages, totalCount, hasNextPage };
+    return {
+      status: HTTP.OK,
+      ok: true,
+      data: result.data,
+      pagination: result.pagination,
+    };
   } catch (err) {
-    console.error('[EquipmentService] getMobilizationHistory:', err);
+    logger.error('[EquipmentService] getMobilizationHistory:', err);
     throw err;
   }
 };
@@ -1498,7 +1447,7 @@ const fetchAllMobilizations = async () => {
       operatorMap
     );
   } catch (err) {
-    console.error('[EquipmentService] fetchAllMobilizations:', err);
+    logger.error('[EquipmentService] fetchAllMobilizations:', err);
     throw err;
   }
 };
@@ -1562,7 +1511,7 @@ const fetchFilteredMobilizations = async (
       operatorMap
     );
   } catch (err) {
-    console.error('[EquipmentService] fetchFilteredMobilizations:', err);
+    logger.error('[EquipmentService] fetchFilteredMobilizations:', err);
     throw err;
   }
 };
@@ -1702,7 +1651,7 @@ const replaceOperator = async (data) => {
     );
 
     if (!updatedEquipment)
-      return { status: 404, ok: false, message: 'Equipment not found' };
+      return { status: HTTP.NOT_FOUND, ok: false, message: 'Equipment not found' };
 
     await replacementsModel
       .findByIdAndUpdate(replacement._id, {
@@ -1767,19 +1716,19 @@ const replaceOperator = async (data) => {
       hiredFrom: updatedEquipment?.hiredFrom || '',
       rentRate: updatedEquipment?.rentRate || null,
       location: updatedEquipment?.location || '',
-    }).catch((e) => console.error('Replace operator email failed:', e));
+    }).catch((e) => logger.error('Replace operator email failed:', e));
 
     analyser.clearCache();
     wsUtils.sendDashboardUpdate('replacement');
 
     return {
-      status: 201,
+      status: HTTP.CREATED,
       ok: true,
       message: 'Operator replaced successfully',
       data: { replacement, updatedEquipment },
     };
   } catch (err) {
-    console.error('[EquipmentService] replaceOperator:', err);
+    logger.error('[EquipmentService] replaceOperator:', err);
     throw err;
   }
 };
@@ -1810,12 +1759,12 @@ const replaceEquipment = async (data) => {
 
     const currentEquipment = await equipmentModel.findById(equipmentId);
     if (!currentEquipment)
-      return { status: 404, ok: false, message: 'Current equipment not found' };
+      return { status: HTTP.NOT_FOUND, ok: false, message: 'Current equipment not found' };
 
     const currentSite = currentEquipment.site;
     if (!currentSite)
       return {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message: 'Current equipment has no site assigned',
       };
@@ -1833,7 +1782,7 @@ const replaceEquipment = async (data) => {
       await equipmentModel.findById(replacedEquipmentId);
     if (!replacedEquipment)
       return {
-        status: 404,
+        status: HTTP.NOT_FOUND,
         ok: false,
         message: 'Replacement equipment not found',
       };
@@ -1921,7 +1870,7 @@ const replaceEquipment = async (data) => {
 
     if (!updatedReplacedEquipment)
       return {
-        status: 404,
+        status: HTTP.NOT_FOUND,
         ok: false,
         message: 'Replacement equipment not found',
       };
@@ -1982,10 +1931,10 @@ const replaceEquipment = async (data) => {
         replacedEquipment?.certificationBody?.at(-1)?.operatorName ||
         '',
       currentOperator: finalOperatorName,
-    }).catch((e) => console.error('Replace equipment email failed:', e));
+    }).catch((e) => logger.error('Replace equipment email failed:', e));
 
     return {
-      status: 201,
+      status: HTTP.CREATED,
       ok: true,
       message: 'Equipment replaced successfully',
       data: {
@@ -1995,7 +1944,7 @@ const replaceEquipment = async (data) => {
       },
     };
   } catch (err) {
-    console.error('[EquipmentService] replaceEquipment:', err);
+    logger.error('[EquipmentService] replaceEquipment:', err);
     throw err;
   }
 };
@@ -2008,29 +1957,25 @@ const replaceEquipment = async (data) => {
  * @param {string|null} type - 'operator' | 'equipment' | null (all)
  * @returns {Promise<object>}
  */
-const getReplacementHistory = async (equipmentId, page, limit, type = null) => {
+const getReplacementHistory = async (
+  equipmentId,
+  pagination = { page: 1, limit: 20, skip: 0 },
+  type = null
+) => {
   try {
-    const skip = (page - 1) * limit;
     const query = { equipmentId, ...(type ? { type } : {}) };
+    const result = await paginate(replacementsModel, query, pagination, {
+      sort: { date: -1, createdAt: -1 },
+    });
 
-    const [history, totalCount] = await Promise.all([
-      replacementsModel
-        .find(query)
-        .sort({ date: -1, createdAt: -1 })
-        .skip(skip)
-        .limit(limit),
-      replacementsModel.countDocuments(query),
-    ]);
-
-    const { totalPages, hasNextPage } = getPaginationMeta(
-      totalCount,
-      page,
-      limit
-    );
-
-    return { history, currentPage: page, totalPages, totalCount, hasNextPage };
+    return {
+      status: HTTP.OK,
+      ok: true,
+      data: result.data,
+      pagination: result.pagination,
+    };
   } catch (err) {
-    console.error('[EquipmentService] getReplacementHistory:', err);
+    logger.error('[EquipmentService] getReplacementHistory:', err);
     throw err;
   }
 };
@@ -2084,7 +2029,7 @@ const fetchAllReplacements = async () => {
       operatorMap
     );
   } catch (err) {
-    console.error('[EquipmentService] fetchAllReplacements:', err);
+    logger.error('[EquipmentService] fetchAllReplacements:', err);
     throw err;
   }
 };
@@ -2155,7 +2100,7 @@ const fetchFilteredReplacements = async (
       operatorMap
     );
   } catch (err) {
-    console.error('[EquipmentService] fetchFilteredReplacements:', err);
+    logger.error('[EquipmentService] fetchFilteredReplacements:', err);
     throw err;
   }
 };

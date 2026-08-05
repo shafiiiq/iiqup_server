@@ -1,3 +1,5 @@
+const logger = require('../../shared/logger/logger');
+
 // push/notification.push.js
 const admin = require('../../shared/utils/firebase.util');
 const tokenService = require('../../shared/auth/token.auth');
@@ -80,7 +82,7 @@ const dismissNotification = async (uniqueCode, notificationId) => {
     );
     return { success: true };
   } catch (error) {
-    console.error('[NotificationPush] dismissNotification:', error);
+    logger.error('[NotificationPush] dismissNotification:', error);
     return { success: false };
   }
 };
@@ -171,7 +173,7 @@ const sendVoIPCallNotification = async (
     );
     return { success: true };
   } catch (error) {
-    console.error('[NotificationPush] sendVoIPCallNotification:', error);
+    logger.error('[NotificationPush] sendVoIPCallNotification:', error);
     return { success: false };
   }
 };
@@ -192,7 +194,7 @@ const sendVoipSyncPush = async (uniqueCode, notificationId) => {
     const bundleId = process.env.APNS_BUNDLE_ID;
 
     if (!teamId || !keyId || !bundleId) {
-      console.error('[NotificationPush] APNS env not fully configured', {
+      logger.error('[NotificationPush] APNS env not fully configured', {
         teamId: !!teamId,
         keyId: !!keyId,
         bundleId: !!bundleId,
@@ -201,7 +203,7 @@ const sendVoipSyncPush = async (uniqueCode, notificationId) => {
     }
 
     if (!keyPath) {
-      console.error('[NotificationPush] APNS_KEY_PATH is not configured');
+      logger.error('[NotificationPush] APNS_KEY_PATH is not configured');
       return { success: false, error: 'APNS key path not configured' };
     }
 
@@ -217,7 +219,7 @@ const sendVoipSyncPush = async (uniqueCode, notificationId) => {
     }
 
     if (!fs.existsSync(resolvedKeyPath)) {
-      console.error(
+      logger.error(
         '[NotificationPush] APNS key missing at path:',
         resolvedKeyPath
       );
@@ -251,7 +253,7 @@ const sendVoipSyncPush = async (uniqueCode, notificationId) => {
       const client = http2.connect(host);
 
       client.on('error', (err) => {
-        console.error('[NotificationPush] sendVoipSyncPush http2 error:', err);
+        logger.error('[NotificationPush] sendVoipSyncPush http2 error:', err);
         resolve({ success: false });
       });
 
@@ -281,19 +283,19 @@ const sendVoipSyncPush = async (uniqueCode, notificationId) => {
 
       req.on('response', (headers) => {
         const status = headers[':status'];
-        console.log('[NotificationPush] sendVoipSyncPush status:', status);
+        logger.info('[NotificationPush] sendVoipSyncPush status:', status);
         client.close();
         resolve({ success: status === 200 });
       });
 
       req.on('error', (err) => {
-        console.error('[NotificationPush] sendVoipSyncPush req error:', err);
+        logger.error('[NotificationPush] sendVoipSyncPush req error:', err);
         client.close();
         resolve({ success: false });
       });
     });
   } catch (error) {
-    console.error('[NotificationPush] sendVoipSyncPush:', error);
+    logger.error('[NotificationPush] sendVoipSyncPush:', error);
     return { success: false };
   }
 };
@@ -323,7 +325,7 @@ const _storeSpecialNotification = async () => {
 };
 
 const _dispatchToUser = async (uniqueCode, notificationData) => {
-  console.log(
+  logger.info(
     `[NotificationPush] Dispatching notification to user ${uniqueCode}:`,
     notificationData
   );
@@ -353,7 +355,7 @@ const _dispatchToUser = async (uniqueCode, notificationData) => {
       uniqueCode,
       notificationData._id || notificationData.notificationId
     ).catch(() => {});
-    console.log(
+    logger.info(
       `[NotificationPush] sendVoipSyncPush verdict for ${uniqueCode}:`,
       verdict
     );
@@ -397,7 +399,7 @@ const _dispatchToUser = async (uniqueCode, notificationData) => {
 };
 
 const _dispatchBroadcast = async (notificationData) => {
-  console.log(
+  logger.info(
     '[NotificationPush] Broadcasting notification:',
     notificationData
   );
@@ -454,7 +456,7 @@ const _dispatchBroadcast = async (notificationData) => {
 };
 
 const _dispatchToUsers = async (uniqueCodes, notificationData) => {
-  console.log(
+  logger.info(
     `[NotificationPush] Dispatching notification to multiple users: ${uniqueCodes.join(', ')}`,
     notificationData
   );
@@ -561,7 +563,7 @@ const _dispatchToUsers = async (uniqueCodes, notificationData) => {
 
   const overallSuccess =
     results.websocket.success > 0 || results.pushNotification.success > 0;
-  console.log(
+  logger.info(
     `Dispatched notification to ${uniqueCodes.length} users. WebSocket success: ${results.websocket.success}, Push success: ${results.pushNotification.success}`
   );
   return {
@@ -607,7 +609,7 @@ class PushNotificationService {
       notificationId,
       ...extraData,
     };
-    console.log(
+    logger.info(
       `Sending general notification to ${uniqueCode || 'broadcast'}:`,
       notification
     );
@@ -692,7 +694,7 @@ class PushNotificationService {
         };
       return _dispatchToUsers(uniqueCodes, notificationData);
     } catch (error) {
-      console.error('[NotificationPush] sendNotificationToRoles:', error);
+      logger.error('[NotificationPush] sendNotificationToRoles:', error);
       return {
         success: false,
         message: 'Failed to send notifications to roles',
@@ -726,7 +728,7 @@ class PushNotificationService {
         },
       };
     } catch (error) {
-      console.error('[NotificationPush] getNotificationStats:', error);
+      logger.error('[NotificationPush] getNotificationStats:', error);
       return {
         success: false,
         message: 'Failed to get notification statistics',

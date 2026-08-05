@@ -1,4 +1,6 @@
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
 const HireOrder = require('./hro.model');
+const { paginate } = require('../../shared/pagination/pagination.util');
 
 const calculateTotal = (items, showDiscountInTotal, discount) => {
   let total = items.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
@@ -151,20 +153,20 @@ const signHireOrder = async (refNo, signData) => {
         new Error(
           'Unauthorised: your account is not recognised as an authorised signatory for hire order documents'
         ),
-        { status: 403 }
+        { status: HTTP.FORBIDDEN }
       );
 
     const hireOrder = await HireOrder.findOne({ hireOrderRef: refNo.trim() });
     if (!hireOrder)
-      throw Object.assign(new Error('Hire order not found'), { status: 404 });
+      throw Object.assign(new Error('Hire order not found'), { status: HTTP.NOT_FOUND });
     if (hireOrder.workflowStatus === 'hire_order_created')
       throw Object.assign(new Error('HIRE_ORDER_NOT_UPLOADED'), {
-        status: 403,
+        status: HTTP.FORBIDDEN,
       });
     if (hireOrder[matched.field] === true)
       throw Object.assign(
         new Error('The authorized signatory role has already been signed'),
-        { status: 409 }
+        { status: HTTP.CONFLICT }
       );
 
     const updateFields = {
@@ -203,7 +205,7 @@ const signHireOrder = async (refNo, signData) => {
       { new: true, runValidators: true }
     );
     return {
-      status: 200,
+      status: HTTP.OK,
       message: `${matched.role} signature recorded successfully`,
       data: updated,
     };
@@ -212,7 +214,8 @@ const signHireOrder = async (refNo, signData) => {
   }
 };
 
-const getAllHireOrders = async () => HireOrder.find().sort({ createdAt: -1 });
+const getAllHireOrders = async (pagination) =>
+  paginate(HireOrder, {}, pagination, { sort: { createdAt: -1 } });
 
 const getHireOrderByRef = async (refNo) => {
   const hireOrder = await HireOrder.findOne({ hireOrderRef: refNo.trim() });

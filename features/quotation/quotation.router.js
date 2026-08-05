@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 
 const controller = require('./quotation.controller');
+const paginationMiddleware = require('../../shared/pagination/pagination.middleware');
 
 const upload = multer({ storage: multer.memoryStorage() });
 
@@ -11,7 +12,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Records ───────────────────────────────────────────────────────────────────
-router.get('/get-all-quotation', controller.getAllquotations);
+router.get('/get-all-quotation', paginationMiddleware, controller.getAllquotations);
 router.get('/get-quotation-by-ref/:refNo(*)', controller.getquotationByRef);
 router.get('/get-company-details', controller.getCompanyDetails);
 router.get('/check-latest-quotation-ref', controller.getLatestquotationRef);

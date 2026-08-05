@@ -1,14 +1,15 @@
 // controllers/complaint.controller.js
+const logger = require('../../shared/logger/logger');
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
+const { sendSuccess, sendError } = require('../../shared/response/response.util');
 const path = require('path');
 const ComplaintService = require('./complaint.service');
 const { putObject } = require('../../config/aws/s3.aws');
-const { uploadToS3 } = require('../../shared/services/s3.service');
+const UploadService = require('../../shared/file-handling/upload.service');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
-
-const MAX_RETRIES = 3;
 
 const isVideoFile = (mimeType, fileName) => {
   if (mimeType) {
@@ -33,26 +34,6 @@ const isVideoFile = (mimeType, fileName) => {
   return false;
 };
 
-const uploadWithRetry = async (file, attempt = 1) => {
-  try {
-    await uploadToS3(file.buffer, file.filePath, file.mimeType);
-  } catch (error) {
-    console.error('[Complaint] uploadWithRetry failed', {
-      filePath: file.filePath,
-      fileName: file.fileName,
-      attempt,
-      error: error.message,
-    });
-    if (attempt < MAX_RETRIES) {
-      await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
-      return uploadWithRetry(file, attempt + 1);
-    }
-    throw new Error(
-      `Failed to upload file after ${MAX_RETRIES} attempts: ${file.fileName}. ${error.message}`
-    );
-  }
-};
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Complaint Lifecycle Controllers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -63,79 +44,64 @@ const uploadWithRetry = async (file, attempt = 1) => {
  */
 const registerComplaint = async (req, res) => {
   try {
-    console.log(
+    logger.info(
       '[Complaint] /register body keys',
       Object.keys(req.body),
       'content-type',
       req.headers['content-type']
     );
-    console.log('[Complaint] /register files count', req.files?.length);
-    console.log(
+    logger.info('[Complaint] /register sessionIds count', sessionIds?.length);
+    logger.info(
       '[Complaint] /register auth header present',
       !!req.headers.authorization
     );
 
-    const { regNo, name, uniqueCode, remarks } = req.body;
-    const files = req.files;
+    const { regNo, name, uniqueCode, remarks, sessionIds } = req.body;
 
-    if (!files || files.length === 0) {
-      console.warn(
-        '[Complaint] /register missing files or invalid multipart upload',
+    if (!sessionIds || sessionIds.length === 0) {
+      logger.warn(
+        '[Complaint] /register missing sessionIds',
         { body: req.body }
       );
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'At least one media file is required',
       });
     }
 
-    const uploadData = files.map((file) => {
-      const ext = path.extname(file.originalname);
-      const finalFilename = `${regNo || 'no-reg'}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}${ext}`;
-      const s3Key = `complaints/${regNo || 'no-reg'}/${uniqueCode}/complaint-${uniqueCode}-${finalFilename}`;
-
-      return {
-        fileName: finalFilename,
-        originalName: file.originalname,
-        filePath: s3Key,
-        mimeType: file.mimetype,
-        type: isVideoFile(file.mimetype, file.originalname) ? 'video' : 'photo',
-        buffer: file.buffer,
-        uploadDate: new Date(),
-      };
+    const sessions = await UploadService.getCompletedSessions({
+      sessionIds,
+      uploadedBy: req.userId,
+      feature: 'complaint',
     });
-
-    await Promise.all(uploadData.map((file) => uploadWithRetry(file)));
 
     const complaintData = {
       uniqueCode,
       regNo: regNo || 'no-reg',
       name: name || 'no-name',
       remarks: remarks || '',
-      mediaFiles: uploadData.map(
-        ({ fileName, originalName, filePath, mimeType, type, uploadDate }) => ({
-          fileName,
-          originalName,
-          filePath,
-          mimeType,
-          type,
-          uploadDate,
-        })
-      ),
+      mediaFiles: sessions.map((session) => ({
+        fileName: session.fileName,
+        originalName: session.originalName,
+        filePath: session.s3Key,
+        mimeType: session.mimeType,
+        type: isVideoFile(session.mimeType, session.originalName) ? 'video' : 'photo',
+        uploadDate: session.completedAt,
+      })),
     };
 
     const result = await ComplaintService.createComplaint(complaintData);
 
-    console.log('registerComplaint result:', result);
+    logger.info('registerComplaint result:', result);
 
-    res.status(201).json({
+    sendSuccess(res, {
       success: true,
       message: 'Complaint registered successfully',
       data: { complaint: result },
     });
   } catch (error) {
-    console.error('[Complaint] registerComplaint:', error);
-    res.status(500).json({
+    logger.error('[Complaint] registerComplaint:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to register complaint',
       error: error.message,
@@ -153,7 +119,7 @@ const assignMechanic = async (req, res) => {
     const { mechanics, assignedBy } = req.body;
 
     if (!mechanics || !Array.isArray(mechanics) || mechanics.length === 0) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message:
           'mechanics array is required and must contain at least one mechanic',
@@ -162,13 +128,13 @@ const assignMechanic = async (req, res) => {
 
     if (!assignedBy) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'assignedBy is required' });
     }
 
     for (const mechanic of mechanics) {
       if (!mechanic.mechanicId || !mechanic.mechanicName) {
-        return res.status(400).json({
+        return sendError(res, {
           success: false,
           message: 'Each mechanic must have mechanicId and mechanicName',
         });
@@ -181,14 +147,14 @@ const assignMechanic = async (req, res) => {
       assignedBy
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Mechanic(s) assigned successfully',
       data: result,
     });
   } catch (error) {
-    console.error('[Complaint] assignMechanic:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Complaint] assignMechanic:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to assign mechanics',
     });
@@ -202,33 +168,23 @@ const assignMechanic = async (req, res) => {
 const mechanicRequestItems = async (req, res) => {
   try {
     const { complaintId } = req.params;
-    const { requestText, mechanicId, duration } = req.body;
-    const audioFilePayload = req.files?.audioFile?.[0] || req.body.audioFile;
+    const { requestText, mechanicId, audioFile } = req.body;
 
-    if (!requestText && !audioFilePayload) {
-      return res.status(400).json({
+    if (!requestText && !audioFile) {
+      return sendError(res, {
         success: false,
         message: 'Either requestText or audioFile is required',
       });
     }
 
-    let audioFileData = null;
-    if (audioFilePayload) {
-      const file = req.files?.audioFile?.[0] || null;
-      const ext = file
-        ? path.extname(file.originalname || 'audio.m4a')
-        : path.extname(audioFilePayload.fileName || 'audio.m4a');
-      const finalFilename = `audio-${complaintId}-${Date.now()}${ext || '.m4a'}`;
-      audioFileData = {
-        fileName: finalFilename,
-        filePath: `complaint-audio/${complaintId}/${finalFilename}`,
-        duration: duration || audioFilePayload.duration || 0,
-        fileBuffer: file
-          ? file.buffer.toString('base64')
-          : audioFilePayload.fileBuffer,
-        mimeType: file ? file.mimetype : audioFilePayload.mimeType,
-      };
-    }
+    const audioFileData = audioFile
+      ? {
+          fileName: audioFile.fileName,
+          filePath: audioFile.filePath,
+          mimeType: audioFile.mimeType,
+          duration: audioFile.duration || 0,
+        }
+      : null;
 
     const result = await ComplaintService.mechanicRequestItems(
       complaintId,
@@ -236,30 +192,14 @@ const mechanicRequestItems = async (req, res) => {
       mechanicId
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Item request submitted successfully',
       data: result.data,
     });
-
-    if (audioFileData?.fileBuffer) {
-      try {
-        const buffer = Buffer.from(audioFileData.fileBuffer, 'base64');
-        await uploadToS3(
-          buffer,
-          audioFileData.filePath,
-          audioFileData.mimeType
-        );
-      } catch (error) {
-        console.error(
-          '[Complaint] mechanicRequestItems — audio upload failed:',
-          error
-        );
-      }
-    }
   } catch (error) {
-    console.error('[Complaint] mechanicRequestItems:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Complaint] mechanicRequestItems:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to submit request',
     });
@@ -277,7 +217,7 @@ const forwardToWorkshop = async (req, res) => {
 
     if (!approvedBy) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'approvedBy is required' });
     }
 
@@ -331,14 +271,14 @@ const forwardToWorkshop = async (req, res) => {
         }
       : result;
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Request forwarded to workshop manager',
       data: responseData,
     });
   } catch (error) {
-    console.error('[Complaint] forwardToWorkshop:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Complaint] forwardToWorkshop:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to forward to workshop',
     });
@@ -356,7 +296,7 @@ const forwardToWorkshopWithoutLPO = async (req, res) => {
 
     if (!approvedBy) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'approvedBy is required' });
     }
 
@@ -366,14 +306,14 @@ const forwardToWorkshopWithoutLPO = async (req, res) => {
       comments
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Request forwarded to workshop manager',
       data: result,
     });
   } catch (error) {
-    console.error('[Complaint] forwardToWorkshopWithoutLPO:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Complaint] forwardToWorkshopWithoutLPO:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to forward to workshop',
     });
@@ -391,7 +331,7 @@ const approveItemWithoutLPO = async (req, res) => {
 
     if (!approvedBy) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'approvedBy is required' });
     }
 
@@ -400,14 +340,14 @@ const approveItemWithoutLPO = async (req, res) => {
       approvedBy
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Item approved successfully',
       data: result,
     });
   } catch (error) {
-    console.error('[Complaint] approveItemWithoutLPO:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Complaint] approveItemWithoutLPO:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to approve item',
     });
@@ -424,7 +364,7 @@ const createLPOForComplaint = async (req, res) => {
     const { lpoData, createdBy } = req.body;
 
     if (!lpoData || !createdBy) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'lpoData and createdBy are required',
       });
@@ -436,14 +376,14 @@ const createLPOForComplaint = async (req, res) => {
       createdBy
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'LPO created successfully',
       data: result,
     });
   } catch (error) {
-    console.error('[Complaint] createLPOForComplaint:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Complaint] createLPOForComplaint:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to create LPO',
     });
@@ -460,7 +400,7 @@ const uploadLPOForComplaint = async (req, res) => {
     const { uploadedBy, lpoRef, description, fileName, isAmendment } = req.body;
 
     if (!uploadedBy || !lpoRef) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'uploadedBy and lpoRef are required',
       });
@@ -490,15 +430,15 @@ const uploadLPOForComplaint = async (req, res) => {
       isAmendment
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: `Pre-signed URL generated successfully${isAmendment ? ' (Amendment)' : ''}`,
       uploadUrl,
       data: { complaint: result, uploadData: lpoFileData },
     });
   } catch (error) {
-    console.error('[Complaint] uploadLPOForComplaint:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Complaint] uploadLPOForComplaint:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to upload LPO',
     });
@@ -523,7 +463,7 @@ const signComplaint = async (req, res) => {
     } = req.body;
 
     if (!uniqueCode || !signedDate || !signedFrom || !role) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'uniqueCode, signedDate, signedFrom, and role are required',
       });
@@ -540,7 +480,7 @@ const signComplaint = async (req, res) => {
 
     const allowed = allowedCodes[normalizedRole] || [];
     if (!allowed.includes(uniqueCode)) {
-      return res.status(403).json({
+      return sendError(res, {
         success: false,
         message:
           'Unauthorised: your account is not recognised as an authorised signatory for this document',
@@ -602,19 +542,19 @@ const signComplaint = async (req, res) => {
         break;
       default:
         return res
-          .status(403)
+          .status(HTTP.FORBIDDEN)
           .json({ success: false, message: 'Unsupported role for signing' });
     }
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Document signed successfully',
       data: result.data || result,
     });
   } catch (error) {
-    console.error('[Complaint] signComplaint:', error);
+    logger.error('[Complaint] signComplaint:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message || 'Signing failed' });
   }
 };
@@ -640,12 +580,12 @@ const purchaseApproval = async (req, res) => {
 
     if (!approvedBy) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'approvedBy is required' });
     }
 
     if (signed && (!approvedDate || !approvedFrom)) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'approvedDate and approvedFrom are required for signing',
       });
@@ -663,14 +603,14 @@ const purchaseApproval = async (req, res) => {
       approvedLocation,
     });
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Purchase approval recorded successfully',
       data: result,
     });
   } catch (error) {
-    console.error('[Complaint] purchaseApproval:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Complaint] purchaseApproval:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to approve purchase',
     });
@@ -698,7 +638,7 @@ const managerApproval = async (req, res) => {
 
     if (!approvedBy) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'approvedBy is required' });
     }
 
@@ -720,14 +660,14 @@ const managerApproval = async (req, res) => {
       approvedCreds
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Manager approval recorded successfully',
       data: result,
     });
   } catch (error) {
-    console.error('[Complaint] managerApproval:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Complaint] managerApproval:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to get manager approval',
     });
@@ -756,7 +696,7 @@ const ceoApproval = async (req, res) => {
 
     if (!approvedBy) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'approvedBy is required' });
     }
 
@@ -779,14 +719,14 @@ const ceoApproval = async (req, res) => {
       authUser
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'CEO approval recorded successfully',
       data: result,
     });
   } catch (error) {
-    console.error('[Complaint] ceoApproval:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Complaint] ceoApproval:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to get CEO approval',
     });
@@ -814,7 +754,7 @@ const accountsApproval = async (req, res) => {
 
     if (!approvedBy) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'approvedBy is required' });
     }
 
@@ -836,14 +776,14 @@ const accountsApproval = async (req, res) => {
       approvedCreds
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Accounts approval recorded successfully',
       data: result,
     });
   } catch (error) {
-    console.error('[Complaint] accountsApproval:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Complaint] accountsApproval:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to record accounts approval',
     });
@@ -861,7 +801,7 @@ const markItemsAvailable = async (req, res) => {
 
     if (!markedBy) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'markedBy is required' });
     }
 
@@ -870,14 +810,14 @@ const markItemsAvailable = async (req, res) => {
       markedBy
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Items marked as available successfully',
       data: result,
     });
   } catch (error) {
-    console.error('[Complaint] markItemsAvailable:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Complaint] markItemsAvailable:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to mark items as available',
     });
@@ -891,84 +831,46 @@ const markItemsAvailable = async (req, res) => {
 const addSolution = async (req, res) => {
   try {
     const { complaintId } = req.params;
-    const { regNo, mechanic, remarks } = req.body;
-    const uploadedFiles = req.files?.files || [];
-    const legacyFiles = req.body.files || [];
+    const { regNo, mechanic, remarks, sessionIds } = req.body;
 
-    const filesToProcess =
-      uploadedFiles.length > 0
-        ? uploadedFiles
-        : Array.isArray(legacyFiles)
-          ? legacyFiles
-          : [];
-
-    if (filesToProcess.length === 0) {
-      return res.status(400).json({
+    if (!sessionIds || sessionIds.length === 0) {
+      return sendError(res, {
         success: false,
         message: 'At least one solution file is required',
       });
     }
 
-    const filesData = filesToProcess.map((file) => {
-      const fileName =
-        file.originalname ||
-        file.fileName ||
-        file.name ||
-        `solution-${Date.now()}`;
-      const mimeType =
-        file.mimetype || file.mimeType || 'application/octet-stream';
-      const ext = path.extname(fileName);
-      const finalFilename = `${complaintId}-${Date.now()}${ext}`;
-      return {
-        fileName: finalFilename,
-        originalName: fileName,
-        filePath: `complaint-solutions/${complaintId}/${finalFilename}`,
-        mimeType,
-        type: mimeType.startsWith('video/') ? 'video' : 'photo',
-        fileBuffer: file.buffer
-          ? file.buffer.toString('base64')
-          : file.fileBuffer,
-        uploadDate: new Date(),
-      };
+    const sessions = await UploadService.getCompletedSessions({
+      sessionIds,
+      uploadedBy: req.userId,
+      feature: 'complaint',
     });
+
+    const filesData = sessions.map((session) => ({
+      fileName: session.fileName,
+      originalName: session.originalName,
+      filePath: session.s3Key,
+      mimeType: session.mimeType,
+      type: isVideoFile(session.mimeType, session.originalName) ? 'video' : 'photo',
+      uploadDate: session.completedAt,
+    }));
 
     const result = await ComplaintService.addSolutionToComplaint(
       complaintId,
-      filesData.map(
-        ({ fileName, originalName, filePath, mimeType, type, uploadDate }) => ({
-          fileName,
-          originalName,
-          filePath,
-          mimeType,
-          type,
-          uploadDate,
-        })
-      ),
+      filesData,
       regNo,
       mechanic,
       remarks
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
-      message: 'Work completed successfully. Files are being uploaded.',
+      message: 'Work completed successfully.',
       data: { complaint: result.data },
     });
-
-    filesData.forEach(async (file) => {
-      try {
-        const buffer = Buffer.from(file.fileBuffer, 'base64');
-        await uploadToS3(buffer, file.filePath, file.mimeType);
-      } catch (error) {
-        console.error(
-          `[Complaint] addSolution — upload failed for ${file.fileName}:`,
-          error
-        );
-      }
-    });
   } catch (error) {
-    console.error('[Complaint] addSolution:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Complaint] addSolution:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Internal server error',
     });
@@ -986,16 +888,21 @@ const addSolution = async (req, res) => {
 const getUserComplaints = async (req, res) => {
   try {
     const { uniqueCode } = req.params;
-    const complaints = await ComplaintService.getComplaintsByUser(uniqueCode);
+    const result = await ComplaintService.getComplaintsByUser(
+      uniqueCode,
+      req.pagination
+    );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'User complaints retrieved successfully',
-      data: complaints,
+      data: result.data,
+      pagination: result.pagination,
+      count: result.data.length,
     });
   } catch (error) {
-    console.error('[Complaint] getUserComplaints:', error);
-    res.status(500).json({
+    logger.error('[Complaint] getUserComplaints:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to retrieve user complaints',
       error: error.message,
@@ -1014,18 +921,18 @@ const getComplaintDetails = async (req, res) => {
 
     if (!complaint) {
       return res
-        .status(404)
+        .status(HTTP.NOT_FOUND)
         .json({ success: false, message: 'Complaint not found' });
     }
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Complaint retrieved successfully',
       data: complaint,
     });
   } catch (error) {
-    console.error('[Complaint] getComplaintDetails:', error);
-    res.status(500).json({
+    logger.error('[Complaint] getComplaintDetails:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to retrieve complaint',
       error: error.message,
@@ -1039,22 +946,24 @@ const getComplaintDetails = async (req, res) => {
  */
 const getAllComplaints = async (req, res) => {
   try {
-    const complaints = await ComplaintService.getFullComplaints();
+    const result = await ComplaintService.getFullComplaints(req.pagination);
 
-    if (!complaints) {
+    if (!result?.data) {
       return res
-        .status(404)
+        .status(HTTP.NOT_FOUND)
         .json({ success: false, message: 'No complaints found' });
     }
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Complaints retrieved successfully',
-      data: complaints,
+      data: result.data,
+      pagination: result.pagination,
+      count: result.data.length,
     });
   } catch (error) {
-    console.error('[Complaint] getAllComplaints:', error);
-    res.status(500).json({
+    logger.error('[Complaint] getAllComplaints:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to retrieve complaints',
       error: error.message,
@@ -1069,16 +978,21 @@ const getAllComplaints = async (req, res) => {
 const getComplaintsByStatus = async (req, res) => {
   try {
     const { status } = req.params;
-    const complaints = await ComplaintService.getComplaintsByStatus(status);
+    const result = await ComplaintService.getComplaintsByStatus(
+      status,
+      req.pagination
+    );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Complaints retrieved successfully',
-      data: complaints,
+      data: result.data,
+      pagination: result.pagination,
+      count: result.data.length,
     });
   } catch (error) {
-    console.error('[Complaint] getComplaintsByStatus:', error);
-    res.status(500).json({
+    logger.error('[Complaint] getComplaintsByStatus:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to retrieve complaints by status',
       error: error.message,
@@ -1096,20 +1010,25 @@ const getMechanicComplaints = async (req, res) => {
 
     if (!email) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Mechanic email is required' });
     }
 
-    const complaints = await ComplaintService.getComplaintsByMechanic(email);
+    const result = await ComplaintService.getComplaintsByMechanic(
+      email,
+      req.pagination
+    );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Mechanic complaints retrieved successfully',
-      data: complaints,
+      data: result.data,
+      pagination: result.pagination,
+      count: result.data.length,
     });
   } catch (error) {
-    console.error('[Complaint] getMechanicComplaints:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Complaint] getMechanicComplaints:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to retrieve mechanic complaints',
       error: error.message,

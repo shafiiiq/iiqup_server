@@ -1,7 +1,11 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
 const documentModel = require('./document.model');
 const path = require('path');
 const { PDFDocument } = require('pdf-lib');
 const { putObject, deleteObject } = require('../../config/aws/s3.aws');
+const { paginate } = require('../../shared/pagination/pagination.util');
 const { createNotification } = require('../notification/notification.service');
 const PushNotificationService = require('../notification/notification.push');
 const { default: wsUtils } = require('../../socket/socket');
@@ -111,7 +115,7 @@ const saveDocument = async (
     await document.save();
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: 'Document uploaded successfully',
       uploadUrl,
       finalFilename,
@@ -119,9 +123,9 @@ const saveDocument = async (
       document,
     };
   } catch (error) {
-    console.error('[DocumentService] saveDocument:', error);
+    logger.error('[DocumentService] saveDocument:', error);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: 'Failed to save document',
       error: error.message,
     };
@@ -137,16 +141,16 @@ const saveDocument = async (
 const renameFile = async (documentId, newFileName) => {
   try {
     const document = await documentModel.findOne({ 'files._id': documentId });
-    if (!document) return { status: 404, message: 'Document not found' };
+    if (!document) return { status: HTTP.NOT_FOUND, message: 'Document not found' };
 
     const file = document.files.find((f) => f._id.toString() === documentId);
-    if (!file) return { status: 404, message: 'File not found' };
+    if (!file) return { status: HTTP.NOT_FOUND, message: 'File not found' };
 
     file.displayFileName = newFileName;
     await document.save();
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: 'File renamed successfully',
       file: {
         _id: file._id,
@@ -155,9 +159,9 @@ const renameFile = async (documentId, newFileName) => {
       },
     };
   } catch (error) {
-    console.error('[DocumentService] renameFile:', error);
+    logger.error('[DocumentService] renameFile:', error);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: 'Failed to rename file',
       error: error.message,
     };
@@ -173,15 +177,15 @@ const renameFile = async (documentId, newFileName) => {
 const deleteDocument = async (documentId) => {
   try {
     const document = await documentModel.findOne({ 'files._id': documentId });
-    if (!document) return { status: 404, message: 'Document not found' };
+    if (!document) return { status: HTTP.NOT_FOUND, message: 'Document not found' };
 
     const file = document.files.find((f) => f._id.toString() === documentId);
-    if (!file) return { status: 404, message: 'File not found' };
+    if (!file) return { status: HTTP.NOT_FOUND, message: 'File not found' };
 
     try {
       await deleteObject(file.path);
     } catch (s3Error) {
-      console.error(
+      logger.error(
         '[DocumentService] deleteDocument — S3 delete failed:',
         s3Error
       );
@@ -232,14 +236,14 @@ const deleteDocument = async (documentId) => {
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: 'Document deleted successfully',
       deletedFile: { filename: file.filename, path: file.path },
     };
   } catch (error) {
-    console.error('[DocumentService] deleteDocument:', error);
+    logger.error('[DocumentService] deleteDocument:', error);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: 'Failed to delete document',
       error: error.message,
     };
@@ -254,9 +258,10 @@ const deleteDocument = async (documentId) => {
  * Returns all document records belonging to a specific source.
  * @param {string} sourceType
  * @param {string} sourceId
+ * @param {object} pagination
  * @returns {Promise<object>}
  */
-const getDocuments = async (sourceType, sourceId) => {
+const getDocuments = async (sourceType, sourceId, pagination) => {
   try {
     const { sourceData } = await getSourceDetailsAndKey(
       sourceId,
@@ -264,18 +269,23 @@ const getDocuments = async (sourceType, sourceId) => {
       'temp',
       'temp.pdf'
     );
-    if (!sourceData) return { status: 404, message: `${sourceType} not found` };
+    if (!sourceData) return { status: HTTP.NOT_FOUND, message: `${sourceType} not found` };
 
-    const documents = await documentModel.find({
-      SourceId: sourceId,
-      'documentSource.source': sourceType,
-    });
+    const result = await paginate(
+      documentModel,
+      {
+        SourceId: sourceId,
+        'documentSource.source': sourceType,
+      },
+      pagination,
+      { sort: { createdAt: -1 } }
+    );
 
-    return { status: 200, documents };
+    return { status: HTTP.OK, data: result.data, pagination: result.pagination };
   } catch (error) {
-    console.error('[DocumentService] getDocuments:', error);
+    logger.error('[DocumentService] getDocuments:', error);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: 'Failed to retrieve documents',
       error: error.message,
     };
@@ -284,16 +294,19 @@ const getDocuments = async (sourceType, sourceId) => {
 
 /**
  * Returns all document records in the system.
+ * @param {object} pagination
  * @returns {Promise<object>}
  */
-const getAllDocuments = async () => {
+const getAllDocuments = async (pagination) => {
   try {
-    const documents = await documentModel.find({});
-    return { status: 200, documents };
+    const result = await paginate(documentModel, {}, pagination, {
+      sort: { createdAt: -1 },
+    });
+    return { status: HTTP.OK, data: result.data, pagination: result.pagination };
   } catch (error) {
-    console.error('[DocumentService] getAllDocuments:', error);
+    logger.error('[DocumentService] getAllDocuments:', error);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: 'Failed to retrieve documents',
       error: error.message,
     };
@@ -302,16 +315,22 @@ const getAllDocuments = async () => {
 
 /**
  * Returns only the documentType field for all document records.
+ * @param {object} pagination
  * @returns {Promise<object>}
  */
-const getAllDocumentsTypes = async () => {
+const getAllDocumentsTypes = async (pagination) => {
   try {
-    const documents = await documentModel.find({}).select('documentType');
-    return { status: 200, documents };
+    const result = await paginate(
+      documentModel,
+      {},
+      pagination,
+      { sort: { createdAt: -1 }, projection: 'documentType' }
+    );
+    return { status: HTTP.OK, data: result.data, pagination: result.pagination };
   } catch (error) {
-    console.error('[DocumentService] getAllDocumentsTypes:', error);
+    logger.error('[DocumentService] getAllDocumentsTypes:', error);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: 'Failed to retrieve documents',
       error: error.message,
     };
@@ -326,13 +345,13 @@ const getAllDocumentsTypes = async () => {
 const getDocumentById = async (documentId) => {
   try {
     const document = await documentModel.findOne({ 'files._id': documentId });
-    if (!document) return { status: 404, message: 'Document not found' };
+    if (!document) return { status: HTTP.NOT_FOUND, message: 'Document not found' };
 
     const file = document.files.find((f) => f._id.toString() === documentId);
-    if (!file) return { status: 404, message: 'File not found' };
+    if (!file) return { status: HTTP.NOT_FOUND, message: 'File not found' };
 
     return {
-      status: 200,
+      status: HTTP.OK,
       document: {
         filePath: file.path,
         filename: file.filename,
@@ -343,9 +362,9 @@ const getDocumentById = async (documentId) => {
       },
     };
   } catch (error) {
-    console.error('[DocumentService] getDocumentById:', error);
+    logger.error('[DocumentService] getDocumentById:', error);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: 'Failed to retrieve document',
       error: error.message,
     };
@@ -411,7 +430,7 @@ const mergePDFs = async (
         );
         copiedPages.forEach((page) => mergedPdf.addPage(page));
       } catch (error) {
-        console.error(
+        logger.error(
           `[DocumentService] mergePDFs — error processing ${file.filename}:`,
           error
         );
@@ -475,7 +494,7 @@ const mergePDFs = async (
     await document.save();
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: 'PDFs merged successfully',
       document: {
         filename: mergedFilename,
@@ -485,9 +504,9 @@ const mergePDFs = async (
       },
     };
   } catch (error) {
-    console.error('[DocumentService] mergePDFs:', error);
+    logger.error('[DocumentService] mergePDFs:', error);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: 'Failed to merge PDFs',
       error: error.message,
     };
@@ -519,12 +538,12 @@ const splitPDF = async (
     );
 
     const document = await documentModel.findOne({ 'files._id': documentId });
-    if (!document) return { status: 404, message: 'Document not found' };
+    if (!document) return { status: HTTP.NOT_FOUND, message: 'Document not found' };
 
     const file = document.files.find((f) => f._id.toString() === documentId);
-    if (!file) return { status: 404, message: 'File not found' };
+    if (!file) return { status: HTTP.NOT_FOUND, message: 'File not found' };
     if (!file.mimetype.includes('pdf'))
-      return { status: 400, message: 'Only PDF files can be split' };
+      return { status: HTTP.BAD_REQUEST, message: 'Only PDF files can be split' };
 
     const pdfBuffer = await downloadPDFFromS3(file.path);
     const pdf = await PDFDocument.load(pdfBuffer);
@@ -545,13 +564,13 @@ const splitPDF = async (
       for (let i = 1; i <= totalPages; i += pageSize) pagesToExtract.push(i);
     } else {
       return {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         message: 'Invalid split type. Use: specific, range, or every',
       };
     }
 
     if (pagesToExtract.length === 0)
-      return { status: 400, message: 'No valid pages to extract' };
+      return { status: HTTP.BAD_REQUEST, message: 'No valid pages to extract' };
 
     const splitDocuments = [];
 
@@ -648,15 +667,15 @@ const splitPDF = async (
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       message: 'PDF split successfully',
       documents: splitDocuments,
       totalSplits: splitDocuments.length,
     };
   } catch (error) {
-    console.error('[DocumentService] splitPDF:', error);
+    logger.error('[DocumentService] splitPDF:', error);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: 'Failed to split PDF',
       error: error.message,
     };

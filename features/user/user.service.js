@@ -1,3 +1,7 @@
+const logger = require('../../shared/logger/logger');
+
+const AppError = require('../../shared/errors/AppError.js');
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
 // services/user.service.js
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -5,6 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 const User = require('./user.model');
 const Mechanic = require('../mechanic/mechanic.model');
 const Operator = require('../operator/operator.model');
+const { paginate } = require('../../shared/pagination/pagination.util');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -64,7 +69,7 @@ const insertUser = async (userData) => {
     if (userData.userType === 'office') {
       const existingUser = await User.findOne({ email: userData.email });
       if (existingUser)
-        return { status: 409, message: 'User already exists with this email' };
+        return { status: HTTP.CONFLICT, message: 'User already exists with this email' };
 
       const uniqueCode = generateUniqueCode(userData.role);
       const newUser = await new User({
@@ -77,7 +82,7 @@ const insertUser = async (userData) => {
       const token = generateToken(newUser);
 
       return {
-        status: 200,
+        status: HTTP.OK,
         message: 'User created successfully',
         data: {
           user: {
@@ -99,7 +104,7 @@ const insertUser = async (userData) => {
       });
       if (existingMechanic)
         return {
-          status: 409,
+          status: HTTP.CONFLICT,
           message: 'Mechanic already exists with this email',
         };
 
@@ -109,11 +114,11 @@ const insertUser = async (userData) => {
         { new: true }
       );
       if (!updatedMechanic)
-        return { status: 404, message: 'Mechanic not found' };
+        return { status: HTTP.NOT_FOUND, message: 'Mechanic not found' };
 
       const token = generateToken(updatedMechanic);
       return {
-        status: 201,
+        status: HTTP.CREATED,
         message: 'Mechanic updated successfully',
         data: {
           user: {
@@ -134,7 +139,7 @@ const insertUser = async (userData) => {
       });
       if (existingUser)
         return {
-          status: 409,
+          status: HTTP.CONFLICT,
           message: 'User already exists with this qatar Id',
         };
 
@@ -152,7 +157,7 @@ const insertUser = async (userData) => {
       const token = generateToken(newUser);
 
       return {
-        status: 201,
+        status: HTTP.CREATED,
         message: 'Operator created successfully',
         data: {
           user: {
@@ -169,9 +174,9 @@ const insertUser = async (userData) => {
       };
     }
   } catch (error) {
-    console.error('[UserService] insertUser:', error);
+    logger.error('[UserService] insertUser:', error);
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: 'Failed to create user',
       error: error.message,
     };
@@ -187,7 +192,7 @@ const insertUser = async (userData) => {
 const userUpdate = async (userId, updateData) => {
   try {
     const user = await User.findById(userId);
-    if (!user) return { status: 404, message: 'User not found' };
+    if (!user) return { status: HTTP.NOT_FOUND, message: 'User not found' };
 
     if (updateData.password) {
       const salt = await bcrypt.genSalt(10);
@@ -206,14 +211,14 @@ const userUpdate = async (userId, updateData) => {
       { new: true, select: '-password' }
     );
     return {
-      status: 200,
+      status: HTTP.OK,
       message: 'User updated successfully',
       data: updatedUser,
     };
   } catch (error) {
-    console.error('[UserService] userUpdate:', error);
+    logger.error('[UserService] userUpdate:', error);
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: 'Failed to update user',
       error: error.message,
     };
@@ -228,13 +233,13 @@ const userUpdate = async (userId, updateData) => {
 const userDelete = async (userId) => {
   try {
     const user = await User.findById(userId);
-    if (!user) return { status: 404, message: 'User not found' };
+    if (!user) return { status: HTTP.NOT_FOUND, message: 'User not found' };
     await User.findByIdAndDelete(userId);
-    return { status: 200, message: 'User deleted successfully' };
+    return { status: HTTP.OK, message: 'User deleted successfully' };
   } catch (error) {
-    console.error('[UserService] userDelete:', error);
+    logger.error('[UserService] userDelete:', error);
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: 'Failed to delete user',
       error: error.message,
     };
@@ -252,7 +257,7 @@ const updateUserAuthMail = async (userId, authMail, type) => {
   try {
     if (!authMail)
       return {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         success: false,
         message: 'Please provide a valid email',
       };
@@ -281,17 +286,17 @@ const updateUserAuthMail = async (userId, authMail, type) => {
       ).select('-password');
 
     if (!updatedUser)
-      return { status: 404, success: false, message: 'User not found' };
+      return { status: HTTP.NOT_FOUND, success: false, message: 'User not found' };
 
     return {
-      status: 200,
+      status: HTTP.OK,
       success: true,
       message: 'Authentication email updated successfully',
       data: { _id: updatedUser._id, phone: updatedUser.phone },
     };
   } catch (error) {
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       success: false,
       message: 'Failed to update phone number',
       error: error.message,
@@ -305,16 +310,24 @@ const updateUserAuthMail = async (userId, authMail, type) => {
 
 /**
  * Fetches all office users (excludes passwords).
+ * @param {object} pagination
  * @returns {Promise}
  */
-const fetchUsers = async () => {
+const fetchUsers = async (pagination) => {
   try {
-    const users = await User.find({}, { password: 0 });
-    return { status: 200, message: 'Users fetched successfully', data: users };
+    const result = await paginate(User, {}, pagination, {
+      projection: { password: 0 },
+    });
+    return {
+      status: HTTP.OK,
+      message: 'Users fetched successfully',
+      data: result.data,
+      pagination: result.pagination,
+    };
   } catch (error) {
-    console.error('[UserService] fetchUsers:', error);
+    logger.error('[UserService] fetchUsers:', error);
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: 'Failed to fetch users',
       error: error.message,
     };
@@ -323,24 +336,34 @@ const fetchUsers = async () => {
 
 /**
  * Fetches all users across all user types.
+ * @param {object} pagination
  * @returns {Promise}
  */
-const fetchAllUsers = async () => {
+const fetchAllUsers = async (pagination) => {
   try {
     const [office, mechanic, operator] = await Promise.all([
-      User.find({}, { password: 0 }),
-      Mechanic.find({}, { password: 0 }),
-      Operator.find({}, { password: 0 }),
+      paginate(User, {}, pagination, { projection: { password: 0 } }),
+      paginate(Mechanic, {}, pagination, { projection: { password: 0 } }),
+      paginate(Operator, {}, pagination, { projection: { password: 0 } }),
     ]);
     return {
-      status: 200,
+      status: HTTP.OK,
       message: 'Users fetched successfully',
-      data: { office, mechanic, operator },
+      data: {
+        office: office.data,
+        mechanic: mechanic.data,
+        operator: operator.data,
+      },
+      pagination: {
+        office: office.pagination,
+        mechanic: mechanic.pagination,
+        operator: operator.pagination,
+      },
     };
   } catch (error) {
-    console.error('[UserService] fetchAllUsers:', error);
+    logger.error('[UserService] fetchAllUsers:', error);
     throw {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       message: 'Failed to fetch users',
       error: error.message,
     };
@@ -360,14 +383,14 @@ const fetchAllUsers = async () => {
 const loginUser = async (email, password) => {
   try {
     const user = await User.findOne({ email });
-    if (!user) return { status: 404, message: 'User not found' };
+    if (!user) return { status: HTTP.NOT_FOUND, message: 'User not found' };
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) return { status: 401, message: 'Invalid password' };
+    if (!isPasswordValid) return { status: HTTP.UNAUTHORIZED, message: 'Invalid password' };
 
     const token = generateToken(user);
     return {
-      status: 200,
+      status: HTTP.OK,
       message: 'Login successful',
       data: {
         user: {
@@ -381,8 +404,8 @@ const loginUser = async (email, password) => {
       },
     };
   } catch (error) {
-    console.error('[UserService] loginUser:', error);
-    throw { status: 500, message: 'Login failed', error: error.message };
+    logger.error('[UserService] loginUser:', error);
+    throw { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Login failed', error: error.message };
   }
 };
 
@@ -414,13 +437,13 @@ const verifyUserCredentials = async (email, password, type, deviceInfo) => {
 
     if (!user)
       return {
-        status: 401,
+        status: HTTP.UNAUTHORIZED,
         success: false,
         message: 'Invalid email or password',
       };
     if (!user.isActive)
       return {
-        status: 403,
+        status: HTTP.FORBIDDEN,
         success: false,
         message:
           'Your account has been deactivated. Please contact an administrator.',
@@ -429,7 +452,7 @@ const verifyUserCredentials = async (email, password, type, deviceInfo) => {
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid)
       return {
-        status: 401,
+        status: HTTP.UNAUTHORIZED,
         success: false,
         message: 'Invalid email or password',
       };
@@ -463,7 +486,7 @@ const verifyUserCredentials = async (email, password, type, deviceInfo) => {
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       success: true,
       message: 'Authentication successful',
       data: {
@@ -482,7 +505,7 @@ const verifyUserCredentials = async (email, password, type, deviceInfo) => {
     };
   } catch (error) {
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       success: false,
       message: 'Authentication failed',
       error: error.message,
@@ -500,13 +523,13 @@ const verifyCEOcreds = async (email) => {
     const user = await User.findOne({ email });
     if (!user)
       return {
-        status: 401,
+        status: HTTP.UNAUTHORIZED,
         success: false,
         message: 'Invalid email or password',
       };
     if (!user.isActive)
       return {
-        status: 403,
+        status: HTTP.FORBIDDEN,
         success: false,
         message:
           'Your account has been deactivated. Please contact an administrator.',
@@ -517,7 +540,7 @@ const verifyCEOcreds = async (email) => {
       email !== process.env.CEO_EMAIL
     ) {
       return {
-        status: 200,
+        status: HTTP.OK,
         success: true,
         message: 'Authentication failed, user is not a ceo',
         data: null,
@@ -525,14 +548,14 @@ const verifyCEOcreds = async (email) => {
     }
 
     return {
-      status: 200,
+      status: HTTP.OK,
       success: true,
       message: 'Authentication successful',
       data: user.uniqueCode,
     };
   } catch (error) {
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       success: false,
       message: 'Authentication failed',
       error: error.message,
@@ -550,13 +573,13 @@ const verifyDocAuthUserCreds = async (password) => {
     const user = await User.findOne({ email: process.env.AUTH_USER });
     if (!user)
       return {
-        status: 401,
+        status: HTTP.UNAUTHORIZED,
         success: false,
         message: 'Invalid email or password',
       };
     if (!user.isActive)
       return {
-        status: 403,
+        status: HTTP.FORBIDDEN,
         success: false,
         message:
           'Your account has been deactivated. Please contact an administrator.',
@@ -565,15 +588,15 @@ const verifyDocAuthUserCreds = async (password) => {
     const isPasswordValid = await bcrypt.compare(password, user.docAuthPasw);
     if (!isPasswordValid)
       return {
-        status: 401,
+        status: HTTP.UNAUTHORIZED,
         success: false,
         message: 'Invalid email or password',
       };
 
-    return { status: 200, success: true, message: 'Authentication successful' };
+    return { status: HTTP.OK, success: true, message: 'Authentication successful' };
   } catch (error) {
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       success: false,
       message: 'Authentication failed',
       error: error.message,
@@ -593,13 +616,13 @@ const changePassword = async (email, currentPassword, newPassword) => {
     const user = await User.findOne({ email });
     if (!user)
       return {
-        status: 401,
+        status: HTTP.UNAUTHORIZED,
         success: false,
         message: 'Invalid email or password',
       };
     if (!user.isActive)
       return {
-        status: 403,
+        status: HTTP.FORBIDDEN,
         success: false,
         message:
           'Your account has been deactivated. Please contact an administrator.',
@@ -611,7 +634,7 @@ const changePassword = async (email, currentPassword, newPassword) => {
     );
     if (!isPasswordValid)
       return {
-        status: 401,
+        status: HTTP.UNAUTHORIZED,
         success: false,
         message: 'Current password is incorrect',
       };
@@ -625,14 +648,14 @@ const changePassword = async (email, currentPassword, newPassword) => {
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       success: true,
       message: 'Password changed successfully',
       data: updatedUser,
     };
   } catch (error) {
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       success: false,
       message: 'Password change failed',
       error: error.message,
@@ -655,13 +678,13 @@ const resetPassword = async (email, type) => {
 
     if (!user)
       return {
-        status: 401,
+        status: HTTP.UNAUTHORIZED,
         success: false,
         message: 'Invalid email or password',
       };
     if (!user.isActive)
       return {
-        status: 403,
+        status: HTTP.FORBIDDEN,
         success: false,
         message:
           'Your account has been deactivated. Please contact an administrator.',
@@ -676,14 +699,14 @@ const resetPassword = async (email, type) => {
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       success: true,
       message: 'Reset changed successfully',
       data: updatedUser,
     };
   } catch (error) {
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       success: false,
       message: 'Password reset failed',
       error: error.message,
@@ -697,14 +720,14 @@ const resetPassword = async (email, type) => {
 
 const verifyToken = (req, res, next) => {
   const token = req.headers.authorization?.split(' ')[1] || req.cookies?.token;
-  if (!token) return res.status(401).json({ message: 'No token provided' });
+  if (!token) return res.status(HTTP.UNAUTHORIZED).json({ message: 'No token provided' });
 
   try {
     req.user = jwt.verify(token, JWT_SECRET);
     next();
   } catch (error) {
     return res
-      .status(403)
+      .status(HTTP.FORBIDDEN)
       .json({ message: 'Invalid or expired token' + error.message });
   }
 };
@@ -712,10 +735,10 @@ const verifyToken = (req, res, next) => {
 const checkRole =
   (...roles) =>
   (req, res, next) => {
-    if (!req.user) return res.status(401).json({ message: 'Unauthorized' });
+    if (!req.user) return res.status(HTTP.UNAUTHORIZED).json({ message: 'Unauthorized' });
     if (!roles.includes(req.user.role))
       return res
-        .status(403)
+        .status(HTTP.FORBIDDEN)
         .json({ message: 'Access denied, insufficient permissions' });
     next();
   };
@@ -729,9 +752,9 @@ const getTutorialsSeen = async (userId) => {
   try {
     const user = await User.findById(userId).select('tutorialsSeen').lean();
     if (!user)
-      return { status: 404, success: false, message: 'User not found' };
+      return { status: HTTP.NOT_FOUND, success: false, message: 'User not found' };
     return {
-      status: 200,
+      status: HTTP.OK,
       success: true,
       tutorialsSeen: user.tutorialsSeen || [],
     };
@@ -753,7 +776,7 @@ const completeTutorial = async (userId, tutorialId) => {
     await User.findByIdAndUpdate(userId, {
       $addToSet: { tutorialsSeen: tutorialId },
     });
-    return { status: 200, success: true };
+    return { status: HTTP.OK, success: true };
   } catch (error) {
     throw new Error(`[UserService] completeTutorial:${error.message}`, {
       cause: error,

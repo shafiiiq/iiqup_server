@@ -1,3 +1,5 @@
+const logger = require('../../../shared/logger/logger');
+
 // services/biometric.service.js
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
@@ -50,7 +52,7 @@ const generateBiometricToken = async (uniqueCode, deviceInfo) => {
       data: { biometricToken, expiresAt, expiresIn: '90 days' },
     };
   } catch (error) {
-    console.error('[BiometricService] generateBiometricToken:', error);
+    logger.error('[BiometricService] generateBiometricToken:', error);
     return {
       success: false,
       message: 'Failed to generate biometric token',
@@ -84,7 +86,7 @@ const revokeBiometricToken = async (uniqueCode, deviceInfo) => {
     await user.save();
     return { success: true, message: 'Biometric token revoked successfully' };
   } catch (error) {
-    console.error('[BiometricService] revokeBiometricToken:', error);
+    logger.error('[BiometricService] revokeBiometricToken:', error);
     return {
       success: false,
       message: 'Failed to revoke biometric token',
@@ -182,7 +184,7 @@ const biometricLogin = async (biometricToken, deviceInfo) => {
       },
     };
   } catch (error) {
-    console.error('[BiometricService] biometricLogin:', error);
+    logger.error('[BiometricService] biometricLogin:', error);
     return {
       success: false,
       message: 'Failed to login with biometric',

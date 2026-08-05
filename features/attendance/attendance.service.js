@@ -1,3 +1,6 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
 // services/attendance.service.js
 const Attendance = require('./attendance.model');
 const moment = require('moment');
@@ -220,7 +223,7 @@ const addAttendance = async (attendanceData) => {
         'attendance'
       );
     } catch (error) {
-      console.error(
+      logger.error(
         '[AttendanceService] addAttendance — notification error:',
         error
       );
@@ -229,7 +232,7 @@ const addAttendance = async (attendanceData) => {
     return savedAttendance;
   } catch (error) {
     if (error.code === 11000) return null;
-    console.error('[AttendanceService] addAttendance:', error);
+    logger.error('[AttendanceService] addAttendance:', error);
     throw error;
   }
 };
@@ -273,7 +276,7 @@ const fixExistingPunchTypes = async (pin = null, date = null) => {
 
     return { message: `Fixed punch types for ${totalFixed} records` };
   } catch (error) {
-    console.error('[AttendanceService] fixExistingPunchTypes:', error);
+    logger.error('[AttendanceService] fixExistingPunchTypes:', error);
     throw error;
   }
 };
@@ -288,7 +291,7 @@ const markAsProcessed = async (recordIds) => {
       { $set: { isProcessed: true, notificationSent: true } }
     );
   } catch (error) {
-    console.error('[AttendanceService] markAsProcessed:', error);
+    logger.error('[AttendanceService] markAsProcessed:', error);
     throw error;
   }
 };
@@ -325,7 +328,7 @@ const getLiveMecAttendance = async (userId, filters = {}) => {
       .sort({ punchDateTime: -1 })
       .limit(parseInt(filters.limit) || 100);
   } catch (error) {
-    console.error('[AttendanceService] getLiveMecAttendance:', error);
+    logger.error('[AttendanceService] getLiveMecAttendance:', error);
     throw error;
   }
 };
@@ -368,7 +371,7 @@ const getAttendanceStats = async (filters = {}) => {
       { $sort: { date: -1, pin: 1 } },
     ]);
   } catch (error) {
-    console.error('[AttendanceService] getAttendanceStats:', error);
+    logger.error('[AttendanceService] getAttendanceStats:', error);
     throw error;
   }
 };
@@ -383,7 +386,7 @@ const getTodayAttendance = async () => {
       punchDateTime: -1,
     });
   } catch (error) {
-    console.error('[AttendanceService] getTodayAttendance:', error);
+    logger.error('[AttendanceService] getTodayAttendance:', error);
     throw error;
   }
 };
@@ -397,7 +400,7 @@ const getUnprocessedRecords = async () => {
       punchDateTime: 1,
     });
   } catch (error) {
-    console.error('[AttendanceService] getUnprocessedRecords:', error);
+    logger.error('[AttendanceService] getUnprocessedRecords:', error);
     throw error;
   }
 };
@@ -439,7 +442,7 @@ const sendWhatsAppMessage = async (empName, punchType, time, date) => {
     ].filter(Boolean);
 
     if (recipients.length === 0) {
-      console.warn(
+      logger.warn(
         '[AttendanceService] sendWhatsAppMessage — no recipients configured'
       );
       return;
@@ -464,15 +467,15 @@ const sendWhatsAppMessage = async (empName, punchType, time, date) => {
         }
       );
 
-      console.log(
+      logger.info(
         `[AttendanceService] sendWhatsAppMessage — sent to ${cleanNumber}:`,
         response.data
       );
     }
   } catch (error) {
-    console.error('[AttendanceService] sendWhatsAppMessage:', error.message);
+    logger.error('[AttendanceService] sendWhatsAppMessage:', error.message);
     if (error.response) {
-      console.error(
+      logger.error(
         '[AttendanceService] sendWhatsAppMessage — response:',
         error.response.data
       );

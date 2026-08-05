@@ -13,6 +13,9 @@ const { authMiddleware } = require('./middlewares/jwt.middleware');
 // ── WebSocket ──────────────────────────────────────────────────────────────────
 const websocket = require('./socket/socket');
 const setupWebSocket = websocket.default.setupWebSocket;
+const notFoundHandler = require('./middlewares/notFound.middleware');
+const errorHandler = require('./middlewares/errorHandler.middleware');
+const requestLogger = require('./shared/logger/requestLogger.middleware');
 
 // ── Routes ─────────────────────────────────────────────────────────────────────
 const equipmentRouter = require('./features/equipment/equipment.router');
@@ -39,6 +42,8 @@ const backchargeRouter = require('./features/backcharge/backcharge.router');
 const chatRouter = require('./features/chat/chat.router');
 const explorerRouter = require('./features/explorer/explorer.router');
 const webPushRouter = require('./features/notification/webpush/webpush.router');
+const sharedSearchRouter = require('./shared/search/search.router');
+const uploadsRouter = require('./shared/file-handling/upload.router');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // App Initialisation
@@ -98,6 +103,7 @@ app.use(express.json({ limit: '50gb' }));
 app.use(express.urlencoded({ extended: true, limit: '50gb' }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(requestLogger);
 
 // ── Health check ───────────────────────────────────────────────────────────────
 
@@ -108,47 +114,37 @@ app.get('/', (req, res) => res.send('Server is running!'));
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ── Public routes (no auth required) ──────────────────────────────────────────
-app.use('/ztech', ztechRouter);
-app.use('/users', userRouter);
-app.use('/otp', otpRouter);
-app.use('/equipments', equipmentRouter);
-app.use('/service-report', serviceReportRouter);
-app.use('/stocks', stocksRouter);
-app.use('/documents', documentsRouter);
-app.use('/mechanics', mechanicsRouter);
-app.use('/operators', operatorRouter);
-app.use('/complaints', complaintsRouter);
-app.use('/oauth', oauthRouter);
-app.use('/fuels', fuelsRouter);
-app.use('/attendance', attendanceRouter);
-app.use('/backcharge', backchargeRouter);
-app.use('/webpush', webPushRouter);
+app.use('/api/v1/ztech', ztechRouter);
+app.use('/api/v1/users', userRouter);
+app.use('/api/v1/otp', otpRouter);
+app.use('/api/v1/equipments', equipmentRouter);
+app.use('/api/v1/service-report', serviceReportRouter);
+app.use('/api/v1/stocks', stocksRouter);
+app.use('/api/v1/documents', documentsRouter);
+app.use('/api/v1/mechanics', mechanicsRouter);
+app.use('/api/v1/operators', operatorRouter);
+app.use('/api/v1/oauth', oauthRouter);
+app.use('/api/v1/fuels', fuelsRouter);
+app.use('/api/v1/attendance', attendanceRouter);
+app.use('/api/v1/backcharge', backchargeRouter);
+app.use('/api/v1/webpush', webPushRouter);
 
 // ── Protected routes (auth required) ──────────────────────────────────────────
-app.use('/service-history', authMiddleware, serviceHistoryRouter);
-app.use('/dashboard', dashboardRouter);
-app.use('/toolkits', authMiddleware, toolkitsRouter);
-app.use('/notification', authMiddleware, notificationRouter);
-app.use('/lpo', authMiddleware, lpoRouter);
-app.use('/hire-order', authMiddleware, hireOrderRouter);
-app.use('/s3', s3Router);
-app.use('/chat', authMiddleware, chatRouter);
-app.use('/explorer', authMiddleware, explorerRouter);
+app.use('/api/v1/service-history', authMiddleware, serviceHistoryRouter);
+app.use('/api/v1/dashboard', authMiddleware,dashboardRouter);
+app.use('/api/v1/complaints', authMiddleware,complaintsRouter);
+app.use('/api/v1/toolkits', authMiddleware, toolkitsRouter);
+app.use('/api/v1/notification', authMiddleware, notificationRouter);
+app.use('/api/v1/lpo', authMiddleware, lpoRouter);
+app.use('/api/v1/hire-order', authMiddleware, hireOrderRouter);
+app.use('/api/v1/s3', s3Router);
+app.use('/api/v1/chat', authMiddleware, chatRouter);
+app.use('/api/v1/explorer', authMiddleware, explorerRouter);
+app.use('/api/v1/search', sharedSearchRouter);
+app.use('/api/v1/uploads', authMiddleware, uploadsRouter);
 
-// ── Global error handler ───────────────────────────────────────────────────
-app.use((err, req, res, next) => {
-  if (err && err.code === 'LIMIT_FILE_SIZE') {
-    return res.status(413).json({
-      success: false,
-      message: 'File is too large. Please try a smaller file or contact support.',
-    });
-  }
-  console.error('[Unhandled Error]', err);
-  res.status(err.status || 500).json({
-    success: false,
-    message: err.message || 'Something went wrong. Please try again.',
-  });
-});
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Exports

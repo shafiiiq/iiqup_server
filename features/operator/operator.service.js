@@ -1,9 +1,13 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
 // services/operator.service.js
 const Operator = require('./operator.model');
 const Equipment = require('../equipment/equipment.model');
 const User = require('../user/user.model');
 const otpServices = require('../otp/otp.service');
 const { putObject } = require('../../config/aws/s3.aws');
+const { paginate } = require('../../shared/pagination/pagination.util');
 require('dotenv').config();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -19,7 +23,7 @@ const getAuthUser = async () => {
   const authUser = await User.findOne({ email: process.env.AUTH_USER });
   if (!authUser)
     throw Object.assign(new Error('Authorization user not found'), {
-      status: 404,
+      status: HTTP.NOT_FOUND,
     });
   return authUser;
 };
@@ -38,7 +42,7 @@ const createOperator = async (operatorData) => {
   if (existing)
     throw Object.assign(
       new Error('Operator with this Qatar ID already exists'),
-      { status: 409 }
+      { status: HTTP.CONFLICT }
     );
 
   const lastOperator = await Operator.findOne().sort({ slNo: -1 }).lean();
@@ -66,16 +70,16 @@ const createOperator = async (operatorData) => {
  */
 const verifyOperator = async (qatarId) => {
   if (!qatarId)
-    throw Object.assign(new Error('Qatar ID is required'), { status: 400 });
+    throw Object.assign(new Error('Qatar ID is required'), { status: HTTP.BAD_REQUEST });
 
   const validOperator = await Operator.findOne({ qatarId });
   if (!validOperator)
-    throw Object.assign(new Error('Operator not found'), { status: 404 });
+    throw Object.assign(new Error('Operator not found'), { status: HTTP.NOT_FOUND });
 
   const authUser = await getAuthUser();
   if (!authUser?.authMail) {
     throw Object.assign(new Error('Authorization email not found'), {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
     });
   }
 
@@ -87,9 +91,9 @@ const verifyOperator = async (qatarId) => {
       validOperator.name
     );
   } catch (otpError) {
-    console.error('[OperatorService] verifyOperator OTP error:', otpError);
+    logger.error('[OperatorService] verifyOperator OTP error:', otpError);
     throw Object.assign(new Error('Failed to send OTP'), {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       details: otpError.message,
     });
   }
@@ -102,7 +106,7 @@ const verifyOperator = async (qatarId) => {
   if (!updatedOperator)
     throw Object.assign(
       new Error('Failed to update operator verification status'),
-      { status: 500 }
+      { status: HTTP.INTERNAL_SERVER_ERROR }
     );
 
   const response = updatedOperator.toObject();
@@ -125,13 +129,13 @@ const uploadProfilePic = async (qatarId, fileName, mimeType) => {
   if (!qatarId || !fileName || !mimeType) {
     throw Object.assign(
       new Error('Qatar ID, fileName, and mimeType are required'),
-      { status: 400 }
+      { status: HTTP.BAD_REQUEST }
     );
   }
 
   const operator = await Operator.findOne({ qatarId });
   if (!operator)
-    throw Object.assign(new Error('Operator not found'), { status: 404 });
+    throw Object.assign(new Error('Operator not found'), { status: HTTP.NOT_FOUND });
 
   const timestamp = Date.now();
   const fileExtension = fileName.split('.').pop() || 'jpg';
@@ -158,9 +162,9 @@ const uploadProfilePic = async (qatarId, fileName, mimeType) => {
 
     return { uploadUrl, profilePicData, operator: updatedOperator };
   } catch (error) {
-    console.error('[OperatorService] uploadProfilePic S3 error:', error);
+    logger.error('[OperatorService] uploadProfilePic S3 error:', error);
     throw Object.assign(new Error('Failed to generate upload URL'), {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
     });
   }
 };
@@ -173,11 +177,11 @@ const uploadProfilePic = async (qatarId, fileName, mimeType) => {
  */
 const updateOperator = async (qatarId, updateData) => {
   if (!qatarId)
-    throw Object.assign(new Error('Qatar ID is required'), { status: 400 });
+    throw Object.assign(new Error('Qatar ID is required'), { status: HTTP.BAD_REQUEST });
 
   const existing = await Operator.findOneAndUpdate(qatarId);
   if (!existing)
-    throw Object.assign(new Error('Operator not found'), { status: 404 });
+    throw Object.assign(new Error('Operator not found'), { status: HTTP.NOT_FOUND });
 
   const equipmentNumberChanged =
     updateData.equipmentNumber !== undefined &&
@@ -191,7 +195,7 @@ const updateOperator = async (qatarId, updateData) => {
     { new: true, runValidators: true }
   );
   if (!operator)
-    throw Object.assign(new Error('Operator not found'), { status: 404 });
+    throw Object.assign(new Error('Operator not found'), { status: HTTP.NOT_FOUND });
 
   if (equipmentNumberChanged) {
     try {
@@ -240,7 +244,7 @@ const updateOperator = async (qatarId, updateData) => {
         }
       }
     } catch (equipmentError) {
-      console.error(
+      logger.error(
         '[OperatorService] updateOperator equipment sync error:',
         equipmentError
       );
@@ -257,11 +261,11 @@ const updateOperator = async (qatarId, updateData) => {
  */
 const deleteOperator = async (qatarId) => {
   if (!qatarId)
-    throw Object.assign(new Error('Qatar ID is required'), { status: 400 });
+    throw Object.assign(new Error('Qatar ID is required'), { status: HTTP.BAD_REQUEST });
 
   const operator = await Operator.findOneAndDelete({ qatarId });
   if (!operator)
-    throw Object.assign(new Error('Operator not found'), { status: 404 });
+    throw Object.assign(new Error('Operator not found'), { status: HTTP.NOT_FOUND });
 
   return operator;
 };
@@ -272,10 +276,11 @@ const deleteOperator = async (qatarId) => {
 
 /**
  * Returns all operators sorted by creation date descending.
- * @returns {Promise<Array>}
+ * @param {object} pagination
+ * @returns {Promise<object>}
  */
-const getAllOperators = async () => {
-  return await Operator.find().sort({ createdAt: -1 });
+const getAllOperators = async (pagination) => {
+  return await paginate(Operator, {}, pagination, { sort: { createdAt: -1 } });
 };
 
 /**
@@ -285,11 +290,11 @@ const getAllOperators = async () => {
  */
 const getOperatorByQatarId = async (qatarId) => {
   if (!qatarId)
-    throw Object.assign(new Error('Qatar ID is required'), { status: 400 });
+    throw Object.assign(new Error('Qatar ID is required'), { status: HTTP.BAD_REQUEST });
 
   const operator = await Operator.findOne({ qatarId });
   if (!operator)
-    throw Object.assign(new Error('Operator not found'), { status: 404 });
+    throw Object.assign(new Error('Operator not found'), { status: HTTP.NOT_FOUND });
 
   return operator;
 };

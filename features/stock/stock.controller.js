@@ -1,3 +1,7 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
+const { sendSuccess, sendError } = require('../../shared/response/response.util');
 // controllers/stocks.controller.js
 const stockServices = require('./stock.service');
 
@@ -13,11 +17,11 @@ const addStocks = async (req, res) => {
   try {
     const result = await stockServices.insertStocks(req.body);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Stocks] addStocks:', error);
+    logger.error('[Stocks] addStocks:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -28,13 +32,13 @@ const addStocks = async (req, res) => {
  */
 const getStocks = async (req, res) => {
   try {
-    const result = await stockServices.fetchStocks();
+    const result = await stockServices.fetchStocks(req.pagination);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Stocks] getStocks:', error);
+    logger.error('[Stocks] getStocks:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -49,17 +53,17 @@ const getStocksByType = async (req, res) => {
 
     if (!type) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Stock type is required' });
     }
 
-    const result = await stockServices.fetchStocksByType(type);
+    const result = await stockServices.fetchStocksByType(type, req.pagination);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Stocks] getStocksByType:', error);
+    logger.error('[Stocks] getStocksByType:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -74,17 +78,17 @@ const getStocksByEquipment = async (req, res) => {
 
     if (!equipmentNumber) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Equipment number is required' });
     }
 
     const result = await stockServices.fetchStocksByEquipment(equipmentNumber);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Stocks] getStocksByEquipment:', error);
+    logger.error('[Stocks] getStocksByEquipment:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -99,17 +103,17 @@ const getStockById = async (req, res) => {
 
     if (!stockId) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Stock ID is required' });
     }
 
     const result = await stockServices.getStockById(stockId);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Stocks] getStockById:', error);
+    logger.error('[Stocks] getStockById:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -124,17 +128,17 @@ const updateProduct = async (req, res) => {
 
     if (!stockId) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Stock ID is required' });
     }
 
     const result = await stockServices.updateProduct(stockId, req.body);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Stocks] updateProduct:', error);
+    logger.error('[Stocks] updateProduct:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -149,7 +153,7 @@ const updateStock = async (req, res) => {
 
     if (!stockId) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Stock ID is required' });
     }
 
@@ -158,7 +162,7 @@ const updateStock = async (req, res) => {
       const missingFields = requiredFields.filter((field) => !req.body[field]);
 
       if (missingFields.length > 0) {
-        return res.status(400).json({
+        return sendError(res, {
           success: false,
           message: `Missing required fields for deduction: ${missingFields.join(', ')}`,
         });
@@ -167,11 +171,11 @@ const updateStock = async (req, res) => {
 
     const result = await stockServices.updateStock(stockId, req.body);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Stocks] updateStock:', error);
+    logger.error('[Stocks] updateStock:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -186,17 +190,17 @@ const deleteStock = async (req, res) => {
 
     if (!id) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Stock ID is required' });
     }
 
     const result = await stockServices.deleteStock(id);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Stocks] deleteStock:', error);
+    logger.error('[Stocks] deleteStock:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -216,14 +220,14 @@ const addStockQuantity = async (req, res) => {
 
     if (!quantity || quantity <= 0) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Valid quantity is required' });
     }
 
     const currentStock = await stockServices.getStockById(stockId);
 
     if (!currentStock.success) {
-      return res.status(currentStock.status).json(currentStock);
+      return sendSuccess(res, currentStock);
     }
 
     const updateData = {
@@ -236,11 +240,11 @@ const addStockQuantity = async (req, res) => {
 
     const result = await stockServices.updateStock(stockId, updateData);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Stocks] addStockQuantity:', error);
+    logger.error('[Stocks] addStockQuantity:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -266,12 +270,12 @@ const deductStockQuantity = async (req, res) => {
 
     if (!quantity || quantity <= 0) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Valid quantity is required' });
     }
 
     if (!equipmentId || !mechanicId || !equipmentName || !mechanicName) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message:
           'equipmentId, mechanicId, equipmentName, and mechanicName are required',
@@ -281,12 +285,12 @@ const deductStockQuantity = async (req, res) => {
     const currentStock = await stockServices.getStockById(stockId);
 
     if (!currentStock.success) {
-      return res.status(currentStock.status).json(currentStock);
+      return sendSuccess(res, currentStock);
     }
 
     if (currentStock.data.stockCount < quantity) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Insufficient stock quantity' });
     }
 
@@ -305,11 +309,11 @@ const deductStockQuantity = async (req, res) => {
 
     const result = await stockServices.updateStock(stockId, updateData);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Stocks] deductStockQuantity:', error);
+    logger.error('[Stocks] deductStockQuantity:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -325,7 +329,7 @@ const adjustStockQuantity = async (req, res) => {
 
     if (newQuantity === undefined || newQuantity < 0) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Valid new quantity is required' });
     }
 
@@ -339,11 +343,11 @@ const adjustStockQuantity = async (req, res) => {
 
     const result = await stockServices.updateStock(stockId, updateData);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Stocks] adjustStockQuantity:', error);
+    logger.error('[Stocks] adjustStockQuantity:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -370,11 +374,11 @@ const getMovementsWithStock = async (req, res) => {
 
     const result = await stockServices.getMovementsWithStock(filters);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Stocks] getMovementsWithStock:', error);
+    logger.error('[Stocks] getMovementsWithStock:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -390,7 +394,7 @@ const getStockMovements = async (req, res) => {
 
     if (!stockId) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Stock ID is required' });
     }
 
@@ -400,11 +404,11 @@ const getStockMovements = async (req, res) => {
       parseInt(offset)
     );
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Stocks] getStockMovements:', error);
+    logger.error('[Stocks] getStockMovements:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -419,18 +423,18 @@ const getStockMovementsByEquipment = async (req, res) => {
 
     if (!equipmentId) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Equipment ID is required' });
     }
 
     const result =
       await stockServices.getStockMovementsByEquipment(equipmentId);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Stocks] getStockMovementsByEquipment:', error);
+    logger.error('[Stocks] getStockMovementsByEquipment:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -445,17 +449,17 @@ const getStockMovementsByMechanic = async (req, res) => {
 
     if (!mechanicId) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Mechanic ID is required' });
     }
 
     const result = await stockServices.getStockMovementsByMechanic(mechanicId);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Stocks] getStockMovementsByMechanic:', error);
+    logger.error('[Stocks] getStockMovementsByMechanic:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -469,7 +473,7 @@ const getStockAccountabilityReport = async (req, res) => {
     const { startDate, endDate } = req.query;
 
     if (!startDate || !endDate) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'startDate and endDate are required',
       });
@@ -480,11 +484,11 @@ const getStockAccountabilityReport = async (req, res) => {
       endDate
     );
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Stocks] getStockAccountabilityReport:', error);
+    logger.error('[Stocks] getStockAccountabilityReport:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -499,17 +503,17 @@ const scanStockByBarcode = async (req, res) => {
 
     if (!objectId) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Barcode data is required' });
     }
 
     const result = await stockServices.scanStockByBarcode(objectId);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Stocks] scanStockByBarcode:', error);
+    logger.error('[Stocks] scanStockByBarcode:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };

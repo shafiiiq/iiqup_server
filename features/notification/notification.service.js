@@ -1,7 +1,11 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
 // services/notification.service.js
 const Notification = require('./notification.model');
 const User = require('../user/user.model');
 const mongoose = require('mongoose');
+const { paginate } = require('../../shared/pagination/pagination.util');
 require('dotenv').config();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -90,7 +94,7 @@ const createNotification = async (notificationData) => {
 
     return { success: true, data: notification };
   } catch (error) {
-    console.error('[NotificationService] createNotification:', error);
+    logger.error('[NotificationService] createNotification:', error);
     return { success: false, error: error.message };
   }
 };
@@ -121,7 +125,7 @@ const createBulkNotifications = async (notificationsArray) => {
       message: 'Bulk notifications created successfully',
     };
   } catch (error) {
-    console.error('[NotificationService] createBulkNotifications:', error);
+    logger.error('[NotificationService] createBulkNotifications:', error);
     return {
       success: false,
       error: error.message,
@@ -192,7 +196,7 @@ const getNotificationStatsService = async (uniqueCode) => {
 
     return { total, unread, forYouUnread };
   } catch (error) {
-    console.error('[NotificationService] getNotificationStatsService:', error);
+    logger.error('[NotificationService] getNotificationStatsService:', error);
     throw error;
   }
 };
@@ -203,66 +207,40 @@ const getNotificationStatsService = async (uniqueCode) => {
  *
  * @param {string} uniqueCode - Caller's unique code (used for role-based filtering).
  * @param {number} [page=1]
- * @param {number} [limit=200]
+ * @param {number} [limit=HTTP.OK]
  * @returns {Promise<{ notifications: Object[], currentPage: number, totalPages: number, totalCount: number, hasNextPage: boolean }>}
  */
 const getAllNotificationsService = async (
   uniqueCode,
-  page = 1,
-  limit = 200
+  pagination = { page: 1, limit: HTTP.OK, skip: 0 }
 ) => {
   try {
     const query = buildVisibilityQuery(uniqueCode);
 
-    const skip = (page - 1) * limit;
-    const totalCount = await Notification.countDocuments(query);
-    const totalPages = Math.ceil(totalCount / limit);
-
-    const notifications = await Notification.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
-
-    return {
-      notifications,
-      currentPage: page,
-      totalPages,
-      totalCount,
-      hasNextPage: page < totalPages,
-    };
+    return paginate(Notification, query, pagination, {
+      sort: { createdAt: -1 },
+    });
   } catch (error) {
-    console.error('[NotificationService] getAllNotificationsService:', error);
+    logger.error('[NotificationService] getAllNotificationsService:', error);
     throw new Error('Failed to retrieve notifications from database');
   }
 };
 
 const getUnreadNotificationsService = async (
   uniqueCode,
-  page = 1,
-  limit = 100
+  pagination = { page: 1, limit: 100, skip: 0 }
 ) => {
   try {
-    const skip = (page - 1) * limit;
     const query = {
       'readBy.uniqueCode': { $ne: uniqueCode },
       $and: [buildVisibilityQuery(uniqueCode)],
     };
-    const totalCount = await Notification.countDocuments(query);
-    const notifications = await Notification.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
-    return {
-      notifications,
-      currentPage: page,
-      totalPages: Math.ceil(totalCount / limit),
-      totalCount,
-      hasNextPage: page < Math.ceil(totalCount / limit),
-    };
+
+    return paginate(Notification, query, pagination, {
+      sort: { createdAt: -1 },
+    });
   } catch (error) {
-    console.error(
+    logger.error(
       '[NotificationService] getUnreadNotificationsService:',
       error
     );
@@ -272,27 +250,16 @@ const getUnreadNotificationsService = async (
 
 const getForYouNotificationsService = async (
   uniqueCode,
-  page = 1,
-  limit = 100
+  pagination = { page: 1, limit: 100, skip: 0 }
 ) => {
   try {
-    const skip = (page - 1) * limit;
     const query = { forYou: uniqueCode };
-    const totalCount = await Notification.countDocuments(query);
-    const notifications = await Notification.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
-    return {
-      notifications,
-      currentPage: page,
-      totalPages: Math.ceil(totalCount / limit),
-      totalCount,
-      hasNextPage: page < Math.ceil(totalCount / limit),
-    };
+
+    return paginate(Notification, query, pagination, {
+      sort: { createdAt: -1 },
+    });
   } catch (error) {
-    console.error(
+    logger.error(
       '[NotificationService] getForYouNotificationsService:',
       error
     );
@@ -302,30 +269,19 @@ const getForYouNotificationsService = async (
 
 const getNormalNotificationsService = async (
   uniqueCode,
-  page = 1,
-  limit = 100
+  pagination = { page: 1, limit: 100, skip: 0 }
 ) => {
   try {
-    const skip = (page - 1) * limit;
     const query = {
       priority: 'high',
       $and: [buildVisibilityQuery(uniqueCode)],
     };
-    const totalCount = await Notification.countDocuments(query);
-    const notifications = await Notification.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
-    return {
-      notifications,
-      currentPage: page,
-      totalPages: Math.ceil(totalCount / limit),
-      totalCount,
-      hasNextPage: page < Math.ceil(totalCount / limit),
-    };
+
+    return paginate(Notification, query, pagination, {
+      sort: { createdAt: -1 },
+    });
   } catch (error) {
-    console.error(
+    logger.error(
       '[NotificationService] getNormalNotificationsService:',
       error
     );
@@ -335,31 +291,20 @@ const getNormalNotificationsService = async (
 
 const getHighPriorityNotificationsService = async (
   uniqueCode,
-  page = 1,
-  limit = 100
+  pagination = { page: 1, limit: 100, skip: 0 }
 ) => {
   try {
-    const skip = (page - 1) * limit;
     const query = {
       sourceId: { $ne: 'attendance' },
       priority: 'high',
       $and: [buildVisibilityQuery(uniqueCode)],
     };
-    const totalCount = await Notification.countDocuments(query);
-    const notifications = await Notification.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
-    return {
-      notifications,
-      currentPage: page,
-      totalPages: Math.ceil(totalCount / limit),
-      totalCount,
-      hasNextPage: page < Math.ceil(totalCount / limit),
-    };
+
+    return paginate(Notification, query, pagination, {
+      sort: { createdAt: -1 },
+    });
   } catch (error) {
-    console.error(
+    logger.error(
       '[NotificationService] getHighPriorityNotificationsService:',
       error
     );
@@ -370,28 +315,17 @@ const getHighPriorityNotificationsService = async (
 const getUserSpecificNotificationsService = async (
   uniqueCode,
   sourceId,
-  page = 1,
-  limit = 100
+  pagination = { page: 1, limit: 100, skip: 0 }
 ) => {
   try {
-    const skip = (page - 1) * limit;
     const query = buildUserSpecificQuery(uniqueCode);
     if (sourceId) query.sourceId = sourceId;
-    const totalCount = await Notification.countDocuments(query);
-    const notifications = await Notification.find(query)
-      .sort({ sourceId: 1, createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
-    return {
-      notifications,
-      currentPage: page,
-      totalPages: Math.ceil(totalCount / limit),
-      totalCount,
-      hasNextPage: page < Math.ceil(totalCount / limit),
-    };
+
+    return paginate(Notification, query, pagination, {
+      sort: { sourceId: 1, createdAt: -1 },
+    });
   } catch (error) {
-    console.error(
+    logger.error(
       '[NotificationService] getUserSpecificNotificationsService:',
       error
     );
@@ -402,30 +336,19 @@ const getUserSpecificNotificationsService = async (
 const getCategoryNotificationsService = async (
   uniqueCode,
   category,
-  page = 1,
-  limit = 100
+  pagination = { page: 1, limit: 100, skip: 0 }
 ) => {
   try {
-    const skip = (page - 1) * limit;
     const query = {
       category,
       $and: [buildVisibilityQuery(uniqueCode)],
     };
-    const totalCount = await Notification.countDocuments(query);
-    const notifications = await Notification.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
-    return {
-      notifications,
-      currentPage: page,
-      totalPages: Math.ceil(totalCount / limit),
-      totalCount,
-      hasNextPage: page < Math.ceil(totalCount / limit),
-    };
+
+    return paginate(Notification, query, pagination, {
+      sort: { createdAt: -1 },
+    });
   } catch (error) {
-    console.error(
+    logger.error(
       '[NotificationService] getCategoryNotificationsService:',
       error
     );
@@ -471,7 +394,7 @@ const getUserSpecificTabsService = async (uniqueCode) => {
       }))
       .filter((tab) => tab.id);
   } catch (error) {
-    console.error('[NotificationService] getUserSpecificTabsService:', error);
+    logger.error('[NotificationService] getUserSpecificTabsService:', error);
     throw error;
   }
 };
@@ -492,7 +415,7 @@ const getModelCategoriesService = async (uniqueCode) => {
     ]);
     return groups.map((g) => g.category).filter(Boolean);
   } catch (error) {
-    console.error('[NotificationService] getModelCategoriesService:', error);
+    logger.error('[NotificationService] getModelCategoriesService:', error);
     throw error;
   }
 };
@@ -502,11 +425,9 @@ const searchNotificationsService = async (
   searchTerm,
   filter = 'all',
   category = 'all',
-  page = 1,
-  limit = 50
+  pagination = { page: 1, limit: 50, skip: 0 }
 ) => {
   try {
-    const skip = (page - 1) * limit;
     const textMatch = {
       $or: [
         { title: { $regex: searchTerm, $options: 'i' } },
@@ -544,22 +465,12 @@ const searchNotificationsService = async (
     }
 
     const query = { $and: [scopeQuery, textMatch] };
-    const totalCount = await Notification.countDocuments(query);
-    const notifications = await Notification.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
 
-    return {
-      notifications,
-      currentPage: page,
-      totalPages: Math.ceil(totalCount / limit),
-      totalCount,
-      hasNextPage: page < Math.ceil(totalCount / limit),
-    };
+    return paginate(Notification, query, pagination, {
+      sort: { createdAt: -1 },
+    });
   } catch (error) {
-    console.error('[NotificationService] searchNotificationsService:', error);
+    logger.error('[NotificationService] searchNotificationsService:', error);
     throw error;
   }
 };
@@ -589,7 +500,7 @@ const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
       .limit(limit)
       .lean();
 
-    console.log(
+    logger.info(
       `[NotificationService] getPendingNotifications — found ${normalNotifications.length} undelivered for ${uniqueCode}`
     );
 
@@ -620,7 +531,7 @@ const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
 
     const limitedNotifications = allNotifications.slice(0, limit);
 
-    console.log(
+    logger.info(
       `[NotificationService] getPendingNotifications — returning ${limitedNotifications.length} notifications`
     );
 
@@ -634,7 +545,7 @@ const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
       },
     };
   } catch (error) {
-    console.error('[NotificationService] getPendingNotifications:', error);
+    logger.error('[NotificationService] getPendingNotifications:', error);
     throw error;
   }
 };
@@ -646,7 +557,7 @@ const getPendingNotifications = async (uniqueCode, since, limit = 100) => {
 const markNotificationAsRead = async (notificationId, uniqueCode) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(notificationId)) {
-      console.warn(
+      logger.warn(
         `[NotificationService] markNotificationAsRead — invalid notification id ${notificationId}`
       );
       return { success: false, message: 'Invalid notification ID' };
@@ -669,7 +580,7 @@ const markNotificationAsRead = async (notificationId, uniqueCode) => {
 
     return { success: true, message: 'Marked as read' };
   } catch (error) {
-    console.error('[NotificationService] markNotificationAsRead:', error);
+    logger.error('[NotificationService] markNotificationAsRead:', error);
     throw error;
   }
 };
@@ -683,12 +594,12 @@ const markNotificationAsRead = async (notificationId, uniqueCode) => {
  */
 const markNotificationAsDelivered = async (notificationId, uniqueCode) => {
   try {
-    console.log(
+    logger.info(
       `[NotificationService] markNotificationAsDelivered — ${notificationId} → ${uniqueCode}`
     );
 
     if (!mongoose.Types.ObjectId.isValid(notificationId)) {
-      console.warn(
+      logger.warn(
         `[NotificationService] markNotificationAsDelivered — invalid notification id ${notificationId}`
       );
       return { success: false, message: 'Invalid notification ID' };
@@ -708,7 +619,7 @@ const markNotificationAsDelivered = async (notificationId, uniqueCode) => {
     );
 
     if (!result) {
-      console.warn(
+      logger.warn(
         `[NotificationService] markNotificationAsDelivered — notification ${notificationId} not found`
       );
       return { success: false, message: 'Notification not found' };
@@ -716,7 +627,7 @@ const markNotificationAsDelivered = async (notificationId, uniqueCode) => {
 
     return { success: true, message: 'Marked as delivered' };
   } catch (error) {
-    console.error('[NotificationService] markNotificationAsDelivered:', error);
+    logger.error('[NotificationService] markNotificationAsDelivered:', error);
     throw error;
   }
 };

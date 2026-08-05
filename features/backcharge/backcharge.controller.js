@@ -1,3 +1,7 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
+const { sendSuccess, sendError } = require('../../shared/response/response.util');
 // controllers/backcharge.controller.js
 const backchargeService = require('./backcharge.service');
 const { sendBackchargeViaEmail } = require('./backcharge.gmail');
@@ -14,14 +18,14 @@ const getAllBackchargeReports = async (req, res) => {
   try {
     const reports = await backchargeService.getAllBackchargeReports();
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Backcharge reports retrieved successfully',
       data: reports,
     });
   } catch (error) {
-    console.error('[Backcharge] getAllBackchargeReports:', error);
-    res.status(500).json({
+    logger.error('[Backcharge] getAllBackchargeReports:', error);
+    sendError(res, {
       success: false,
       message: 'Error retrieving backcharge reports',
       error: error.message,
@@ -39,18 +43,18 @@ const getBackchargeById = async (req, res) => {
 
     if (!report) {
       return res
-        .status(404)
+        .status(HTTP.NOT_FOUND)
         .json({ success: false, message: 'Backcharge report not found' });
     }
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Backcharge report retrieved successfully',
       data: report,
     });
   } catch (error) {
-    console.error('[Backcharge] getBackchargeById:', error);
-    res.status(500).json({
+    logger.error('[Backcharge] getBackchargeById:', error);
+    sendError(res, {
       success: false,
       message: 'Error retrieving backcharge report',
       error: error.message,
@@ -70,18 +74,18 @@ const getBackchargeByReportNo = async (req, res) => {
 
     if (!report) {
       return res
-        .status(404)
+        .status(HTTP.NOT_FOUND)
         .json({ success: false, message: 'Backcharge report not found' });
     }
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Backcharge report retrieved successfully',
       data: report,
     });
   } catch (error) {
-    console.error('[Backcharge] getBackchargeByReportNo:', error);
-    res.status(500).json({
+    logger.error('[Backcharge] getBackchargeByReportNo:', error);
+    sendError(res, {
       success: false,
       message: 'Error retrieving backcharge report',
       error: error.message,
@@ -101,18 +105,18 @@ const getBackchargeByRefNo = async (req, res) => {
 
     if (!report) {
       return res
-        .status(404)
+        .status(HTTP.NOT_FOUND)
         .json({ success: false, message: 'Backcharge report not found' });
     }
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Backcharge report retrieved successfully',
       data: report,
     });
   } catch (error) {
-    console.error('[Backcharge] getBackchargeByRefNo:', error);
-    res.status(500).json({
+    logger.error('[Backcharge] getBackchargeByRefNo:', error);
+    sendError(res, {
       success: false,
       message: 'Error retrieving backcharge report',
       error: error.message,
@@ -129,7 +133,7 @@ const addBackcharge = async (req, res) => {
     const { reportNo, equipmentType, plateNo } = req.body;
 
     if (!reportNo || !equipmentType || !plateNo) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'Report number, equipment type, and plate number are required',
       });
@@ -137,7 +141,7 @@ const addBackcharge = async (req, res) => {
 
     const existing = await backchargeService.getBackchargeByReportNo(reportNo);
     if (existing) {
-      return res.status(409).json({
+      return sendError(res, {
         success: false,
         message: 'Backcharge report with this report number already exists',
       });
@@ -145,14 +149,14 @@ const addBackcharge = async (req, res) => {
 
     const report = await backchargeService.addBackcharge(req.body);
 
-    res.status(201).json({
+    sendSuccess(res, {
       success: true,
       message: 'Backcharge report created successfully',
       data: report,
     });
   } catch (error) {
-    console.error('[Backcharge] addBackcharge:', error);
-    res.status(500).json({
+    logger.error('[Backcharge] addBackcharge:', error);
+    sendError(res, {
       success: false,
       message: 'Error creating backcharge report',
       error: error.message,
@@ -171,7 +175,7 @@ const sendBackchargeToEmail = async (req, res) => {
 
     if (!email || !pdfFile) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Email and PDF are required' });
     }
 
@@ -196,10 +200,10 @@ const sendBackchargeToEmail = async (req, res) => {
       equipment
     );
 
-    res.status(200).json({ success: true, data: result });
+    sendSuccess(res, { success: true, data: result });
   } catch (error) {
-    console.error('[Backcharge] sendBackchargeViaEmail:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[Backcharge] sendBackchargeViaEmail:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -214,7 +218,7 @@ const updateSupplierEmail = async (req, res) => {
 
     if (!email || !email.includes('@')) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Valid email required' });
     }
 
@@ -223,14 +227,14 @@ const updateSupplierEmail = async (req, res) => {
       email
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: `Email updated for all records with supplier code ${supplierCode}`,
       modifiedCount: result.modifiedCount,
     });
   } catch (error) {
-    console.error('[Backcharge] updateSupplierEmail:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[Backcharge] updateSupplierEmail:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -247,18 +251,18 @@ const updateBackcharge = async (req, res) => {
 
     if (!report) {
       return res
-        .status(404)
+        .status(HTTP.NOT_FOUND)
         .json({ success: false, message: 'Backcharge report not found' });
     }
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Backcharge report updated successfully',
       data: report,
     });
   } catch (error) {
-    console.error('[Backcharge] updateBackcharge:', error);
-    res.status(500).json({
+    logger.error('[Backcharge] updateBackcharge:', error);
+    sendError(res, {
       success: false,
       message: 'Error updating backcharge report',
       error: error.message,
@@ -276,17 +280,17 @@ const deleteBackcharge = async (req, res) => {
 
     if (!report) {
       return res
-        .status(404)
+        .status(HTTP.NOT_FOUND)
         .json({ success: false, message: 'Backcharge report not found' });
     }
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Backcharge report deleted successfully',
     });
   } catch (error) {
-    console.error('[Backcharge] deleteBackcharge:', error);
-    res.status(500).json({
+    logger.error('[Backcharge] deleteBackcharge:', error);
+    sendError(res, {
       success: false,
       message: 'Error deleting backcharge report',
       error: error.message,
@@ -302,14 +306,14 @@ const getLatestBackchargeRef = async (req, res) => {
   try {
     const latestNumber = await backchargeService.getLatestBackchargeRef();
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Latest backcharge reference retrieved successfully',
       data: { latestNumber },
     });
   } catch (error) {
-    console.error('[Backcharge] getLatestBackchargeRef:', error);
-    res.status(500).json({
+    logger.error('[Backcharge] getLatestBackchargeRef:', error);
+    sendError(res, {
       success: false,
       message: 'Error retrieving latest backcharge reference',
       error: error.message,
@@ -326,7 +330,7 @@ const searchEquipmentByPlate = async (req, res) => {
     const { plateNo } = req.query;
 
     if (!plateNo || plateNo.length < 2) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'Plate number must be at least 2 characters',
       });
@@ -334,14 +338,14 @@ const searchEquipmentByPlate = async (req, res) => {
 
     const equipment = await backchargeService.searchEquipmentByPlate(plateNo);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Equipment search completed',
       data: equipment,
     });
   } catch (error) {
-    console.error('[Backcharge] searchEquipmentByPlate:', error);
-    res.status(500).json({
+    logger.error('[Backcharge] searchEquipmentByPlate:', error);
+    sendError(res, {
       success: false,
       message: 'Error searching equipment',
       error: error.message,
@@ -358,7 +362,7 @@ const searchSuppliers = async (req, res) => {
     const { name } = req.query;
 
     if (!name || name.length < 2) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'Supplier name must be at least 2 characters',
       });
@@ -366,14 +370,14 @@ const searchSuppliers = async (req, res) => {
 
     const suppliers = await backchargeService.searchSuppliers(name);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Supplier search completed',
       data: suppliers,
     });
   } catch (error) {
-    console.error('[Backcharge] searchSuppliers:', error);
-    res.status(500).json({
+    logger.error('[Backcharge] searchSuppliers:', error);
+    sendError(res, {
       success: false,
       message: 'Error searching suppliers',
       error: error.message,
@@ -390,7 +394,7 @@ const searchSites = async (req, res) => {
     const { location } = req.query;
 
     if (!location || location.length < 2) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'Site location must be at least 2 characters',
       });
@@ -399,11 +403,11 @@ const searchSites = async (req, res) => {
     const sites = await backchargeService.searchSites(location);
 
     res
-      .status(200)
+      .status(HTTP.OK)
       .json({ success: true, message: 'Site search completed', data: sites });
   } catch (error) {
-    console.error('[Backcharge] searchSites:', error);
-    res.status(500).json({
+    logger.error('[Backcharge] searchSites:', error);
+    sendError(res, {
       success: false,
       message: 'Error searching sites',
       error: error.message,
@@ -432,12 +436,12 @@ const signBackcharge = async (req, res) => {
 
     if (!uniqueCode) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'uniqueCode is required' });
     }
 
     if (!signedDate || !signedFrom) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'signedDate and signedFrom are required',
       });
@@ -455,7 +459,7 @@ const signBackcharge = async (req, res) => {
 
     // Out-of-order detected — frontend will show override prompt
     if (result.requireOverride) {
-      return res.status(202).json({
+      return sendError(res, {
         success: false,
         requireOverride: true,
         unsignedAbove: result.unsignedAbove,
@@ -463,10 +467,10 @@ const signBackcharge = async (req, res) => {
       });
     }
 
-    res.status(200).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Backcharge] signBackcharge:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Backcharge] signBackcharge:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to sign backcharge',
     });
@@ -484,21 +488,21 @@ const getPendingSignatures = async (req, res) => {
 
     if (!uniqueCode) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'uniqueCode is required' });
     }
 
     const pending = await backchargeService.getPendingSignatures(uniqueCode);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Pending signatures retrieved successfully',
       data: pending,
       count: pending.length,
     });
   } catch (error) {
-    console.error('[Backcharge] getPendingSignatures:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[Backcharge] getPendingSignatures:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -513,21 +517,21 @@ const getSignedByUser = async (req, res) => {
 
     if (!uniqueCode) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'uniqueCode is required' });
     }
 
     const signed = await backchargeService.getSignedByUser(uniqueCode);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Signed documents retrieved successfully',
       data: signed,
       count: signed.length,
     });
   } catch (error) {
-    console.error('[Backcharge] getSignedByUser:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[Backcharge] getSignedByUser:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 

@@ -1,5 +1,10 @@
+const logger = require('../../shared/logger/logger');
+
+const AppError = require('../../shared/errors/AppError.js');
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
 // services/backcharge.service.js
 const Backcharge = require('./backcharge.model');
+const { paginate } = require('../../shared/pagination/pagination.util');
 const { createNotification } = require('../notification/notification.service');
 const PushNotificationService = require('../notification/notification.push');
 const { default: wsUtils } = require('../../socket/socket');
@@ -137,7 +142,7 @@ const getBackchargeById = async (id) => {
   try {
     return await Backcharge.findById(id).lean();
   } catch (error) {
-    console.error('[BackchargeService] getBackchargeById:', error);
+    logger.error('[BackchargeService] getBackchargeById:', error);
     throw new Error(
       `Error retrieving backcharge report by ID: ${error.message}`
     );
@@ -153,7 +158,7 @@ const getBackchargeByReportNo = async (reportNo) => {
   try {
     return await Backcharge.findOne({ reportNo }).lean();
   } catch (error) {
-    console.error('[BackchargeService] getBackchargeByReportNo:', error);
+    logger.error('[BackchargeService] getBackchargeByReportNo:', error);
     throw new Error(
       `Error retrieving backcharge report by report number: ${error.message}`
     );
@@ -169,7 +174,7 @@ const getBackchargeByRefNo = async (refNo) => {
   try {
     return await Backcharge.findOne({ refNo }).lean();
   } catch (error) {
-    console.error('[BackchargeService] getBackchargeByRefNo:', error);
+    logger.error('[BackchargeService] getBackchargeByRefNo:', error);
     throw new Error(
       `Error retrieving backcharge report by ref number: ${error.message}`
     );
@@ -196,7 +201,7 @@ const getLatestBackchargeRef = async () => {
 
     return 140;
   } catch (error) {
-    console.error('[BackchargeService] getLatestBackchargeRef:', error);
+    logger.error('[BackchargeService] getLatestBackchargeRef:', error);
     throw new Error(
       `Error retrieving latest backcharge reference: ${error.message}`
     );
@@ -211,12 +216,10 @@ const getLatestBackchargeRef = async () => {
  * @returns {Promise<object>}
  */
 const getBackchargeReportsWithPagination = async (
-  page = 1,
-  limit = 10,
+  pagination = { page: 1, limit: 10, skip: 0 },
   filters = {}
 ) => {
   try {
-    const skip = (page - 1) * limit;
     const query = {};
 
     if (filters.reportNo) query.reportNo = new RegExp(filters.reportNo, 'i');
@@ -232,27 +235,21 @@ const getBackchargeReportsWithPagination = async (
       if (filters.dateTo) query.date.$lte = new Date(filters.dateTo);
     }
 
-    const [reports, total] = await Promise.all([
-      Backcharge.find(query)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      Backcharge.countDocuments(query),
-    ]);
+    const result = await paginate(Backcharge, query, pagination, {
+      sort: { createdAt: -1 },
+    });
 
     return {
-      reports,
+      data: result.data,
       pagination: {
-        currentPage: page,
-        totalPages: Math.ceil(total / limit),
-        totalReports: total,
-        hasNext: page < Math.ceil(total / limit),
-        hasPrev: page > 1,
+        ...result.pagination,
+        totalReports: result.pagination.totalCount,
+        hasNext: result.pagination.hasMore,
+        hasPrev: result.pagination.currentPage > 1,
       },
     };
   } catch (error) {
-    console.error(
+    logger.error(
       '[BackchargeService] getBackchargeReportsWithPagination:',
       error
     );
@@ -617,14 +614,14 @@ const signBackcharge = async (refNo, signData) => {
   const matched = roleMap.find((r) => r.envKey === uniqueCode);
   if (!matched)
     throw {
-      status: 403,
+      status: HTTP.FORBIDDEN,
       message:
         'Unauthorised: your device is not recognised as an authorised signatory for backcharge documents',
     };
 
   const backcharge = await Backcharge.findOne({ refNo });
   if (!backcharge)
-    throw { status: 404, message: `Backcharge not found: ${refNo}` };
+    throw { status: HTTP.NOT_FOUND, message: `Backcharge not found: ${refNo}` };
 
   // ── CEO vs MD guard ────────────────────────────────────────────────────────
   if (matched.field === 'authorizedSignatory') {
@@ -635,7 +632,7 @@ const signBackcharge = async (refNo, signData) => {
       savedMode === 'MANAGING DIRECTOR' ? 'MANAGING_DIRECTOR' : 'CEO';
     if (matched.role !== expectedRole)
       throw {
-        status: 403,
+        status: HTTP.FORBIDDEN,
         message: `This document requires ${savedMode} signature, not ${matched.role}`,
       };
   }
@@ -643,7 +640,7 @@ const signBackcharge = async (refNo, signData) => {
   // ── Already signed guard ───────────────────────────────────────────────────
   if (backcharge.signatures?.[matched.field]?.signed) {
     throw {
-      status: 409,
+      status: HTTP.CONFLICT,
       message: `This position (${matched.role}) has already been signed`,
     };
   }
@@ -712,7 +709,7 @@ const signBackcharge = async (refNo, signData) => {
     { new: true }
   );
   if (!updated)
-    throw { status: 500, message: 'Failed to update backcharge record' };
+    throw { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to update backcharge record' };
 
   // ── Notifications ──────────────────────────────────────────────────────────
 
@@ -788,7 +785,7 @@ const signBackcharge = async (refNo, signData) => {
   }
 
   return {
-    status: 200,
+    status: HTTP.OK,
     message: `${matched.role} signature recorded successfully`,
     data: updated,
     role: matched.role,

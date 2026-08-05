@@ -1,3 +1,6 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
 // ─────────────────────────────────────────────────────────────────────────────
 // Toolkit Service
 // Flat named async functions — no prototype objects, no class syntax.
@@ -9,6 +12,7 @@ const Mechanic = require('../mechanic/mechanic.model');
 const Operator = require('../operator/operator.model');
 const User = require('../user/user.model');
 const mongoose = require('mongoose');
+const { paginate } = require('../../shared/pagination/pagination.util');
 
 const { createNotification } = require('../notification/notification.service');
 const PushNotificationService = require('../notification/notification.push');
@@ -99,7 +103,7 @@ const _sendNotification = async (
       notification.data._id.toString()
     );
   } catch (err) {
-    console.error('[ToolkitService] Notification failed:', err.message);
+    logger.error('[ToolkitService] Notification failed:', err.message);
   }
 };
 
@@ -189,7 +193,7 @@ const insertToolkit = async (toolkitData) => {
       wsUtils.sendDashboardUpdate('toolkit');
 
       return {
-        status: 200,
+        status: HTTP.OK,
         ok: true,
         message: existingVariant
           ? 'Variant stock updated successfully'
@@ -226,15 +230,15 @@ const insertToolkit = async (toolkitData) => {
     }).save();
 
     return {
-      status: 201,
+      status: HTTP.CREATED,
       ok: true,
       message: 'Toolkit added successfully',
       data: savedToolkit,
     };
   } catch (err) {
-    console.error('[ToolkitService] insertToolkit:', err);
+    logger.error('[ToolkitService] insertToolkit:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Failed to add toolkit',
       error: err.message,
@@ -250,19 +254,22 @@ const insertToolkit = async (toolkitData) => {
  * Returns all toolkits sorted by newest first.
  * @returns {Promise<object>}
  */
-const fetchToolkits = async () => {
+const fetchToolkits = async (pagination) => {
   try {
-    const toolkits = await Toolkit.find({}).sort({ createdAt: -1 });
+    const result = await paginate(Toolkit, {}, pagination, {
+      sort: { createdAt: -1 },
+    });
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'Toolkits fetched successfully',
-      data: toolkits,
+      data: result.data,
+      pagination: result.pagination,
     };
   } catch (err) {
-    console.error('[ToolkitService] fetchToolkits:', err);
+    logger.error('[ToolkitService] fetchToolkits:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Failed to fetch toolkits',
       error: err.message,
@@ -275,22 +282,30 @@ const fetchToolkits = async () => {
  * @param {string} searchTerm
  * @returns {Promise<object>}
  */
-const searchToolkits = async (searchTerm) => {
+const searchToolkits = async (searchTerm, pagination) => {
   try {
-    const toolkits = await Toolkit.find({
-      name: { $regex: new RegExp(searchTerm, 'i') },
-    }).sort({ createdAt: -1 });
+    const result = await paginate(
+      Toolkit,
+      {
+        name: { $regex: new RegExp(searchTerm, 'i') },
+      },
+      pagination,
+      {
+        sort: { createdAt: -1 },
+      }
+    );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'Search completed successfully',
-      data: toolkits,
+      data: result.data,
+      pagination: result.pagination,
     };
   } catch (err) {
-    console.error('[ToolkitService] searchToolkits:', err);
+    logger.error('[ToolkitService] searchToolkits:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Failed to search toolkits',
       error: err.message,
@@ -311,7 +326,7 @@ const scanToolkitByBarcode = async (objectId) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(objectId)) {
       return {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         ok: false,
         success: false,
         message: 'Invalid barcode format. Please scan a valid toolkit barcode.',
@@ -335,7 +350,7 @@ const scanToolkitByBarcode = async (objectId) => {
 
     if (!toolkit) {
       return {
-        status: 404,
+        status: HTTP.NOT_FOUND,
         ok: false,
         success: false,
         message:
@@ -379,7 +394,7 @@ const scanToolkitByBarcode = async (objectId) => {
     ).length;
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       success: true,
       message: scannedVariantId
@@ -400,9 +415,9 @@ const scanToolkitByBarcode = async (objectId) => {
       },
     };
   } catch (err) {
-    console.error('[ToolkitService] scanToolkitByBarcode:', err);
+    logger.error('[ToolkitService] scanToolkitByBarcode:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       success: false,
       message: 'Error scanning toolkit barcode',
@@ -426,7 +441,7 @@ const updateToolkit = async (toolkitId, updateData) => {
     const currentToolkit = await Toolkit.findById(toolkitId);
     if (!currentToolkit) {
       return {
-        status: 404,
+        status: HTTP.NOT_FOUND,
         ok: false,
         message: `Toolkit with ID ${toolkitId} not found`,
       };
@@ -450,15 +465,15 @@ const updateToolkit = async (toolkitId, updateData) => {
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'Toolkit updated successfully',
       data: updatedToolkit,
     };
   } catch (err) {
-    console.error('[ToolkitService] updateToolkit:', err);
+    logger.error('[ToolkitService] updateToolkit:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Failed to update toolkit',
       error: err.message,
@@ -478,7 +493,7 @@ const updateVariant = async (toolkitId, variantId, updateData) => {
     const toolkit = await Toolkit.findById(toolkitId);
     if (!toolkit)
       return {
-        status: 404,
+        status: HTTP.NOT_FOUND,
         ok: false,
         message: `Toolkit with ID ${toolkitId} not found`,
       };
@@ -486,7 +501,7 @@ const updateVariant = async (toolkitId, variantId, updateData) => {
     const variant = toolkit.variants.id(variantId);
     if (!variant)
       return {
-        status: 404,
+        status: HTTP.NOT_FOUND,
         ok: false,
         message: `Variant with ID ${variantId} not found`,
       };
@@ -532,15 +547,15 @@ const updateVariant = async (toolkitId, variantId, updateData) => {
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'Variant updated successfully',
       data: savedToolkit,
     };
   } catch (err) {
-    console.error('[ToolkitService] updateVariant:', err);
+    logger.error('[ToolkitService] updateVariant:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Failed to update variant',
       error: err.message,
@@ -574,7 +589,7 @@ const reduceStock = async (
     const toolkit = await Toolkit.findById(toolkitId);
     if (!toolkit)
       return {
-        status: 404,
+        status: HTTP.NOT_FOUND,
         ok: false,
         message: `Toolkit with ID ${toolkitId} not found`,
       };
@@ -582,14 +597,14 @@ const reduceStock = async (
     const variant = toolkit.variants.id(variantId);
     if (!variant)
       return {
-        status: 404,
+        status: HTTP.NOT_FOUND,
         ok: false,
         message: `Variant with ID ${variantId} not found`,
       };
 
     if (variant.stockCount < quantity) {
       return {
-        status: 400,
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message: `Insufficient stock. Available: ${variant.stockCount}, Requested: ${quantity}`,
       };
@@ -649,15 +664,15 @@ const reduceStock = async (
     );
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'Stock reduced successfully',
       data: savedToolkit,
     };
   } catch (err) {
-    console.error('[ToolkitService] reduceStock:', err);
+    logger.error('[ToolkitService] reduceStock:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Failed to reduce stock',
       error: err.message,
@@ -679,21 +694,21 @@ const deleteToolkit = async (toolkitId) => {
     const deleted = await Toolkit.findByIdAndDelete(toolkitId);
     if (!deleted)
       return {
-        status: 404,
+        status: HTTP.NOT_FOUND,
         ok: false,
         message: `Toolkit with ID ${toolkitId} not found`,
       };
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'Toolkit deleted successfully',
       data: deleted,
     };
   } catch (err) {
-    console.error('[ToolkitService] deleteToolkit:', err);
+    logger.error('[ToolkitService] deleteToolkit:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Failed to delete toolkit',
       error: err.message,
@@ -713,7 +728,7 @@ const deleteVariant = async (toolkitId, variantId) => {
     const toolkit = await Toolkit.findById(toolkitId);
     if (!toolkit)
       return {
-        status: 404,
+        status: HTTP.NOT_FOUND,
         ok: false,
         message: `Toolkit with ID ${toolkitId} not found`,
       };
@@ -721,7 +736,7 @@ const deleteVariant = async (toolkitId, variantId) => {
     const variant = toolkit.variants.id(variantId);
     if (!variant)
       return {
-        status: 404,
+        status: HTTP.NOT_FOUND,
         ok: false,
         message: `Variant with ID ${variantId} not found`,
       };
@@ -731,7 +746,7 @@ const deleteVariant = async (toolkitId, variantId) => {
     if (toolkit.variants.length === 0) {
       await Toolkit.findByIdAndDelete(toolkitId);
       return {
-        status: 200,
+        status: HTTP.OK,
         ok: true,
         message: 'Toolkit deleted as no variants remain',
         data: null,
@@ -740,15 +755,15 @@ const deleteVariant = async (toolkitId, variantId) => {
 
     const savedToolkit = await toolkit.save();
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'Variant deleted successfully',
       data: savedToolkit,
     };
   } catch (err) {
-    console.error('[ToolkitService] deleteVariant:', err);
+    logger.error('[ToolkitService] deleteVariant:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Failed to delete variant',
       error: err.message,
@@ -771,7 +786,7 @@ const getStockHistory = async (toolkitId, variantId) => {
     const toolkit = await Toolkit.findById(toolkitId);
     if (!toolkit)
       return {
-        status: 404,
+        status: HTTP.NOT_FOUND,
         ok: false,
         message: `Toolkit with ID ${toolkitId} not found`,
       };
@@ -779,13 +794,13 @@ const getStockHistory = async (toolkitId, variantId) => {
     const variant = toolkit.variants.id(variantId);
     if (!variant)
       return {
-        status: 404,
+        status: HTTP.NOT_FOUND,
         ok: false,
         message: `Variant with ID ${variantId} not found`,
       };
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'Stock history retrieved successfully',
       data: {
@@ -803,9 +818,9 @@ const getStockHistory = async (toolkitId, variantId) => {
       },
     };
   } catch (err) {
-    console.error('[ToolkitService] getStockHistory:', err);
+    logger.error('[ToolkitService] getStockHistory:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Failed to get stock history',
       error: err.message,
@@ -823,13 +838,13 @@ const getToolkitStockHistory = async (toolkitId) => {
     const toolkit = await Toolkit.findById(toolkitId);
     if (!toolkit)
       return {
-        status: 404,
+        status: HTTP.NOT_FOUND,
         ok: false,
         message: `Toolkit with ID ${toolkitId} not found`,
       };
 
     return {
-      status: 200,
+      status: HTTP.OK,
       ok: true,
       message: 'Toolkit stock history retrieved successfully',
       data: {
@@ -852,9 +867,9 @@ const getToolkitStockHistory = async (toolkitId) => {
       },
     };
   } catch (err) {
-    console.error('[ToolkitService] getToolkitStockHistory:', err);
+    logger.error('[ToolkitService] getToolkitStockHistory:', err);
     return {
-      status: 500,
+      status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
       message: 'Failed to get toolkit stock history',
       error: err.message,

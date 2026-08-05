@@ -1,3 +1,7 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
+const { sendSuccess, sendError } = require('../../shared/response/response.util');
 // controllers/user.controller.js
 const path = require('path');
 const { putObject } = require('../../config/aws/s3.aws');
@@ -46,11 +50,11 @@ const ROLE_ENV_KEYS = [
 const addUsers = async (req, res) => {
   try {
     const result = await userService.insertUser(req.body);
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] addUsers:', error);
+    logger.error('[User] addUsers:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -61,12 +65,12 @@ const addUsers = async (req, res) => {
  */
 const getUsers = async (req, res) => {
   try {
-    const result = await userService.fetchUsers();
-    res.status(result.status).json(result);
+    const result = await userService.fetchUsers(req.pagination);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] getUsers:', error);
+    logger.error('[User] getUsers:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -77,12 +81,12 @@ const getUsers = async (req, res) => {
  */
 const getAllUsers = async (req, res) => {
   try {
-    const result = await userService.fetchAllUsers();
-    res.status(result.status).json(result);
+    const result = await userService.fetchAllUsers(req.pagination);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] getAllUsers:', error);
+    logger.error('[User] getAllUsers:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -96,15 +100,15 @@ const updateUser = async (req, res) => {
     const { id } = req.params;
     if (!id)
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'User ID is required' });
 
     const result = await userService.userUpdate(id, req.body);
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] updateUser:', error);
+    logger.error('[User] updateUser:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -118,15 +122,15 @@ const deleteUser = async (req, res) => {
     const { id } = req.params;
     if (!id)
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'User ID is required' });
 
     const result = await userService.userDelete(id);
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] deleteUser:', error);
+    logger.error('[User] deleteUser:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -144,7 +148,7 @@ const verifyUser = async (req, res) => {
     const { email, password, type, deviceInfo } = req.body;
     if (!email || !password)
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Email and password are required' });
 
     const result = await userService.verifyUserCredentials(
@@ -153,11 +157,11 @@ const verifyUser = async (req, res) => {
       type,
       deviceInfo
     );
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] verifyUser:', error);
+    logger.error('[User] verifyUser:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: 'Authentication failed' });
   }
 };
@@ -171,15 +175,15 @@ const verifyCEO = async (req, res) => {
     const { email } = req.body;
     if (!email)
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Email is required' });
 
     const result = await userService.verifyCEOcreds(email);
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] verifyCEO:', error);
+    logger.error('[User] verifyCEO:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: 'Authentication failed' });
   }
 };
@@ -193,15 +197,15 @@ const verifyDocAuthUser = async (req, res) => {
     const { password } = req.body;
     if (!password)
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Password is required' });
 
     const result = await userService.verifyDocAuthUserCreds(password);
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] verifyDocAuthUser:', error);
+    logger.error('[User] verifyDocAuthUser:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: 'Authentication failed' });
   }
 };
@@ -213,11 +217,11 @@ const verifyDocAuthUser = async (req, res) => {
 const verifyToken = async (req, res) => {
   try {
     res
-      .status(200)
+      .status(HTTP.OK)
       .json({ success: true, valid: true, message: 'Token is valid' });
   } catch (error) {
-    console.error('[User] verifyToken:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[User] verifyToken:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -234,13 +238,13 @@ const changePassword = async (req, res) => {
     const { email, currentPassword, newPassword } = req.body;
 
     if (!email || !currentPassword || !newPassword) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'Email, current password, and new password are required',
       });
     }
     if (currentPassword === newPassword) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'New password must be different from current password',
       });
@@ -249,7 +253,7 @@ const changePassword = async (req, res) => {
     const passwordRegex =
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
     if (!passwordRegex.test(newPassword)) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'New password does not meet security requirements',
       });
@@ -260,11 +264,11 @@ const changePassword = async (req, res) => {
       currentPassword,
       newPassword
     );
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] changePassword:', error);
+    logger.error('[User] changePassword:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: 'Password change failed' });
   }
 };
@@ -278,15 +282,15 @@ const resetPassword = async (req, res) => {
     const { email, type } = req.body;
     if (!email)
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Email is required' });
 
     const result = await userService.resetPassword(email, type);
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] resetPassword:', error);
+    logger.error('[User] resetPassword:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: 'Password reset failed' });
   }
 };
@@ -300,15 +304,15 @@ const updateAuthMail = async (req, res) => {
     const { userId, authMail, type } = req.body;
     if (!userId || !authMail)
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'userId and authMail are required' });
 
     const result = await userService.updateUserAuthMail(userId, authMail, type);
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] updateAuthMail:', error);
+    logger.error('[User] updateAuthMail:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -324,13 +328,13 @@ const updateAuthMail = async (req, res) => {
 const getUserRoles = (req, res) => {
   const missingVars = ROLE_ENV_KEYS.filter((key) => !process.env[key]);
   if (missingVars.length > 0) {
-    return res.status(500).json({
+    return sendError(res, {
       success: false,
       message: 'Cannot get all roles',
       missingVariables: missingVars,
     });
   }
-  res.status(200).json({
+  sendSuccess(res, {
     success: true,
     roles: Object.fromEntries(
       ROLE_ENV_KEYS.map((key) => [key, process.env[key]])
@@ -352,10 +356,10 @@ const getUserSessions = async (req, res) => {
       req.user.id,
       req.headers.authorization?.split(' ')[1]
     );
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] getUserSessions:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[User] getUserSessions:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -368,7 +372,7 @@ const logoutSession = async (req, res) => {
     const { sessionId } = req.params;
     if (!sessionId)
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Session ID is required' });
 
     const result = await sessionService.logoutSession(
@@ -376,10 +380,10 @@ const logoutSession = async (req, res) => {
       req.user.id,
       req.headers.authorization?.split(' ')[1]
     );
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] logoutSession:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[User] logoutSession:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -393,10 +397,10 @@ const logoutAllSessions = async (req, res) => {
       req.user.id,
       req.headers.authorization?.split(' ')[1]
     );
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] logoutAllSessions:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[User] logoutAllSessions:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -409,14 +413,14 @@ const blockDevice = async (req, res) => {
     const { sessionId } = req.params;
     if (!sessionId)
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Session ID is required' });
 
     const result = await sessionService.blockDevice(sessionId, req.user.id);
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] blockDevice:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[User] blockDevice:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -432,12 +436,12 @@ const addPushToken = async (req, res) => {
   try {
     const { uniqueCode, pushToken, platform } = req.body;
     if (!uniqueCode || !pushToken)
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'uniqueCode and pushToken are required',
       });
     if (platform && !['ios', 'android'].includes(platform))
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'Platform must be either ios or android',
       });
@@ -447,7 +451,7 @@ const addPushToken = async (req, res) => {
       pushToken,
       platform
     );
-    res.status(result.success ? 200 : 404).json({
+    sendSuccess(res, {
       success: result.success,
       message: result.success
         ? 'Push token registered successfully'
@@ -455,8 +459,8 @@ const addPushToken = async (req, res) => {
       data: result.success ? result.data : undefined,
     });
   } catch (error) {
-    console.error('[User] addPushToken:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[User] addPushToken:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -467,18 +471,18 @@ const addPushToken = async (req, res) => {
 const registerVoipToken = async (req, res) => {
   try {
     const { uniqueCode, voipToken } = req.body;
-    console.log('uniqueCode :', uniqueCode);
-    console.log('voipToken :', voipToken);
+    logger.info('uniqueCode :', uniqueCode);
+    logger.info('voipToken :', voipToken);
     if (!uniqueCode || !voipToken)
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'uniqueCode and voipToken are required',
       });
     const result = await tokenService.insertVoipToken(uniqueCode, voipToken);
-    res.status(result.success ? 200 : 404).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] registerVoipToken:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[User] registerVoipToken:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -490,21 +494,21 @@ const removePushToken = async (req, res) => {
   try {
     const { uniqueCode, pushToken } = req.body;
     if (!uniqueCode || !pushToken)
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'uniqueCode and pushToken are required',
       });
 
     const result = await tokenService.removePushToken(uniqueCode, pushToken);
-    res.status(result.success ? 200 : 404).json({
+    sendSuccess(res, {
       success: result.success,
       message: result.success
         ? 'Push token removed successfully'
         : result.message,
     });
   } catch (error) {
-    console.error('[User] removePushToken:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[User] removePushToken:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -517,18 +521,18 @@ const getUserPushTokens = async (req, res) => {
     const { uniqueCode } = req.body;
     if (!uniqueCode)
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'uniqueCode is required' });
 
     const result = await tokenService.getUserPushTokens(uniqueCode);
-    res.status(result.success ? 200 : 404).json({
+    sendSuccess(res, {
       success: result.success,
       message: result.success ? undefined : result.message,
       data: result.success ? result.data : undefined,
     });
   } catch (error) {
-    console.error('[User] getUserPushTokens:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[User] getUserPushTokens:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -541,7 +545,7 @@ const sendTestNotification = async (req, res) => {
     const { uniqueCode, title, message } = req.body;
     if (!uniqueCode)
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'uniqueCode is required' });
 
     const result = await tokenService.sendNotificationToUser(uniqueCode, {
@@ -549,7 +553,7 @@ const sendTestNotification = async (req, res) => {
       body: message || 'This is a test notification',
       data: { type: 'test', timestamp: new Date().toISOString() },
     });
-    res.status(result.success ? 200 : 400).json({
+    sendSuccess(res, {
       success: result.success,
       message: result.success
         ? 'Test notification sent successfully'
@@ -557,8 +561,8 @@ const sendTestNotification = async (req, res) => {
       data: result.success ? result.data : undefined,
     });
   } catch (error) {
-    console.error('[User] sendTestNotification:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[User] sendTestNotification:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -578,19 +582,19 @@ const requestGrant = async (req, res) => {
     const { date, regNo, times, workDetails, files, ...rest } = req.body;
 
     if (!date || !regNo || !times || !workDetails) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'date, regNo, times, and workDetails are required',
       });
     }
     if (!Array.isArray(times) || times.length === 0) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'times must be a non-empty array' });
     }
     for (let i = 0; i < times.length; i++) {
       if (!times[i].in || !times[i].out) {
-        return res.status(400).json({
+        return sendError(res, {
           success: false,
           message: `Time entry ${i + 1} is missing 'in' or 'out' time`,
         });
@@ -636,15 +640,15 @@ const requestGrant = async (req, res) => {
       }
     );
 
-    res.status(response.status).json({
+    sendSuccess(res, {
       success: true,
       message: 'Pre-signed URLs generated',
       data: { uploadData: filesWithUploadData },
     });
   } catch (error) {
-    console.error('[User] requestGrant:', error);
+    logger.error('[User] requestGrant:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -656,11 +660,11 @@ const requestGrant = async (req, res) => {
 const requestService = async (req, res) => {
   try {
     const result = await permissionService.submitRequest(req.body);
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] requestService:', error);
+    logger.error('[User] requestService:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -673,7 +677,7 @@ const grantAccess = async (req, res) => {
   try {
     const { uniqueCode, dataId, purpose } = req.body;
     if (!uniqueCode || !dataId || !purpose)
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'uniqueCode, dataId, and purpose are required',
       });
@@ -683,11 +687,11 @@ const grantAccess = async (req, res) => {
       dataId,
       purpose
     );
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] grantAccess:', error);
+    logger.error('[User] grantAccess:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -701,18 +705,18 @@ const getGrantAccessData = async (req, res) => {
     const { uniqueCode, purpose } = req.body;
     if (!uniqueCode)
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'uniqueCode is required' });
 
     const result = await permissionService.getPendingRequests(
       uniqueCode,
       purpose
     );
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] getGrantAccessData:', error);
+    logger.error('[User] getGrantAccessData:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -730,15 +734,15 @@ const getSignKey = async (req, res) => {
     const { password } = req.body;
     if (!password)
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Password is required' });
 
     const result = await signatureService.getAuthSignKey(password);
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] getSignKey:', error);
+    logger.error('[User] getSignKey:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -753,11 +757,11 @@ const getSignWmKey = async (req, res) => {
       deviceInfo.userId,
       deviceInfo
     );
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] getSignWmKey:', error);
+    logger.error('[User] getSignWmKey:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: 'Cannot get WM sign key' });
   }
 };
@@ -772,11 +776,11 @@ const getSignPmKey = async (req, res) => {
       deviceInfo.userId,
       deviceInfo
     );
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] getSignPmKey:', error);
+    logger.error('[User] getSignPmKey:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: 'Cannot get PM sign key' });
   }
 };
@@ -791,11 +795,11 @@ const getSignAccountsKey = async (req, res) => {
       deviceInfo.userId,
       deviceInfo
     );
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] getSignAccountsKey:', error);
+    logger.error('[User] getSignAccountsKey:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: 'Cannot get Accounts sign key' });
   }
 };
@@ -810,11 +814,11 @@ const getSignManagerKey = async (req, res) => {
       deviceInfo.userId,
       deviceInfo
     );
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] getSignManagerKey:', error);
+    logger.error('[User] getSignManagerKey:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: 'Cannot get Manager sign key' });
   }
 };
@@ -830,11 +834,11 @@ const getSignAuthorizedKey = async (req, res) => {
       deviceInfo,
       authRole
     );
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] getSignAuthorizedKey:', error);
+    logger.error('[User] getSignAuthorizedKey:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: 'Cannot get Authorized sign key' });
   }
 };
@@ -849,11 +853,11 @@ const getSealKey = async (req, res) => {
       deviceInfo.userId,
       deviceInfo
     );
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] getSealKey:', error);
+    logger.error('[User] getSealKey:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: 'Cannot get Seal key' });
   }
 };
@@ -866,7 +870,7 @@ const activateSignature = async (req, res) => {
   try {
     const { activationKey, signType, deviceInfo } = req.body;
     if (!activationKey || !signType || !deviceInfo) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'activationKey, signType, and deviceInfo are required',
       });
@@ -878,11 +882,11 @@ const activateSignature = async (req, res) => {
       signType,
       deviceInfo
     );
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] activateSignature:', error);
+    logger.error('[User] activateSignature:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: 'Signature activation failed' });
   }
 };
@@ -895,7 +899,7 @@ const verifyDeviceTrust = async (req, res) => {
   try {
     const { signType, deviceInfo } = req.body;
     if (!signType || !deviceInfo) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'signType and deviceInfo are required',
       });
@@ -906,11 +910,11 @@ const verifyDeviceTrust = async (req, res) => {
       signType,
       deviceInfo
     );
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] verifyDeviceTrust:', error);
+    logger.error('[User] verifyDeviceTrust:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: 'Device verification failed' });
   }
 };
@@ -927,7 +931,7 @@ const generateBiometricToken = async (req, res) => {
   try {
     const { uniqueCode, deviceInfo } = req.body;
     if (!uniqueCode || !deviceInfo)
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'uniqueCode and deviceInfo are required',
       });
@@ -936,14 +940,14 @@ const generateBiometricToken = async (req, res) => {
       uniqueCode,
       deviceInfo
     );
-    res.status(result.success ? 200 : 404).json({
+    sendSuccess(res, {
       success: result.success,
       message: result.success ? undefined : result.message,
       data: result.success ? result.data : undefined,
     });
   } catch (error) {
-    console.error('[User] generateBiometricToken:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[User] generateBiometricToken:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -955,7 +959,7 @@ const biometricLogin = async (req, res) => {
   try {
     const { biometricToken, deviceInfo } = req.body;
     if (!biometricToken || !deviceInfo)
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'biometricToken and deviceInfo are required',
       });
@@ -964,15 +968,15 @@ const biometricLogin = async (req, res) => {
       biometricToken,
       deviceInfo
     );
-    res.status(result.success ? 200 : 401).json({
+    sendSuccess(res, {
       success: result.success,
       authorized: result.success,
       message: result.success ? 'Biometric login successful' : result.message,
       data: result.success ? result.data : undefined,
     });
   } catch (error) {
-    console.error('[User] biometricLogin:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[User] biometricLogin:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -985,7 +989,7 @@ const revokeBiometricToken = async (req, res) => {
     const { uniqueCode, deviceInfo } = req.body;
     if (!uniqueCode)
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'uniqueCode is required' });
 
     const result = await biometricService.revokeBiometricToken(
@@ -993,11 +997,11 @@ const revokeBiometricToken = async (req, res) => {
       deviceInfo
     );
     res
-      .status(result.success ? 200 : 404)
+      .status(result.success ? HTTP.OK : HTTP.NOT_FOUND)
       .json({ success: result.success, message: result.message });
   } catch (error) {
-    console.error('[User] revokeBiometricToken:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[User] revokeBiometricToken:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -1008,10 +1012,10 @@ const revokeBiometricToken = async (req, res) => {
 const getTutorials = async (req, res) => {
   try {
     const result = await userService.getTutorialsSeen(req.user.id);
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] getTutorials:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[User] getTutorials:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -1025,14 +1029,14 @@ const completeTutorial = async (req, res) => {
     const { tutorialId } = req.body;
     if (!tutorialId) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'tutorialId is required' });
     }
     const result = await userService.completeTutorial(req.user.id, tutorialId);
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[User] completeTutorial:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[User] completeTutorial:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 

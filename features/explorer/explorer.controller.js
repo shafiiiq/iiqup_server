@@ -1,3 +1,7 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
+const { sendSuccess, sendError } = require('../../shared/response/response.util');
 // controllers/explorer.controller.js
 const path = require('path');
 const User = require('../user/user.model');
@@ -29,16 +33,18 @@ const parseHighlights = (highlights) =>
  */
 const getAllReleases = async (req, res) => {
   try {
-    const releases = await explorerServices.getAllReleases();
+    const result = await explorerServices.getAllReleases(req.pagination);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Releases retrieved successfully',
-      data: releases,
+      data: result.data,
+      pagination: result.pagination,
+      count: result.data.length,
     });
   } catch (error) {
-    console.error('[Explorer] getAllReleases:', error);
-    res.status(500).json({
+    logger.error('[Explorer] getAllReleases:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to retrieve releases',
       error: error.message,
@@ -54,14 +60,14 @@ const getLatestRelease = async (req, res) => {
   try {
     const release = await explorerServices.getLatestRelease();
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Latest release retrieved successfully',
       data: release,
     });
   } catch (error) {
-    console.error('[Explorer] getLatestRelease:', error);
-    res.status(500).json({
+    logger.error('[Explorer] getLatestRelease:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to retrieve latest release',
       error: error.message,
@@ -80,7 +86,7 @@ const getLatestReleaseForUser = async (req, res) => {
 
     if (!release) {
       return res
-        .status(404)
+        .status(HTTP.NOT_FOUND)
         .json({ success: false, message: 'No releases available', data: null });
     }
 
@@ -90,7 +96,7 @@ const getLatestReleaseForUser = async (req, res) => {
 
     if (!user) {
       return res
-        .status(404)
+        .status(HTTP.NOT_FOUND)
         .json({ success: false, message: 'User not found', data: null });
     }
 
@@ -108,7 +114,7 @@ const getLatestReleaseForUser = async (req, res) => {
       ),
     }));
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Latest release retrieved successfully',
       data: {
@@ -118,8 +124,8 @@ const getLatestReleaseForUser = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[Explorer] getLatestReleaseForUser:', error);
-    res.status(500).json({
+    logger.error('[Explorer] getLatestReleaseForUser:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to retrieve latest release',
       error: error.message,
@@ -137,13 +143,13 @@ const createRelease = async (req, res) => {
 
     if (!releaseVersion) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Release version is required' });
     }
 
     if (!features || !Array.isArray(features) || features.length === 0) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'At least one feature is required' });
     }
 
@@ -153,7 +159,7 @@ const createRelease = async (req, res) => {
       const feature = features[i];
 
       if (!feature.videoFile?.fileBuffer) {
-        return res.status(400).json({
+        return sendError(res, {
           success: false,
           message: `Video file is required for feature ${i + 1}`,
         });
@@ -187,7 +193,7 @@ const createRelease = async (req, res) => {
       features: processedFeatures,
     });
 
-    res.status(202).json({
+    sendSuccess(res, {
       success: true,
       message: 'Release created successfully. Videos are being uploaded.',
       data: result,
@@ -208,7 +214,7 @@ const createRelease = async (req, res) => {
           'active'
         );
       } catch (error) {
-        console.error(
+        logger.error(
           `[Explorer] createRelease — upload failed for ${feature._s3Key}:`,
           error
         );
@@ -220,8 +226,8 @@ const createRelease = async (req, res) => {
       }
     }
   } catch (error) {
-    console.error('[Explorer] createRelease:', error);
-    res.status(500).json({
+    logger.error('[Explorer] createRelease:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to create release',
       error: error.message,
@@ -239,13 +245,13 @@ const deleteRelease = async (req, res) => {
 
     await explorerServices.deleteRelease(id);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Release deleted successfully',
     });
   } catch (error) {
-    console.error('[Explorer] deleteRelease:', error);
-    res.status(500).json({
+    logger.error('[Explorer] deleteRelease:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to delete release',
       error: error.message,
@@ -268,7 +274,7 @@ const addFeature = async (req, res) => {
 
     if (!videoFile?.fileBuffer) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Video file is required' });
     }
 
@@ -289,7 +295,7 @@ const addFeature = async (req, res) => {
     );
     const addedFeature = result.features[result.features.length - 1];
 
-    res.status(202).json({
+    sendSuccess(res, {
       success: true,
       message: 'Feature added successfully. Video is being uploaded.',
       data: result,
@@ -304,7 +310,7 @@ const addFeature = async (req, res) => {
         'active'
       );
     } catch (error) {
-      console.error(
+      logger.error(
         `[Explorer] addFeature — upload failed for ${finalFilename}:`,
         error
       );
@@ -315,8 +321,8 @@ const addFeature = async (req, res) => {
       );
     }
   } catch (error) {
-    console.error('[Explorer] addFeature:', error);
-    res.status(500).json({
+    logger.error('[Explorer] addFeature:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to add feature',
       error: error.message,
@@ -357,7 +363,7 @@ const updateFeature = async (req, res) => {
         updateData
       );
 
-      res.status(202).json({
+      sendSuccess(res, {
         success: true,
         message: 'Feature updated successfully. New video is being uploaded.',
         data: result,
@@ -372,7 +378,7 @@ const updateFeature = async (req, res) => {
           'active'
         );
       } catch (error) {
-        console.error(
+        logger.error(
           `[Explorer] updateFeature — upload failed for ${finalFilename}:`,
           error
         );
@@ -389,15 +395,15 @@ const updateFeature = async (req, res) => {
         updateData
       );
 
-      res.status(200).json({
+      sendSuccess(res, {
         success: true,
         message: 'Feature updated successfully',
         data: result,
       });
     }
   } catch (error) {
-    console.error('[Explorer] updateFeature:', error);
-    res.status(500).json({
+    logger.error('[Explorer] updateFeature:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to update feature',
       error: error.message,
@@ -415,13 +421,13 @@ const deleteFeature = async (req, res) => {
 
     await explorerServices.deleteFeature(releaseId, featureId);
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Feature deleted successfully',
     });
   } catch (error) {
-    console.error('[Explorer] deleteFeature:', error);
-    res.status(500).json({
+    logger.error('[Explorer] deleteFeature:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to delete feature',
       error: error.message,
@@ -440,7 +446,7 @@ const reorderFeatures = async (req, res) => {
 
     if (!Array.isArray(featureIds)) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'featureIds must be an array' });
     }
 
@@ -449,14 +455,14 @@ const reorderFeatures = async (req, res) => {
       featureIds
     );
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Features reordered successfully',
       data: result,
     });
   } catch (error) {
-    console.error('[Explorer] reorderFeatures:', error);
-    res.status(500).json({
+    logger.error('[Explorer] reorderFeatures:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to reorder features',
       error: error.message,
@@ -508,14 +514,14 @@ const markFeatureAsExplored = async (req, res) => {
 
     await user.save();
 
-    res.status(200).json({
+    sendSuccess(res, {
       success: true,
       message: 'Feature marked as explored',
       data: { allFeaturesExplored },
     });
   } catch (error) {
-    console.error('[Explorer] markFeatureAsExplored:', error);
-    res.status(500).json({
+    logger.error('[Explorer] markFeatureAsExplored:', error);
+    sendError(res, {
       success: false,
       message: 'Failed to mark feature as explored',
       error: error.message,

@@ -1,3 +1,7 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
+const { sendSuccess, sendError } = require('../../shared/response/response.util');
 const OperatorService = require('./operator.service');
 const Equipment = require('../equipment/equipment.model');
 require('dotenv').config();
@@ -36,14 +40,14 @@ const validate = (fields, source) => {
 };
 
 /**
- * Sends a 400 validation error response.
+ * Sends a HTTP.BAD_REQUEST validation error response.
  *
  * @param {Object} res    - Express response object.
  * @param {Array}  errors - Array of validation error objects.
  */
 const sendValidationError = (res, errors) =>
   res
-    .status(400)
+    .status(HTTP.BAD_REQUEST)
     .json({ success: false, message: 'Validation failed', errors });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -64,15 +68,15 @@ const createOperator = async (req, res) => {
 
     const operator = await OperatorService.createOperator(req.body);
 
-    res.status(201).json({
+    sendSuccess(res, {
       success: true,
       data: operator,
       authMail: process.env.AUTH_OTP_USER_EMAIL,
       message: 'Operator created successfully',
     });
   } catch (error) {
-    console.error('[Operator] createOperator:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Operator] createOperator:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to create operator',
       ...(error.details && { details: error.details }),
@@ -98,8 +102,8 @@ const verifyOperator = async (req, res) => {
       message: 'Operator verified successfully',
     });
   } catch (error) {
-    console.error('[Operator] verifyOperator:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Operator] verifyOperator:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to verify operator',
       ...(error.details && { details: error.details }),
@@ -136,8 +140,8 @@ const uploadProfilePic = async (req, res) => {
       message: 'Upload URL generated successfully',
     });
   } catch (error) {
-    console.error('[Operator] uploadProfilePic:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Operator] uploadProfilePic:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to upload profile picture',
     });
@@ -150,17 +154,18 @@ const uploadProfilePic = async (req, res) => {
  */
 const getAllOperators = async (req, res) => {
   try {
-    const operators = await OperatorService.getAllOperators();
+    const result = await OperatorService.getAllOperators(req.pagination);
 
     res.json({
       success: true,
-      data: operators,
-      count: operators.length,
+      data: result.data,
+      pagination: result.pagination,
+      count: result.data.length,
       message: 'Operators retrieved successfully',
     });
   } catch (error) {
-    console.error('[Operator] getAllOperators:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Operator] getAllOperators:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to retrieve operators',
     });
@@ -186,8 +191,8 @@ const getOperatorByQatarId = async (req, res) => {
       message: 'Operator retrieved successfully',
     });
   } catch (error) {
-    console.error('[Operator] getOperatorByQatarId:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Operator] getOperatorByQatarId:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to retrieve operator',
     });
@@ -208,7 +213,7 @@ const updateOperator = async (req, res) => {
         regNo: req.body.equipmentNumber,
       });
       if (!equipment) {
-        return res.status(404).json({
+        return sendError(res, {
           success: false,
           message: `Equipment with regNo ${req.body.equipmentNumber} not found`,
         });
@@ -226,8 +231,8 @@ const updateOperator = async (req, res) => {
       message: 'Operator updated successfully',
     });
   } catch (error) {
-    console.error('[Operator] updateOperator:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Operator] updateOperator:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to update operator',
     });
@@ -250,8 +255,8 @@ const deleteOperator = async (req, res) => {
       message: 'Operator deleted successfully',
     });
   } catch (error) {
-    console.error('[Operator] deleteOperator:', error);
-    res.status(error.status || 500).json({
+    logger.error('[Operator] deleteOperator:', error);
+    sendError(res, {
       success: false,
       message: error.message || 'Failed to delete operator',
     });

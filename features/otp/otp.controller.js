@@ -1,3 +1,7 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
+const { sendSuccess, sendError } = require('../../shared/response/response.util');
 // controllers/otp.controller.js
 const otpServices = require('./otp.service');
 
@@ -20,23 +24,23 @@ const resolveEmail = (email) =>
  */
 const requestOTP = async (req, res) => {
   try {
-    console.log('req.body.email', req.body.email);
-    console.log('resolved email', resolveEmail(req.body.email));
+    logger.info('req.body.email', req.body.email);
+    logger.info('resolved email', resolveEmail(req.body.email));
 
     const email = resolveEmail(req.body.email);
 
     if (!email) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Email address is required' });
     }
 
     const result = await otpServices.generateAndSendOTP(email);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[OTP] requestOTP:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[OTP] requestOTP:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -46,7 +50,7 @@ const requestOTP = async (req, res) => {
  */
 const verifyOTP = async (req, res) => {
   try {
-    console.log('otp verify req.body', req.body.otp);
+    logger.info('otp verify req.body', req.body.otp);
     const { otp, qatarId } = req.body;
     const emailInput =
       req.body.email || req.body.authMail || req.body.authMailAddress;
@@ -57,7 +61,7 @@ const verifyOTP = async (req, res) => {
 
     if (!email || !otp) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Email and OTP are required' });
     }
 
@@ -68,12 +72,12 @@ const verifyOTP = async (req, res) => {
       type === 'operator' ? qatarId : null
     );
 
-    console.log('otp verify result', result);
+    logger.info('otp verify result', result);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[OTP] verifyOTP:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[OTP] verifyOTP:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 
@@ -86,14 +90,14 @@ const resetPassword = async (req, res) => {
     const { email, otp, newPassword } = req.body;
 
     if (!email || !otp || !newPassword) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'Email, OTP, and new password are required',
       });
     }
 
     if (newPassword.length < 6) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'Password must be at least 6 characters long',
       });
@@ -105,10 +109,10 @@ const resetPassword = async (req, res) => {
       newPassword
     );
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[OTP] resetPassword:', error);
-    res.status(500).json({ success: false, message: error.message });
+    logger.error('[OTP] resetPassword:', error);
+    sendError(res, { success: false, message: error.message });
   }
 };
 

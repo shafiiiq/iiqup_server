@@ -1,3 +1,7 @@
+const logger = require('../../shared/logger/logger');
+
+const HTTP = require('../../shared/constants/httpStatus.constant.js');
+const { sendSuccess, sendError } = require('../../shared/response/response.util');
 // controllers/equipment.controller.js
 const path = require('path');
 const { putObject } = require('../../config/aws/s3.aws');
@@ -27,11 +31,11 @@ const addEquipment = async (req, res) => {
   try {
     const result = await equipmentServices.insertEquipment(req.body);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Equipment] addEquipment:', error);
+    logger.error('[Equipment] addEquipment:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -42,7 +46,7 @@ const addEquipment = async (req, res) => {
  */
 const getEquipments = async (req, res) => {
   try {
-    const { page = 1, limit = 20, hired, status } = req.query;
+    const { hired, status } = req.query;
     const statusFilter = Array.isArray(status)
       ? status
       : status
@@ -50,21 +54,20 @@ const getEquipments = async (req, res) => {
         : null;
 
     const result = await equipmentServices.fetchEquipments(
-      parseInt(page),
-      parseInt(limit),
+      req.pagination,
       hired,
       statusFilter
     );
 
-    res.status(200).json({
-      status: 200,
+    sendSuccess(res, {
+      status: HTTP.OK,
       ok: true,
-      data: result.equipments,
-      pagination: paginationShape(result),
+      data: result.data,
+      pagination: result.pagination,
     });
   } catch (error) {
-    console.error('[Equipment] getEquipments:', error);
-    res.status(500).json({ status: 500, ok: false, message: error.message });
+    logger.error('[Equipment] getEquipments:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message });
   }
 };
 
@@ -77,11 +80,11 @@ const getEquipmentsByReg = async (req, res) => {
     const { regNo } = req.params;
     const result = await equipmentServices.fetchEquipmentByReg(regNo);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Equipment] getEquipmentsByReg:', error);
+    logger.error('[Equipment] getEquipmentsByReg:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -96,17 +99,17 @@ const getEquipmentImages = async (req, res) => {
 
     if (!regNo) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Equipment regNo is required' });
     }
 
     const result = await equipmentServices.getEquipmentImages(regNo);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Equipment] getEquipmentImages:', error);
+    logger.error('[Equipment] getEquipmentImages:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -122,11 +125,11 @@ const updateEquipments = async (req, res) => {
 
     const result = await equipmentServices.updateEquipment(regNo, updateData);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Equipment] updateEquipments:', error);
+    logger.error('[Equipment] updateEquipments:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -140,11 +143,11 @@ const deleteEquipments = async (req, res) => {
     const { regNo } = req.params;
     const result = await equipmentServices.deleteEquipment(regNo);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Equipment] deleteEquipments:', error);
+    logger.error('[Equipment] deleteEquipments:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -160,11 +163,11 @@ const updateStatus = async (req, res) => {
 
     const result = await equipmentServices.changeStatus(id, updateData);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Equipment] updateStatus:', error);
+    logger.error('[Equipment] updateStatus:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -179,38 +182,31 @@ const updateStatus = async (req, res) => {
  */
 const searchEquipments = async (req, res) => {
   try {
-    const {
-      searchTerm,
-      page = 1,
-      limit = 20,
-      searchField = 'all',
-      hired,
-    } = req.body;
+    const { searchTerm, searchField = 'all', hired } = req.body;
 
     if (!searchTerm || searchTerm.trim() === '') {
       return res
-        .status(400)
-        .json({ status: 400, ok: false, message: 'Search term is required' });
+        .status(HTTP.BAD_REQUEST)
+        .json({ status: HTTP.BAD_REQUEST, ok: false, message: 'Search term is required' });
     }
 
     const result = await equipmentServices.searchEquipments(
       searchTerm.trim(),
-      parseInt(page),
-      parseInt(limit),
+      req.pagination,
       searchField,
       hired
     );
 
-    res.status(200).json({
-      status: 200,
+    sendSuccess(res, {
+      status: HTTP.OK,
       ok: true,
-      data: result.equipments,
-      pagination: paginationShape(result),
+      data: result.data,
+      pagination: result.pagination,
       searchTerm,
     });
   } catch (error) {
-    console.error('[Equipment] searchEquipments:', error);
-    res.status(500).json({ status: 500, ok: false, message: error.message });
+    logger.error('[Equipment] searchEquipments:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message });
   }
 };
 
@@ -220,24 +216,23 @@ const searchEquipments = async (req, res) => {
  */
 const getEquipmentsByStatus = async (req, res) => {
   try {
-    const { status, page = 1, limit = 20, hired } = req.query;
+    const { status, hired } = req.query;
 
     const result = await equipmentServices.fetchEquipmentsByStatus(
       status,
-      parseInt(page),
-      parseInt(limit),
+      req.pagination,
       hired
     );
 
-    res.status(200).json({
-      status: 200,
+    sendSuccess(res, {
+      status: HTTP.OK,
       ok: true,
-      data: result.equipments,
-      pagination: paginationShape(result),
+      data: result.data,
+      pagination: result.pagination,
     });
   } catch (error) {
-    console.error('[Equipment] getEquipmentsByStatus:', error);
-    res.status(500).json({ status: 500, ok: false, message: error.message });
+    logger.error('[Equipment] getEquipmentsByStatus:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message });
   }
 };
 
@@ -250,14 +245,14 @@ const getEquipmentStats = async (req, res) => {
     const { hired } = req.query;
     const result = await equipmentServices.fetchEquipmentStats(hired);
 
-    res.status(200).json({
-      status: 200,
+    sendSuccess(res, {
+      status: HTTP.OK,
       ok: true,
       data: result,
     });
   } catch (error) {
-    console.error('[Equipment] getEquipmentStats:', error);
-    res.status(500).json({ status: 500, ok: false, message: error.message });
+    logger.error('[Equipment] getEquipmentStats:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message });
   }
 };
 
@@ -299,10 +294,10 @@ const getEquipmentCount = async (req, res) => {
 
     const count = await equipmentModel.countDocuments(query);
 
-    res.status(200).json({ status: 200, ok: true, count });
+    sendSuccess(res, { status: HTTP.OK, ok: true, count });
   } catch (error) {
-    console.error('[Equipment] getEquipmentCount:', error);
-    res.status(500).json({ status: 500, ok: false, message: error.message });
+    logger.error('[Equipment] getEquipmentCount:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message });
   }
 };
 
@@ -314,10 +309,10 @@ const getSites = async (req, res) => {
   try {
     const result = await equipmentServices.fetchUniqueSites();
 
-    res.status(200).json({ status: 200, ok: true, data: result });
+    sendSuccess(res, { status: HTTP.OK, ok: true, data: result });
   } catch (error) {
-    console.error('[Equipment] getSites:', error);
-    res.status(500).json({ status: 500, ok: false, message: error.message });
+    logger.error('[Equipment] getSites:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message });
   }
 };
 
@@ -335,13 +330,13 @@ const addEquipmentImage = async (req, res) => {
 
     if (!equipmentNo) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'Equipment number is required' });
     }
 
     if (!files?.length) {
       return res
-        .status(400)
+        .status(HTTP.BAD_REQUEST)
         .json({ success: false, message: 'At least one file is required' });
     }
 
@@ -381,15 +376,15 @@ const addEquipmentImage = async (req, res) => {
       })
     );
 
-    res.status(200).json({
-      status: 200,
+    sendSuccess(res, {
+      status: HTTP.OK,
       message: 'Pre-signed URLs generated and metadata saved',
       data: { uploadData: filesWithUploadData },
     });
   } catch (error) {
-    console.error('[Equipment] addEquipmentImage:', error);
+    logger.error('[Equipment] addEquipmentImage:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -403,14 +398,14 @@ const getBulkEquipmentImages = async (req, res) => {
     const { regNos } = req.body;
 
     if (!regNos || !Array.isArray(regNos) || regNos.length === 0) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'Array of equipment regNos is required',
       });
     }
 
     if (regNos.length > 50) {
-      return res.status(400).json({
+      return sendError(res, {
         success: false,
         message: 'Maximum 50 equipment regNos allowed per request',
       });
@@ -418,11 +413,11 @@ const getBulkEquipmentImages = async (req, res) => {
 
     const result = await equipmentServices.getBulkEquipmentImages(regNos);
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Equipment] getBulkEquipmentImages:', error);
+    logger.error('[Equipment] getBulkEquipmentImages:', error);
     res
-      .status(error.status || 500)
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message });
   }
 };
@@ -459,8 +454,8 @@ const changeEquipmentStatus = async (req, res) => {
       !year ||
       !time
     ) {
-      return res.status(400).json({
-        status: 400,
+      return sendError(res, {
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message:
           'Missing required fields: equipmentId, regNo, machine, previousStatus, newStatus, month, year, time',
@@ -468,8 +463,8 @@ const changeEquipmentStatus = async (req, res) => {
     }
 
     if (previousStatus === newStatus) {
-      return res.status(400).json({
-        status: 400,
+      return sendError(res, {
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message: 'Previous status and new status cannot be the same',
       });
@@ -487,10 +482,10 @@ const changeEquipmentStatus = async (req, res) => {
       remarks: remarks || '',
     });
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Equipment] changeEquipmentStatus:', error);
-    res.status(500).json({ status: 500, ok: false, message: error.message });
+    logger.error('[Equipment] changeEquipmentStatus:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message });
   }
 };
 
@@ -527,8 +522,8 @@ const mobilizeEquipment = async (req, res) => {
     } = req.body;
 
     if (!equipmentId || !regNo || !machine || !month || !year || !time) {
-      return res.status(400).json({
-        status: 400,
+      return sendError(res, {
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message:
           'Missing required fields: equipmentId, regNo, machine, month, year, time',
@@ -536,24 +531,24 @@ const mobilizeEquipment = async (req, res) => {
     }
 
     if (deployType === 'company' && !clientCompany) {
-      return res.status(400).json({
-        status: 400,
+      return sendError(res, {
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message: 'clientCompany is required when deployType is company',
       });
     }
 
     if (deployType !== 'company' && !site) {
-      return res.status(400).json({
-        status: 400,
+      return sendError(res, {
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message: 'site is required when deployType is site',
       });
     }
 
     if (withOperator && (!operators || !operators.length)) {
-      return res.status(400).json({
-        status: 400,
+      return sendError(res, {
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message: 'At least one operator is required when withOperator is true',
       });
@@ -581,10 +576,10 @@ const mobilizeEquipment = async (req, res) => {
       rentRate: rentRate || null,
     });
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Equipment] mobilizeEquipment:', error);
-    res.status(500).json({ status: 500, ok: false, message: error.message });
+    logger.error('[Equipment] mobilizeEquipment:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message });
   }
 };
 
@@ -606,8 +601,8 @@ const demobilizeEquipment = async (req, res) => {
     } = req.body;
 
     if (!equipmentId || !regNo || !machine || !month || !year || !time) {
-      return res.status(400).json({
-        status: 400,
+      return sendError(res, {
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message:
           'Missing required fields: equipmentId, regNo, machine, month, year, time',
@@ -625,10 +620,10 @@ const demobilizeEquipment = async (req, res) => {
       remarks: remarks || '',
     });
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Equipment] demobilizeEquipment:', error);
-    res.status(500).json({ status: 500, ok: false, message: error.message });
+    logger.error('[Equipment] demobilizeEquipment:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message });
   }
 };
 
@@ -651,8 +646,8 @@ const addShifts = async (req, res) => {
     } = req.body;
 
     if (!equipmentId || !regNo || !operators?.length) {
-      return res.status(400).json({
-        status: 400,
+      return sendError(res, {
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message: 'equipmentId, regNo, operators are required',
       });
@@ -669,10 +664,10 @@ const addShifts = async (req, res) => {
       selectedDate,
       remarks,
     });
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Equipment] addShifts:', error);
-    res.status(500).json({ status: 500, ok: false, message: error.message });
+    logger.error('[Equipment] addShifts:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message });
   }
 };
 
@@ -683,29 +678,27 @@ const addShifts = async (req, res) => {
 const getMobilizationHistory = async (req, res) => {
   try {
     const { equipmentId } = req.params;
-    const { page = 1, limit = 20 } = req.query;
 
     if (!equipmentId) {
       return res
-        .status(400)
-        .json({ status: 400, ok: false, message: 'Equipment ID is required' });
+        .status(HTTP.BAD_REQUEST)
+        .json({ status: HTTP.BAD_REQUEST, ok: false, message: 'Equipment ID is required' });
     }
 
     const result = await equipmentServices.getMobilizationHistory(
       parseInt(equipmentId),
-      parseInt(page),
-      parseInt(limit)
+      req.pagination
     );
 
-    res.status(200).json({
-      status: 200,
+    sendSuccess(res, {
+      status: HTTP.OK,
       ok: true,
-      data: result.history,
-      pagination: paginationShape(result),
+      data: result.data,
+      pagination: result.pagination,
     });
   } catch (error) {
-    console.error('[Equipment] getMobilizationHistory:', error);
-    res.status(500).json({ status: 500, ok: false, message: error.message });
+    logger.error('[Equipment] getMobilizationHistory:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message });
   }
 };
 
@@ -717,10 +710,10 @@ const getAllMobilizations = async (req, res) => {
   try {
     const result = await equipmentServices.fetchAllMobilizations();
 
-    res.status(200).json({ status: 200, ok: true, data: result });
+    sendSuccess(res, { status: HTTP.OK, ok: true, data: result });
   } catch (error) {
-    console.error('[Equipment] getAllMobilizations:', error);
-    res.status(500).json({ status: 500, ok: false, message: error.message });
+    logger.error('[Equipment] getAllMobilizations:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message });
   }
 };
 
@@ -741,8 +734,8 @@ const getFilteredMobilizations = async (req, res) => {
     } = req.query;
 
     if (!filterType) {
-      return res.status(400).json({
-        status: 400,
+      return sendError(res, {
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message:
           'filterType is required (daily, yesterday, weekly, monthly, yearly, months, custom, single)',
@@ -750,32 +743,32 @@ const getFilteredMobilizations = async (req, res) => {
     }
 
     if (filterType === 'custom' && (!startDate || !endDate)) {
-      return res.status(400).json({
-        status: 400,
+      return sendError(res, {
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message: 'startDate and endDate are required for custom range',
       });
     }
 
     if (filterType === 'single' && !startDate) {
-      return res.status(400).json({
-        status: 400,
+      return sendError(res, {
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message: 'Date is required for single date filter',
       });
     }
 
     if (filterType === 'months' && !months) {
-      return res.status(400).json({
-        status: 400,
+      return sendError(res, {
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message: 'months is required for months filter type',
       });
     }
 
     if (startTime && endTime && startTime > endTime) {
-      return res.status(400).json({
-        status: 400,
+      return sendError(res, {
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message: 'startTime must be before endTime',
       });
@@ -792,11 +785,11 @@ const getFilteredMobilizations = async (req, res) => {
     );
 
     res
-      .status(200)
-      .json({ status: 200, ok: true, data: result, count: result.length });
+      .status(HTTP.OK)
+      .json({ status: HTTP.OK, ok: true, data: result, count: result.length });
   } catch (error) {
-    console.error('[Equipment] getFilteredMobilizations:', error);
-    res.status(500).json({ status: 500, ok: false, message: error.message });
+    logger.error('[Equipment] getFilteredMobilizations:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message });
   }
 };
 
@@ -830,7 +823,7 @@ const replaceOperator = async (req, res) => {
       replaceAll,
     } = req.body;
 
-    console.log('mmmmmmmm', req.body);
+    logger.info('mmmmmmmm', req.body);
     if (
       !equipmentId ||
       !regNo ||
@@ -841,8 +834,8 @@ const replaceOperator = async (req, res) => {
       !year ||
       !time
     ) {
-      return res.status(400).json({
-        status: 400,
+      return sendError(res, {
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message:
           'Missing required fields: equipmentId, regNo, machine, replacedOperator, replacedOperatorId, month, year, time',
@@ -850,8 +843,8 @@ const replaceOperator = async (req, res) => {
     }
 
     if (!replaceAll && !currentOperator) {
-      return res.status(400).json({
-        status: 400,
+      return sendError(res, {
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message: 'currentOperator is required when not replacing all operators',
       });
@@ -877,10 +870,10 @@ const replaceOperator = async (req, res) => {
       replaceAll: replaceAll || false,
     });
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Equipment] replaceOperator:', error);
-    res.status(500).json({ status: 500, ok: false, message: error.message });
+    logger.error('[Equipment] replaceOperator:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message });
   }
 };
 
@@ -918,8 +911,8 @@ const replaceEquipment = async (req, res) => {
       !year ||
       !time
     ) {
-      return res.status(400).json({
-        status: 400,
+      return sendError(res, {
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message:
           'Missing required fields: equipmentId, regNo, machine, replacedEquipmentId, replacedEquipmentRegNo, replacedEquipmentMachine, month, year, time',
@@ -943,10 +936,10 @@ const replaceEquipment = async (req, res) => {
       operatorId: operatorId || '',
     });
 
-    res.status(result.status).json(result);
+    sendSuccess(res, result);
   } catch (error) {
-    console.error('[Equipment] replaceEquipment:', error);
-    res.status(500).json({ status: 500, ok: false, message: error.message });
+    logger.error('[Equipment] replaceEquipment:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message });
   }
 };
 
@@ -957,30 +950,29 @@ const replaceEquipment = async (req, res) => {
 const getReplacementHistory = async (req, res) => {
   try {
     const { equipmentId } = req.params;
-    const { page = 1, limit = 20, type } = req.query;
+    const { type } = req.query;
 
     if (!equipmentId) {
       return res
-        .status(400)
-        .json({ status: 400, ok: false, message: 'Equipment ID is required' });
+        .status(HTTP.BAD_REQUEST)
+        .json({ status: HTTP.BAD_REQUEST, ok: false, message: 'Equipment ID is required' });
     }
 
     const result = await equipmentServices.getReplacementHistory(
       parseInt(equipmentId),
-      parseInt(page),
-      parseInt(limit),
+      req.pagination,
       type
     );
 
-    res.status(200).json({
-      status: 200,
+    sendSuccess(res, {
+      status: HTTP.OK,
       ok: true,
-      data: result.history,
-      pagination: paginationShape(result),
+      data: result.data,
+      pagination: result.pagination,
     });
   } catch (error) {
-    console.error('[Equipment] getReplacementHistory:', error);
-    res.status(500).json({ status: 500, ok: false, message: error.message });
+    logger.error('[Equipment] getReplacementHistory:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message });
   }
 };
 
@@ -992,10 +984,10 @@ const getAllReplacements = async (req, res) => {
   try {
     const result = await equipmentServices.fetchAllReplacements();
 
-    res.status(200).json({ status: 200, ok: true, data: result });
+    sendSuccess(res, { status: HTTP.OK, ok: true, data: result });
   } catch (error) {
-    console.error('[Equipment] getAllReplacements:', error);
-    res.status(500).json({ status: 500, ok: false, message: error.message });
+    logger.error('[Equipment] getAllReplacements:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message });
   }
 };
 
@@ -1008,8 +1000,8 @@ const getFilteredReplacements = async (req, res) => {
     const { filterType, startDate, endDate, months } = req.query;
 
     if (!filterType) {
-      return res.status(400).json({
-        status: 400,
+      return sendError(res, {
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message:
           'filterType is required (daily, yesterday, weekly, monthly, yearly, months, custom)',
@@ -1017,16 +1009,16 @@ const getFilteredReplacements = async (req, res) => {
     }
 
     if (filterType === 'custom' && (!startDate || !endDate)) {
-      return res.status(400).json({
-        status: 400,
+      return sendError(res, {
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message: 'startDate and endDate are required for custom range',
       });
     }
 
     if (filterType === 'months' && !months) {
-      return res.status(400).json({
-        status: 400,
+      return sendError(res, {
+        status: HTTP.BAD_REQUEST,
         ok: false,
         message: 'months is required for months filter type',
       });
@@ -1040,11 +1032,11 @@ const getFilteredReplacements = async (req, res) => {
     );
 
     res
-      .status(200)
-      .json({ status: 200, ok: true, data: result, count: result.length });
+      .status(HTTP.OK)
+      .json({ status: HTTP.OK, ok: true, data: result, count: result.length });
   } catch (error) {
-    console.error('[Equipment] getFilteredReplacements:', error);
-    res.status(500).json({ status: 500, ok: false, message: error.message });
+    logger.error('[Equipment] getFilteredReplacements:', error);
+    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message });
   }
 };
 
