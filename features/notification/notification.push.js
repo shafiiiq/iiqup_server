@@ -185,13 +185,11 @@ const sendVoipSyncPush = async (uniqueCode, notificationId) => {
 
     const http2 = require('http2');
     const jwt = require('jsonwebtoken');
-    const fs = require('fs');
-    const path = require('path');
 
     const teamId = process.env.APNS_TEAM_ID;
     const keyId = process.env.APNS_KEY_ID;
-    const keyPath = process.env.APNS_KEY_PATH;
     const bundleId = process.env.APNS_BUNDLE_ID;
+    const apnsAuthKey = process.env.APNS_AUTH_KEY; // expected base64-encoded
 
     if (!teamId || !keyId || !bundleId) {
       logger.error('[NotificationPush] APNS env not fully configured', {
@@ -202,31 +200,19 @@ const sendVoipSyncPush = async (uniqueCode, notificationId) => {
       return { success: false, error: 'APNS configuration incomplete' };
     }
 
-    if (!keyPath) {
-      logger.error('[NotificationPush] APNS_KEY_PATH is not configured');
-      return { success: false, error: 'APNS key path not configured' };
+    if (!apnsAuthKey) {
+      logger.error('[NotificationPush] APNS_AUTH_KEY is not configured');
+      return { success: false, error: 'APNS auth key not configured' };
     }
 
-    let resolvedKeyPath = path.isAbsolute(keyPath)
-      ? keyPath
-      : path.resolve(__dirname, keyPath);
-
-    if (!fs.existsSync(resolvedKeyPath)) {
-      const altPath = path.resolve(process.cwd(), keyPath);
-      if (fs.existsSync(altPath)) {
-        resolvedKeyPath = altPath;
-      }
+    let privateKey;
+    try {
+      privateKey = Buffer.from(apnsAuthKey, 'base64').toString('utf-8');
+    } catch (err) {
+      logger.error('[NotificationPush] APNS_AUTH_KEY invalid base64', err);
+      return { success: false, error: 'APNS auth key invalid' };
     }
 
-    if (!fs.existsSync(resolvedKeyPath)) {
-      logger.error(
-        '[NotificationPush] APNS key missing at path:',
-        resolvedKeyPath
-      );
-      return { success: false, error: 'APNS key missing' };
-    }
-
-    const privateKey = fs.readFileSync(resolvedKeyPath);
     const jwtToken = jwt.sign({}, privateKey, {
       algorithm: 'ES256',
       keyid: keyId,
