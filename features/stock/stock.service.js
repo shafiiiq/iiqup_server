@@ -1,5 +1,5 @@
 const logger = require('../../shared/logger/logger');
-
+const { paginate } = require('../../shared/pagination');
 const HTTP = require('../../shared/constants/httpStatus.constant.js');
 // ─────────────────────────────────────────────────────────────────────────────
 // Stock Service
@@ -613,17 +613,6 @@ const updateStock = async (stockId, updateData) => {
         updatedStock.stockCount === 0
           ? `Urgent Requirement: ${currentStock.product} with part number ${currentStock.serialNumber} is out of stock`
           : `Urgent Requirement: ${currentStock.product} with part number ${currentStock.serialNumber} is low in stock — only ${updatedStock.stockCount} items left`;
-
-      await userServices
-        .pushSpecialNotification(
-          process.env.JALEEL_KA,
-          updatedStock.stockCount,
-          stockId,
-          message
-        )
-        .catch((e) =>
-          logger.error('[StockService] Low stock notification failed:', e)
-        );
 
       await PushNotificationService.sendGeneralNotification(
         officeHero,

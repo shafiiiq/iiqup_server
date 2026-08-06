@@ -7,7 +7,7 @@ const Equipment = require('../equipment/equipment.model');
 const User = require('../user/user.model');
 const otpServices = require('../otp/otp.service');
 const { putObject } = require('../../config/aws/s3.aws');
-const { paginate } = require('../../shared/pagination/pagination.util');
+const { paginationUtil: { paginate } } = require('../../shared/pagination');
 require('dotenv').config();
 
 // ─────────────────────────────────────────────────────────────────────────────

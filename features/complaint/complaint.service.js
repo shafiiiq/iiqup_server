@@ -5,7 +5,7 @@ const HTTP = require('../../shared/constants/httpStatus.constant.js');
 // services/complaint.service.js
 const Complaint = require('./complaint.model');
 const Equipment = require('../equipment/equipment.model');
-const MobilizationModel = require('../equipment/mobilization/mobilizations.model');
+const { mobilizationModel } = require('../equipment/mobilization');
 const LPO = require('../lpo/lpo.model');
 const Mechanic = require('../mechanic/mechanic.model');
 const { createNotification } = require('../notification/notification.service');
@@ -1354,7 +1354,7 @@ const addSolutionToComplaint = async (
   }
 };
 
-const { paginate } = require('../../shared/pagination/pagination.util');
+const { paginationUtil: { paginate } } = require('../../shared/pagination');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Read

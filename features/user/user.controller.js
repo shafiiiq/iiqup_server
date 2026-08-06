@@ -8,11 +8,13 @@ const { putObject } = require('../../config/aws/s3.aws');
 require('dotenv').config();
 
 const userService = require('./user.service');
-const sessionService = require('../../shared/auth/session/session.auth');
-const tokenService = require('../../shared/auth/token.auth');
-const permissionService = require('./auth/permission.auth');
-const signatureService = require('./auth/signature.auth');
-const biometricService = require('./auth/biometric.auth');
+const { sessionAuth: sessionService } = require('../../shared/auth');
+const { tokenAuth: tokenService } = require('../../shared/auth');
+const {
+  permissionService,
+  signatureService,
+  biometricService,
+} = require('./auth');
 const PushNotification = require('../notification/notification.push');
 
 // ─────────────────────────────────────────────────────────────────────────────

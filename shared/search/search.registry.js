@@ -45,12 +45,12 @@ const searchRegistry = {
     defaultFields: ['equipmentName', 'equipmentNo'],
   },
   mobilizations: {
-    model: require('../../features/equipment/mobilization/mobilizations.model'),
+    model: require('../../features/equipment/mobilization').mobilizationModel,
     searchableFields: ['regNo', 'machine', 'action', 'previousStatus', 'newStatus', 'status', 'deployType', 'clientCompany', 'site', 'time', 'demobRemarks', 'operator', 'operatorName'],
     defaultFields: ['regNo', 'machine', 'status', 'site'],
   },
   replacements: {
-    model: require('../../features/equipment/replacement/replacement.model'),
+    model: require('../../features/equipment/replacement').replacementModel,
     searchableFields: ['regNo', 'machine', 'type', 'status', 'time', 'currentOperator', 'currentOperatorId', 'outgoingOperator', 'outgoingOperatorId', 'incomingOperator', 'incomingOperatorId', 'replacedOperator', 'replacedOperatorId', 'shiftName', 'shiftStart', 'shiftEnd'],
     defaultFields: ['regNo', 'machine', 'status', 'time'],
   },

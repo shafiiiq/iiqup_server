@@ -1,10 +1,12 @@
+// shared/gmail/gmail.instances.js
+const GmailClient = require('./gmail.client');
+const { GMAIL_ACCOUNTS } = require('../constants/email.constant');
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Email Constants
+// Shared Singleton Instances
 // ─────────────────────────────────────────────────────────────────────────────
 
-const GMAIL_SCOPES = [
-  'https://www.googleapis.com/auth/gmail.send',
-  'https://www.googleapis.com/auth/gmail.settings.basic',
-];
+const serviceGmailClient = new GmailClient(GMAIL_ACCOUNTS.SERVICE);
+const operationsGmailClient = new GmailClient(GMAIL_ACCOUNTS.OPERATIONS);
 
-module.exports = { GMAIL_SCOPES };
+module.exports = { serviceGmailClient, operationsGmailClient };

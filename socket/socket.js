@@ -1,5 +1,5 @@
 // utils/websocket.js
-const { checkSessionStatus } = require('../shared/auth/session/session.auth');
+const { sessionAuth: { checkSessionStatus } } = require('../shared/auth');
 const messageService = require('../features/chat/message/message.service');
 const chatService = require('../features/chat/chat.service');
 

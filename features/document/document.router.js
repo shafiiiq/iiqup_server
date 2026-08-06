@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const controller = require('./document.controller');
-const paginationMiddleware = require('../../shared/pagination/pagination.middleware');
+const { paginationMiddleware } = require('../../shared/pagination');
 const { authMiddleware } = require('../../middlewares/jwt.middleware');
 
 // ─────────────────────────────────────────────────────────────────────────────

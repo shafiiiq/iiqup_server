@@ -28,7 +28,7 @@ const findUserByUniqueCode = async (
  * @param {string} pushToken
  * @param {string|null} platform
  * @returns {Promise}
- */
+ */ 
 const insertPushToken = async (uniqueCode, pushToken, platform = null) => {
   try {
     const tokenString = String(pushToken || '');

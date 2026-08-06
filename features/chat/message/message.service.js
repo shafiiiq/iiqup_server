@@ -5,7 +5,7 @@ const Message = require('./messages.model');
 const Chat = require('../chats.model');
 const User = require('../../user/user.model');
 const chatService = require('../chat.service');
-const { paginate } = require('../../../shared/pagination/pagination.util');
+const { paginationUtil: { paginate } } = require('../../../shared/pagination');
 const { putObject, getObjectUrl } = require('../../../config/aws/s3.aws');
 
 // ─────────────────────────────────────────────────────────────────────────────

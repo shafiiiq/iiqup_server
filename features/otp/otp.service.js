@@ -206,7 +206,7 @@ const verifyOTP = async (email, otp, type, qatarId = null) => {
       name: user.name,
     });
 
-    const { createSession } = require('../../shared/auth/session/session.auth');
+    const { sessionAuth: { createSession } } = require('../../shared/auth');
     const sessionToken = await createSession(
       user._id,
       type === 'mechanic'

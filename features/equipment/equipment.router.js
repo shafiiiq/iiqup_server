@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const controller = require('./equipment.controller');
-const paginationMiddleware = require('../../shared/pagination/pagination.middleware');
+const { paginationMiddleware } = require('../../shared/pagination');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Equipment Routes

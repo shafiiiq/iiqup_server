@@ -3,7 +3,7 @@ const logger = require('../../shared/logger/logger');
 const HTTP = require('../../shared/constants/httpStatus.constant.js');
 // services/explorer.service.js
 const Explorer = require('./explorer.model');
-const { paginate } = require('../../shared/pagination/pagination.util');
+const { paginationUtil: { paginate } } = require('../../shared/pagination');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Read

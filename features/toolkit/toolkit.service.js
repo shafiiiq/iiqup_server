@@ -12,7 +12,7 @@ const Mechanic = require('../mechanic/mechanic.model');
 const Operator = require('../operator/operator.model');
 const User = require('../user/user.model');
 const mongoose = require('mongoose');
-const { paginate } = require('../../shared/pagination/pagination.util');
+const { paginationUtil: { paginate } } = require('../../shared/pagination');
 
 const { createNotification } = require('../notification/notification.service');
 const PushNotificationService = require('../notification/notification.push');

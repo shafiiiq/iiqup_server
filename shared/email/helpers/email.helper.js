@@ -2,12 +2,12 @@
 // Email Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
+const fs = require('fs');
+const path = require('path');
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
-
-const fs = require('fs');
-const path = require('path');
 
 const MIME_TYPES = {
   '.pdf': 'application/pdf',
@@ -24,6 +24,26 @@ const MIME_TYPES = {
   '.csv': 'text/csv',
   '.zip': 'application/zip',
 };
+
+const MONTH_NAMES = [
+  '',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Load a local image and return a base64 data URI, or '' on failure.
@@ -47,7 +67,7 @@ const getMimeType = (filename) =>
   'application/octet-stream';
 
 /**
- * Format time to AM/PM
+ * Format time (HH:mm) to AM/PM.
  */
 const formatTime = (t) => {
   if (!t) return '';
@@ -58,4 +78,33 @@ const formatTime = (t) => {
   return `${hour}:${String(m).padStart(2, '0')} ${period}`;
 };
 
-module.exports = { MIME_TYPES, loadImageAsBase64, getMimeType, formatTime };
+/**
+ * Format a date to "DD Month YYYY", or 'N/A' when absent.
+ */
+const formatDate = (d) =>
+  d
+    ? new Date(d).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+      })
+    : 'N/A';
+
+/**
+ * Resolve a location value (array or string) into a display string.
+ */
+const renderLocation = (location) => {
+  if (Array.isArray(location)) return location.at(-1) || '';
+  if (typeof location === 'string') return location;
+  return '';
+};
+
+module.exports = {
+  MIME_TYPES,
+  MONTH_NAMES,
+  loadImageAsBase64,
+  getMimeType,
+  formatTime,
+  formatDate,
+  renderLocation,
+};

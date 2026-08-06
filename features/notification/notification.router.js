@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const controller = require('./notification.controller');
-const paginationMiddleware = require('../../shared/pagination/pagination.middleware');
+const { paginationMiddleware } = require('../../shared/pagination');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Notification Routes

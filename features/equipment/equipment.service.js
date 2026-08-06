@@ -8,16 +8,14 @@ const HTTP = require('../../shared/constants/httpStatus.constant.js');
 // ─────────────────────────────────────────────────────────────────────────────
 
 const equipmentModel = require('./equipment.model');
-const mobilizationModel = require('./mobilization/mobilizations.model');
-const replacementsModel = require('./replacement/replacement.model');
+const { mobilizationModel, alertMobilizationViaEmail } = require('./mobilization');
+const { replacementModel, alertReplacementViaEmail } = require('./replacement');
 const EquipmentImageModel = require('./images/images.model');
-const { paginate } = require('../../shared/pagination/pagination.util');
+const { paginationUtil: { paginate } } = require('../../shared/pagination');
 
 const { createNotification } = require('../notification/notification.service');
 const PushNotificationService = require('../notification/notification.push');
 const OperatorService = require('../operator/operator.service');
-const { alertMobilizationViaEmail } = require('./mobilization/mobilization.gmail');
-const { alertReplacementViaEmail } = require('./replacement/replacement.gmail');
 
 const { default: wsUtils } = require('../../socket/socket');
 const analyser = require('../dashboard/dashboard.analyser');

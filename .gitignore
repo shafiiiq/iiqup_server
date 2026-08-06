@@ -1,6 +1,5 @@
 node_modules
 .env
-dev
-backup
+__scripts__
+config/db/backup
 logs
-tests

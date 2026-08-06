@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const controller = require('./complaint.controller')
-const paginationMiddleware = require('../../shared/pagination/pagination.middleware');
+const { paginationMiddleware } = require('../../shared/pagination');
 
 router.post('/register',                                                           controller.registerComplaint);
 router.post('/assign-mechanic/:complaintId',                                       controller.assignMechanic );

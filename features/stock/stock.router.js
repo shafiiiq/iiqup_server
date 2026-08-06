@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const controller = require('./stock.controller');
-const paginationMiddleware = require('../../shared/pagination/pagination.middleware');
+const { paginationMiddleware } = require('../../shared/pagination');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Stock Routes

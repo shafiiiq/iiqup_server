@@ -15,7 +15,7 @@ const websocket = require('./socket/socket');
 const setupWebSocket = websocket.default.setupWebSocket;
 const notFoundHandler = require('./middlewares/notFound.middleware');
 const errorHandler = require('./middlewares/errorHandler.middleware');
-const requestLogger = require('./shared/logger/requestLogger.middleware');
+const requestLogger = require('./shared/logger/request.middleware');
 
 // ── Routes ─────────────────────────────────────────────────────────────────────
 const equipmentRouter = require('./features/equipment/equipment.router');
@@ -42,8 +42,8 @@ const backchargeRouter = require('./features/backcharge/backcharge.router');
 const chatRouter = require('./features/chat/chat.router');
 const explorerRouter = require('./features/explorer/explorer.router');
 const webPushRouter = require('./features/notification/webpush/webpush.router');
-const sharedSearchRouter = require('./shared/search/search.router');
-const uploadsRouter = require('./shared/file-handling/upload.router');
+const { searchRouter: sharedSearchRouter } = require('./shared/search');
+const { uploadRouter } = require('./shared/file-handling');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // App Initialisation
@@ -141,7 +141,7 @@ app.use('/api/v1/s3', s3Router);
 app.use('/api/v1/chat', authMiddleware, chatRouter);
 app.use('/api/v1/explorer', authMiddleware, explorerRouter);
 app.use('/api/v1/search', sharedSearchRouter);
-app.use('/api/v1/uploads', authMiddleware, uploadsRouter);
+app.use('/api/v1/uploads', authMiddleware, uploadRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

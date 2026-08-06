@@ -139,7 +139,7 @@ const biometricLogin = async (biometricToken, deviceInfo) => {
     user.lastLogin = new Date();
     await user.save();
 
-    const { createSession } = require('../../shared/auth/session.auth');
+    const { sessionAuth: { createSession } } = require('../../shared/auth');
     const deviceData = {
       deviceName: deviceInfo?.deviceName || 'Unknown Device',
       deviceModel: deviceInfo?.deviceModel || 'Unknown Model',

@@ -7,7 +7,7 @@ const path = require('path');
 const User = require('../user/user.model');
 const explorerServices = require('./explorer.service');
 const Explorer = require('./explorer.model');
-const { uploadToS3 } = require('../../shared/services/s3.service');
+const { uploadToS3 } = require('../../shared/services/s3.service.js');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers

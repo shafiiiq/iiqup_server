@@ -5,7 +5,7 @@ const bcrypt = require('bcrypt');
 const User = require('./user.model');
 
 const controller = require('./user.controller');
-const paginationMiddleware = require('../../shared/pagination/pagination.middleware');
+const { paginationMiddleware } = require('../../shared/pagination');
 const { authMiddleware } = require('../../middlewares/jwt.middleware');
 const PushNotificationService = require('../notification/notification.push');
 

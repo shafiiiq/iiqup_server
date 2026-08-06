@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require('multer');
 
 const controller = require('./quotation.controller');
-const paginationMiddleware = require('../../shared/pagination/pagination.middleware');
+const { paginationMiddleware } = require('../../shared/pagination');
 
 const upload = multer({ storage: multer.memoryStorage() });
 

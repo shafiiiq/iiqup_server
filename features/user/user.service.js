@@ -9,7 +9,7 @@ const { v4: uuidv4 } = require('uuid');
 const User = require('./user.model');
 const Mechanic = require('../mechanic/mechanic.model');
 const Operator = require('../operator/operator.model');
-const { paginate } = require('../../shared/pagination/pagination.util');
+const { paginationUtil: { paginate } } = require('../../shared/pagination');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -420,7 +420,7 @@ const loginUser = async (email, password) => {
 const verifyUserCredentials = async (email, password, type, deviceInfo) => {
   try {
     const PushNotificationService = require('../notification/notification.push');
-    const { createSession } = require('../../shared/auth/session/session.auth');
+    const { sessionAuth: { createSession } } = require('../../shared/auth');
 
     let user, userModel;
 

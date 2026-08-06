@@ -1,6 +1,6 @@
 const HTTP = require('../../shared/constants/httpStatus.constant.js');
 const HireOrder = require('./hro.model');
-const { paginate } = require('../../shared/pagination/pagination.util');
+const { paginationUtil: { paginate } } = require('../../shared/pagination');
 
 const calculateTotal = (items, showDiscountInTotal, discount) => {
   let total = items.reduce((sum, item) => sum + (item.totalPrice || 0), 0);

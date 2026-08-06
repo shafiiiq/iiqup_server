@@ -5,7 +5,7 @@ const HTTP = require('../../shared/constants/httpStatus.constant.js');
 const Notification = require('./notification.model');
 const User = require('../user/user.model');
 const mongoose = require('mongoose');
-const { paginate } = require('../../shared/pagination/pagination.util');
+const { paginationUtil: { paginate } } = require('../../shared/pagination');
 require('dotenv').config();
 
 // ─────────────────────────────────────────────────────────────────────────────

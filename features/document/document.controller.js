@@ -3,7 +3,7 @@ const logger = require('../../shared/logger/logger');
 const HTTP = require('../../shared/constants/httpStatus.constant.js');
 const { sendSuccess, sendError } = require('../../shared/response/response.util');
 const documentServices = require('./document.service');
-const paginationMiddleware = require('../../shared/pagination/pagination.middleware');
+const { paginationMiddleware } = require('../../shared/pagination');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants

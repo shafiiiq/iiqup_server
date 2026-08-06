@@ -4,7 +4,7 @@ const AppError = require('../../shared/errors/AppError.js');
 const HTTP = require('../../shared/constants/httpStatus.constant.js');
 // services/backcharge.service.js
 const Backcharge = require('./backcharge.model');
-const { paginate } = require('../../shared/pagination/pagination.util');
+const { paginationUtil: { paginate } } = require('../../shared/pagination');
 const { createNotification } = require('../notification/notification.service');
 const PushNotificationService = require('../notification/notification.push');
 const { default: wsUtils } = require('../../socket/socket');

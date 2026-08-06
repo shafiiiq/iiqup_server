@@ -2,7 +2,7 @@ const logger = require('../../shared/logger/logger');
 
 // push/notification.push.js
 const admin = require('../../shared/utils/firebase.util');
-const tokenService = require('../../shared/auth/token.auth');
+const { tokenAuth: tokenService } = require('../../shared/auth');
 const {
   sendNotificationToUser: sendWebSocketNotification,
   broadcastNotification: broadcastWebSocketNotification,

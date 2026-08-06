@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const controller = require('./chat.controller');
-const paginationMiddleware = require('../../shared/pagination/pagination.middleware');
+const { paginationMiddleware } = require('../../shared/pagination');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Chat Routes
@@ -32,7 +32,7 @@ router.put('/messages/:messageId/caption', controller.updateCaption);
 router.post('/messages/:messageId/forward', controller.forwardMessage);
 
 // ── Uploads ───────────────────────────────────────────────────────────────────
-router.post('/upload/audio', controller.uploadVoicexMessage);
+router.post('/upload/audio', controller.uploadVoiceMessage);
 router.post('/upload/image', controller.uploadImage);
 router.post('/upload/video', controller.uploadVideo);
 router.post('/upload/document', controller.uploadDocument);

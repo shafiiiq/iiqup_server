@@ -3,7 +3,7 @@ const logger = require('../../shared/logger/logger');
 const HTTP = require('../../shared/constants/httpStatus.constant.js');
 const { sendSuccess, sendError } = require('../../shared/response/response.util');
 // controllers/s3.controller.js
-const s3Services = require('../../shared/services/s3.service');
+const s3Services = require('../../shared/services/s3.service.js');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // S3 Controllers

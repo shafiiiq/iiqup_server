@@ -5,7 +5,7 @@ const { sendSuccess, sendError } = require('../../shared/response/response.util'
 const path = require('path');
 const ComplaintService = require('./complaint.service');
 const { putObject } = require('../../config/aws/s3.aws');
-const UploadService = require('../../shared/file-handling/upload.service');
+const { uploadService: UploadService } = require('../../shared/file-handling');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
