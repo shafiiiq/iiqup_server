@@ -10,7 +10,7 @@ const participantSchema = new mongoose.Schema(
     userId: { type: mongoose.Schema.Types.ObjectId, required: true },
     userType: {
       type: String,
-      enum: ['office', 'mechanic', 'operator'],
+      enum: ['staff', 'mechanic', 'operator'],
       required: true,
     },
     uniqueCode: { type: String, required: true },

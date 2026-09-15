@@ -1,13 +1,13 @@
-const logger = require('../../shared/logger/logger');
+const logger = require('#shared/logger/logger');
 
-const HTTP = require('../../shared/constants/httpStatus.constant.js');
-const { sendSuccess, sendError } = require('../../shared/response/response.util');
+const HTTP = require('#shared/response/response.status')
+const { sendSuccess, sendError } = require('#shared/response/response.sender');
 // controllers/explorer.controller.js
 const path = require('path');
-const User = require('../user/user.model');
+const User = require('#features/user/staff/staff.model')
 const explorerServices = require('./explorer.service');
 const Explorer = require('./explorer.model');
-const { uploadToS3 } = require('../../shared/services/s3.service.js');
+const { uploadToS3 } = require('#core/s3/s3.service')
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers

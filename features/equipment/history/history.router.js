@@ -1,15 +1,22 @@
 const express = require('express');
 const router = express.Router();
 const controller = require('./history.controller');
+const { paginationMiddleware } = require('#middlewares/pagination.middleware');
 
-router.get('/get/:regNo', controller.getServiceHistory);
-router.get('/get/:regNo/:type', controller.getServiceHistoryByType);
-router.get('/get-by-id/:type/:id', controller.getServiceHistoryById);
-router.post('/add', controller.addServiceHistory);
-router.post('/batch', controller.addBatchServiceHistory);
-router.delete('/delete/:type/:id', controller.deleteServiceHistory);
+router.post('/', controller.createServiceHistory);
+router.post('/batch', controller.createServiceHistoryBatch);
+
 router.get('/full-service/latest/:regNo', controller.getLatestFullService);
-router.get('/full-service/notifications', controller.getFullServiceNotification);
-router.post('/full-service/notification', controller.addNextFullService);
+router.get('/full-service/notifications', controller.getFullServiceNotifications);
+router.post('/full-service/notifications', controller.createFullServiceNotification);
+
+router.get('/list', paginationMiddleware, controller.getServiceHistoryList);
+router.get('/type-counts', controller.getServiceHistoryTypeCounts);
+
+router.get('/record/:type/:id', controller.getServiceHistoryRecord);
+router.delete('/:type/:id', controller.deleteServiceHistory);
+
+router.get('/:regNo/:type', controller.getServiceHistoryByType);
+router.get('/:regNo', controller.getServiceHistory);
 
 module.exports = router;

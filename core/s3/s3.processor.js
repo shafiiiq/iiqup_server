@@ -1,0 +1,49 @@
+const logger = require('#shared/logger/logger')
+const ffmpegPath = require('ffmpeg-static')
+const ffmpeg = require('fluent-ffmpeg')
+const fs = require('fs')
+const os = require('os')
+const path = require('path')
+const crypto = require('crypto')
+
+ffmpeg.setFfmpegPath(ffmpegPath)
+
+const isVideoMime = (mimeType) => !!mimeType && mimeType.toLowerCase().startsWith('video/')
+
+const remuxForFastStart = (inputPath, outputPath) =>
+  new Promise((resolve, reject) => {
+    ffmpeg(inputPath)
+      .outputOptions(['-c copy', '-movflags +faststart'])
+      .output(outputPath)
+      .on('end', resolve)
+      .on('error', reject)
+      .run()
+  })
+
+const processVideoForStreaming = async (buffer, mimeType) => {
+  if (!isVideoMime(mimeType)) return buffer
+
+  const id = crypto.randomBytes(8).toString('hex')
+  const inputPath = path.join(os.tmpdir(), `in-${id}`)
+  const outputPath = path.join(os.tmpdir(), `out-${id}.mp4`)
+
+  try {
+    fs.writeFileSync(inputPath, buffer)
+    await remuxForFastStart(inputPath, outputPath)
+
+    const result = fs.readFileSync(outputPath)
+    logger.info('[VideoProcessor] processVideoForStreaming success', {
+      originalSize: buffer.length,
+      processedSize: result.length,
+    })
+    return result
+  } catch (error) {
+    logger.error('[VideoProcessor] processVideoForStreaming failed, uploading original buffer instead', error)
+    return buffer
+  } finally {
+    fs.unlink(inputPath, () => {})
+    fs.unlink(outputPath, () => {})
+  }
+}
+
+module.exports = { processVideoForStreaming, isVideoMime }

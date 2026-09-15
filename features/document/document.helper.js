@@ -1,18 +1,9 @@
 const equipmentModel = require('../equipment/equipment.model');
-const operatorModel = require('../operator/operator.model');
-const mechanicModel = require('../mechanic/mechanic.model');
-const userModel = require('../user/user.model');
-const { putObject, getObjectUrl } = require('../../config/aws/s3.aws');
+const operatorModel = require('#features/user/operator/operator.model');
+const mechanicModel = require('#features/user/mechanic/mechanic.model');
+const staffModel = require('#features/user/staff/staff.model');
+const { putObject, getObjectUrl } = require('#core/s3/s3.config');
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Date Formatters
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Formats a date value into DD-MM-YYYY string.
- * @param {string|Date|null} date
- * @returns {string|null}
- */
 const formatDate = (date) => {
   if (!date) return null;
 
@@ -21,21 +12,17 @@ const formatDate = (date) => {
     return `${day}-${month}-${year}`;
   }
 
-  const dateObj = date instanceof Date ? date : new Date(date + 'T00:00:00');
-  if (isNaN(dateObj.getTime())) return null;
+  const parsedDate = date instanceof Date ? date : new Date(date + 'T00:00:00');
+  if (isNaN(parsedDate.getTime())) return null;
 
-  const year = dateObj.getFullYear();
-  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-  const day = String(dateObj.getDate()).padStart(2, '0');
+  const year = parsedDate.getFullYear();
+  const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
+  const day = String(parsedDate.getDate()).padStart(2, '0');
 
   return `${day}-${month}-${year}`;
 };
 
-/**
- * Returns a timestamp string formatted as DD-MM-YY-HHMMam/pm.
- * @returns {string}
- */
-const formatDateTime = () => {
+const formatTimestampForFilename = () => {
   const now = new Date();
 
   const day = String(now.getDate()).padStart(2, '0');
@@ -44,125 +31,74 @@ const formatDateTime = () => {
 
   let hours = now.getHours();
   const minutes = String(now.getMinutes()).padStart(2, '0');
-  const ampm = hours >= 12 ? 'pm' : 'am';
+  const meridiem = hours >= 12 ? 'pm' : 'am';
+  hours = String(hours % 12 || 12).padStart(2, '0');
 
-  hours = hours % 12 || 12;
-  hours = String(hours).padStart(2, '0');
-
-  return `${day}-${month}-${year}-${hours}${minutes}${ampm}`;
+  return `${day}-${month}-${year}-${hours}${minutes}${meridiem}`;
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Source Resolution
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Looks up the source document and builds the S3 key for a given file.
- * @param {string} sourceId
- * @param {string} sourceType  'equipment' | 'operator' | 'mechanic' | 'office-staff'
- * @param {string} documentType
- * @param {string} finalFilename
- * @returns {Promise<{ sourceData: object, s3Key: string, sourceModel: string }>}
- */
-const getSourceDetailsAndKey = async (
-  sourceId,
-  sourceType,
-  documentType,
-  finalFilename
-) => {
-  let sourceData = null;
-  let s3Key = '';
-  let sourceModel = '';
-
+const resolveSourceAndBuildS3Key = async (sourceId, sourceType, documentType, finalFilename) => {
   switch (sourceType) {
-    case 'equipment':
-      sourceData = await equipmentModel.findById(sourceId);
+    case 'equipment': {
+      const sourceData = await equipmentModel.findById(sourceId);
       if (!sourceData) throw new Error('Equipment not found');
-      s3Key = `equipment-documents/${sourceData.regNo}/${documentType}/${finalFilename}`;
-      sourceModel = 'Equipment Model';
-      break;
-
-    case 'operator':
-      sourceData = await operatorModel.findById(sourceId);
+      return {
+        sourceData,
+        sourceModel: 'Equipment Model',
+        s3Key: `equipment-documents/${sourceData.regNo}/${documentType}/${finalFilename}`,
+      };
+    }
+    case 'operator': {
+      const sourceData = await operatorModel.findById(sourceId);
       if (!sourceData) throw new Error('Operator not found');
-      s3Key = `operator-documents/${sourceData.qatarId}/${documentType}/${finalFilename}`;
-      sourceModel = 'Operator Model';
-      break;
-
-    case 'mechanic':
-      sourceData = await mechanicModel.findById(sourceId);
+      return {
+        sourceData,
+        sourceModel: 'Operator Model',
+        s3Key: `operator-documents/${sourceData.qatarId}/${documentType}/${finalFilename}`,
+      };
+    }
+    case 'mechanic': {
+      const sourceData = await mechanicModel.findById(sourceId);
       if (!sourceData) throw new Error('Mechanic not found');
-      s3Key = `mechanic-documents/${sourceData.email}/${sourceData._id}/${documentType}/${finalFilename}`;
-      sourceModel = 'Mechanic Model';
-      break;
-
-    case 'office-staff':
-      sourceData = await userModel.findById(sourceId);
-      if (!sourceData) throw new Error('Office staff not found');
-      s3Key = `office-documents/${sourceData.email}/${sourceData._id}/${documentType}/${finalFilename}`;
-      sourceModel = 'Office Model';
-      break;
-
+      return {
+        sourceData,
+        sourceModel: 'Mechanic Model',
+        s3Key: `mechanic-documents/${sourceData.email}/${sourceData._id}/${documentType}/${finalFilename}`,
+      };
+    }
+    case 'staff': {
+      const sourceData = await staffModel.findById(sourceId);
+      if (!sourceData) throw new Error('Staff member not found');
+      return {
+        sourceData,
+        sourceModel: 'Staff Model',
+        s3Key: `staff-documents/${sourceData.email}/${sourceData._id}/${documentType}/${finalFilename}`,
+      };
+    }
     default:
       throw new Error('Invalid source type');
   }
-
-  return { sourceData, s3Key, sourceModel };
 };
 
-/**
- * Resolves a human-readable identifier for a source document.
- * @param {string} sourceType
- * @param {object} sourceData
- * @returns {string}
- */
-const resolveSourceIdentifier = (sourceType, sourceData) => {
-  switch (sourceType) {
-    case 'equipment':
-      return sourceData.regNo;
-    case 'operator':
-    case 'mechanic':
-    case 'office-staff':
-      return sourceData.name;
-    default:
-      return '';
-  }
+const resolveSourceDisplayName = (sourceType, sourceData) => {
+  if (sourceType === 'equipment') return sourceData.regNo;
+  if (sourceType === 'operator' || sourceType === 'mechanic' || sourceType === 'staff') return sourceData.name;
+  return '';
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// S3 Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Downloads a PDF from S3 and returns it as a Buffer.
- * @param {string} s3Key
- * @returns {Promise<Buffer>}
- */
-const downloadPDFFromS3 = async (s3Key) => {
+const downloadPdfBufferFromS3 = async (s3Key) => {
   try {
-    const url = await getObjectUrl(s3Key, false);
-    const response = await fetch(url);
-
-    if (!response.ok)
-      throw new Error(`Failed to fetch PDF: ${response.status}`);
-
+    const signedUrl = await getObjectUrl(s3Key, false);
+    const response = await fetch(signedUrl);
+    if (!response.ok) throw new Error(`Failed to fetch PDF: ${response.status}`);
     const arrayBuffer = await response.arrayBuffer();
     return Buffer.from(arrayBuffer);
   } catch (error) {
-    throw new Error(`[DocumentHelper] downloadPDFFromS3:${error.message}`, {
-      cause: error,
-    });
+    throw new Error(`[DocumentHelper] downloadPdfBufferFromS3: ${error.message}`, { cause: error });
   }
 };
 
-/**
- * Uploads raw PDF bytes to S3 via a presigned PUT URL.
- * @param {Uint8Array|Buffer} pdfBytes
- * @param {string}            s3Key
- * @param {string}            mimeType
- * @returns {Promise<string>} The presigned upload URL.
- */
-const uploadPDFToS3 = async (pdfBytes, s3Key, mimeType = 'application/pdf') => {
+const uploadPdfBytesToS3 = async (pdfBytes, s3Key, mimeType = 'application/pdf') => {
   try {
     const uploadUrl = await putObject('merged.pdf', s3Key, mimeType);
     const uploadResponse = await fetch(uploadUrl, {
@@ -170,27 +106,18 @@ const uploadPDFToS3 = async (pdfBytes, s3Key, mimeType = 'application/pdf') => {
       body: pdfBytes,
       headers: { 'Content-Type': mimeType },
     });
-
-    if (!uploadResponse.ok)
-      throw new Error(`S3 upload failed with status: ${uploadResponse.status}`);
-
+    if (!uploadResponse.ok) throw new Error(`S3 upload failed with status: ${uploadResponse.status}`);
     return uploadUrl;
   } catch (error) {
-    throw new Error(`[DocumentHelper] uploadPDFToS3:${error.message}`, {
-      cause: error,
-    });
+    throw new Error(`[DocumentHelper] uploadPdfBytesToS3: ${error.message}`, { cause: error });
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Exports
-// ─────────────────────────────────────────────────────────────────────────────
-
 module.exports = {
   formatDate,
-  formatDateTime,
-  getSourceDetailsAndKey,
-  resolveSourceIdentifier,
-  downloadPDFFromS3,
-  uploadPDFToS3,
+  formatTimestampForFilename,
+  resolveSourceAndBuildS3Key,
+  resolveSourceDisplayName,
+  downloadPdfBufferFromS3,
+  uploadPdfBytesToS3,
 };

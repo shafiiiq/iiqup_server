@@ -27,13 +27,13 @@ const documentSourceSchema = new mongoose.Schema(
   {
     source: {
       type: String,
-      enum: ['office-staff', 'mechanic', 'operator', 'equipment'],
+      enum: ['staff', 'mechanic', 'operator', 'equipment'],
     },
     sourceId: { type: String },
     sourceModel: {
       type: String,
       enum: [
-        'Office Model',
+        'Staff Model',
         'Mechanic Model',
         'Opertor Model',
         'Equipment Model',

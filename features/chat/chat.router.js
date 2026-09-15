@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const controller = require('./chat.controller');
-const { paginationMiddleware } = require('../../shared/pagination');
+const { paginationMiddleware } = require('#middlewares/pagination.middleware');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Chat Routes

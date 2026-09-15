@@ -1,22 +1,16 @@
-// routes/report.routes.js
 const express = require('express');
 const router = express.Router();
 const controller = require('./report.controller');
 
-// ── CRUD ──────────────────────────────────────────────────────────────────────
-router.post('/add-service-report', controller.addServiceReport);
-router.get('/get-report/with-id/:id', controller.getServiceReportWithId);
-router.put('/updatewith/:id', controller.updateServiceReportWithId);
-router.delete('/deletewith/:id', controller.removeServiceReportWithId);
+router.post('/', controller.createServiceReport);
 
-// ── Queries ───────────────────────────────────────────────────────────────────
-router.get(
-  '/histories/:regNo/:type/:param1?/:param2?/:param3?',
-  controller.handleHistory
-);
-router.get('/summary/:type/:param1?/:param2?', controller.handleSummary);
+router.get('/histories/:regNo/:type/:param1?/:param2?/:param3?', controller.handleHistoryQuery);
+router.get('/summary/:type/:param1?/:param2?', controller.handleSummaryQuery);
 
-// ── Wildcard (must stay last) ─────────────────────────────────────────────────
+router.get('/record/:id', controller.getServiceReportById);
+router.put('/record/:id', controller.updateServiceReport);
+router.delete('/record/:id', controller.deleteServiceReport);
+
 router.get('/:regNo/:date', controller.getServiceReport);
 
 module.exports = router;

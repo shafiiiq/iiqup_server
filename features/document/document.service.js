@@ -1,67 +1,32 @@
-const logger = require('../../shared/logger/logger');
-
-const HTTP = require('../../shared/constants/httpStatus.constant.js');
+const logger = require('#shared/logger/logger');
+const HTTP = require('#shared/response/response.status');
 const documentModel = require('./document.model');
 const path = require('path');
 const { PDFDocument } = require('pdf-lib');
-const { putObject, deleteObject } = require('../../config/aws/s3.aws');
-const { paginationUtil: { paginate } } = require('../../shared/pagination');
-const { createNotification } = require('../notification/notification.service');
-const PushNotificationService = require('../notification/notification.push');
-const { default: wsUtils } = require('../../socket/socket');
-const analyser = require('../dashboard/dashboard.analyser');
+const { putObject, deleteObject } = require('#core/s3/s3.config');
+const { paginate } = require('#shared/pagination/pagination');
+const PushNotificationService = require('#core/notification/notification.push');
+const wsUtils = require('#core/socket/socket.io');
+const dashboardServices = require('#features/dashboard/dashboard.service');
 const {
   formatDate,
-  formatDateTime,
-  getSourceDetailsAndKey,
-  resolveSourceIdentifier,
-  downloadPDFFromS3,
-  uploadPDFToS3,
+  formatTimestampForFilename,
+  resolveSourceAndBuildS3Key,
+  resolveSourceDisplayName,
+  downloadPdfBufferFromS3,
+  uploadPdfBytesToS3,
 } = require('./document.helper');
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Write
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Uploads a document file to S3 and persists its metadata in the database.
- * @param {string} sourceId
- * @param {string} sourceType
- * @param {string} documentType
- * @param {object} file
- * @param {string} description
- * @param {string} category
- * @param {string} date
- * @param {string} expiry
- * @returns {Promise<object>}
- */
-const saveDocument = async (
-  sourceId,
-  sourceType,
-  documentType,
-  file,
-  description,
-  category,
-  date,
-  expiry
-) => {
+const saveDocument = async (sourceId, sourceType, documentType, file, description, category, date, expiry) => {
   try {
-    const ext = path.extname(file.fileName);
-    const finalFilename = `${documentType}-${formatDateTime()}${ext}`;
+    const extension = path.extname(file.fileName);
+    const finalFilename = `${documentType}-${formatTimestampForFilename()}${extension}`;
 
-    const { sourceData, s3Key, sourceModel } = await getSourceDetailsAndKey(
-      sourceId,
-      sourceType,
-      documentType,
-      finalFilename
-    );
+    const { sourceData, s3Key, sourceModel } = await resolveSourceAndBuildS3Key(sourceId, sourceType, documentType, finalFilename);
 
     const uploadUrl = await putObject(file.fileName, s3Key, file.mimeType);
 
-    let document = await documentModel.findOne({
-      SourceId: sourceId,
-      documentType,
-    });
+    let document = await documentModel.findOne({ SourceId: sourceId, documentType });
 
     if (!document) {
       document = new documentModel({
@@ -89,28 +54,21 @@ const saveDocument = async (
       mimetype: file.mimeType || file.fileName.split('.').pop(),
     });
 
-    const sourceIdentifier = resolveSourceIdentifier(sourceType, sourceData);
-    const notifMessage = `Document ${documentType} is uploaded for ${sourceIdentifier} (${sourceType}), Now you can access new one`;
+    const sourceDisplayName = resolveSourceDisplayName(sourceType, sourceData);
+    const notificationMessage = `Document ${documentType} is uploaded for ${sourceDisplayName} (${sourceType}), Now you can access new one`;
 
-    const notification = await createNotification({
-      title: 'New document added',
-      description: notifMessage,
+    notifyUsers(null, {
       priority: 'high',
-      sourceId: 'from applications',
+      title: 'New document added',
+      description: notificationMessage,
+      priority: 'high',
+      type: 'normal',
+      sourceId: 'documents',
       time: new Date(),
-    });
+    })
 
-    await PushNotificationService.sendGeneralNotification(
-      null,
-      'New document added',
-      notifMessage,
-      'high',
-      'normal',
-      notification.data._id.toString()
-    );
-
-    analyser.clearCache();
-    wsUtils.sendDashboardUpdate('documents');
+    dashboardServices.clearDashboardCache();
+    wsUtils.dispatchDashboardUpdate('documents');
 
     await document.save();
 
@@ -123,21 +81,11 @@ const saveDocument = async (
       document,
     };
   } catch (error) {
-    logger.error('[DocumentService] saveDocument:', error);
-    return {
-      status: HTTP.INTERNAL_SERVER_ERROR,
-      message: 'Failed to save document',
-      error: error.message,
-    };
+    logger.error('[document.service] saveDocument', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to save document', error: error.message };
   }
 };
 
-/**
- * Renames the display name of a specific file inside a document.
- * @param {string} documentId  The file's _id.
- * @param {string} newFileName
- * @returns {Promise<object>}
- */
 const renameFile = async (documentId, newFileName) => {
   try {
     const document = await documentModel.findOne({ 'files._id': documentId });
@@ -152,28 +100,14 @@ const renameFile = async (documentId, newFileName) => {
     return {
       status: HTTP.OK,
       message: 'File renamed successfully',
-      file: {
-        _id: file._id,
-        displayFileName: file.displayFileName,
-        filename: file.filename,
-      },
+      file: { _id: file._id, displayFileName: file.displayFileName, filename: file.filename },
     };
   } catch (error) {
-    logger.error('[DocumentService] renameFile:', error);
-    return {
-      status: HTTP.INTERNAL_SERVER_ERROR,
-      message: 'Failed to rename file',
-      error: error.message,
-    };
+    logger.error('[document.service] renameFile', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to rename file', error: error.message };
   }
 };
 
-/**
- * Deletes a specific file from S3 and removes it from the document record.
- * Deletes the entire document record if no files remain.
- * @param {string} documentId  The file's _id.
- * @returns {Promise<object>}
- */
 const deleteDocument = async (documentId) => {
   try {
     const document = await documentModel.findOne({ 'files._id': documentId });
@@ -185,15 +119,10 @@ const deleteDocument = async (documentId) => {
     try {
       await deleteObject(file.path);
     } catch (s3Error) {
-      logger.error(
-        '[DocumentService] deleteDocument — S3 delete failed:',
-        s3Error
-      );
+      logger.error('[document.service] deleteDocument S3 delete failed', s3Error);
     }
 
-    document.files = document.files.filter(
-      (f) => f._id.toString() !== documentId
-    );
+    document.files = document.files.filter((f) => f._id.toString() !== documentId);
 
     if (document.files.length === 0) {
       await documentModel.findByIdAndDelete(document._id);
@@ -202,38 +131,26 @@ const deleteDocument = async (documentId) => {
     }
 
     const sourceType = document.documentSource[0]?.source;
-    let sourceIdentifier = document.SourceId;
+    let sourceDisplayName = document.SourceId;
 
     try {
-      const { sourceData } = await getSourceDetailsAndKey(
-        document.SourceId,
-        sourceType,
-        'temp',
-        'temp.pdf'
-      );
-      sourceIdentifier = resolveSourceIdentifier(sourceType, sourceData);
-    } catch (_) {
-      /* fallback to SourceId */
+      const { sourceData } = await resolveSourceAndBuildS3Key(document.SourceId, sourceType, 'temp', 'temp.pdf');
+      sourceDisplayName = resolveSourceDisplayName(sourceType, sourceData);
+    } catch (lookupError) {
+      logger.error('[document.service] deleteDocument source lookup failed', lookupError);
     }
 
-    const notifMessage = `Document ${file.filename} was deleted for ${sourceIdentifier} (${sourceType})`;
+    const notificationMessage = `Document ${file.filename} was deleted for ${sourceDisplayName} (${sourceType})`;
 
-    const notification = await createNotification({
+    notifyUsers(null, {
+      priority: 'high',
       title: 'Document deleted',
-      description: notifMessage,
+      description: notificationMessage,
       priority: 'normal',
-      sourceId: 'from applications',
+      type: 'normal',
+      sourceId: 'documents',
       time: new Date(),
-    });
-
-    await PushNotificationService.sendGeneralNotification(
-      null,
-      'Document deleted',
-      notifMessage,
-      'normal',
-      'normal',
-      notification.data._id.toString()
-    );
+    })
 
     return {
       status: HTTP.OK,
@@ -241,108 +158,51 @@ const deleteDocument = async (documentId) => {
       deletedFile: { filename: file.filename, path: file.path },
     };
   } catch (error) {
-    logger.error('[DocumentService] deleteDocument:', error);
-    return {
-      status: HTTP.INTERNAL_SERVER_ERROR,
-      message: 'Failed to delete document',
-      error: error.message,
-    };
+    logger.error('[document.service] deleteDocument', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to delete document', error: error.message };
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Read
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Returns all document records belonging to a specific source.
- * @param {string} sourceType
- * @param {string} sourceId
- * @param {object} pagination
- * @returns {Promise<object>}
- */
-const getDocuments = async (sourceType, sourceId, pagination) => {
+const getDocumentsBySource = async (sourceType, sourceId, pagination) => {
   try {
-    const { sourceData } = await getSourceDetailsAndKey(
-      sourceId,
-      sourceType,
-      'temp',
-      'temp.pdf'
-    );
+    const { sourceData } = await resolveSourceAndBuildS3Key(sourceId, sourceType, 'temp', 'temp.pdf');
     if (!sourceData) return { status: HTTP.NOT_FOUND, message: `${sourceType} not found` };
 
     const result = await paginate(
       documentModel,
-      {
-        SourceId: sourceId,
-        'documentSource.source': sourceType,
-      },
+      { SourceId: sourceId, 'documentSource.source': sourceType },
       pagination,
       { sort: { createdAt: -1 } }
     );
 
     return { status: HTTP.OK, data: result.data, pagination: result.pagination };
   } catch (error) {
-    logger.error('[DocumentService] getDocuments:', error);
-    return {
-      status: HTTP.INTERNAL_SERVER_ERROR,
-      message: 'Failed to retrieve documents',
-      error: error.message,
-    };
+    logger.error('[document.service] getDocumentsBySource', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to retrieve documents', error: error.message };
   }
 };
 
-/**
- * Returns all document records in the system.
- * @param {object} pagination
- * @returns {Promise<object>}
- */
 const getAllDocuments = async (pagination) => {
   try {
-    const result = await paginate(documentModel, {}, pagination, {
-      sort: { createdAt: -1 },
-    });
+    const result = await paginate(documentModel, {}, pagination, { sort: { createdAt: -1 } });
     return { status: HTTP.OK, data: result.data, pagination: result.pagination };
   } catch (error) {
-    logger.error('[DocumentService] getAllDocuments:', error);
-    return {
-      status: HTTP.INTERNAL_SERVER_ERROR,
-      message: 'Failed to retrieve documents',
-      error: error.message,
-    };
+    logger.error('[document.service] getAllDocuments', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to retrieve documents', error: error.message };
   }
 };
 
-/**
- * Returns only the documentType field for all document records.
- * @param {object} pagination
- * @returns {Promise<object>}
- */
-const getAllDocumentsTypes = async (pagination) => {
+const getAllDocumentTypes = async (pagination) => {
   try {
-    const result = await paginate(
-      documentModel,
-      {},
-      pagination,
-      { sort: { createdAt: -1 }, projection: 'documentType' }
-    );
+    const result = await paginate(documentModel, {}, pagination, { sort: { createdAt: -1 }, projection: 'documentType' });
     return { status: HTTP.OK, data: result.data, pagination: result.pagination };
   } catch (error) {
-    logger.error('[DocumentService] getAllDocumentsTypes:', error);
-    return {
-      status: HTTP.INTERNAL_SERVER_ERROR,
-      message: 'Failed to retrieve documents',
-      error: error.message,
-    };
+    logger.error('[document.service] getAllDocumentTypes', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to retrieve documents', error: error.message };
   }
 };
 
-/**
- * Returns metadata for a single file by its _id.
- * @param {string} documentId  The file's _id.
- * @returns {Promise<object>}
- */
-const getDocumentById = async (documentId) => {
+const getDocumentFileById = async (documentId) => {
   try {
     const document = await documentModel.findOne({ 'files._id': documentId });
     if (!document) return { status: HTTP.NOT_FOUND, message: 'Document not found' };
@@ -362,58 +222,27 @@ const getDocumentById = async (documentId) => {
       },
     };
   } catch (error) {
-    logger.error('[DocumentService] getDocumentById:', error);
-    return {
-      status: HTTP.INTERNAL_SERVER_ERROR,
-      message: 'Failed to retrieve document',
-      error: error.message,
-    };
+    logger.error('[document.service] getDocumentFileById', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to retrieve document', error: error.message };
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PDF Operations
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Merges multiple PDF files into a single PDF and saves it to S3 and the database.
- * @param {string}   sourceId
- * @param {string}   sourceType
- * @param {string[]} documentIds  Array of file _ids to merge.
- * @param {string}   category
- * @param {string}   documentType
- * @returns {Promise<object>}
- */
-const mergePDFs = async (
-  sourceId,
-  sourceType,
-  documentIds,
-  category,
-  documentType
-) => {
+const mergePDFs = async (sourceId, sourceType, documentIds, category, documentType) => {
   try {
-    const { sourceModel } = await getSourceDetailsAndKey(
-      sourceId,
-      sourceType,
-      'temp',
-      'temp.pdf'
-    );
+    const { sourceModel } = await resolveSourceAndBuildS3Key(sourceId, sourceType, 'temp', 'temp.pdf');
 
     const mergedPdf = await PDFDocument.create();
 
     const documentsData = await Promise.all(
-      documentIds.map(async (docId) => {
-        const document = await documentModel.findOne({ 'files._id': docId });
-        if (!document)
-          throw new Error(`Document with file ID ${docId} not found`);
+      documentIds.map(async (fileId) => {
+        const document = await documentModel.findOne({ 'files._id': fileId });
+        if (!document) throw new Error(`Document with file ID ${fileId} not found`);
 
-        const file = document.files.find((f) => f._id.toString() === docId);
-        if (!file) throw new Error(`File ${docId} not found in document`);
+        const file = document.files.find((f) => f._id.toString() === fileId);
+        if (!file) throw new Error(`File ${fileId} not found in document`);
 
         if (!file.mimetype.includes('pdf')) {
-          throw new Error(
-            `File ${file.filename} is not a PDF. Only PDFs can be merged.`
-          );
+          throw new Error(`File ${file.filename} is not a PDF. Only PDFs can be merged.`);
         }
 
         return { file, document };
@@ -422,38 +251,24 @@ const mergePDFs = async (
 
     for (const { file } of documentsData) {
       try {
-        const pdfBuffer = await downloadPDFFromS3(file.path);
+        const pdfBuffer = await downloadPdfBufferFromS3(file.path);
         const pdf = await PDFDocument.load(pdfBuffer);
-        const copiedPages = await mergedPdf.copyPages(
-          pdf,
-          pdf.getPageIndices()
-        );
+        const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
         copiedPages.forEach((page) => mergedPdf.addPage(page));
       } catch (error) {
-        logger.error(
-          `[DocumentService] mergePDFs — error processing ${file.filename}:`,
-          error
-        );
+        logger.error(`[document.service] mergePDFs processing ${file.filename}`, error);
         throw new Error(`Failed to process ${file.filename}: ${error.message}`);
       }
     }
 
     const mergedPdfBytes = await mergedPdf.save();
-    const mergedFilename = `${documentType}-merged-${formatDateTime()}.pdf`;
+    const mergedFilename = `${documentType}-merged-${formatTimestampForFilename()}.pdf`;
 
-    const { s3Key } = await getSourceDetailsAndKey(
-      sourceId,
-      sourceType,
-      documentType,
-      mergedFilename
-    );
+    const { s3Key } = await resolveSourceAndBuildS3Key(sourceId, sourceType, documentType, mergedFilename);
 
-    await uploadPDFToS3(mergedPdfBytes, s3Key);
+    await uploadPdfBytesToS3(mergedPdfBytes, s3Key);
 
-    let document = await documentModel.findOne({
-      SourceId: sourceId,
-      documentType,
-    });
+    let document = await documentModel.findOne({ SourceId: sourceId, documentType });
 
     if (!document) {
       document = new documentModel({
@@ -466,14 +281,10 @@ const mergePDFs = async (
       });
     }
 
-    const dates = documentsData.map((d) => d.file.date).filter(Boolean);
-    const expiries = documentsData.map((d) => d.file.expiry).filter(Boolean);
-    const earliestDate =
-      dates.length > 0 ? dates.sort()[0] : formatDate(new Date());
-    const latestExpiry =
-      expiries.length > 0
-        ? expiries.sort().reverse()[0]
-        : formatDate(new Date());
+    const fileDates = documentsData.map((entry) => entry.file.date).filter(Boolean);
+    const fileExpiries = documentsData.map((entry) => entry.file.expiry).filter(Boolean);
+    const earliestDate = fileDates.length > 0 ? fileDates.sort()[0] : formatDate(new Date());
+    const latestExpiry = fileExpiries.length > 0 ? fileExpiries.sort().reverse()[0] : formatDate(new Date());
 
     document.files.push({
       date: earliestDate,
@@ -483,13 +294,15 @@ const mergePDFs = async (
       mimetype: 'application/pdf',
     });
 
-    await PushNotificationService.sendGeneralNotification(
-      process.env.SUPER_ADMIN,
-      'PDFs Merged',
-      `${documentIds.length} PDFs merged successfully for ${sourceType}`,
-      'normal',
-      'normal'
-    );
+    notifyUsers(null, {
+      priority: 'high',
+      title: 'PDFs Merged',
+      description: `${documentIds.length} PDFs merged successfully for ${sourceType}`,
+      priority: 'normal',
+      type: 'normal',
+      sourceId: 'documents',
+      time: new Date(),
+    })
 
     await document.save();
 
@@ -504,48 +317,23 @@ const mergePDFs = async (
       },
     };
   } catch (error) {
-    logger.error('[DocumentService] mergePDFs:', error);
-    return {
-      status: HTTP.INTERNAL_SERVER_ERROR,
-      message: 'Failed to merge PDFs',
-      error: error.message,
-    };
+    logger.error('[document.service] mergePDFs', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to merge PDFs', error: error.message };
   }
 };
 
-/**
- * Splits a PDF into one or more new PDFs based on the provided split options.
- * @param {string} sourceId
- * @param {string} sourceType
- * @param {string} documentId    The file's _id.
- * @param {object} splitOptions  { splitType: 'specific'|'range'|'every', pages: number[]|number[][] }
- * @param {string} category
- * @returns {Promise<object>}
- */
-const splitPDF = async (
-  sourceId,
-  sourceType,
-  documentId,
-  splitOptions,
-  category
-) => {
+const splitPDF = async (sourceId, sourceType, documentId, splitOptions, category) => {
   try {
-    const { sourceModel } = await getSourceDetailsAndKey(
-      sourceId,
-      sourceType,
-      'temp',
-      'temp.pdf'
-    );
+    const { sourceModel } = await resolveSourceAndBuildS3Key(sourceId, sourceType, 'temp', 'temp.pdf');
 
     const document = await documentModel.findOne({ 'files._id': documentId });
     if (!document) return { status: HTTP.NOT_FOUND, message: 'Document not found' };
 
     const file = document.files.find((f) => f._id.toString() === documentId);
     if (!file) return { status: HTTP.NOT_FOUND, message: 'File not found' };
-    if (!file.mimetype.includes('pdf'))
-      return { status: HTTP.BAD_REQUEST, message: 'Only PDF files can be split' };
+    if (!file.mimetype.includes('pdf')) return { status: HTTP.BAD_REQUEST, message: 'Only PDF files can be split' };
 
-    const pdfBuffer = await downloadPDFFromS3(file.path);
+    const pdfBuffer = await downloadPdfBufferFromS3(file.path);
     const pdf = await PDFDocument.load(pdfBuffer);
     const totalPages = pdf.getPageCount();
 
@@ -553,74 +341,59 @@ const splitPDF = async (
     let pagesToExtract = [];
 
     if (splitType === 'specific') {
-      pagesToExtract = pages.filter((p) => p > 0 && p <= totalPages);
+      pagesToExtract = pages.filter((page) => page > 0 && page <= totalPages);
     } else if (splitType === 'range') {
       pages.forEach(([start, end]) => {
-        for (let i = start; i <= end && i <= totalPages; i++)
-          pagesToExtract.push(i);
+        for (let page = start; page <= end && page <= totalPages; page++) pagesToExtract.push(page);
       });
     } else if (splitType === 'every') {
       const pageSize = pages[0] || 1;
-      for (let i = 1; i <= totalPages; i += pageSize) pagesToExtract.push(i);
+      for (let page = 1; page <= totalPages; page += pageSize) pagesToExtract.push(page);
     } else {
-      return {
-        status: HTTP.BAD_REQUEST,
-        message: 'Invalid split type. Use: specific, range, or every',
-      };
+      return { status: HTTP.BAD_REQUEST, message: 'Invalid split type. Use: specific, range, or every' };
     }
 
-    if (pagesToExtract.length === 0)
-      return { status: HTTP.BAD_REQUEST, message: 'No valid pages to extract' };
+    if (pagesToExtract.length === 0) return { status: HTTP.BAD_REQUEST, message: 'No valid pages to extract' };
 
     const splitDocuments = [];
 
     if (splitType === 'every') {
       const pageSize = pages[0] || 1;
 
-      for (let i = 0; i < totalPages; i += pageSize) {
+      for (let start = 0; start < totalPages; start += pageSize) {
         const newPdf = await PDFDocument.create();
-        const endPage = Math.min(i + pageSize, totalPages);
+        const endPage = Math.min(start + pageSize, totalPages);
 
-        for (let pageNum = i; pageNum < endPage; pageNum++) {
-          const [copiedPage] = await newPdf.copyPages(pdf, [pageNum]);
+        for (let pageIndex = start; pageIndex < endPage; pageIndex++) {
+          const [copiedPage] = await newPdf.copyPages(pdf, [pageIndex]);
           newPdf.addPage(copiedPage);
         }
 
         const pdfBytes = await newPdf.save();
-        const splitFilename = `${document.documentType}-split-${i + 1}-to-${endPage}-${formatDateTime()}.pdf`;
-        const { s3Key } = await getSourceDetailsAndKey(
-          sourceId,
-          sourceType,
-          document.documentType,
-          splitFilename
-        );
+        const splitFilename = `${document.documentType}-split-${start + 1}-to-${endPage}-${formatTimestampForFilename()}.pdf`;
+        const { s3Key } = await resolveSourceAndBuildS3Key(sourceId, sourceType, document.documentType, splitFilename);
 
-        await uploadPDFToS3(pdfBytes, s3Key);
+        await uploadPdfBytesToS3(pdfBytes, s3Key);
 
         splitDocuments.push({
           filename: splitFilename,
           path: s3Key,
-          pages: `${i + 1}-${endPage}`,
+          pages: `${start + 1}-${endPage}`,
           pageCount: newPdf.getPageCount(),
         });
       }
     } else {
       const newPdf = await PDFDocument.create();
-      const pageIndices = pagesToExtract.map((p) => p - 1);
+      const pageIndices = pagesToExtract.map((page) => page - 1);
       const copiedPages = await newPdf.copyPages(pdf, pageIndices);
 
       copiedPages.forEach((page) => newPdf.addPage(page));
 
       const pdfBytes = await newPdf.save();
-      const splitFilename = `${document.documentType}-split-pages-${pagesToExtract.join('-')}-${formatDateTime()}.pdf`;
-      const { s3Key } = await getSourceDetailsAndKey(
-        sourceId,
-        sourceType,
-        document.documentType,
-        splitFilename
-      );
+      const splitFilename = `${document.documentType}-split-pages-${pagesToExtract.join('-')}-${formatTimestampForFilename()}.pdf`;
+      const { s3Key } = await resolveSourceAndBuildS3Key(sourceId, sourceType, document.documentType, splitFilename);
 
-      await uploadPDFToS3(pdfBytes, s3Key);
+      await uploadPdfBytesToS3(pdfBytes, s3Key);
 
       splitDocuments.push({
         filename: splitFilename,
@@ -631,10 +404,7 @@ const splitPDF = async (
     }
 
     for (const splitDoc of splitDocuments) {
-      let doc = await documentModel.findOne({
-        SourceId: sourceId,
-        documentType: `${document.documentType} (Split)`,
-      });
+      let doc = await documentModel.findOne({ SourceId: sourceId, documentType: `${document.documentType} (Split)` });
 
       if (!doc) {
         doc = new documentModel({
@@ -673,27 +443,19 @@ const splitPDF = async (
       totalSplits: splitDocuments.length,
     };
   } catch (error) {
-    logger.error('[DocumentService] splitPDF:', error);
-    return {
-      status: HTTP.INTERNAL_SERVER_ERROR,
-      message: 'Failed to split PDF',
-      error: error.message,
-    };
+    logger.error('[document.service] splitPDF', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to split PDF', error: error.message };
   }
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Exports
-// ─────────────────────────────────────────────────────────────────────────────
 
 module.exports = {
   saveDocument,
   renameFile,
   deleteDocument,
-  getDocuments,
+  getDocumentsBySource,
   getAllDocuments,
-  getAllDocumentsTypes,
-  getDocumentById,
+  getAllDocumentTypes,
+  getDocumentFileById,
   mergePDFs,
   splitPDF,
 };

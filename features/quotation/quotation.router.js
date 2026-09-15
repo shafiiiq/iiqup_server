@@ -1,52 +1,40 @@
-const express = require('express');
-const router = express.Router();
-const multer = require('multer');
+const express = require('express')
+const multer = require('multer')
+const controller = require('./quotation.controller')
+const { paginationMiddleware } = require('#middlewares/pagination.middleware')
 
-const controller = require('./quotation.controller');
-const { paginationMiddleware } = require('../../shared/pagination');
+const router = express.Router()
+const upload = multer({ storage: multer.memoryStorage() })
 
-const upload = multer({ storage: multer.memoryStorage() });
+router.post('/', controller.createQuotation)
+router.get('/', paginationMiddleware, controller.getQuotations)
+router.get('/company-details', controller.getCompanyDetails)
+router.get('/by-date', controller.getQuotationsByDateRange)
+router.get('/by-company/:vendorName', controller.getQuotationsByCompany)
+router.get('/latest', controller.getLatestQuotation)
+router.get('/latest-refno', controller.getLatestQuotationRefNo)
 
-// ─────────────────────────────────────────────────────────────────────────────
-// quotation Routes
-// ─────────────────────────────────────────────────────────────────────────────
+router.get('/pdf/download/:refNo(*)', controller.downloadQuotation)
+router.post('/pdf/submit/:refNo(*)', controller.submitQuotation)
+router.post('/sign/:refNo(*)', controller.signQuotationDocument)
+router.post(
+  '/pdf/email/:refNo(*)',
+  upload.fields([{ name: 'attachments', maxCount: 10 }]),
+  controller.emailQuotation
+)
 
-// ── Records ───────────────────────────────────────────────────────────────────
-router.get('/get-all-quotation', paginationMiddleware, controller.getAllquotations);
-router.get('/get-quotation-by-ref/:refNo(*)', controller.getquotationByRef);
-router.get('/get-company-details', controller.getCompanyDetails);
-router.get('/check-latest-quotation-ref', controller.getLatestquotationRef);
-router.get('/check-latest-quotation', controller.getLatestquotation);
-router.get('/get-quotations-by-date', controller.getquotationsByDateRange);
-router.get(
-  '/get-quotations-by-company/:vendorName',
-  controller.getquotationsByCompany
-);
-router.get('/get-quotation-by-regno/:regNo', controller.getquotationsByRegNo);
-router.get('/get-quotation-of-stock', controller.getquotationsForStock);
-router.get(
-  '/get-quotation-of-all-equipments',
-  controller.getquotationsForAllEquipments
-);
-router.post('/add-quotation', controller.addquotation);
-router.post('/upload-quotation', controller.uploadquotation);
-router.put('/update-quotation/:refNo(*)', controller.updatequotation);
-router.delete('/delete-quotation/:refNo', controller.deletequotation);
+router.get('/:refNo(*)', controller.getQuotationByRef)
+router.put('/:refNo(*)', controller.updateQuotation)
+router.delete('/:refNo', controller.deleteQuotation)
 
-// ── Signing   ───────────────────────────────────────────────────────────────────
-router.post('/sign/:quotationRef(*)', controller.signquotation);
-router.post('/pending-signatures', controller.getPendingSignatures);
-router.post('/signed-by-user', controller.getSignedByUser);
-
-// ── Email ─────────────────────────────────────────────────────────────────────
 router.post(
   '/send-via-email',
   upload.fields([
     { name: 'pdf', maxCount: 1 },
     { name: 'attachments', maxCount: 10 },
   ]),
-  controller.sendquotationViaEmail
-);
-router.put('/update-vendor-email/:vendorCode', controller.updateVendorEmail);
+  controller.sendQuotationViaEmail
+)
+router.put('/vendor-email/:vendorCode', controller.updateVendorEmail)
 
-module.exports = router;
+module.exports = router

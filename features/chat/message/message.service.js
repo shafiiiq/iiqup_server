@@ -1,12 +1,12 @@
-const logger = require('../../../shared/logger/logger');
+const logger = require('#shared/logger/logger');
 
-const HTTP = require('../../../shared/constants/httpStatus.constant.js');
+const HTTP = require('#shared/response/response.status')
 const Message = require('./messages.model');
 const Chat = require('../chats.model');
-const User = require('../../user/user.model');
+const User = require('#features/user/staff/staff.model')
 const chatService = require('../chat.service');
-const { paginationUtil: { paginate } } = require('../../../shared/pagination');
-const { putObject, getObjectUrl } = require('../../../config/aws/s3.aws');
+const { paginate } = require('#shared/pagination/pagination')
+const { putObject, getObjectUrl } = require('#core/s3/s3.config')
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -155,7 +155,7 @@ const createGroupSystemMessage = async ({
     const systemMessage = await Message.create({
       chatId,
       senderId: actorId,
-      senderType: 'office',
+      senderType: 'staff',
       senderName: actorName || 'System',
       messageType: 'system',
       content,
@@ -221,7 +221,7 @@ const sendMessage = async (messageData) => {
     );
     await chatService.incrementUnreadCount(chatId, senderId);
 
-    const PushNotificationService = require('../../notification/notification.push');
+    const PushNotificationService = require('#core/notification/notification.push')
     const chat = await Chat.findById(chatId).lean();
     if (chat) {
       const recipientCodes = chat.participants

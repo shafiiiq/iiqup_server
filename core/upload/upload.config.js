@@ -1,0 +1,11 @@
+const MIN_PART_SIZE = 8 * 1024 * 1024; 
+const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024;
+const PART_URL_BATCH_SIZE = 25; 
+const SESSION_STALE_HOURS = 24; 
+
+module.exports = {
+  MIN_PART_SIZE,
+  MAX_FILE_SIZE,
+  PART_URL_BATCH_SIZE,
+  SESSION_STALE_HOURS,
+};

@@ -1,5 +1,9 @@
 #!/usr/bin/env node
-require('./utils/suppress.utils');
+
+// import logger from '#shared/logger/logger';
+
+require('./warning.filter');
+require('module-alias/register');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Module Dependencies
@@ -66,5 +70,5 @@ function onListening() {
   const addr = server.address();
   const bind = typeof addr === 'string' ? `pipe ${addr}` : `port ${addr.port}`;
   debug(`Listening on ${bind}`);
-  console.log(`[Server] listening on ${bind}`);
+  console.log(`[www] server listening on ${bind}`);
 }

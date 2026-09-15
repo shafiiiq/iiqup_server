@@ -1,4 +1,4 @@
-const logger = require('../../shared/logger/logger');
+const logger = require('#shared/logger/logger');
 
 const ffmpeg = require('fluent-ffmpeg');
 const fs = require('fs');

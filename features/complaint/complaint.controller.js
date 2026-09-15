@@ -1,11 +1,11 @@
 // controllers/complaint.controller.js
-const logger = require('../../shared/logger/logger');
-const HTTP = require('../../shared/constants/httpStatus.constant.js');
-const { sendSuccess, sendError } = require('../../shared/response/response.util');
+const logger = require('#shared/logger/logger');
+const HTTP = require('#shared/response/response.status')
+const { sendSuccess, sendError } = require('#shared/response/response.sender');
 const path = require('path');
 const ComplaintService = require('./complaint.service');
-const { putObject } = require('../../config/aws/s3.aws');
-const { uploadService: UploadService } = require('../../shared/file-handling');
+const { putObject } = require('#core/s3/s3.config');
+const uploadService = require('#core/upload/upload.service');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -44,23 +44,24 @@ const isVideoFile = (mimeType, fileName) => {
  */
 const registerComplaint = async (req, res) => {
   try {
+    const { regNo, name, uniqueCode, remarks, sessionIds } = req.body;
+    
+    logger.info('[complaint.controller] /register sessionIds count', sessionIds?.length);
     logger.info(
-      '[Complaint] /register body keys',
+      '[complaint.controller] /register body keys',
       Object.keys(req.body),
       'content-type',
       req.headers['content-type']
     );
-    logger.info('[Complaint] /register sessionIds count', sessionIds?.length);
     logger.info(
-      '[Complaint] /register auth header present',
+      '[complaint.controller] /register auth header present',
       !!req.headers.authorization
     );
 
-    const { regNo, name, uniqueCode, remarks, sessionIds } = req.body;
 
     if (!sessionIds || sessionIds.length === 0) {
       logger.warn(
-        '[Complaint] /register missing sessionIds',
+        '[complaint.controller] /register missing sessionIds',
         { body: req.body }
       );
       return sendError(res, {
@@ -69,7 +70,7 @@ const registerComplaint = async (req, res) => {
       });
     }
 
-    const sessions = await UploadService.getCompletedSessions({
+    const sessions = await uploadService.getCompletedSessions({
       sessionIds,
       uploadedBy: req.userId,
       feature: 'complaint',
@@ -100,7 +101,7 @@ const registerComplaint = async (req, res) => {
       data: { complaint: result },
     });
   } catch (error) {
-    logger.error('[Complaint] registerComplaint:', error);
+    logger.error('[complaint.controller] registerComplaint:', error);
     sendError(res, {
       success: false,
       message: error.message || 'Failed to register complaint',
@@ -153,7 +154,7 @@ const assignMechanic = async (req, res) => {
       data: result,
     });
   } catch (error) {
-    logger.error('[Complaint] assignMechanic:', error);
+    logger.error('[complaint.controller] assignMechanic:', error);
     sendError(res, {
       success: false,
       message: error.message || 'Failed to assign mechanics',
@@ -198,7 +199,7 @@ const mechanicRequestItems = async (req, res) => {
       data: result.data,
     });
   } catch (error) {
-    logger.error('[Complaint] mechanicRequestItems:', error);
+    logger.error('[complaint.controller] mechanicRequestItems:', error);
     sendError(res, {
       success: false,
       message: error.message || 'Failed to submit request',
@@ -277,7 +278,7 @@ const forwardToWorkshop = async (req, res) => {
       data: responseData,
     });
   } catch (error) {
-    logger.error('[Complaint] forwardToWorkshop:', error);
+    logger.error('[complaint.controller] forwardToWorkshop:', error);
     sendError(res, {
       success: false,
       message: error.message || 'Failed to forward to workshop',
@@ -286,10 +287,10 @@ const forwardToWorkshop = async (req, res) => {
 };
 
 /**
- * PUT /complaints/:complaintId/forward-to-workshop-no-lpo
- * Step 4 (alternate) — Forwards complaint to workshop without requiring an LPO.
+ * PUT /complaints/:complaintId/forward-to-workshop-no-purchaseorder
+ * Step 4 (alternate) — Forwards complaint to workshop without requiring an PurchaseOrder.
  */
-const forwardToWorkshopWithoutLPO = async (req, res) => {
+const forwardToWorkshopWithoutPurchaseOrder = async (req, res) => {
   try {
     const { complaintId } = req.params;
     const { approvedBy, comments } = req.body;
@@ -300,7 +301,7 @@ const forwardToWorkshopWithoutLPO = async (req, res) => {
         .json({ success: false, message: 'approvedBy is required' });
     }
 
-    const result = await ComplaintService.forwardToWorkshopWithoutLPO(
+    const result = await ComplaintService.forwardToWorkshopWithoutPurchaseOrder(
       complaintId,
       approvedBy,
       comments
@@ -312,7 +313,7 @@ const forwardToWorkshopWithoutLPO = async (req, res) => {
       data: result,
     });
   } catch (error) {
-    logger.error('[Complaint] forwardToWorkshopWithoutLPO:', error);
+    logger.error('[complaint.controller] forwardToWorkshopWithoutPurchaseOrder:', error);
     sendError(res, {
       success: false,
       message: error.message || 'Failed to forward to workshop',
@@ -321,10 +322,10 @@ const forwardToWorkshopWithoutLPO = async (req, res) => {
 };
 
 /**
- * PUT /complaints/:complaintId/approve-no-lpo
- * Approves a complaint item without an LPO.
+ * PUT /complaints/:complaintId/approve-no-purchaseorder
+ * Approves a complaint item without an PurchaseOrder.
  */
-const approveItemWithoutLPO = async (req, res) => {
+const approveItemWithoutPurchaseOrder = async (req, res) => {
   try {
     const { complaintId } = req.params;
     const { approvedBy } = req.body;
@@ -335,7 +336,7 @@ const approveItemWithoutLPO = async (req, res) => {
         .json({ success: false, message: 'approvedBy is required' });
     }
 
-    const result = await ComplaintService.approveItemWithoutLPO(
+    const result = await ComplaintService.approveItemWithoutPurchaseOrder(
       complaintId,
       approvedBy
     );
@@ -346,7 +347,7 @@ const approveItemWithoutLPO = async (req, res) => {
       data: result,
     });
   } catch (error) {
-    logger.error('[Complaint] approveItemWithoutLPO:', error);
+    logger.error('[complaint.controller] approveItemWithoutPurchaseOrder:', error);
     sendError(res, {
       success: false,
       message: error.message || 'Failed to approve item',
@@ -355,64 +356,64 @@ const approveItemWithoutLPO = async (req, res) => {
 };
 
 /**
- * PUT /complaints/:complaintId/create-lpo
- * Step 5 — WORKSHOP_MANAGER creates an LPO for the complaint.
+ * PUT /complaints/:complaintId/create-purchaseorder
+ * Step 5 — WORKSHOP_MANAGER creates an PurchaseOrder for the complaint.
  */
-const createLPOForComplaint = async (req, res) => {
+const createPurchaseOrderForComplaint = async (req, res) => {
   try {
     const { complaintId } = req.params;
-    const { lpoData, createdBy } = req.body;
+    const { purchaseorderData, createdBy } = req.body;
 
-    if (!lpoData || !createdBy) {
+    if (!purchaseorderData || !createdBy) {
       return sendError(res, {
         success: false,
-        message: 'lpoData and createdBy are required',
+        message: 'purchaseorderData and createdBy are required',
       });
     }
 
-    const result = await ComplaintService.createLPOForComplaint(
+    const result = await ComplaintService.createPurchaseOrderForComplaint(
       complaintId,
-      lpoData,
+      purchaseorderData,
       createdBy
     );
 
     sendSuccess(res, {
       success: true,
-      message: 'LPO created successfully',
+      message: 'PurchaseOrder created successfully',
       data: result,
     });
   } catch (error) {
-    logger.error('[Complaint] createLPOForComplaint:', error);
+    logger.error('[complaint.controller] createPurchaseOrderForComplaint:', error);
     sendError(res, {
       success: false,
-      message: error.message || 'Failed to create LPO',
+      message: error.message || 'Failed to create PurchaseOrder',
     });
   }
 };
 
 /**
- * PUT /complaints/:complaintId/upload-lpo
- * Generates a pre-signed S3 URL and records the LPO (or amendment) on the complaint.
+ * PUT /complaints/:complaintId/upload
+ * Generates a pre-signed S3 URL and records the PurchaseOrder (or amendment) on the complaint.
  */
-const uploadLPOForComplaint = async (req, res) => {
+const uploadPurchaseOrderForComplaint = async (req, res) => {
   try {
     const { complaintId } = req.params;
-    const { uploadedBy, lpoRef, description, fileName, isAmendment } = req.body;
+    const { uploadedBy, purchaseorderRef, description, fileName, isAmendment } = req.body;
 
-    if (!uploadedBy || !lpoRef) {
+    if (!uploadedBy || !purchaseorderRef) {
       return sendError(res, {
         success: false,
-        message: 'uploadedBy and lpoRef are required',
+        message: 'uploadedBy and purchaseorderRef are required',
       });
     }
 
     const amendmentSuffix = isAmendment ? '-amendment' : '';
     const finalFilename =
-      fileName || `lpo-${complaintId}${amendmentSuffix}-${Date.now()}.pdf`;
-    const s3Key = `complaint-lpos/${complaintId}/${finalFilename}`;
+      fileName || `purchaseorder-${complaintId}${amendmentSuffix}-${Date.now()}.pdf`;
+    const s3Key = `complaint-purchaseorders/${complaintId}/${finalFilename}`;
     const uploadUrl = await putObject(finalFilename, s3Key, 'application/pdf');
 
-    const lpoFileData = {
+    const purchaseorderFileData = {
       fileName: finalFilename,
       originalName: finalFilename,
       filePath: s3Key,
@@ -421,11 +422,11 @@ const uploadLPOForComplaint = async (req, res) => {
       uploadDate: new Date(),
     };
 
-    const result = await ComplaintService.uploadLPOForComplaint(
+    const result = await ComplaintService.uploadPurchaseOrderForComplaint(
       complaintId,
-      lpoFileData,
+      purchaseorderFileData,
       uploadedBy,
-      lpoRef,
+      purchaseorderRef,
       description,
       isAmendment
     );
@@ -434,20 +435,20 @@ const uploadLPOForComplaint = async (req, res) => {
       success: true,
       message: `Pre-signed URL generated successfully${isAmendment ? ' (Amendment)' : ''}`,
       uploadUrl,
-      data: { complaint: result, uploadData: lpoFileData },
+      data: { complaint: result, uploadData: purchaseorderFileData },
     });
   } catch (error) {
-    logger.error('[Complaint] uploadLPOForComplaint:', error);
+    logger.error('[complaint.controller] uploadPurchaseOrderForComplaint:', error);
     sendError(res, {
       success: false,
-      message: error.message || 'Failed to upload LPO',
+      message: error.message || 'Failed to upload PurchaseOrder',
     });
   }
 };
 
 /**
  * POST /complaints/sign/:complaintId
- * Unified sign endpoint used by the mobile app for all LPO approval roles.
+ * Unified sign endpoint used by the mobile app for all PurchaseOrder approval roles.
  */
 const signComplaint = async (req, res) => {
   try {
@@ -552,7 +553,7 @@ const signComplaint = async (req, res) => {
       data: result.data || result,
     });
   } catch (error) {
-    logger.error('[Complaint] signComplaint:', error);
+    logger.error('[complaint.controller] signComplaint:', error);
     res
       .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
       .json({ success: false, message: error.message || 'Signing failed' });
@@ -609,7 +610,7 @@ const purchaseApproval = async (req, res) => {
       data: result,
     });
   } catch (error) {
-    logger.error('[Complaint] purchaseApproval:', error);
+    logger.error('[complaint.controller] purchaseApproval:', error);
     sendError(res, {
       success: false,
       message: error.message || 'Failed to approve purchase',
@@ -666,7 +667,7 @@ const managerApproval = async (req, res) => {
       data: result,
     });
   } catch (error) {
-    logger.error('[Complaint] managerApproval:', error);
+    logger.error('[complaint.controller] managerApproval:', error);
     sendError(res, {
       success: false,
       message: error.message || 'Failed to get manager approval',
@@ -725,7 +726,7 @@ const ceoApproval = async (req, res) => {
       data: result,
     });
   } catch (error) {
-    logger.error('[Complaint] ceoApproval:', error);
+    logger.error('[complaint.controller] ceoApproval:', error);
     sendError(res, {
       success: false,
       message: error.message || 'Failed to get CEO approval',
@@ -782,7 +783,7 @@ const accountsApproval = async (req, res) => {
       data: result,
     });
   } catch (error) {
-    logger.error('[Complaint] accountsApproval:', error);
+    logger.error('[complaint.controller] accountsApproval:', error);
     sendError(res, {
       success: false,
       message: error.message || 'Failed to record accounts approval',
@@ -816,7 +817,7 @@ const markItemsAvailable = async (req, res) => {
       data: result,
     });
   } catch (error) {
-    logger.error('[Complaint] markItemsAvailable:', error);
+    logger.error('[complaint.controller] markItemsAvailable:', error);
     sendError(res, {
       success: false,
       message: error.message || 'Failed to mark items as available',
@@ -840,7 +841,7 @@ const addSolution = async (req, res) => {
       });
     }
 
-    const sessions = await UploadService.getCompletedSessions({
+    const sessions = await uploadService.getCompletedSessions({
       sessionIds,
       uploadedBy: req.userId,
       feature: 'complaint',
@@ -869,7 +870,7 @@ const addSolution = async (req, res) => {
       data: { complaint: result.data },
     });
   } catch (error) {
-    logger.error('[Complaint] addSolution:', error);
+    logger.error('[complaint.controller] addSolution:', error);
     sendError(res, {
       success: false,
       message: error.message || 'Internal server error',
@@ -901,7 +902,7 @@ const getUserComplaints = async (req, res) => {
       count: result.data.length,
     });
   } catch (error) {
-    logger.error('[Complaint] getUserComplaints:', error);
+    logger.error('[complaint.controller] getUserComplaints:', error);
     sendError(res, {
       success: false,
       message: 'Failed to retrieve user complaints',
@@ -931,7 +932,7 @@ const getComplaintDetails = async (req, res) => {
       data: complaint,
     });
   } catch (error) {
-    logger.error('[Complaint] getComplaintDetails:', error);
+    logger.error('[complaint.controller] getComplaintDetails:', error);
     sendError(res, {
       success: false,
       message: 'Failed to retrieve complaint',
@@ -962,7 +963,7 @@ const getAllComplaints = async (req, res) => {
       count: result.data.length,
     });
   } catch (error) {
-    logger.error('[Complaint] getAllComplaints:', error);
+    logger.error('[complaint.controller] getAllComplaints:', error);
     sendError(res, {
       success: false,
       message: 'Failed to retrieve complaints',
@@ -991,7 +992,7 @@ const getComplaintsByStatus = async (req, res) => {
       count: result.data.length,
     });
   } catch (error) {
-    logger.error('[Complaint] getComplaintsByStatus:', error);
+    logger.error('[complaint.controller] getComplaintsByStatus:', error);
     sendError(res, {
       success: false,
       message: 'Failed to retrieve complaints by status',
@@ -1027,7 +1028,7 @@ const getMechanicComplaints = async (req, res) => {
       count: result.data.length,
     });
   } catch (error) {
-    logger.error('[Complaint] getMechanicComplaints:', error);
+    logger.error('[complaint.controller] getMechanicComplaints:', error);
     sendError(res, {
       success: false,
       message: error.message || 'Failed to retrieve mechanic complaints',
@@ -1046,10 +1047,10 @@ module.exports = {
   assignMechanic,
   mechanicRequestItems,
   forwardToWorkshop,
-  forwardToWorkshopWithoutLPO,
-  approveItemWithoutLPO,
-  createLPOForComplaint,
-  uploadLPOForComplaint,
+  forwardToWorkshopWithoutPurchaseOrder,
+  approveItemWithoutPurchaseOrder,
+  createPurchaseOrderForComplaint,
+  uploadPurchaseOrderForComplaint,
   signComplaint,
   purchaseApproval,
   managerApproval,

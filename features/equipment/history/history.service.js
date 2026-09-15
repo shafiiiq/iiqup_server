@@ -1,69 +1,49 @@
-const logger = require('../../../shared/logger/logger');
+const logger = require('#shared/logger/logger');
+const HTTP = require('#shared/response/response.status');
+const mongoose = require('mongoose');
 
-const HTTP = require('../../../shared/constants/httpStatus.constant.js');
-// services/history.service.js
+const { paginate } = require('#shared/pagination/pagination');
 const ServiceHistoryModel = require('./history.model');
-const NotificationModel = require('../../notification/notification.model');
+const NotificationModel = require('#core/notification/notification.model');
 const ServiceReportModel = require('../report/report.model');
 const EquipmentModel = require('../equipment.model');
-const { createNotification } = require('../../notification/notification.service');
-const PushNotificationService = require('../../notification/notification.push');
-const mongoose = require('mongoose');
-const { default: wsUtils } = require('../../../socket/socket');
-const analyser = require('../../dashboard/dashboard.analyser');
+const { createNotification } = require('#core/notification/notification.service');
+const PushNotificationService = require('#core/notification/notification.push');
+const wsUtils = require('#core/socket/socket.io');
+const dashboardServices = require('#features/dashboard/dashboard.service')
+const { buildDateFilterQuery } = require('./history.query');
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────────────────────
+const VALID_SERVICE_TYPES = ['oil', 'normal', 'tyre', 'battery', 'major'];
+const OIL_SERVICE_TYPES = new Set(['oil', 'normal']);
+const FULL_SERVICE_INTERVAL = 3000;
 
-const VALID_TYPES = ['oil', 'normal', 'tyre', 'battery', 'major'];
-const OIL_TYPES = new Set(['oil', 'normal']);
-const FULL_SVC_STEP = 3000; // hrs/km boundary that triggers a full-service notification
+const parseServiceHours = (value) => parseInt(String(value ?? '').replace(/[^0-9]/g, ''), 10);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Strips non-numeric characters and parses to integer.
- * Returns NaN if the result is not a valid number.
- */
-const parseHrs = (val) =>
-  parseInt(String(val ?? '').replace(/[^0-9]/g, ''), 10);
-
-/**
- * Checks whether the next service value crosses a FULL_SVC_STEP boundary
- * relative to the current service value.
- */
-const crossesFullServiceBoundary = (current, next) => {
-  const c = parseHrs(current);
-  const n = parseHrs(next);
-  if (isNaN(c) || isNaN(n)) return false;
-  return Math.floor(n / FULL_SVC_STEP) > Math.floor(c / FULL_SVC_STEP);
+const crossesFullServiceInterval = (currentHrs, nextHrs) => {
+  const current = parseServiceHours(currentHrs);
+  const next = parseServiceHours(nextHrs);
+  if (isNaN(current) || isNaN(next)) return false;
+  return Math.floor(next / FULL_SERVICE_INTERVAL) > Math.floor(current / FULL_SERVICE_INTERVAL);
 };
 
-/**
- * Builds the equipment display label used in notifications.
- */
 const equipmentLabel = (equipment, regNo) =>
-  equipment
-    ? `${equipment.brand} ${equipment.machine} ${regNo}`
-    : String(regNo);
+  equipment ? `${equipment.brand} ${equipment.machine} ${regNo}` : String(regNo);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Notification Helper
-// ─────────────────────────────────────────────────────────────────────────────
+const incrementMaintenanceRecord = async (regNo, type, count = 1, session = null) => {
+  if (!VALID_SERVICE_TYPES.includes(type) || !count) return;
+  try {
+    await EquipmentModel.updateOne(
+      { regNo: String(regNo) },
+      { $inc: { [`maintenanceRecord.${type}`]: count } },
+      session ? { session } : {}
+    );
+  } catch (err) {
+    logger.warn('[history.service] incrementMaintenanceRecord failed (non-fatal):', err.message);
+  }
+};
 
-/**
- * Fires a full-service-due notification if the next service hrs/km crosses a
- * 3000-unit boundary. Non-fatal — caller should catch and log on error.
- */
-const maybeFireFullServiceNotification = async (
-  regNo,
-  serviceHrs,
-  nextServiceHrs
-) => {
-  if (!crossesFullServiceBoundary(serviceHrs, nextServiceHrs)) return;
+const notifyFullServiceDue = async (regNo, serviceHrs, nextServiceHrs) => {
+  if (!crossesFullServiceInterval(serviceHrs, nextServiceHrs)) return;
 
   const equipment = await EquipmentModel.findOne({ regNo });
   const label = equipmentLabel(equipment, regNo);
@@ -88,28 +68,12 @@ const maybeFireFullServiceNotification = async (
   );
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// History Document Builder
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Builds a unified history document from the incoming data.
- * All fields are present on the schema — irrelevant ones default to null.
- * Works for both single-insert and batch-insert flows.
- *
- * @param {string} type        - Service type: oil | normal | tyre | battery | major
- * @param {Object} record      - Per-record fields (date, serviceHrs, etc.)
- * @param {Object} shared      - Shared fields across a batch (regNo, machine, etc.)
- * @returns {Object}           - Document ready for ServiceHistoryModel.create()
- */
 const buildHistoryDocument = (type, record, shared) => {
-  const isOil = OIL_TYPES.has(type);
-  const isTyre = type === 'tyre';
-  const isBatt = type === 'battery';
-  const isMajor = type === 'major';
+  const isOilService = OIL_SERVICE_TYPES.has(type);
+  const isTyreService = type === 'tyre';
+  const isBatteryService = type === 'battery';
 
   return {
-    // ── Core ──────────────────────────────────────────────────────────────────
     regNo: String(shared.regNo ?? record.regNo),
     serviceType: type,
     date: record.date,
@@ -119,44 +83,27 @@ const buildHistoryDocument = (type, record, shared) => {
     mechanics: shared.mechanics || record.mechanics || null,
     remarks: shared.remarks || record.remarks || record.workRemarks || null,
 
-    // ── Unified Service Hours ────────────────────────────────────────────────
     serviceHrs: record.serviceHrs || record.runningHours || null,
     nextServiceHrs: record.nextServiceHrs || null,
-    fullService: isOil ? (record.fullService ?? false) : false,
+    fullService: isOilService ? (record.fullService ?? false) : false,
 
-    // ── Oil / Normal ──────────────────────────────────────────────────────────
-    oil: isOil ? shared.oil || 'Check' : null,
-    oilFilter: isOil ? shared.oilFilter || 'Check' : null,
-    fuelFilter: isOil ? shared.fuelFilter || 'Check' : null,
-    acFilter: isOil ? shared.acFilter || 'Clean' : null,
-    waterSeparator: isOil ? shared.waterSeparator || 'Check' : null,
-    airFilter: isOil ? shared.airFilter || 'Clean' : null,
+    oil: isOilService ? shared.oil || 'Check' : null,
+    oilFilter: isOilService ? shared.oilFilter || 'Check' : null,
+    fuelFilter: isOilService ? shared.fuelFilter || 'Check' : null,
+    acFilter: isOilService ? shared.acFilter || 'Clean' : null,
+    waterSeparator: isOilService ? shared.waterSeparator || 'Check' : null,
+    airFilter: isOilService ? shared.airFilter || 'Clean' : null,
 
-    // ── Tyre ──────────────────────────────────────────────────────────────────
-    tyreModel: isTyre ? shared.tyreModel || record.tyreModel || null : null,
-    tyreNumber: isTyre ? shared.tyreNumber || record.tyreNumber || null : null,
-    runningHours: isTyre
-      ? record.runningHours || record.serviceHrs || null
-      : null,
+    tyreModel: isTyreService ? shared.tyreModel || record.tyreModel || null : null,
+    tyreNumber: isTyreService ? shared.tyreNumber || record.tyreNumber || null : null,
+    runningHours: isTyreService ? record.runningHours || record.serviceHrs || null : null,
 
-    // ── Battery ───────────────────────────────────────────────────────────────
-    batteryModel: isBatt
-      ? shared.batteryModel || record.batteryModel || null
-      : null,
+    batteryModel: isBatteryService ? shared.batteryModel || record.batteryModel || null : null,
 
-    // reportId injected after report is created
     reportId: null,
   };
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Report Document Builder
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Builds a service report document from shared + per-record fields.
- * historyId is injected after the history document has been saved.
- */
 const buildReportDocument = (type, record, shared, historyId) => ({
   regNo: String(shared.regNo ?? record.regNo),
   machine: shared.machine || shared.equipment || '',
@@ -172,77 +119,59 @@ const buildReportDocument = (type, record, shared, historyId) => ({
   historyId,
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Pre-flight Validation
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Validates all records before any DB writes occur.
- * Checks for missing dates and duplicate entries (same regNo + date + serviceType).
- * Returns an array of human-readable error strings — empty means all clear.
- */
-const preflightCheck = async (type, records, shared) => {
-  const errors = [];
+const findDuplicateRecords = async (type, records, shared) => {
+  const issues = [];
 
   for (let i = 0; i < records.length; i++) {
     const record = records[i];
     const label = `Record #${i + 1} (${record.date || 'no date'})`;
 
     if (!record.date) {
-      errors.push(`${label}: date is required`);
+      issues.push(`${label}: date is required`);
       continue;
     }
 
-    const conflict = await ServiceHistoryModel.findOne({
+    const existing = await ServiceHistoryModel.findOne({
       regNo: String(shared.regNo),
       serviceType: type,
       date: record.date,
     });
 
-    if (conflict) {
-      errors.push(
+    if (existing) {
+      issues.push(
         `${label}: a ${type} record for ${shared.regNo} on ${record.date} already exists — remove this entry and resubmit`
       );
     }
   }
 
-  return errors;
+  return issues;
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Insert — Single Record
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Inserts a single service history record.
- * Body shape mirrors the old per-type endpoints — serviceType field determines behaviour.
- */
 const insertServiceHistory = async (data) => {
   try {
     const type = data.serviceType;
+    const regNo = data.regNo ?? data.equipmentNo;
 
-    // ── Duplicate check ───────────────────────────────────────────────────────
-    const conflict = await ServiceHistoryModel.findOne({
-      regNo: String(data.regNo ?? data.equipmentNo),
+    const existing = await ServiceHistoryModel.findOne({
+      regNo: String(regNo),
       serviceType: type,
       date: data.date,
     });
-    if (conflict) {
+    if (existing) {
       return { status: HTTP.CONFLICT, ok: false, message: 'data is already added' };
     }
 
-    // ── Build and save history ────────────────────────────────────────────────
-    // For single inserts, record = data and shared = data (same object).
     const historyDoc = buildHistoryDocument(type, data, data);
     const history = await ServiceHistoryModel.create(historyDoc);
 
-    // ── Handle full-service notification deletion if applicable ───────────────
-    if (OIL_TYPES.has(type) && data.fullService === true) {
+    await incrementMaintenanceRecord(regNo, type, 1);
+
+    if (OIL_SERVICE_TYPES.has(type) && data.fullService === true) {
       await NotificationModel.findOneAndDelete({ regNo: data.regNo });
     }
 
-    analyser.clearCache();
-    wsUtils.sendDashboardUpdate('serviceHistory');
+    dashboardServices.clearDashboardCache()
+    wsUtils.dispatchDashboardUpdate('serviceHistory');
 
     return {
       status: HTTP.OK,
@@ -254,7 +183,7 @@ const insertServiceHistory = async (data) => {
     if (error.code === 11000) {
       return { status: HTTP.CONFLICT, ok: false, message: 'data is already added' };
     }
-    logger.error('[HistoryService] insertServiceHistory:', error);
+    logger.error('[history.service] insertServiceHistory:', error);
     return {
       status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
@@ -264,67 +193,37 @@ const insertServiceHistory = async (data) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Insert — Batch (transaction)
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Bulk-inserts service history + report pairs inside a MongoDB transaction.
- * All records share a single type and equipment (sharedData.regNo).
- * If any record fails, the entire batch is rolled back.
- *
- * Expected body:
- * {
- *   type:       'oil' | 'normal' | 'tyre' | 'battery' | 'major',
- *   sharedData: { regNo, machine, location, mechanics, operator, remarks,
- *                 checklistItems, oil, oilFilter, fuelFilter, acFilter,
- *                 airFilter, waterSeparator, tyreModel, tyreNumber, batteryModel },
- *   records:    [{ date, serviceHrs?, nextServiceHrs?, runningHours?,
- *                  workRemarks?, fullService? }]
- * }
- */
 const insertBatchServiceHistory = async (body) => {
   const { type, sharedData, records } = body;
 
-  // ── Input guards ──────────────────────────────────────────────────────────
   if (!type) return { status: HTTP.BAD_REQUEST, ok: false, message: 'type is required' };
-  if (!VALID_TYPES.includes(type))
+  if (!VALID_SERVICE_TYPES.includes(type)) {
     return {
       status: HTTP.BAD_REQUEST,
       ok: false,
-      message: `Invalid type. Must be one of: ${VALID_TYPES.join(', ')}`,
+      message: `Invalid type. Must be one of: ${VALID_SERVICE_TYPES.join(', ')}`,
     };
-  if (!sharedData?.regNo)
-    return { status: HTTP.BAD_REQUEST, ok: false, message: 'sharedData.regNo is required' };
-  if (!sharedData?.machine)
-    return {
-      status: HTTP.BAD_REQUEST,
-      ok: false,
-      message: 'sharedData.machine is required',
-    };
-  if (!Array.isArray(records) || !records.length)
-    return {
-      status: HTTP.BAD_REQUEST,
-      ok: false,
-      message: 'records array is required and must not be empty',
-    };
+  }
+  if (!sharedData?.regNo) return { status: HTTP.BAD_REQUEST, ok: false, message: 'sharedData.regNo is required' };
+  if (!sharedData?.machine) return { status: HTTP.BAD_REQUEST, ok: false, message: 'sharedData.machine is required' };
+  if (!Array.isArray(records) || !records.length) {
+    return { status: HTTP.BAD_REQUEST, ok: false, message: 'records array is required and must not be empty' };
+  }
 
-  // ── Pre-flight (no writes) ────────────────────────────────────────────────
-  const preflightErrors = await preflightCheck(type, records, sharedData);
-  if (preflightErrors.length > 0) {
+  const duplicateIssues = await findDuplicateRecords(type, records, sharedData);
+  if (duplicateIssues.length > 0) {
     return {
       status: HTTP.UNPROCESSABLE_ENTITY,
       ok: false,
-      message: `Batch rejected — ${preflightErrors.length} issue${preflightErrors.length > 1 ? 's' : ''} must be fixed before submitting`,
-      errors: preflightErrors,
+      message: `Batch rejected — ${duplicateIssues.length} issue${duplicateIssues.length > 1 ? 's' : ''} must be fixed before submitting`,
+      errors: duplicateIssues,
       data: {
         succeeded: [],
-        failed: preflightErrors.map((reason, i) => ({ index: i, reason })),
+        failed: duplicateIssues.map((reason, index) => ({ index, reason })),
       },
     };
   }
 
-  // ── Transaction ───────────────────────────────────────────────────────────
   const session = await mongoose.startSession();
   session.startTransaction();
   const succeeded = [];
@@ -333,54 +232,31 @@ const insertBatchServiceHistory = async (body) => {
     for (let i = 0; i < records.length; i++) {
       const record = records[i];
 
-      // History
       const historyDoc = buildHistoryDocument(type, record, sharedData);
-      const [history] = await ServiceHistoryModel.create([historyDoc], {
-        session,
-      });
+      const [history] = await ServiceHistoryModel.create([historyDoc], { session });
 
-      // Report
-      const reportDoc = buildReportDocument(
-        type,
-        record,
-        sharedData,
-        history._id.toString()
-      );
-      const [report] = await ServiceReportModel.create([reportDoc], {
-        session,
-      });
+      const reportDoc = buildReportDocument(type, record, sharedData, history._id.toString());
+      const [report] = await ServiceReportModel.create([reportDoc], { session });
 
-      // Cross-link
       history.reportId = report._id.toString();
       await history.save({ session });
 
-      succeeded.push({
-        index: i,
-        date: record.date,
-        historyId: history._id,
-        reportId: report._id,
-      });
+      succeeded.push({ index: i, date: record.date, historyId: history._id, reportId: report._id });
 
-      // Full-service notification (non-fatal, outside transaction)
-      if (OIL_TYPES.has(type)) {
-        maybeFireFullServiceNotification(
-          sharedData.regNo,
-          record.serviceHrs,
-          record.nextServiceHrs
-        ).catch((err) =>
-          logger.warn(
-            '[HistoryService] notification error (non-fatal):',
-            err.message
-          )
+      if (OIL_SERVICE_TYPES.has(type)) {
+        notifyFullServiceDue(sharedData.regNo, record.serviceHrs, record.nextServiceHrs).catch((err) =>
+          logger.warn('[history.service] notification error (non-fatal):', err.message)
         );
       }
     }
+
+    await incrementMaintenanceRecord(sharedData.regNo, type, succeeded.length, session);
 
     await session.commitTransaction();
   } catch (err) {
     await session.abortTransaction();
     session.endSession();
-    logger.error('[HistoryService] batch transaction aborted:', err);
+    logger.error('[history.service] batch transaction aborted:', err);
     return {
       status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
@@ -390,9 +266,8 @@ const insertBatchServiceHistory = async (body) => {
   }
 
   session.endSession();
-
-  analyser.clearCache();
-  wsUtils.sendDashboardUpdate('serviceHistory');
+  dashboardServices.clearDashboardCache()
+  wsUtils.dispatchDashboardUpdate('serviceHistory');
 
   return {
     status: HTTP.OK,
@@ -403,44 +278,26 @@ const insertBatchServiceHistory = async (body) => {
   };
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Fetch
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Returns all history records for a registration number (all types), newest first.
- */
 const fetchServiceHistory = async (regNo) => {
   try {
-    const records = await ServiceHistoryModel.find({
-      regNo: String(regNo),
-    }).sort({ date: -1 });
+    const records = await ServiceHistoryModel.find({ regNo: String(regNo) }).sort({ date: -1 });
     return { status: HTTP.OK, ok: true, data: records };
   } catch (error) {
-    logger.error('[HistoryService] fetchServiceHistory:', error);
+    logger.error('[history.service] fetchServiceHistory:', error);
     return { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message };
   }
 };
 
-/**
- * Returns history records filtered by type for a registration number.
- */
 const fetchServiceHistoryByType = async (regNo, type) => {
   try {
-    const records = await ServiceHistoryModel.find({
-      regNo: String(regNo),
-      serviceType: type,
-    }).sort({ date: -1 });
+    const records = await ServiceHistoryModel.find({ regNo: String(regNo), serviceType: type }).sort({ date: -1 });
     return { status: HTTP.OK, ok: true, data: records };
   } catch (error) {
-    logger.error('[HistoryService] fetchServiceHistoryByType:', error);
+    logger.error('[history.service] fetchServiceHistoryByType:', error);
     return { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message };
   }
 };
 
-/**
- * Returns a single history record by ID.
- */
 const fetchServiceHistoryById = async (id) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(id)) {
@@ -448,81 +305,109 @@ const fetchServiceHistoryById = async (id) => {
     }
 
     const record = await ServiceHistoryModel.findById(id);
-    if (!record)
-      return { status: HTTP.NOT_FOUND, ok: false, message: 'History record not found' };
+    if (!record) return { status: HTTP.NOT_FOUND, ok: false, message: 'History record not found' };
 
     return { status: HTTP.OK, ok: true, data: record };
   } catch (error) {
-    logger.error('[HistoryService] fetchServiceHistoryById:', error);
+    logger.error('[history.service] fetchServiceHistoryById:', error);
     return { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message };
   }
 };
 
-/**
- * Returns the most recent full-service record for a registration number.
- */
+const fetchServiceHistoryList = async ({
+  regNos,
+  serviceType,
+  dateFilterMode,
+  lastMonthsCount,
+  customStartDate,
+  customEndDate,
+  pagination,
+}) => {
+  try {
+    const query = {
+      regNo: { $in: regNos.map(String) },
+      ...(serviceType ? { serviceType } : {}),
+      ...buildDateFilterQuery({ dateFilterMode, lastMonthsCount, customStartDate, customEndDate }),
+    };
+
+    const result = await paginate(ServiceHistoryModel, query, pagination, { sort: { date: -1, createdAt: -1 } });
+    return { status: HTTP.OK, ok: true, data: result.data, pagination: result.pagination };
+  } catch (error) {
+    logger.error('[history.service] fetchServiceHistoryList:', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message || 'Error fetching service history list' };
+  }
+};
+
+const fetchServiceHistoryTypeCounts = async ({
+  regNos,
+  dateFilterMode,
+  lastMonthsCount,
+  customStartDate,
+  customEndDate,
+}) => {
+  try {
+    const matchQuery = {
+      regNo: { $in: regNos.map(String) },
+      ...buildDateFilterQuery({ dateFilterMode, lastMonthsCount, customStartDate, customEndDate }),
+    };
+
+    const counts = await ServiceHistoryModel.aggregate([
+      { $match: matchQuery },
+      { $group: { _id: '$serviceType', count: { $sum: 1 } } },
+    ]);
+
+    const breakdown = { oil: 0, normal: 0, tyre: 0, battery: 0, major: 0 };
+    let total = 0;
+    counts.forEach(({ _id, count }) => {
+      if (Object.hasOwn(breakdown, _id)) breakdown[_id] = count;
+      total += count;
+    });
+
+    return { status: HTTP.OK, ok: true, data: { total, ...breakdown } };
+  } catch (error) {
+    logger.error('[history.service] fetchServiceHistoryTypeCounts:', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message || 'Error fetching service history counts' };
+  }
+};
+
 const fetchLatestFullService = async (regNo) => {
   try {
-    const record = await ServiceHistoryModel.findOne({
-      regNo: String(regNo),
-      fullService: true,
-    }).sort({ date: -1 });
-
+    const record = await ServiceHistoryModel.findOne({ regNo: String(regNo), fullService: true }).sort({ date: -1 });
     return { status: HTTP.OK, ok: true, data: record || null };
   } catch (error) {
-    logger.error('[HistoryService] fetchLatestFullService:', error);
+    logger.error('[history.service] fetchLatestFullService:', error);
     return { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message };
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Delete
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Deletes a history record by ID and also removes its linked service report.
- */
 const deleteServiceHistory = async (id) => {
   try {
     const record = await ServiceHistoryModel.findById(id);
-    if (!record)
-      return {
-        status: HTTP.NOT_FOUND,
-        ok: false,
-        message: `History record with ID ${id} not found`,
-      };
+    if (!record) {
+      return { status: HTTP.NOT_FOUND, ok: false, message: `History record with ID ${id} not found` };
+    }
 
     const { reportId } = record;
-
     await ServiceHistoryModel.findByIdAndDelete(id);
 
-    let deletedReport = null;
-    if (reportId) {
-      deletedReport = await ServiceReportModel.findByIdAndDelete(reportId);
-    }
+    const deletedReport = reportId ? await ServiceReportModel.findByIdAndDelete(reportId) : null;
+
+    // Mirror the deletion in the counter so it doesn't drift upward forever.
+    await incrementMaintenanceRecord(record.regNo, record.serviceType, -1);
 
     return {
       status: HTTP.OK,
       ok: true,
       message: 'History record and linked report deleted successfully',
       data: {
-        deletedHistory: {
-          id: record._id,
-          regNo: record.regNo,
-          date: record.date,
-          serviceType: record.serviceType,
-        },
+        deletedHistory: { id: record._id, regNo: record.regNo, date: record.date, serviceType: record.serviceType },
         deletedReport: deletedReport
-          ? {
-              id: deletedReport._id,
-              regNo: deletedReport.regNo,
-              date: deletedReport.date,
-            }
+          ? { id: deletedReport._id, regNo: deletedReport.regNo, date: deletedReport.date }
           : null,
       },
     };
   } catch (error) {
-    logger.error('[HistoryService] deleteServiceHistory:', error);
+    logger.error('[history.service] deleteServiceHistory:', error);
     return {
       status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
@@ -532,21 +417,11 @@ const deleteServiceHistory = async (id) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Full Service Notifications
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Creates a full-service-due notification for an equipment manually.
- */
 const insertFullService = async (data) => {
   try {
-    if (!data?.regNo)
-      return {
-        status: HTTP.BAD_REQUEST,
-        ok: false,
-        message: 'Registration number is required',
-      };
+    if (!data?.regNo) {
+      return { status: HTTP.BAD_REQUEST, ok: false, message: 'Registration number is required' };
+    }
 
     const equipment = await EquipmentModel.findOne({ regNo: data.regNo });
     const label = equipmentLabel(equipment, data.regNo);
@@ -570,33 +445,22 @@ const insertFullService = async (data) => {
       notification.data._id.toString()
     );
 
-    return {
-      status: HTTP.OK,
-      ok: true,
-      message: 'Full service notification sent successfully',
-    };
+    return { status: HTTP.OK, ok: true, message: 'Full service notification sent successfully' };
   } catch (error) {
-    logger.error('[HistoryService] insertFullService:', error);
+    logger.error('[history.service] insertFullService:', error);
     return { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message };
   }
 };
 
-/**
- * Returns all full-service notifications.
- */
 const fetchFullServiceNotification = async () => {
   try {
     const notifications = await NotificationModel.find({});
     return { status: HTTP.OK, ok: true, data: notifications };
   } catch (error) {
-    logger.error('[HistoryService] fetchFullServiceNotification:', error);
+    logger.error('[history.service] fetchFullServiceNotification:', error);
     return { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message };
   }
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Exports
-// ─────────────────────────────────────────────────────────────────────────────
 
 module.exports = {
   insertServiceHistory,
@@ -604,6 +468,8 @@ module.exports = {
   fetchServiceHistory,
   fetchServiceHistoryByType,
   fetchServiceHistoryById,
+  fetchServiceHistoryList,
+  fetchServiceHistoryTypeCounts,
   fetchLatestFullService,
   deleteServiceHistory,
   insertFullService,

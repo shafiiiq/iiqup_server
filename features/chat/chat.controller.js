@@ -1,14 +1,14 @@
-const logger = require('../../shared/logger/logger');
+const logger = require('#shared/logger/logger');
 
-const HTTP = require('../../shared/constants/httpStatus.constant.js');
-const { sendSuccess, sendError } = require('../../shared/response/response.util');
+const HTTP = require('#shared/response/response.status')
+const { sendSuccess, sendError } = require('#shared/response/response.sender');
 // controllers/chat.controller.js
 const chatService = require('./chat.service');
 const messageService = require('./message/message.service');
-const websocket = require('../../socket/socket');
-const { createNotification } = require('../notification/notification.service');
-const PushNotificationService = require('../notification/notification.push');
-const User = require('../user/user.model');
+const websocket = require('#core/socket/socket.io');
+const { createNotification } = require('#core/notification/notification.service');
+const PushNotificationService = require('#core/notification/notification.push');
+const User = require('#features/user/staff/staff.model')
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Chat Controllers
@@ -107,13 +107,13 @@ const createGroupChat = async (req, res) => {
       .filter(Boolean)
       .map((participant) => ({
         userId: participant.userId || participant._id,
-        userType: participant.userType || 'office',
+        userType: participant.userType || 'staff',
         uniqueCode: participant.uniqueCode,
         isAdmin: false,
       }));
 
     const allParticipants = [
-      { userId, userType: userType || 'office', uniqueCode, isAdmin: true },
+      { userId, userType: userType || 'staff', uniqueCode, isAdmin: true },
       ...normalizedParticipants,
     ];
 
@@ -143,7 +143,7 @@ const createGroupChat = async (req, res) => {
         participants: groupChat.participants,
         avatar: groupChat.avatar,
       };
-      websocket.default.sendMessageToChat(groupChat.participants, payload);
+      websocket.default.dispatchMessageToChat(groupChat.participants, payload);
     }
 
     allParticipants.forEach((participant) => {
@@ -336,7 +336,7 @@ const updateGroupChat = async (req, res) => {
         participants: updatedChat.participants,
         avatar: updatedChat.avatar,
       };
-      websocket.default.sendMessageToChat(
+      websocket.default.dispatchMessageToChat(
         updatedChat.participants,
         messagePayload
       );
@@ -395,7 +395,7 @@ const leaveGroupChat = async (req, res) => {
         participants: updatedChat.participants,
         avatar: updatedChat.avatar,
       };
-      websocket.default.sendMessageToChat(
+      websocket.default.dispatchMessageToChat(
         updatedChat.participants,
         messagePayload
       );
@@ -506,7 +506,7 @@ const sendTextMessage = async (req, res) => {
     });
 
     const chat = await chatService.getChatById(chatId, userId);
-    websocket.default.sendMessageToChat(chat.participants, message, uniqueCode);
+    websocket.default.dispatchMessageToChat(chat.participants, message, uniqueCode);
 
     const user = await User.findById(userId);
 

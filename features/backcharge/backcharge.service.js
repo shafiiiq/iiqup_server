@@ -1,40 +1,16 @@
-const logger = require('../../shared/logger/logger');
+const HTTP = require('#shared/response/response.status')
+const Backcharge = require('./backcharge.model')
+const { paginate } = require('#shared/pagination/pagination')
+const { createNotification } = require('#core/notification/notification.service')
+const PushNotificationService = require('#core/notification/notification.push')
+const wsUtils = require('#core/socket/socket.io')
+const dashboardServices = require('#features/dashboard/dashboard.service')
 
-const AppError = require('../../shared/errors/AppError.js');
-const HTTP = require('../../shared/constants/httpStatus.constant.js');
-// services/backcharge.service.js
-const Backcharge = require('./backcharge.model');
-const { paginationUtil: { paginate } } = require('../../shared/pagination');
-const { createNotification } = require('../notification/notification.service');
-const PushNotificationService = require('../notification/notification.push');
-const { default: wsUtils } = require('../../socket/socket');
-const analyser = require('../dashboard/dashboard.analyser');
+const wrapServiceError = (serviceName, error) =>
+  new Error(`[BackchargeService] ${serviceName}:${error.message}`, { cause: error })
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Sends a notification and a push notification together.
- * @param {object} notifPayload
- * @param {string|Array} recipient
- * @param {string} title
- * @param {string} description
- * @param {string} priority
- * @returns {Promise<void>}
- */
-const notify = async (
-  notifPayload,
-  recipient,
-  title,
-  description,
-  priority = 'high'
-) => {
-  const notification = await createNotification({
-    ...notifPayload,
-    recipient,
-    time: new Date(),
-  });
+const notify = async (notifPayload, recipient, title, description, priority = 'high') => {
+  const notification = await createNotification({ ...notifPayload, recipient, time: new Date() })
 
   await PushNotificationService.sendGeneralNotification(
     recipient,
@@ -43,367 +19,151 @@ const notify = async (
     priority,
     'normal',
     notification.data._id.toString()
-  );
-};
+  )
+}
 
-/**
- * Converts flat text inputs into the structured { combinedText, lines } shape.
- * The Backcharge form/doc now supports one scope line and up to four workshop summary lines.
- *
- * @param {...string} lines
- * @returns {{combinedText: string, lines: Array<{lineNumber: number, text: string}>}}
- */
 const buildTextLines = (...lines) => {
-  const normalized = lines
-    .filter((line) => typeof line === 'string' && line.trim() !== '')
-    .map((line) => line.trim());
+  const normalized = lines.filter((line) => typeof line === 'string' && line.trim() !== '').map((line) => line.trim())
 
   return {
     combinedText: normalized.join(' '),
-    lines: normalized.map((text, index) => ({
-      lineNumber: index + 1,
-      text,
-    })),
-  };
-};
+    lines: normalized.map((text, index) => ({ lineNumber: index + 1, text })),
+  }
+}
 
-/**
- * Resolves the supplier code for a new backcharge:
- * reuses the code if the supplier already exists, otherwise increments the last code.
- * @param {string} supplierName
- * @returns {Promise<string>}
- */
 const resolveSupplierCode = async (supplierName) => {
   const existing = await Backcharge.findOne({
     supplierName: { $regex: new RegExp(`^${supplierName.trim()}$`, 'i') },
     supplierCode: { $ne: null },
   })
     .select('supplierCode')
-    .lean();
+    .lean()
 
-  if (existing) return existing.supplierCode;
+  if (existing) return existing.supplierCode
 
   const last = await Backcharge.findOne({ supplierCode: { $ne: null } })
     .sort({ createdAt: -1 })
     .select('supplierCode')
-    .lean();
+    .lean()
 
   if (last?.supplierCode) {
-    const lastNumber = parseInt(last.supplierCode.split('-')[1]) || 0;
-    return `SUP-${String(lastNumber + 1).padStart(3, '0')}`;
+    const lastNumber = parseInt(last.supplierCode.split('-')[1]) || 0
+    return `SUP-${String(lastNumber + 1).padStart(3, '0')}`
   }
 
-  return 'SUP-001';
-};
+  return 'SUP-001'
+}
 
-/**
- * Looks up the saved email for a supplier code, if one exists.
- * @param {string} supplierCode
- * @returns {Promise<string|null>}
- */
 const resolveSupplierMail = async (supplierCode) => {
-  if (!supplierCode) return null;
+  if (!supplierCode) return null
 
-  const record = await Backcharge.findOne({
-    supplierCode,
-    supplierMail: { $ne: null, $exists: true },
-  })
+  const record = await Backcharge.findOne({ supplierCode, supplierMail: { $ne: null, $exists: true } })
     .select('supplierMail')
-    .lean();
+    .lean()
 
-  return record?.supplierMail || null;
-};
+  return record?.supplierMail || null
+}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Read
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Returns all backcharge reports sorted by creation date descending.
- * @returns {Promise<Array>}
- */
-const getAllBackchargeReports = async () => {
+const getAllBackchargeReports = async (pagination = { page: 1, limit: 20 }) => {
   try {
-    return await Backcharge.find().sort({ createdAt: -1 }).lean();
+    return await paginate(Backcharge, {}, pagination, { sort: { createdAt: -1 } })
   } catch (error) {
-    throw new Error(
-      `[BackchargeService] getAllBackchargeReports:${error.message}`,
-      { cause: error }
-    );
+    throw wrapServiceError('getAllBackchargeReports', error)
   }
-};
+}
 
-/**
- * Returns a backcharge report by its MongoDB ID.
- * @param {string} id
- * @returns {Promise<object>}
- */
 const getBackchargeById = async (id) => {
   try {
-    return await Backcharge.findById(id).lean();
+    return await Backcharge.findById(id).lean()
   } catch (error) {
-    logger.error('[BackchargeService] getBackchargeById:', error);
-    throw new Error(
-      `Error retrieving backcharge report by ID: ${error.message}`
-    );
+    throw wrapServiceError('getBackchargeById', error)
   }
-};
+}
 
-/**
- * Returns a backcharge report by report number.
- * @param {string} reportNo
- * @returns {Promise<object>}
- */
 const getBackchargeByReportNo = async (reportNo) => {
   try {
-    return await Backcharge.findOne({ reportNo }).lean();
+    return await Backcharge.findOne({ reportNo }).lean()
   } catch (error) {
-    logger.error('[BackchargeService] getBackchargeByReportNo:', error);
-    throw new Error(
-      `Error retrieving backcharge report by report number: ${error.message}`
-    );
+    throw wrapServiceError('getBackchargeByReportNo', error)
   }
-};
+}
 
-/**
- * Returns a backcharge report by reference number.
- * @param {string} refNo
- * @returns {Promise<object>}
- */
 const getBackchargeByRefNo = async (refNo) => {
   try {
-    return await Backcharge.findOne({ refNo }).lean();
+    return await Backcharge.findOne({ refNo }).lean()
   } catch (error) {
-    logger.error('[BackchargeService] getBackchargeByRefNo:', error);
-    throw new Error(
-      `Error retrieving backcharge report by ref number: ${error.message}`
-    );
+    throw wrapServiceError('getBackchargeByRefNo', error)
   }
-};
+}
 
-/**
- * Returns the numeric part of the latest backcharge refNo (e.g. 193 from "ATE193-09-25").
- * Defaults to 140 if no records exist.
- * @returns {Promise<number>}
- */
 const getLatestBackchargeRef = async () => {
   try {
-    const latest = await Backcharge.findOne()
-      .sort({ createdAt: -1 })
-      .select('refNo')
-      .lean();
-    if (!latest?.refNo) return 140;
+    const latest = await Backcharge.findOne().sort({ createdAt: -1 }).select('refNo').lean()
+    if (!latest?.refNo) return 140
 
-    const parts = latest.refNo.split('-');
+    const parts = latest.refNo.split('-')
     if (parts.length >= 1 && parts[0].startsWith('ATE')) {
-      return parseInt(parts[0].replace('ATE', '')) || 140;
+      return parseInt(parts[0].replace('ATE', '')) || 140
     }
 
-    return 140;
+    return 140
   } catch (error) {
-    logger.error('[BackchargeService] getLatestBackchargeRef:', error);
-    throw new Error(
-      `Error retrieving latest backcharge reference: ${error.message}`
-    );
+    throw wrapServiceError('getLatestBackchargeRef', error)
   }
-};
+}
 
-/**
- * Returns backcharge reports with pagination and optional filters.
- * @param {number} page
- * @param {number} limit
- * @param {object} filters
- * @returns {Promise<object>}
- */
-const getBackchargeReportsWithPagination = async (
-  pagination = { page: 1, limit: 10, skip: 0 },
-  filters = {}
-) => {
-  try {
-    const query = {};
-
-    if (filters.reportNo) query.reportNo = new RegExp(filters.reportNo, 'i');
-    if (filters.equipmentType)
-      query.equipmentType = new RegExp(filters.equipmentType, 'i');
-    if (filters.supplierName)
-      query.supplierName = new RegExp(filters.supplierName, 'i');
-    if (filters.status) query.status = filters.status;
-
-    if (filters.dateFrom || filters.dateTo) {
-      query.date = {};
-      if (filters.dateFrom) query.date.$gte = new Date(filters.dateFrom);
-      if (filters.dateTo) query.date.$lte = new Date(filters.dateTo);
-    }
-
-    const result = await paginate(Backcharge, query, pagination, {
-      sort: { createdAt: -1 },
-    });
-
-    return {
-      data: result.data,
-      pagination: {
-        ...result.pagination,
-        totalReports: result.pagination.totalCount,
-        hasNext: result.pagination.hasMore,
-        hasPrev: result.pagination.currentPage > 1,
-      },
-    };
-  } catch (error) {
-    logger.error(
-      '[BackchargeService] getBackchargeReportsWithPagination:',
-      error
-    );
-    throw new Error(
-      `Error retrieving paginated backcharge reports: ${error.message}`
-    );
-  }
-};
-
-/**
- * Returns aggregate statistics: overall totals, by status, and last 12 months.
- * @returns {Promise<object>}
- */
-const getBackchargeStats = async () => {
-  try {
-    const [overall, byStatus, monthly] = await Promise.all([
-      Backcharge.aggregate([
-        {
-          $group: {
-            _id: null,
-            totalReports: { $sum: 1 },
-            totalCost: { $sum: '$costSummary.totalCost' },
-            totalDeductions: { $sum: '$costSummary.approvedDeduction' },
-            avgCost: { $avg: '$costSummary.totalCost' },
-            avgDeduction: { $avg: '$costSummary.approvedDeduction' },
-          },
-        },
-      ]),
-      Backcharge.aggregate([
-        { $group: { _id: '$status', count: { $sum: 1 } } },
-      ]),
-      Backcharge.aggregate([
-        {
-          $group: {
-            _id: {
-              year: { $year: '$createdAt' },
-              month: { $month: '$createdAt' },
-            },
-            count: { $sum: 1 },
-            totalCost: { $sum: '$costSummary.totalCost' },
-          },
-        },
-        { $sort: { '_id.year': -1, '_id.month': -1 } },
-        { $limit: 12 },
-      ]),
-    ]);
-
-    return {
-      overall: overall[0] || {
-        totalReports: 0,
-        totalCost: 0,
-        totalDeductions: 0,
-        avgCost: 0,
-        avgDeduction: 0,
-      },
-      byStatus,
-      monthly,
-    };
-  } catch (error) {
-    throw new Error(`[BackchargeService] getBackchargeStats:${error.message}`, {
-      cause: error,
-    });
-  }
-};
-
-/**
- * Returns unique equipment records matching a plate number (partial match, max 10).
- * @param {string} plateNo
- * @returns {Promise<Array>}
- */
 const searchEquipmentByPlate = async (plateNo) => {
   try {
     const results = await Backcharge.find({ plateNo: new RegExp(plateNo, 'i') })
       .select('plateNo equipmentType model supplierName contactPerson')
       .limit(10)
-      .lean();
+      .lean()
 
     return results.reduce((acc, cur) => {
-      if (!acc.find((i) => i.plateNo === cur.plateNo)) acc.push(cur);
-      return acc;
-    }, []);
+      if (!acc.find((i) => i.plateNo === cur.plateNo)) acc.push(cur)
+      return acc
+    }, [])
   } catch (error) {
-    throw new Error(
-      `[BackchargeService] searchEquipmentByPlate:${error.message}`,
-      { cause: error }
-    );
+    throw wrapServiceError('searchEquipmentByPlate', error)
   }
-};
+}
 
-/**
- * Returns unique supplier records matching a supplier name (partial match, max 10).
- * @param {string} supplierName
- * @returns {Promise<Array>}
- */
 const searchSuppliers = async (supplierName) => {
   try {
-    const results = await Backcharge.find({
-      supplierName: new RegExp(supplierName, 'i'),
-    })
+    const results = await Backcharge.find({ supplierName: new RegExp(supplierName, 'i') })
       .select('supplierName contactPerson')
       .limit(10)
-      .lean();
+      .lean()
 
     return results.reduce((acc, cur) => {
-      if (!acc.find((i) => i.name === cur.supplierName))
-        acc.push({ name: cur.supplierName, contactPerson: cur.contactPerson });
-      return acc;
-    }, []);
+      if (!acc.find((i) => i.name === cur.supplierName)) acc.push({ name: cur.supplierName, contactPerson: cur.contactPerson })
+      return acc
+    }, [])
   } catch (error) {
-    throw new Error(`[BackchargeService] searchSuppliers:${error.message}`, {
-      cause: error,
-    });
+    throw wrapServiceError('searchSuppliers', error)
   }
-};
+}
 
-/**
- * Returns unique site locations matching a partial string (max 10).
- * @param {string} siteLocation
- * @returns {Promise<Array>}
- */
 const searchSites = async (siteLocation) => {
   try {
-    const results = await Backcharge.find({
-      siteLocation: new RegExp(siteLocation, 'i'),
-    })
+    const results = await Backcharge.find({ siteLocation: new RegExp(siteLocation, 'i') })
       .select('siteLocation')
       .limit(10)
-      .lean();
+      .lean()
 
     return results.reduce((acc, cur) => {
-      if (!acc.find((i) => i.location === cur.siteLocation))
-        acc.push({ location: cur.siteLocation });
-      return acc;
-    }, []);
+      if (!acc.find((i) => i.location === cur.siteLocation)) acc.push({ location: cur.siteLocation })
+      return acc
+    }, [])
   } catch (error) {
-    throw new Error(`[BackchargeService] searchSites:${error.message}`, {
-      cause: error,
-    });
+    throw wrapServiceError('searchSites', error)
   }
-};
+}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Write
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Creates a new backcharge report. Auto-generates supplierCode and inherits supplierMail if known.
- * @param {object} data
- * @returns {Promise<object>}
- */
 const addBackcharge = async (data) => {
   try {
-    const supplierCode = await resolveSupplierCode(data.supplierName);
-    const supplierMail = await resolveSupplierMail(supplierCode);
+    const supplierCode = await resolveSupplierCode(data.supplierName)
+    const supplierMail = await resolveSupplierMail(supplierCode)
 
     const newBackcharge = new Backcharge({
       reportNo: data.reportNo,
@@ -418,12 +178,7 @@ const addBackcharge = async (data) => {
       supplierCode,
       supplierMail,
       scopeOfWork: buildTextLines(data.scopeOfWork, data.scopeLine2Text),
-      workshopComments: buildTextLines(
-        data.workshopComments,
-        data.workSummaryLine2,
-        data.workSummaryLine3,
-        data.workSummaryLine4
-      ),
+      workshopComments: buildTextLines(data.workshopComments, data.workSummaryLine2, data.workSummaryLine3, data.workSummaryLine4),
       sparePartsTable: data.tableRows || [],
       workDate: data.workDate || '',
       costSummary: {
@@ -439,38 +194,25 @@ const addBackcharge = async (data) => {
         authorizedSignatory: {
           signedBy: data.authorizedSignatoryName || 'Ahammed Kamal',
           authorizedSignatoryMode: data.authorizedSignatoryMode || 'CEO',
-          authorizedSignatoryName:
-            data.authorizedSignatoryName || 'Ahammed Kamal',
+          authorizedSignatoryName: data.authorizedSignatoryName || 'Ahammed Kamal',
         },
       },
       status: 'draft',
-    });
+    })
 
-    analyser.clearCache();
-    wsUtils.sendDashboardUpdate('backcharge');
-    return await newBackcharge.save();
+    dashboardServices.clearDashboardCache()
+    wsUtils.dispatchDashboardUpdate('backcharge')
+    return await newBackcharge.save()
   } catch (error) {
-    throw new Error(`[BackchargeService] addBackcharge:${error.message}`, {
-      cause: error,
-    });
+    throw wrapServiceError('addBackcharge', error)
   }
-};
+}
 
-/**
- * Updates an existing backcharge report by ID.
- * Handles reshaping of nested text/cost/table fields before persisting.
- * @param {string} id
- * @param {object} updateData
- * @returns {Promise<object>}
- */
 const updateBackcharge = async (id, updateData) => {
   try {
     if ('scopeOfWork' in updateData || 'scopeLine2Text' in updateData) {
-      updateData.scopeOfWork = buildTextLines(
-        updateData.scopeOfWork,
-        updateData.scopeLine2Text
-      );
-      delete updateData.scopeLine2Text;
+      updateData.scopeOfWork = buildTextLines(updateData.scopeOfWork, updateData.scopeLine2Text)
+      delete updateData.scopeLine2Text
     }
 
     if (
@@ -484,97 +226,62 @@ const updateBackcharge = async (id, updateData) => {
         updateData.workSummaryLine2,
         updateData.workSummaryLine3,
         updateData.workSummaryLine4
-      );
-      delete updateData.workSummaryLine2;
-      delete updateData.workSummaryLine3;
-      delete updateData.workSummaryLine4;
+      )
+      delete updateData.workSummaryLine2
+      delete updateData.workSummaryLine3
+      delete updateData.workSummaryLine4
     }
 
-    if (
-      updateData.sparePartsCost ||
-      updateData.labourCharges ||
-      updateData.totalCost ||
-      updateData.approvedDeduction
-    ) {
+    if (updateData.sparePartsCost || updateData.labourCharges || updateData.totalCost || updateData.approvedDeduction) {
       updateData.costSummary = {
         sparePartsCost: parseFloat(updateData.sparePartsCost) || 0,
         labourCharges: parseFloat(updateData.labourCharges) || 0,
         totalCost: parseFloat(updateData.totalCost) || 0,
         approvedDeduction: parseFloat(updateData.approvedDeduction) || 0,
-      };
-      delete updateData.sparePartsCost;
-      delete updateData.labourCharges;
-      delete updateData.totalCost;
-      delete updateData.approvedDeduction;
+      }
+      delete updateData.sparePartsCost
+      delete updateData.labourCharges
+      delete updateData.totalCost
+      delete updateData.approvedDeduction
     }
 
     if (updateData.tableRows) {
-      updateData.sparePartsTable = updateData.tableRows;
-      delete updateData.tableRows;
+      updateData.sparePartsTable = updateData.tableRows
+      delete updateData.tableRows
     }
 
-    updateData.updatedAt = new Date();
+    updateData.updatedAt = new Date()
 
-    return await Backcharge.findByIdAndUpdate(id, updateData, {
-      new: true,
-      runValidators: true,
-    });
+    return await Backcharge.findByIdAndUpdate(id, updateData, { new: true, runValidators: true })
   } catch (error) {
-    throw new Error(`[BackchargeService] updateBackcharge:${error.message}`, {
-      cause: error,
-    });
+    throw wrapServiceError('updateBackcharge', error)
   }
-};
+}
 
-/**
- * Deletes a backcharge report by ID.
- * @param {string} id
- * @returns {Promise<object>}
- */
 const deleteBackcharge = async (id) => {
   try {
-    return await Backcharge.findByIdAndDelete(id);
+    return await Backcharge.findByIdAndDelete(id)
   } catch (error) {
-    throw new Error(`[BackchargeService] deleteBackcharge:${error.message}`, {
-      cause: error,
-    });
+    throw wrapServiceError('deleteBackcharge', error)
   }
-};
+}
 
-/**
- * Saves or updates the supplier email for all records sharing the same supplier code.
- * @param {string} supplierCode
- * @param {string} email
- * @returns {Promise<object>}
- */
 const saveSupplierEmail = async (supplierCode, email) => {
   try {
-    return await Backcharge.updateMany(
-      { supplierCode },
-      { $set: { supplierMail: email } }
-    );
+    return await Backcharge.updateMany({ supplierCode }, { $set: { supplierMail: email } })
   } catch (error) {
-    throw new Error(`[BackchargeService] saveSupplierEmail:${error.message}`, {
-      cause: error,
-    });
+    throw wrapServiceError('saveSupplierEmail', error)
   }
-};
+}
 
-/**
- * Records a signature on a backcharge document.
- * Resolves the signer's role from their uniqueCode, guards against unauthorised/double-signing,
- * then writes the signature to the record.
- *
- * Role → env var mapping:
- *   workshopManager     → process.env.WORKSHOP_MANAGER
- *   purchaseManager     → process.env.PURCHASE_MANAGER
- *   operationsManager   → process.env.MANAGER
- *   authorizedSignatory → process.env.CEO | process.env.MD
- *
- * @param {string} refNo
- * @param {object} signData
- * @returns {Promise<object>}
- */
+const ROLE_MAP = [
+  { envKey: process.env.WORKSHOP_MANAGER, field: 'workshopManager', role: 'WORKSHOP_MANAGER' },
+  { envKey: process.env.PURCHASE_MANAGER, field: 'purchaseManager', role: 'PURCHASE_MANAGER' },
+  { envKey: process.env.MANAGER, field: 'operationsManager', role: 'MANAGER' },
+  { envKey: process.env.CEO, field: 'authorizedSignatory', role: 'CEO' },
+  { envKey: process.env.MD, field: 'authorizedSignatory', role: 'MANAGING_DIRECTOR' },
+]
+
 const signBackcharge = async (refNo, signData) => {
   const {
     uniqueCode,
@@ -584,93 +291,44 @@ const signBackcharge = async (refNo, signData) => {
     signedIP = null,
     signedDevice = null,
     signedLocation = null,
-  } = signData;
+  } = signData
 
-  // ── Role resolution ────────────────────────────────────────────────────────
-  const roleMap = [
-    {
-      envKey: process.env.WORKSHOP_MANAGER,
-      field: 'workshopManager',
-      role: 'WORKSHOP_MANAGER',
-    },
-    {
-      envKey: process.env.PURCHASE_MANAGER,
-      field: 'purchaseManager',
-      role: 'PURCHASE_MANAGER',
-    },
-    {
-      envKey: process.env.MANAGER,
-      field: 'operationsManager',
-      role: 'MANAGER',
-    },
-    { envKey: process.env.CEO, field: 'authorizedSignatory', role: 'CEO' },
-    {
-      envKey: process.env.MD,
-      field: 'authorizedSignatory',
-      role: 'MANAGING_DIRECTOR',
-    },
-  ];
-
-  const matched = roleMap.find((r) => r.envKey === uniqueCode);
-  if (!matched)
+  const matched = ROLE_MAP.find((r) => r.envKey === uniqueCode)
+  if (!matched) {
     throw {
       status: HTTP.FORBIDDEN,
-      message:
-        'Unauthorised: your device is not recognised as an authorised signatory for backcharge documents',
-    };
+      message: 'Unauthorised: your device is not recognised as an authorised signatory for backcharge documents',
+    }
+  }
 
-  const backcharge = await Backcharge.findOne({ refNo });
-  if (!backcharge)
-    throw { status: HTTP.NOT_FOUND, message: `Backcharge not found: ${refNo}` };
+  const backcharge = await Backcharge.findOne({ refNo })
+  if (!backcharge) throw { status: HTTP.NOT_FOUND, message: `Backcharge not found: ${refNo}` }
 
-  // ── CEO vs MD guard ────────────────────────────────────────────────────────
   if (matched.field === 'authorizedSignatory') {
-    const savedMode =
-      backcharge.signatures?.authorizedSignatory?.authorizedSignatoryMode ||
-      'CEO';
-    const expectedRole =
-      savedMode === 'MANAGING DIRECTOR' ? 'MANAGING_DIRECTOR' : 'CEO';
-    if (matched.role !== expectedRole)
-      throw {
-        status: HTTP.FORBIDDEN,
-        message: `This document requires ${savedMode} signature, not ${matched.role}`,
-      };
+    const savedMode = backcharge.signatures?.authorizedSignatory?.authorizedSignatoryMode || 'CEO'
+    const expectedRole = savedMode === 'MANAGING DIRECTOR' ? 'MANAGING_DIRECTOR' : 'CEO'
+    if (matched.role !== expectedRole) {
+      throw { status: HTTP.FORBIDDEN, message: `This document requires ${savedMode} signature, not ${matched.role}` }
+    }
   }
 
-  // ── Already signed guard ───────────────────────────────────────────────────
   if (backcharge.signatures?.[matched.field]?.signed) {
-    throw {
-      status: HTTP.CONFLICT,
-      message: `This position (${matched.role}) has already been signed`,
-    };
+    throw { status: HTTP.CONFLICT, message: `This position (${matched.role}) has already been signed` }
   }
 
-  // ── Out-of-order detection ─────────────────────────────────────────────────
   const chain = [
-    {
-      role: 'WORKSHOP_MANAGER',
-      signed: backcharge.signatures?.workshopManager?.signed,
-      order: 1,
-    },
-    {
-      role: 'PURCHASE_MANAGER',
-      signed: backcharge.signatures?.purchaseManager?.signed,
-      order: 2,
-    },
-    {
-      role: 'MANAGER',
-      signed: backcharge.signatures?.operationsManager?.signed,
-      order: 3,
-    },
+    { role: 'WORKSHOP_MANAGER', signed: backcharge.signatures?.workshopManager?.signed, order: 1 },
+    { role: 'PURCHASE_MANAGER', signed: backcharge.signatures?.purchaseManager?.signed, order: 2 },
+    { role: 'MANAGER', signed: backcharge.signatures?.operationsManager?.signed, order: 3 },
     {
       role: matched.role === 'MANAGING_DIRECTOR' ? 'MANAGING_DIRECTOR' : 'CEO',
       signed: backcharge.signatures?.authorizedSignatory?.signed,
       order: 4,
     },
-  ];
+  ]
 
-  const myOrder = chain.find((c) => c.role === matched.role)?.order;
-  const unsignedAbove = chain.filter((c) => c.order < myOrder && !c.signed);
+  const myOrder = chain.find((c) => c.role === matched.role)?.order
+  const unsignedAbove = chain.filter((c) => c.order < myOrder && !c.signed)
 
   if (unsignedAbove.length > 0 && !override) {
     return {
@@ -678,10 +336,9 @@ const signBackcharge = async (refNo, signData) => {
       requireOverride: true,
       message: 'Out-of-order signing detected. Confirm override to proceed.',
       unsignedAbove: unsignedAbove.map((c) => c.role),
-    };
+    }
   }
 
-  // ── Write the signature ────────────────────────────────────────────────────
   const updated = await Backcharge.findOneAndUpdate(
     { refNo },
     {
@@ -696,8 +353,7 @@ const signBackcharge = async (refNo, signData) => {
         approvalTrail: {
           signedBy: uniqueCode,
           role: matched.role,
-          action:
-            override && unsignedAbove.length > 0 ? 'override_signed' : 'signed',
+          action: override && unsignedAbove.length > 0 ? 'override_signed' : 'signed',
           signedDate: new Date(),
           comments:
             override && unsignedAbove.length > 0
@@ -707,80 +363,58 @@ const signBackcharge = async (refNo, signData) => {
       },
     },
     { new: true }
-  );
-  if (!updated)
-    throw { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to update backcharge record' };
+  )
+  if (!updated) throw { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to update backcharge record' }
 
-  // ── Notifications ──────────────────────────────────────────────────────────
-
-  // 1. Override — notify OFFICE_HERO for each unsigned person above (message only, no button)
   if (override && unsignedAbove.length > 0) {
     for (const above of unsignedAbove) {
-      const title = `Action Required — Backcharge ${refNo} override signed`;
-      const description = `${matched.role} has signed backcharge ${refNo} out of order. ${above.role} signature is still required.`;
+      const title = `Action Required — Backcharge ${refNo} override signed`
+      const description = `${matched.role} has signed backcharge ${refNo} out of order. ${above.role} signature is still required.`
 
-      await notify(
-        {
-          title,
-          description,
-          priority: 'high',
-          sourceId: 'backcharge_approval',
-        },
-        JSON.parse(process.env.OFFICE_HERO),
-        title,
-        description
-      );
+      await notify({ title, description, priority: 'high', sourceId: 'backcharge_approval' }, JSON.parse(process.env.STAFF_HERO), title, description)
     }
   }
 
-  // 2. Normal next-step notification (only when signing in order)
   if (!override || unsignedAbove.length === 0) {
+    const signatoryMode = updated.signatures?.authorizedSignatory?.authorizedSignatoryMode || 'CEO'
+
     const nextStepMap = {
       WORKSHOP_MANAGER: {
         title: `Purchase Manager Approval Needed - ${refNo}`,
         description: `Workshop Manager signed backcharge ${refNo}. Purchase Manager approval needed.`,
         sourceId: 'backcharge_approval',
-        recipient: JSON.parse(process.env.OFFICE_HERO),
+        recipient: JSON.parse(process.env.STAFF_HERO),
       },
       PURCHASE_MANAGER: {
         title: `Manager Approval Needed - ${refNo}`,
         description: `Purchase Manager signed backcharge ${refNo}. Manager approval needed.`,
         sourceId: 'backcharge_approval',
-        recipient: JSON.parse(process.env.OFFICE_HERO),
+        recipient: JSON.parse(process.env.STAFF_HERO),
       },
       MANAGER: {
-        title: `${updated.signatures?.authorizedSignatory?.authorizedSignatoryMode || 'CEO'} Approval Needed - ${refNo}`,
-        description: `Manager signed backcharge ${refNo}. ${updated.signatures?.authorizedSignatory?.authorizedSignatoryMode || 'CEO'} approval needed.`,
-        sourceId:
-          updated.signatures?.authorizedSignatory?.authorizedSignatoryMode ===
-          'MANAGING DIRECTOR'
-            ? 'md_approval'
-            : 'ceo_approval',
-        recipient: JSON.parse(process.env.OFFICE_HERO),
+        title: `${signatoryMode} Approval Needed - ${refNo}`,
+        description: `Manager signed backcharge ${refNo}. ${signatoryMode} approval needed.`,
+        sourceId: signatoryMode === 'MANAGING DIRECTOR' ? 'md_approval' : 'ceo_approval',
+        recipient: JSON.parse(process.env.STAFF_HERO),
       },
       CEO: {
         title: `Backcharge Signed & Ready - ${refNo}`,
         description: `CEO signed backcharge ${refNo}. All signatures complete.`,
         sourceId: 'backcharge_final',
-        recipient: JSON.parse(process.env.OFFICE_MAIN),
+        recipient: JSON.parse(process.env.STAFF_MAIN),
       },
       MANAGING_DIRECTOR: {
         title: `Backcharge Signed & Ready - ${refNo}`,
         description: `MD signed backcharge ${refNo}. All signatures complete.`,
         sourceId: 'backcharge_final',
-        recipient: JSON.parse(process.env.OFFICE_MAIN),
+        recipient: JSON.parse(process.env.STAFF_MAIN),
       },
-    };
+    }
 
-    const notifConfig = nextStepMap[matched.role];
+    const notifConfig = nextStepMap[matched.role]
     if (notifConfig) {
-      const { recipient, title, description, sourceId } = notifConfig;
-      await notify(
-        { title, description, priority: 'high', sourceId },
-        recipient,
-        title,
-        description
-      );
+      const { recipient, title, description, sourceId } = notifConfig
+      await notify({ title, description, priority: 'high', sourceId }, recipient, title, description)
     }
   }
 
@@ -789,86 +423,41 @@ const signBackcharge = async (refNo, signData) => {
     message: `${matched.role} signature recorded successfully`,
     data: updated,
     role: matched.role,
-  };
-};
+  }
+}
 
-/**
- * Returns all backcharge documents where the given uniqueCode has NOT yet signed
- * their corresponding role field, but the previous role in the chain has signed.
- * @param {string} uniqueCode
- * @returns {Promise<Array>}
- */
 const getPendingSignatures = async (uniqueCode) => {
   try {
     const roleMap = [
-      {
-        envKey: process.env.WORKSHOP_MANAGER,
-        field: 'workshopManager',
-        prevField: null,
-      },
-      {
-        envKey: process.env.PURCHASE_MANAGER,
-        field: 'purchaseManager',
-        prevField: 'workshopManager',
-      },
-      {
-        envKey: process.env.MANAGER,
-        field: 'operationsManager',
-        prevField: 'purchaseManager',
-      },
-      {
-        envKey: process.env.CEO,
-        field: 'authorizedSignatory',
-        prevField: 'operationsManager',
-      },
-      {
-        envKey: process.env.MD,
-        field: 'authorizedSignatory',
-        prevField: 'operationsManager',
-      },
-    ];
+      { envKey: process.env.WORKSHOP_MANAGER, field: 'workshopManager', prevField: null },
+      { envKey: process.env.PURCHASE_MANAGER, field: 'purchaseManager', prevField: 'workshopManager' },
+      { envKey: process.env.MANAGER, field: 'operationsManager', prevField: 'purchaseManager' },
+      { envKey: process.env.CEO, field: 'authorizedSignatory', prevField: 'operationsManager' },
+      { envKey: process.env.MD, field: 'authorizedSignatory', prevField: 'operationsManager' },
+    ]
 
-    const matched = roleMap.find((r) => r.envKey === uniqueCode);
-    if (!matched) return [];
+    const matched = roleMap.find((r) => r.envKey === uniqueCode)
+    if (!matched) return []
 
-    // Build query: their field is not yet signed
-    const query = { [`signatures.${matched.field}.signed`]: { $ne: true } };
+    const query = { [`signatures.${matched.field}.signed`]: { $ne: true } }
+    if (matched.prevField) query[`signatures.${matched.prevField}.signed`] = true
 
-    // If there's a previous step, that step must already be signed
-    if (matched.prevField) {
-      query[`signatures.${matched.prevField}.signed`] = true;
-    }
-
-    // CEO/MD: also filter by authorizedSignatoryMode matching their role
     if (matched.envKey === process.env.CEO) {
-      query['signatures.authorizedSignatory.authorizedSignatoryMode'] = {
-        $nin: ['MANAGING DIRECTOR'],
-      };
+      query['signatures.authorizedSignatory.authorizedSignatoryMode'] = { $nin: ['MANAGING DIRECTOR'] }
     }
     if (matched.envKey === process.env.MD) {
-      query['signatures.authorizedSignatory.authorizedSignatoryMode'] =
-        'MANAGING DIRECTOR';
+      query['signatures.authorizedSignatory.authorizedSignatoryMode'] = 'MANAGING DIRECTOR'
     }
 
     return await Backcharge.find(query)
-      .select(
-        'refNo reportNo supplierName equipmentType plateNo date signatures'
-      )
+      .select('refNo reportNo supplierName equipmentType plateNo date signatures')
       .sort({ createdAt: -1 })
-      .lean();
+      .lean()
   } catch (error) {
-    throw new Error(
-      `[BackchargeService] getPendingSignatures:${error.message}`,
-      { cause: error }
-    );
+    throw wrapServiceError('getPendingSignatures', error)
   }
-};
+}
 
-/**
- * Returns all backcharge documents the given uniqueCode has already signed.
- * @param {string} uniqueCode
- * @returns {Promise<Array>}
- */
 const getSignedByUser = async (uniqueCode) => {
   try {
     const roleMap = [
@@ -877,29 +466,19 @@ const getSignedByUser = async (uniqueCode) => {
       { envKey: process.env.MANAGER, field: 'operationsManager' },
       { envKey: process.env.CEO, field: 'authorizedSignatory' },
       { envKey: process.env.MD, field: 'authorizedSignatory' },
-    ];
+    ]
 
-    const matched = roleMap.find((r) => r.envKey === uniqueCode);
-    if (!matched) return [];
+    const matched = roleMap.find((r) => r.envKey === uniqueCode)
+    if (!matched) return []
 
-    return await Backcharge.find({
-      [`signatures.${matched.field}.signed`]: true,
-    })
-      .select(
-        'refNo reportNo supplierName equipmentType plateNo date signatures'
-      )
+    return await Backcharge.find({ [`signatures.${matched.field}.signed`]: true })
+      .select('refNo reportNo supplierName equipmentType plateNo date signatures')
       .sort({ createdAt: -1 })
-      .lean();
+      .lean()
   } catch (error) {
-    throw new Error(`[BackchargeService] getSignedByUser:${error.message}`, {
-      cause: error,
-    });
+    throw wrapServiceError('getSignedByUser', error)
   }
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Exports
-// ─────────────────────────────────────────────────────────────────────────────
+}
 
 module.exports = {
   getAllBackchargeReports,
@@ -907,8 +486,6 @@ module.exports = {
   getBackchargeByReportNo,
   getBackchargeByRefNo,
   getLatestBackchargeRef,
-  getBackchargeReportsWithPagination,
-  getBackchargeStats,
   searchEquipmentByPlate,
   searchSuppliers,
   searchSites,
@@ -919,4 +496,4 @@ module.exports = {
   signBackcharge,
   getPendingSignatures,
   getSignedByUser,
-};
+}

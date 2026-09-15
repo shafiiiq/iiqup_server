@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const controller = require('./explorer.controller');
-const { paginationMiddleware } = require('../../shared/pagination');
+const { paginationMiddleware } = require('#middlewares/pagination.middleware');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Explorer Routes
@@ -11,7 +11,7 @@ const { paginationMiddleware } = require('../../shared/pagination');
 // ── Releases ──────────────────────────────────────────────────────────────────
 router.get('/get-all-releases', paginationMiddleware, controller.getAllReleases);
 router.get('/get-latest-release', controller.getLatestRelease);
-router.get('/get-latest-release-for-user', controller.getLatestReleaseForUser);
+router.get('/release/latest', controller.getLatestReleaseForUser);
 router.post('/create-release', controller.createRelease);
 router.delete('/releases/:id', controller.deleteRelease);
 

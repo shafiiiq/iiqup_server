@@ -1,17 +1,17 @@
-const logger = require('../../shared/logger/logger');
+const logger = require('#shared/logger/logger');
 
-const AppError = require('../../shared/errors/AppError.js');
-const HTTP = require('../../shared/constants/httpStatus.constant.js');
+const { AppError } = require('#shared/errors/error.http');
+const HTTP = require('#shared/response/response.status')
 // services/complaint.service.js
 const Complaint = require('./complaint.model');
 const Equipment = require('../equipment/equipment.model');
-const { mobilizationModel } = require('../equipment/mobilization');
-const LPO = require('../lpo/lpo.model');
-const Mechanic = require('../mechanic/mechanic.model');
-const { createNotification } = require('../notification/notification.service');
-const PushNotificationService = require('../notification/notification.push');
-const { default: wsUtils } = require('../../socket/socket');
-const analyser = require('../dashboard/dashboard.analyser');
+const { mobilizationModel } = require('../equipment/mobilization/mobilization.model');
+const PurchaseOrder = require('../order/purchase/purchase.model');
+const Mechanic = require('#features/user/mechanic/mechanic.model');
+const { createNotification } = require('#core/notification/notification.service');
+const PushNotificationService = require('#core/notification/notification.push');
+const wsUtils = require('#core/socket/socket.io');
+const dashboardServices = require('#features/dashboard/dashboard.service');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -178,21 +178,21 @@ const createComplaint = async (complaint) => {
       )
     );
 
-    const officeHero = JSON.parse(process.env.OFFICE_HERO);
+    const staffHero = JSON.parse(process.env.STAFF_HERO);
     await notify(
       {
         title: `New Complaint Registered - ${complaint.regNo}`,
         description: `${complaint.name} registered complaint for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Equipment status changed from ${previousStatus} to Maintenance. Please assign a mechanic.`,
         priority: 'high',
         sourceId: complaintData._id,
-        recipient: officeHero,
+        recipient: staffHero,
         time: new Date(),
         navigateTo: `/(mechanics)/assign/${complaintData._id}`,
         navigateText: 'Assign Mechanic',
         navigteToId: complaintData._id,
         hasButton: true,
       },
-      officeHero,
+      staffHero,
       `New Complaint - ${complaint.regNo}`,
       `New complaint needs mechanic assignment. Equipment ${complaint.regNo} is now in Maintenance.`
     );
@@ -260,17 +260,17 @@ const assignMechanic = async (complaintId, mechanicsArray, assignedBy) => {
         ? `Hamsa assigned - ${mechanicNames} to ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo} for complaint rectification.`
         : `Hamsa assigned - ${mechanicsArray.length} mechanics (${mechanicNames}) to ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo} for complaint rectification.`;
 
-    const officeHero = JSON.parse(process.env.OFFICE_HERO);
+    const staffHero = JSON.parse(process.env.STAFF_HERO);
     await notify(
       {
         title: notificationTitle,
         description: notificationDesc,
         priority: 'high',
         sourceId: 'job_assignment-annoucement',
-        recipient: officeHero,
+        recipient: staffHero,
         time: new Date(),
       },
-      officeHero,
+      staffHero,
       notificationTitle,
       notificationDesc
     );
@@ -317,21 +317,21 @@ const mechanicRequestItems = async (complaintId, requestData, mechanicId) => {
         ? complaint.assignedMechanic.map((m) => m.mechanicName).join(', ')
         : 'Mechanic';
 
-    const officeHero = JSON.parse(process.env.OFFICE_HERO);
+    const staffHero = JSON.parse(process.env.STAFF_HERO);
     await notify(
       {
         title: `Mechanic Item Request - ${complaint.regNo}`,
         description: `${mechanicNames} needs items for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Request: ${requestData.requestText}`,
         priority: 'high',
         sourceId: 'mechanic_request',
-        recipient: officeHero,
+        recipient: staffHero,
         time: new Date(),
         navigateTo: `/(mechanics)/assign/${complaint._id}`,
         navigateText: 'View mechanic request',
         navigteToId: complaint._id,
         hasButton: true,
       },
-      officeHero,
+      staffHero,
       'Mechanic Item Request',
       `${mechanicNames} needs items for ${complaint.regNo}`
     );
@@ -403,30 +403,30 @@ const forwardToWorkshop = async (
     const equipment = await Equipment.findOne({ regNo: complaint.regNo });
     const lastRequest =
       complaint.mechanicRequests[complaint.mechanicRequests.length - 1];
-    let notificationMsg = `Please create LPO for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Items needed: ${lastRequest.requestText}`;
-    let pushBody = `Create LPO for ${complaint.regNo} - Items needed by mechanic`;
+    let notificationMsg = `Please create PurchaseOrder for ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Items needed: ${lastRequest.requestText}`;
+    let pushBody = `Create PurchaseOrder for ${complaint.regNo} - Items needed by mechanic`;
 
     if (documentsWithUploadData?.length > 0) {
       notificationMsg += `. ${documentsWithUploadData.length} supporting document(s) attached.`;
       pushBody += ` (${documentsWithUploadData.length} attachments)`;
     }
 
-    const officeMain = JSON.parse(process.env.OFFICE_MAIN);
+    const staffMain = JSON.parse(process.env.STAFF_MAIN);
     await notify(
       {
-        title: `Create LPO Request - ${complaint.regNo}`,
+        title: `Create PurchaseOrder Request - ${complaint.regNo}`,
         description: notificationMsg,
         priority: 'high',
-        sourceId: 'lpo_request',
-        recipient: officeMain,
+        sourceId: 'purchaseorder_request',
+        recipient: staffMain,
         time: new Date(),
         navigateTo: `/(workflow)/quotation/${complaint._id}`,
         navigateText: `View Hamza's request`,
         navigteToId: complaint._id,
         hasButton: true,
       },
-      officeMain,
-      'LPO Creation Request',
+      staffMain,
+      'PurchaseOrder Creation Request',
       pushBody
     );
 
@@ -438,13 +438,13 @@ const forwardToWorkshop = async (
 };
 
 /**
- * MAINTENANCE_HEAD forwards complaint to WORKSHOP_MANAGER without requiring an LPO.
+ * MAINTENANCE_HEAD forwards complaint to WORKSHOP_MANAGER without requiring an PurchaseOrder.
  * @param {string} complaintId
  * @param {string} approvedBy
  * @param {string} comments
  * @returns {Promise<object>}
  */
-const forwardToWorkshopWithoutLPO = async (
+const forwardToWorkshopWithoutPurchaseOrder = async (
   complaintId,
   approvedBy,
   comments = ''
@@ -454,7 +454,7 @@ const forwardToWorkshopWithoutLPO = async (
       complaintId,
       {
         'mechanicRequests.$[].status': 'approved_by_maintenance',
-        workflowStatus: 'sent_to_workshop_without_lpo',
+        workflowStatus: 'sent_to_workshop_without_purchaseorder',
         $push: {
           approvalTrail: {
             approvedBy,
@@ -473,52 +473,52 @@ const forwardToWorkshopWithoutLPO = async (
     const equipment = await Equipment.findOne({ regNo: complaint.regNo });
     const title = `Approval Needed! - ${equipment.machine} - ${equipment.regNo}`;
     const body = `Hamza requested : ${comments}`;
-    const officeMain = JSON.parse(process.env.OFFICE_MAIN);
+    const staffMain = JSON.parse(process.env.STAFF_MAIN);
 
     await notify(
       {
         title,
         description: body,
         priority: 'high',
-        sourceId: 'wihtout_lpo_request',
-        recipient: officeMain,
+        sourceId: 'wihtout_purchaseorder_request',
+        recipient: staffMain,
         time: new Date(),
         navigateTo: `/(mechanics)/assign/${complaint._id}`,
         navigateText: 'Approve',
         directApproval: true,
-        approvalPort: `complaints/approve-item/without-lpo/${complaint._id}`,
+        approvalPort: `complaints/approve-item/without-purchaseorder/${complaint._id}`,
         navigteToId: complaint._id,
         hasButton: true,
       },
-      officeMain,
+      staffMain,
       title,
       body
     );
 
     return complaint;
   } catch (error) {
-    logger.error('[ComplaintService] forwardToWorkshopWithoutLPO:', error);
+    logger.error('[ComplaintService] forwardToWorkshopWithoutPurchaseOrder:', error);
     throw error;
   }
 };
 
 /**
- * Approves an item request that was submitted without an LPO.
+ * Approves an item request that was submitted without an PurchaseOrder.
  * @param {string} complaintId
  * @param {string} approvedBy
  * @returns {Promise<object>}
  */
-const approveItemWithoutLPO = async (complaintId, approvedBy) => {
+const approveItemWithoutPurchaseOrder = async (complaintId, approvedBy) => {
   try {
     const existing = await Complaint.findById(complaintId);
     if (!existing) throw { status: HTTP.NOT_FOUND, message: 'Complaint not found' };
-    if (existing.workflowStatus !== 'sent_to_workshop_without_lpo')
+    if (existing.workflowStatus !== 'sent_to_workshop_without_purchaseorder')
       throw { status: HTTP.BAD_REQUEST, message: 'Already Approved' };
 
     const complaint = await Complaint.findByIdAndUpdate(
       complaintId,
       {
-        workflowStatus: 'approved_without_lpo',
+        workflowStatus: 'approved_without_purchaseorder',
         $push: {
           approvalTrail: {
             approvedBy,
@@ -534,56 +534,56 @@ const approveItemWithoutLPO = async (complaintId, approvedBy) => {
     const equipment = await Equipment.findOne({ regNo: complaint.regNo });
     const title = `Item Approved - ${equipment.machine} - ${equipment.regNo}`;
     const body = `Hamza requested item is approved by purchase manager of ${equipment.machine} - ${equipment.regNo}`;
-    const officeMain = JSON.parse(process.env.OFFICE_MAIN);
+    const staffMain = JSON.parse(process.env.STAFF_MAIN);
 
     await notify(
       {
         title,
         description: body,
         priority: 'high',
-        sourceId: 'approved_wihtout_lpo_request',
-        recipient: officeMain,
+        sourceId: 'approved_wihtout_purchaseorder_request',
+        recipient: staffMain,
         time: new Date(),
       },
-      officeMain,
+      staffMain,
       title,
       body
     );
 
     return complaint;
   } catch (error) {
-    logger.error('[ComplaintService] approveItemWithoutLPO:', error);
+    logger.error('[ComplaintService] approveItemWithoutPurchaseOrder:', error);
     throw error;
   }
 };
 
 /**
- * WORKSHOP_MANAGER links an LPO to the complaint (Step 5).
+ * WORKSHOP_MANAGER links an PurchaseOrder to the complaint (Step 5).
  * @param {string} complaintId
- * @param {object} lpoData
+ * @param {object} purchaseorderData
  * @param {string} createdBy
  * @returns {Promise<object>}
  */
-const createLPOForComplaint = async (complaintId, lpoData, createdBy) => {
+const createPurchaseOrderForComplaint = async (complaintId, purchaseorderData, createdBy) => {
   try {
-    const lpo = await LPO.findOne({ lpoRef: lpoData.lpoRef });
+    const purchaseorder = await PurchaseOrder.findOne({ purchaseorderRef: purchaseorderData.purchaseorderRef });
 
     const complaint = await Complaint.findByIdAndUpdate(
       complaintId,
       {
-        lpoDetails: {
-          lpoId: lpo._id,
-          lpoRef: lpo.lpoRef,
+        purchaseorderDetails: {
+          purchaseorderId: purchaseorder._id,
+          purchaseorderRef: purchaseorder.purchaseorderRef,
           createdBy,
           status: 'created',
         },
-        workflowStatus: 'lpo_created',
+        workflowStatus: 'purchaseorder_created',
         $push: {
           approvalTrail: {
             approvedBy: createdBy,
             role: 'WORKSHOP_MANAGER',
             action: 'approved',
-            comments: `LPO created ${lpo.lpoRef}`,
+            comments: `PurchaseOrder created ${purchaseorder.purchaseorderRef}`,
           },
         },
       },
@@ -591,50 +591,50 @@ const createLPOForComplaint = async (complaintId, lpoData, createdBy) => {
     );
     if (!complaint) throw { status: HTTP.NOT_FOUND, message: 'Complaint not found' };
 
-    const officeMain = JSON.parse(process.env.OFFICE_MAIN);
-    const title = `LPO ${lpo.lpoRef} Created`;
-    const body = `LPO ${lpo.lpoRef} is created for complaint with ${complaint.regNo}, Await until lpo is uploaded`;
+    const staffMain = JSON.parse(process.env.STAFF_MAIN);
+    const title = `PurchaseOrder ${purchaseorder.purchaseorderRef} Created`;
+    const body = `PurchaseOrder ${purchaseorder.purchaseorderRef} is created for complaint with ${complaint.regNo}, Await until purchaseorder is uploaded`;
 
     await notify(
       {
         title,
         description: body,
         priority: 'high',
-        sourceId: 'lpo_approval',
-        recipient: officeMain,
+        sourceId: 'purchaseorder_approval',
+        recipient: staffMain,
         time: new Date(),
       },
-      officeMain,
+      staffMain,
       title,
       body
     );
 
     return {
       status: HTTP.OK,
-      message: 'LPO created successfully',
-      data: { complaint, lpo },
+      message: 'PurchaseOrder created successfully',
+      data: { complaint, purchaseorder },
     };
   } catch (error) {
-    logger.error('[ComplaintService] createLPOForComplaint:', error);
+    logger.error('[ComplaintService] createPurchaseOrderForComplaint:', error);
     throw error;
   }
 };
 
 /**
- * Uploads (or amends) the LPO document for a complaint.
+ * Uploads (or amends) the PurchaseOrder document for a complaint.
  * @param {string}  complaintId
- * @param {object}  lpoFileData
+ * @param {object}  purchaseorderFileData
  * @param {string}  uploadedBy
- * @param {string}  lpoRef
+ * @param {string}  purchaseorderRef
  * @param {string}  description
  * @param {boolean} isAmendment
  * @returns {Promise<object>}
  */
-const uploadLPOForComplaint = async (
+const uploadPurchaseOrderForComplaint = async (
   complaintId,
-  lpoFileData,
+  purchaseorderFileData,
   uploadedBy,
-  lpoRef,
+  purchaseorderRef,
   description,
   isAmendment = false
 ) => {
@@ -645,51 +645,51 @@ const uploadLPOForComplaint = async (
 
     const validStatuses = isAmendment
       ? [
-          'lpo_uploaded',
-          'purchase_approved',
+          'purchaseorder_uploaded',
+          'purchase_manager_approved',
           'accounts_approved',
-          'manager_approved',
+          'operation_manager_approved',
           'ceo_approved',
           'md_approved',
           'completed',
           'items_available',
         ]
-      : ['lpo_created', 'sent_to_workshop'];
+      : ['purchaseorder_created', 'sent_to_workshop'];
 
     if (!validStatuses.includes(complaint.workflowStatus)) {
       throw Object.assign(
         new Error(
-          `Invalid workflow status for LPO ${isAmendment ? 'amendment' : 'upload'}`
+          `Invalid workflow status for PurchaseOrder ${isAmendment ? 'amendment' : 'upload'}`
         ),
         { status: HTTP.BAD_REQUEST }
       );
     }
 
     const updateData = {
-      workflowStatus: isAmendment ? 'lpo_amended' : 'lpo_uploaded',
+      workflowStatus: isAmendment ? 'purchaseorder_amended' : 'purchaseorder_uploaded',
       updatedAt: new Date(),
-      'lpoDetails.lpoFile': lpoFileData,
-      'lpoDetails.lpoRef': lpoRef,
-      'lpoDetails.description': description || '',
-      'lpoDetails.uploadedBy': uploadedBy,
-      'lpoDetails.uploadedDate': new Date(),
-      'lpoDetails.status': isAmendment ? 'amended' : 'uploaded',
+      'purchaseorderDetails.purchaseorderFile': purchaseorderFileData,
+      'purchaseorderDetails.purchaseorderRef': purchaseorderRef,
+      'purchaseorderDetails.description': description || '',
+      'purchaseorderDetails.uploadedBy': uploadedBy,
+      'purchaseorderDetails.uploadedDate': new Date(),
+      'purchaseorderDetails.status': isAmendment ? 'amended' : 'uploaded',
     };
 
     if (isAmendment) {
       Object.assign(updateData, {
-        'lpoDetails.isAmendment': true,
-        'lpoDetails.amendmentDate': new Date().toLocaleDateString('en-GB'),
-        'lpoDetails.PMRsigned': false,
-        'lpoDetails.PMRauthorised': false,
-        'lpoDetails.MANAGERsigned': false,
-        'lpoDetails.MANAGERauthorised': false,
-        'lpoDetails.ACCOUNTSsigned': false,
-        'lpoDetails.ACCOUNTSauthorised': false,
-        'lpoDetails.CEOsigned': false,
-        'lpoDetails.CEOauthorised': false,
-        'lpoDetails.MDsigned': false,
-        'lpoDetails.MDauthorised': false,
+        'purchaseorderDetails.isAmendment': true,
+        'purchaseorderDetails.amendmentDate': new Date().toLocaleDateString('en-GB'),
+        'purchaseorderDetails.PMRsigned': false,
+        'purchaseorderDetails.PMRauthorised': false,
+        'purchaseorderDetails.MANAGERsigned': false,
+        'purchaseorderDetails.MANAGERauthorised': false,
+        'purchaseorderDetails.ACCOUNTSsigned': false,
+        'purchaseorderDetails.ACCOUNTSauthorised': false,
+        'purchaseorderDetails.CEOsigned': false,
+        'purchaseorderDetails.CEOauthorised': false,
+        'purchaseorderDetails.MDsigned': false,
+        'purchaseorderDetails.MDauthorised': false,
       });
     }
 
@@ -699,8 +699,8 @@ const uploadLPOForComplaint = async (
         role: 'WORKSHOP_MANAGER',
         approvalDate: new Date(),
         comments: isAmendment
-          ? `LPO amendment uploaded: ${lpoRef}`
-          : `LPO document uploaded: ${lpoRef}`,
+          ? `PurchaseOrder amendment uploaded: ${purchaseorderRef}`
+          : `PurchaseOrder document uploaded: ${purchaseorderRef}`,
         action: 'uploaded',
       },
     };
@@ -712,27 +712,27 @@ const uploadLPOForComplaint = async (
     );
 
     const notificationTitle = isAmendment
-      ? `LPO Amendment Approval Needed - ${lpoRef}`
-      : `LPO Approval Needed - ${lpoRef}`;
+      ? `PurchaseOrder Amendment Approval Needed - ${purchaseorderRef}`
+      : `PurchaseOrder Approval Needed - ${purchaseorderRef}`;
     const notificationDesc = isAmendment
-      ? `LPO has been amended for complaint ${complaint.regNo}. LPO Ref: ${lpoRef}. Purchase Manager Approval Needed! Please review and approve the amendment.`
-      : `New LPO created for complaint ${complaint.regNo}. LPO Ref: ${lpoRef}. Purchase Manager Approval Needed! Please review and approve.`;
+      ? `PurchaseOrder has been amended for complaint ${complaint.regNo}. PurchaseOrder Ref: ${purchaseorderRef}. Purchase Manager Approval Needed! Please review and approve the amendment.`
+      : `New PurchaseOrder created for complaint ${complaint.regNo}. PurchaseOrder Ref: ${purchaseorderRef}. Purchase Manager Approval Needed! Please review and approve.`;
 
-    const officeHero = JSON.parse(process.env.OFFICE_HERO);
+    const staffHero = JSON.parse(process.env.STAFF_HERO);
     await notify(
       {
         title: notificationTitle,
         description: notificationDesc,
         priority: 'high',
-        sourceId: 'lpo_approval',
-        recipient: officeHero,
+        sourceId: 'purchaseorder_approval',
+        recipient: staffHero,
         time: new Date(),
         navigateTo: `/(signature)/pm/${complaint._id}`,
         navigateText: 'View and Sign',
         navigteToId: complaint._id,
         hasButton: true,
       },
-      officeHero,
+      staffHero,
       notificationTitle,
       notificationDesc
     );
@@ -740,18 +740,18 @@ const uploadLPOForComplaint = async (
     return {
       status: 202,
       message: isAmendment
-        ? 'LPO amendment uploaded successfully and sent for re-approval'
-        : 'LPO uploaded successfully and sent to PURCHASE_MANAGER for approval',
+        ? 'PurchaseOrder amendment uploaded successfully and sent for re-approval'
+        : 'PurchaseOrder uploaded successfully and sent to PURCHASE_MANAGER for approval',
       data: updatedComplaint,
     };
   } catch (error) {
-    logger.error('[ComplaintService] uploadLPOForComplaint:', error);
+    logger.error('[ComplaintService] uploadPurchaseOrderForComplaint:', error);
     throw error;
   }
 };
 
 /**
- * PURCHASE_MANAGER approves (and optionally signs) the LPO (Step 6).
+ * PURCHASE_MANAGER approves (and optionally signs) the PurchaseOrder (Step 6).
  * @param {string} complaintId
  * @param {object} approvalData
  * @returns {Promise<object>}
@@ -772,17 +772,17 @@ const purchaseApproval = async (complaintId, approvalData) => {
 
     const existing = await Complaint.findById(complaintId);
     if (!existing) throw { status: HTTP.NOT_FOUND, message: 'Complaint not found' };
-    if (!['lpo_uploaded', 'lpo_amended'].includes(existing.workflowStatus)) {
+    if (!['purchaseorder_uploaded', 'purchaseorder_amended'].includes(existing.workflowStatus)) {
       throw {
         status: HTTP.BAD_REQUEST,
-        message: `Invalid workflow status. Expected 'lpo_uploaded' or 'lpo_amended', got '${existing.workflowStatus}'`,
+        message: `Invalid workflow status. Expected 'purchaseorder_uploaded' or 'purchaseorder_amended', got '${existing.workflowStatus}'`,
       };
     }
 
     const updateFields = {
-      'lpoDetails.purchaseApprovalDate': new Date(),
-      'lpoDetails.status': 'purchase_approved',
-      workflowStatus: 'purchase_approved',
+      'purchaseorderDetails.purchaseApprovalDate': new Date(),
+      'purchaseorderDetails.status': 'purchase_manager_approved',
+      workflowStatus: 'purchase_manager_approved',
       $push: {
         approvalTrail: {
           approvedBy,
@@ -795,17 +795,17 @@ const purchaseApproval = async (complaintId, approvalData) => {
 
     if (signed) {
       Object.assign(updateFields, {
-        'lpoDetails.PMRsigned': true,
-        'lpoDetails.PMRauthorised': authorised,
-        'lpoDetails.PMRapprovedBy': approvedBy,
-        'lpoDetails.PMRapprovedDate': approvedDate || new Date().toISOString(),
-        ...(approvedFrom && { 'lpoDetails.PMRapprovedFrom': approvedFrom }),
-        ...(approvedIP && { 'lpoDetails.PMRapprovedIP': approvedIP }),
+        'purchaseorderDetails.PMRsigned': true,
+        'purchaseorderDetails.PMRauthorised': authorised,
+        'purchaseorderDetails.PMRapprovedBy': approvedBy,
+        'purchaseorderDetails.PMRapprovedDate': approvedDate || new Date().toISOString(),
+        ...(approvedFrom && { 'purchaseorderDetails.PMRapprovedFrom': approvedFrom }),
+        ...(approvedIP && { 'purchaseorderDetails.PMRapprovedIP': approvedIP }),
         ...(approvedBDevice && {
-          'lpoDetails.PMRapprovedBDevice': approvedBDevice,
+          'purchaseorderDetails.PMRapprovedBDevice': approvedBDevice,
         }),
         ...(approvedLocation && {
-          'lpoDetails.PMRapprovedLocation': approvedLocation,
+          'purchaseorderDetails.PMRapprovedLocation': approvedLocation,
         }),
       });
     }
@@ -818,34 +818,34 @@ const purchaseApproval = async (complaintId, approvalData) => {
     if (!complaint)
       throw { status: HTTP.NOT_FOUND, message: 'Failed to update complaint' };
 
-    if (complaint.lpoDetails?.lpoId)
-      await LPO.updateOne(
-        { _id: complaint.lpoDetails.lpoId },
+    if (complaint.purchaseorderDetails?.purchaseorderId)
+      await PurchaseOrder.updateOne(
+        { _id: complaint.purchaseorderDetails.purchaseorderId },
         { pmSigned: true }
       );
 
-    const lpoData = await LPO.findById(complaint.lpoDetails.lpoId);
-    const prefix = lpoData.isAmendmented ? 'Amendment! ' : '';
-    const title = `${prefix}MANAGER Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`;
-    const description = lpoData.isAmendmented
-      ? `Purchace Manager signed and approved amendment LPO for complaint ${complaint.regNo}. Manager approval needed.`
-      : `Purchace Manager signed and approved LPO for complaint ${complaint.regNo}. Manager approval needed.`;
+    const purchaseorderData = await PurchaseOrder.findById(complaint.purchaseorderDetails.purchaseorderId);
+    const prefix = purchaseorderData.isAmendmented ? 'Amendment! ' : '';
+    const title = `${prefix}MANAGER Approval Needed - PurchaseOrder ${complaint.purchaseorderDetails.purchaseorderRef}`;
+    const description = purchaseorderData.isAmendmented
+      ? `Purchace Manager signed and approved amendment PurchaseOrder for complaint ${complaint.regNo}. Manager approval needed.`
+      : `Purchace Manager signed and approved PurchaseOrder for complaint ${complaint.regNo}. Manager approval needed.`;
 
-    const officeHero = JSON.parse(process.env.OFFICE_HERO);
+    const staffHero = JSON.parse(process.env.STAFF_HERO);
     await notify(
       {
         title,
         description,
         priority: 'high',
         sourceId: 'accounts_approval',
-        recipient: officeHero,
+        recipient: staffHero,
         time: new Date(),
         navigateTo: `/(signature)/op/${complaint._id}`,
         navigateText: 'View and Sign',
         navigteToId: complaint._id,
         hasButton: true,
       },
-      officeHero,
+      staffHero,
       title,
       description
     );
@@ -864,7 +864,7 @@ const purchaseApproval = async (complaintId, approvalData) => {
 };
 
 /**
- * MANAGER approves (and optionally signs) the LPO, then routes to CEO or MD (Step 7).
+ * MANAGER approves (and optionally signs) the PurchaseOrder, then routes to CEO or MD (Step 7).
  * @param {string} complaintId
  * @param {string} approvedBy
  * @param {string} comments
@@ -879,9 +879,9 @@ const managerApproval = async (
 ) => {
   try {
     const updateFields = {
-      'lpoDetails.managerApprovalDate': new Date(),
-      'lpoDetails.status': 'manager_approved',
-      workflowStatus: 'manager_approved',
+      'purchaseorderDetails.managerApprovalDate': new Date(),
+      'purchaseorderDetails.status': 'operation_manager_approved',
+      workflowStatus: 'operation_manager_approved',
       $push: {
         approvalTrail: {
           approvedBy,
@@ -894,22 +894,22 @@ const managerApproval = async (
 
     if (approvedCreds?.signed) {
       Object.assign(updateFields, {
-        'lpoDetails.MANAGERsigned': true,
-        'lpoDetails.MANAGERauthorised': approvedCreds.authorised,
-        'lpoDetails.MANAGERapprovedBy': approvedCreds.approvedBy,
-        'lpoDetails.MANAGERapprovedDate':
+        'purchaseorderDetails.MANAGERsigned': true,
+        'purchaseorderDetails.MANAGERauthorised': approvedCreds.authorised,
+        'purchaseorderDetails.MANAGERapprovedBy': approvedCreds.approvedBy,
+        'purchaseorderDetails.MANAGERapprovedDate':
           approvedCreds.approvedDate || new Date().toISOString(),
         ...(approvedCreds.approvedFrom && {
-          'lpoDetails.MANAGERapprovedFrom': approvedCreds.approvedFrom,
+          'purchaseorderDetails.MANAGERapprovedFrom': approvedCreds.approvedFrom,
         }),
         ...(approvedCreds.approvedIP && {
-          'lpoDetails.MANAGERapprovedIP': approvedCreds.approvedIP,
+          'purchaseorderDetails.MANAGERapprovedIP': approvedCreds.approvedIP,
         }),
         ...(approvedCreds.approvedBDevice && {
-          'lpoDetails.MANAGERapprovedBDevice': approvedCreds.approvedBDevice,
+          'purchaseorderDetails.MANAGERapprovedBDevice': approvedCreds.approvedBDevice,
         }),
         ...(approvedCreds.approvedLocation && {
-          'lpoDetails.MANAGERapprovedLocation': approvedCreds.approvedLocation,
+          'purchaseorderDetails.MANAGERapprovedLocation': approvedCreds.approvedLocation,
         }),
       });
     }
@@ -921,15 +921,15 @@ const managerApproval = async (
     );
     if (!complaint) throw { status: HTTP.NOT_FOUND, message: 'Complaint not found' };
 
-    if (complaint.lpoDetails?.lpoId)
-      await LPO.updateOne(
-        { _id: complaint.lpoDetails.lpoId },
+    if (complaint.purchaseorderDetails?.purchaseorderId)
+      await PurchaseOrder.updateOne(
+        { _id: complaint.purchaseorderDetails.purchaseorderId },
         { managerSigned: true }
       );
 
-    const lpoData = await LPO.findById(complaint.lpoDetails.lpoId);
-    const isAmendment = lpoData.isAmendmented;
-    const sigTitle = lpoData.signatures.authorizedSignatoryTitle;
+    const purchaseorderData = await PurchaseOrder.findById(complaint.purchaseorderDetails.purchaseorderId);
+    const isAmendment = purchaseorderData.isAmendmented;
+    const sigTitle = purchaseorderData.signatures.authorizedSignatoryTitle;
     const isCEO = sigTitle === 'CEO';
     const isMD = sigTitle === 'MANAGING DIRECTOR';
 
@@ -943,24 +943,24 @@ const managerApproval = async (
       : `/(signature)/ceo/${complaint._id}`;
     const roleLabel = isCEO ? 'CEO' : 'MD';
     const source = isCEO ? 'ceo_approval' : 'md_approval';
-    const title = `${prefix}${roleLabel} Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`;
-    const description = `Manager ${approvedCreds?.signed ? 'signed and ' : ''}approved ${isAmendment ? 'amendment ' : ''}LPO for complaint ${complaint.regNo}. ${roleLabel} approval needed.`;
+    const title = `${prefix}${roleLabel} Approval Needed - PurchaseOrder ${complaint.purchaseorderDetails.purchaseorderRef}`;
+    const description = `Manager ${approvedCreds?.signed ? 'signed and ' : ''}approved ${isAmendment ? 'amendment ' : ''}PurchaseOrder for complaint ${complaint.regNo}. ${roleLabel} approval needed.`;
 
-    const officeHero = JSON.parse(process.env.OFFICE_HERO);
+    const staffHero = JSON.parse(process.env.STAFF_HERO);
     await notify(
       {
         title,
         description,
         priority: 'high',
         sourceId: source,
-        recipient: officeHero,
+        recipient: staffHero,
         time: new Date(),
         navigateTo: screen,
         navigateText: 'View and Sign',
         navigteToId: complaint._id,
         hasButton: true,
       },
-      officeHero,
+      staffHero,
       title,
       description
     );
@@ -977,7 +977,7 @@ const managerApproval = async (
 };
 
 /**
- * CEO or MD approves (and optionally signs) the LPO, then routes to ACCOUNTS (Step 8).
+ * CEO or MD approves (and optionally signs) the PurchaseOrder, then routes to ACCOUNTS (Step 8).
  * @param {string} complaintId
  * @param {string} approvedBy
  * @param {string} comments
@@ -997,8 +997,8 @@ const ceoApproval = async (
     const approvalStatus = `${approverType.toLowerCase()}_approved`;
 
     const updateFields = {
-      [`lpoDetails.${approverType.toLowerCase()}ApprovalDate`]: new Date(),
-      'lpoDetails.status': approvalStatus,
+      [`purchaseorderDetails.${approverType.toLowerCase()}ApprovalDate`]: new Date(),
+      'purchaseorderDetails.status': approvalStatus,
       workflowStatus: approvalStatus,
       $push: {
         approvalTrail: {
@@ -1012,24 +1012,24 @@ const ceoApproval = async (
 
     if (approvedCreds?.signed) {
       Object.assign(updateFields, {
-        [`lpoDetails.${approverType}signed`]: true,
-        [`lpoDetails.${approverType}authorised`]: approvedCreds.authorised,
-        [`lpoDetails.${approverType}approvedBy`]: approvedCreds.approvedBy,
-        [`lpoDetails.${approverType}approvedDate`]:
+        [`purchaseorderDetails.${approverType}signed`]: true,
+        [`purchaseorderDetails.${approverType}authorised`]: approvedCreds.authorised,
+        [`purchaseorderDetails.${approverType}approvedBy`]: approvedCreds.approvedBy,
+        [`purchaseorderDetails.${approverType}approvedDate`]:
           approvedCreds.approvedDate || new Date().toISOString(),
         ...(approvedCreds.approvedFrom && {
-          [`lpoDetails.${approverType}approvedFrom`]:
+          [`purchaseorderDetails.${approverType}approvedFrom`]:
             approvedCreds.approvedFrom,
         }),
         ...(approvedCreds.approvedIP && {
-          [`lpoDetails.${approverType}approvedIP`]: approvedCreds.approvedIP,
+          [`purchaseorderDetails.${approverType}approvedIP`]: approvedCreds.approvedIP,
         }),
         ...(approvedCreds.approvedBDevice && {
-          [`lpoDetails.${approverType}approvedBDevice`]:
+          [`purchaseorderDetails.${approverType}approvedBDevice`]:
             approvedCreds.approvedBDevice,
         }),
         ...(approvedCreds.approvedLocation && {
-          [`lpoDetails.${approverType}approvedLocation`]:
+          [`purchaseorderDetails.${approverType}approvedLocation`]:
             approvedCreds.approvedLocation,
         }),
       });
@@ -1042,36 +1042,36 @@ const ceoApproval = async (
     );
     if (!complaint) throw { status: HTTP.NOT_FOUND, message: 'Complaint not found' };
 
-    if (complaint.lpoDetails?.lpoId) {
-      await LPO.updateOne(
-        { _id: complaint.lpoDetails.lpoId },
+    if (complaint.purchaseorderDetails?.purchaseorderId) {
+      await PurchaseOrder.updateOne(
+        { _id: complaint.purchaseorderDetails.purchaseorderId },
         approverType === 'MD' ? { mdSigned: true } : { ceoSigned: true }
       );
     }
 
-    const lpoData = await LPO.findById(complaint.lpoDetails.lpoId);
-    const isAmendment = lpoData.isAmendmented;
+    const purchaseorderData = await PurchaseOrder.findById(complaint.purchaseorderDetails.purchaseorderId);
+    const isAmendment = purchaseorderData.isAmendmented;
     const sigLabel =
-      lpoData.signatures.authorizedSignatoryTitle === 'CEO' ? 'CEO' : 'MD';
+      purchaseorderData.signatures.authorizedSignatoryTitle === 'CEO' ? 'CEO' : 'MD';
     const prefix = isAmendment ? 'Amendment! ' : '';
-    const title = `${prefix}ACCOUNTS Approval Needed - LPO ${complaint.lpoDetails.lpoRef}`;
-    const description = `${sigLabel} signed and approved ${isAmendment ? 'amendment ' : ''}LPO for complaint ${complaint.regNo}. ACCOUNTS approval needed.`;
+    const title = `${prefix}ACCOUNTS Approval Needed - PurchaseOrder ${complaint.purchaseorderDetails.purchaseorderRef}`;
+    const description = `${sigLabel} signed and approved ${isAmendment ? 'amendment ' : ''}PurchaseOrder for complaint ${complaint.regNo}. ACCOUNTS approval needed.`;
 
-    const officeHero = JSON.parse(process.env.OFFICE_HERO);
+    const staffHero = JSON.parse(process.env.STAFF_HERO);
     await notify(
       {
         title,
         description,
         priority: 'high',
         sourceId: 'final_approval',
-        recipient: officeHero,
+        recipient: staffHero,
         time: new Date(),
         navigateTo: `/(signature)/accounts/${complaint._id}`,
         navigateText: 'View and Sign',
         navigteToId: complaint._id,
         hasButton: true,
       },
-      officeHero,
+      staffHero,
       title,
       description
     );
@@ -1091,7 +1091,7 @@ const ceoApproval = async (
 };
 
 /**
- * ACCOUNTS approves (and optionally signs) the LPO — final approval step (Step 9).
+ * ACCOUNTS approves (and optionally signs) the PurchaseOrder — final approval step (Step 9).
  * @param {string} complaintId
  * @param {string} approvedBy
  * @param {string} comments
@@ -1106,8 +1106,8 @@ const accountsApproval = async (
 ) => {
   try {
     const updateFields = {
-      'lpoDetails.accountsApprovalDate': new Date(),
-      'lpoDetails.status': 'accounts_approved',
+      'purchaseorderDetails.accountsApprovalDate': new Date(),
+      'purchaseorderDetails.status': 'accounts_approved',
       workflowStatus: 'accounts_approved',
       $push: {
         approvalTrail: {
@@ -1121,22 +1121,22 @@ const accountsApproval = async (
 
     if (approvedCreds?.signed) {
       Object.assign(updateFields, {
-        'lpoDetails.ACCOUNTSsigned': true,
-        'lpoDetails.ACCOUNTSauthorised': approvedCreds.authorised,
-        'lpoDetails.ACCOUNTSapprovedBy': approvedCreds.approvedBy,
-        'lpoDetails.ACCOUNTSapprovedDate':
+        'purchaseorderDetails.ACCOUNTSsigned': true,
+        'purchaseorderDetails.ACCOUNTSauthorised': approvedCreds.authorised,
+        'purchaseorderDetails.ACCOUNTSapprovedBy': approvedCreds.approvedBy,
+        'purchaseorderDetails.ACCOUNTSapprovedDate':
           approvedCreds.approvedDate || new Date().toISOString(),
         ...(approvedCreds.approvedFrom && {
-          'lpoDetails.ACCOUNTSapprovedFrom': approvedCreds.approvedFrom,
+          'purchaseorderDetails.ACCOUNTSapprovedFrom': approvedCreds.approvedFrom,
         }),
         ...(approvedCreds.approvedIP && {
-          'lpoDetails.ACCOUNTSapprovedIP': approvedCreds.approvedIP,
+          'purchaseorderDetails.ACCOUNTSapprovedIP': approvedCreds.approvedIP,
         }),
         ...(approvedCreds.approvedBDevice && {
-          'lpoDetails.ACCOUNTSapprovedBDevice': approvedCreds.approvedBDevice,
+          'purchaseorderDetails.ACCOUNTSapprovedBDevice': approvedCreds.approvedBDevice,
         }),
         ...(approvedCreds.approvedLocation && {
-          'lpoDetails.ACCOUNTSapprovedLocation': approvedCreds.approvedLocation,
+          'purchaseorderDetails.ACCOUNTSapprovedLocation': approvedCreds.approvedLocation,
         }),
       });
     }
@@ -1148,32 +1148,32 @@ const accountsApproval = async (
     );
     if (!complaint) throw { status: HTTP.NOT_FOUND, message: 'Complaint not found' };
 
-    if (complaint.lpoDetails?.lpoId)
-      await LPO.updateOne(
-        { _id: complaint.lpoDetails.lpoId },
+    if (complaint.purchaseorderDetails?.purchaseorderId)
+      await PurchaseOrder.updateOne(
+        { _id: complaint.purchaseorderDetails.purchaseorderId },
         { accountsSigned: true }
       );
 
-    const lpoData = await LPO.findById(complaint.lpoDetails.lpoId);
-    const prefix = lpoData.isAmendmented ? 'Amendment! ' : '';
-    const title = `${prefix}Approved - LPO ${complaint.lpoDetails.lpoRef}`;
-    const description = `Accounts approved ${lpoData.isAmendmented ? 'amendment ' : ''}LPO for complaint ${complaint.regNo}. Items can now be procured.`;
+    const purchaseorderData = await PurchaseOrder.findById(complaint.purchaseorderDetails.purchaseorderId);
+    const prefix = purchaseorderData.isAmendmented ? 'Amendment! ' : '';
+    const title = `${prefix}Approved - PurchaseOrder ${complaint.purchaseorderDetails.purchaseorderRef}`;
+    const description = `Accounts approved ${purchaseorderData.isAmendmented ? 'amendment ' : ''}PurchaseOrder for complaint ${complaint.regNo}. Items can now be procured.`;
 
-    const officeMain = JSON.parse(process.env.OFFICE_MAIN);
+    const staffMain = JSON.parse(process.env.STAFF_MAIN);
     await notify(
       {
         title,
         description,
         priority: 'high',
         sourceId: 'manager_approval',
-        recipient: officeMain,
+        recipient: staffMain,
         time: new Date(),
-        navigateTo: `/(workflow)/lpo/${complaint._id}`,
+        navigateTo: `/(workflow)/purchaseorder/${complaint._id}`,
         navigateText: 'View the item required',
         navigteToId: complaint._id,
         hasButton: true,
       },
-      officeMain,
+      staffMain,
       title,
       description
     );
@@ -1200,7 +1200,7 @@ const markItemsAvailable = async (complaintId, markedBy) => {
     const complaint = await Complaint.findByIdAndUpdate(
       complaintId,
       {
-        'lpoDetails.status': 'items_procured',
+        'purchaseorderDetails.status': 'items_procured',
         workflowStatus: 'items_available',
         $push: {
           approvalTrail: {
@@ -1215,17 +1215,17 @@ const markItemsAvailable = async (complaintId, markedBy) => {
     );
     if (!complaint) throw { status: HTTP.NOT_FOUND, message: 'Complaint not found' };
 
-    const officeHero = JSON.parse(process.env.OFFICE_HERO);
+    const staffHero = JSON.parse(process.env.STAFF_HERO);
     await notify(
       {
         title: `Items Ready - ${complaint.regNo}`,
         description: `All requested items are now available for ${complaint.regNo}.`,
         priority: 'high',
         sourceId: 'items_ready',
-        recipient: officeHero,
+        recipient: staffHero,
         time: new Date(),
       },
-      officeHero,
+      staffHero,
       'Items Ready',
       `Items available for ${complaint.regNo}. You can start working now.`
     );
@@ -1327,17 +1327,17 @@ const addSolutionToComplaint = async (
       );
     }
 
-    const officeHero = JSON.parse(process.env.OFFICE_HERO);
+    const staffHero = JSON.parse(process.env.STAFF_HERO);
     await notify(
       {
         title: `Work Completed - ${complaint.regNo}`,
         description: `${mechanic} completed work on ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Equipment is now ${restoredStatus} and ready for operation.`,
         priority: 'medium',
         sourceId: 'work_completed',
-        recipient: officeHero,
+        recipient: staffHero,
         time: new Date(),
       },
-      officeHero,
+      staffHero,
       `Work Completed - ${complaint.regNo}`,
       `${mechanic} completed work on ${equipment?.brand || 'unknown'} ${equipment?.machine || 'equipment'} - ${complaint.regNo}. Equipment is now ${restoredStatus}.`,
       'medium'
@@ -1354,7 +1354,7 @@ const addSolutionToComplaint = async (
   }
 };
 
-const { paginationUtil: { paginate } } = require('../../shared/pagination');
+const { paginate } = require('#shared/pagination/pagination')
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Read
@@ -1462,10 +1462,10 @@ module.exports = {
   assignMechanic,
   mechanicRequestItems,
   forwardToWorkshop,
-  forwardToWorkshopWithoutLPO,
-  approveItemWithoutLPO,
-  createLPOForComplaint,
-  uploadLPOForComplaint,
+  forwardToWorkshopWithoutPurchaseOrder,
+  approveItemWithoutPurchaseOrder,
+  createPurchaseOrderForComplaint,
+  uploadPurchaseOrderForComplaint,
   purchaseApproval,
   managerApproval,
   ceoApproval,

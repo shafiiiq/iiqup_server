@@ -53,7 +53,7 @@ const mechanicRequestSchema = new mongoose.Schema({
       'pending',
       'approved_by_maintenance',
       'sent_to_workshop',
-      'lpo_created',
+      'purchaseorder_created',
       'approved_by_purchase',
       'approved_by_ceo',
       'items_available',
@@ -62,11 +62,11 @@ const mechanicRequestSchema = new mongoose.Schema({
   },
 });
 
-// New schema for LPO tracking
-const lpoTrackingSchema = new mongoose.Schema({
-  lpoId: { type: String }, // Reference to LPO model
-  lpoRef: { type: String },
-  description: { type: String }, // Description of LPO
+// New schema for PurchaseOrder tracking
+const purchaseorderTrackingSchema = new mongoose.Schema({
+  purchaseorderId: { type: String }, // Reference to PurchaseOrder model
+  purchaseorderRef: { type: String },
+  description: { type: String }, // Description of PurchaseOrder
   createdBy: { type: String }, // WORKSHOP_MANAGER
   createdDate: { type: Date, default: Date.now },
 
@@ -81,15 +81,15 @@ const lpoTrackingSchema = new mongoose.Schema({
     default: null,
   },
 
-  // Add LPO file information
-  lpoFile: {
+  // Add PurchaseOrder file information
+  purchaseorderFile: {
     fileName: { type: String },
     originalName: { type: String },
     filePath: { type: String },
     mimeType: { type: String },
     uploadDate: { type: Date },
   },
-  uploadedBy: { type: String }, // Who uploaded the LPO file
+  uploadedBy: { type: String }, // Who uploaded the PurchaseOrder file
   uploadedDate: { type: Date },
 
   purchaseApprovalDate: { type: Date },
@@ -101,9 +101,9 @@ const lpoTrackingSchema = new mongoose.Schema({
     enum: [
       'created',
       'uploaded',
-      'purchase_approved',
+      'purchase_manager_approved',
       'accounts_approved',
-      'manager_approved',
+      'operation_manager_approved',
       'ceo_approved',
       'md_approved',
       'items_procured',
@@ -279,8 +279,8 @@ const complaintSchema = new mongoose.Schema({
   // Mechanic requests for items/tools
   mechanicRequests: [mechanicRequestSchema],
 
-  // LPO tracking
-  lpoDetails: lpoTrackingSchema,
+  // PurchaseOrder tracking
+  purchaseorderDetails: purchaseorderTrackingSchema,
 
   // Solutions (when work is completed)
   solutions: [solutionFileSchema],
@@ -297,14 +297,14 @@ const complaintSchema = new mongoose.Schema({
       'mechanic_requested', // Mechanic requested items
       'maintenance_approved', // Maintenance head approved request
       'sent_to_workshop', // Sent to workshop manager
-      'sent_to_workshop_without_lpo', // Sent to workshop manager without lpo
-      'approved_without_lpo', // Approved without lpo
-      'lpo_created', // LPO created by workshop manager
-      'lpo_uploaded', // LPO uploaded by workshop manager
-      'lpo_amended', // LPO amended by workshop manager
-      'purchase_approved', // Approved by purchase manager
+      'sent_to_workshop_without_purchaseorder', // Sent to workshop manager without purchaseorder
+      'approved_without_purchaseorder', // Approved without purchaseorder
+      'purchaseorder_created', // PurchaseOrder created by workshop manager
+      'purchaseorder_uploaded', // PurchaseOrder uploaded by workshop manager
+      'purchaseorder_amended', // PurchaseOrder amended by workshop manager
+      'purchase_manager_approved', // Approved by purchase manager
       'accounts_approved', // Approved by accounts
-      'manager_approved', // Approved by manager
+      'operation_manager_approved', // Approved by manager
       'md_approved', // Approved by md
       'ceo_approved', // Approved by CEO
       'items_available', // Items available for mechanic

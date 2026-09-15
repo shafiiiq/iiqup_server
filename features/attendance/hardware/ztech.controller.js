@@ -1,7 +1,7 @@
-const logger = require('../../../shared/logger/logger');
+const logger = require('#shared/logger/logger');
 
-const HTTP = require('../../../shared/constants/httpStatus.constant.js');
-const { sendSuccess, sendError } = require('../../../shared/response/response.util');
+const HTTP = require('#shared/response/response.status')
+const { sendSuccess, sendError } = require('#shared/response/response.sender');
 const service = require('./ztech.service');
 
 const handshake = async (req, res) => {

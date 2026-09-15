@@ -1,7 +1,7 @@
-const logger = require('../../../shared/logger/logger');
+const logger = require('#shared/logger/logger');
 
-const HTTP = require('../../../shared/constants/httpStatus.constant.js');
-const Mechanic = require('../../mechanic/mechanic.model');
+const HTTP = require('#shared/response/response.status')
+const Mechanic = require('#features/user/mechanic/mechanic.model');
 const attendanceController = require('../attendance.controller');
 
 const parseZKTecoAttendanceData = (dataString) => {

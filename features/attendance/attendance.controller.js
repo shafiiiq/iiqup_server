@@ -1,11 +1,11 @@
-const logger = require('../../shared/logger/logger');
+const logger = require('#shared/logger/logger');
 
-const HTTP = require('../../shared/constants/httpStatus.constant.js');
-const { sendSuccess, sendError } = require('../../shared/response/response.util');
+const HTTP = require('#shared/response/response.status')
+const { sendSuccess, sendError } = require('#shared/response/response.sender');
 const moment = require('moment-timezone');
 
 const attendanceService = require('./attendance.service');
-const Mechanic = require('../mechanic/mechanic.model');
+const Mechanic = require('#features/user/mechanic/mechanic.model');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers

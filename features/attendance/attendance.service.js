@@ -1,11 +1,11 @@
-const logger = require('../../shared/logger/logger');
+const logger = require('#shared/logger/logger');
 
-const HTTP = require('../../shared/constants/httpStatus.constant.js');
+const HTTP = require('#shared/response/response.status')
 // services/attendance.service.js
 const Attendance = require('./attendance.model');
 const moment = require('moment');
-const PushNotificationService = require('../notification/notification.push');
-const { createNotification } = require('../notification/notification.service');
+const PushNotificationService = require('#core/notification/notification.push');
+const { createNotification } = require('#core/notification/notification.service');
 require('dotenv').config();
 
 // ─────────────────────────────────────────────────────────────────────────────

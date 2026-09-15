@@ -1,9 +1,4 @@
-// models/equipment.model.js
 const mongoose = require('mongoose');
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-schemas
-// ─────────────────────────────────────────────────────────────────────────────
 
 const certificationBodySchema = new mongoose.Schema(
   {
@@ -30,13 +25,34 @@ const rentRateSchema = new mongoose.Schema(
   { _id: false }
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Main Schema
-// ─────────────────────────────────────────────────────────────────────────────
+const maintenanceRecordSchema = new mongoose.Schema(
+  {
+    oil: { type: Number, default: 0 },
+    normal: { type: Number, default: 0 },
+    major: { type: Number, default: 0 },
+    battery: { type: Number, default: 0 },
+    tyre: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
+const mobilizationsRecordSchema = new mongoose.Schema(
+  {
+    mobilization: { type: Number, default: 0 },
+    demobilization: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
+
+const replacementRecordSchema = new mongoose.Schema(
+  {
+    equipmentReplacement: { type: Number, default: 0 },
+  },
+  { _id: false }
+);
 
 const equipmentSchema = new mongoose.Schema(
   {
-    // Identity
     id: { type: Number, required: true, unique: true },
     machine: { type: String, required: true },
     regNo: { type: String, required: true },
@@ -44,16 +60,19 @@ const equipmentSchema = new mongoose.Schema(
     year: { type: Number, required: true },
     company: { type: String, required: true, default: 'ATE' },
 
-    // Certification & Compliance
     coc: { type: String, default: '' },
     istimaraExpiry: { type: String, default: '' },
     insuranceExpiry: { type: String, default: '' },
     tpcExpiry: { type: String, default: '' },
 
-    // Ownership & Deployment
     hired: { type: Boolean, required: true, default: false },
     hiredFrom: { type: String, default: '' },
-    rentRate: { type: rentRateSchema, default: null },
+
+    rentRate: {
+      type: rentRateSchema,
+      default: null,
+    },
+
     lastRentRate: [
       {
         basis: { type: String },
@@ -62,31 +81,99 @@ const equipmentSchema = new mongoose.Schema(
         changedAt: { type: Date, default: Date.now },
       },
     ],
-    outside: { type: Boolean, required: true, default: false },
-    certificationBody: { type: [certificationBodySchema], default: [] },
-    lastCertificationBody: { type: [certificationBodySchema], default: [] },
-    site: { type: [String], default: [] },
-    lastSite: { type: [String], default: [] },
-    location: { type: String, default: null },
-    lastLocation: { type: [String], default: [] },
-    mobDate: { type: Date, default: null },
-    lastMobDate: { type: [Date], default: [] },
-    demobDate: { type: Date, default: null },
-    lastDemobDate: { type: [Date], default: [] },
 
-    // Lifecycle
-    status: { type: String, required: true },
+    outside: { type: Boolean, required: true, default: false },
+
+    certificationBody: {
+      type: [certificationBodySchema],
+      default: [],
+    },
+
+    lastCertificationBody: {
+      type: [certificationBodySchema],
+      default: [],
+    },
+
+    site: {
+      type: [String],
+      default: [],
+    },
+
+    lastSite: {
+      type: [String],
+      default: [],
+    },
+
+    location: {
+      type: String,
+      default: null,
+    },
+
+    lastLocation: {
+      type: [String],
+      default: [],
+    },
+
+    mobDate: {
+      type: Date,
+      default: null,
+    },
+
+    lastMobDate: {
+      type: [Date],
+      default: [],
+    },
+
+    demobDate: {
+      type: Date,
+      default: null,
+    },
+
+    lastDemobDate: {
+      type: [Date],
+      default: [],
+    },
+
+    maintenanceRecord: {
+      type: maintenanceRecordSchema,
+      default: () => ({}),
+    },
+
+    mobilizationsRecord: {
+      type: mobilizationsRecordSchema,
+      default: () => ({}),
+    },
+
+    replacementRecord: {
+      type: replacementRecordSchema,
+      default: () => ({}),
+    },
+
+    activeChainId: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+    },
+
+    remarks: { type: String, default: '' },
+
+    idleAt: { type: String, enum: ['site', 'garage'], default: 'garage' },
+    idleSite: { type: String, default: null },
+
+    hasScheduledDemob: { type: Boolean, default: false },
+    scheduledDemobAt: { type: Date, default: null },
+    scheduledDemobTime: { type: String, default: '' },
+    scheduledDemobRemarks: { type: String, default: '' },
+
+    status: {
+      type: String,
+      required: true,
+    },
   },
   {
-    timestamps: true, // Manages createdAt + updatedAt automatically
+    timestamps: true,
   }
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Indexes
-// ─────────────────────────────────────────────────────────────────────────────
-
-// Single-field
 equipmentSchema.index({ machine: 1 });
 equipmentSchema.index({ regNo: 1 });
 equipmentSchema.index({ brand: 1 });
@@ -94,11 +181,8 @@ equipmentSchema.index({ year: -1 });
 equipmentSchema.index({ status: 1 });
 equipmentSchema.index({ site: 1 });
 equipmentSchema.index({ hired: 1 });
-
-// Compound
 equipmentSchema.index({ hired: 1, year: -1, createdAt: -1 });
 
-// Full-text search
 equipmentSchema.index({
   machine: 'text',
   regNo: 'text',
@@ -106,12 +190,9 @@ equipmentSchema.index({
   company: 'text',
 });
 
-// Nested field lookups
 equipmentSchema.index({ 'certificationBody.operatorId': 1 });
 equipmentSchema.index({ 'certificationBody.operatorName': 1 });
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Export
-// ─────────────────────────────────────────────────────────────────────────────
+equipmentSchema.index({ activeChainId: 1 });
+equipmentSchema.index({ hasScheduledDemob: 1, scheduledDemobAt: 1 });
 
 module.exports = mongoose.model('Equipments', equipmentSchema);

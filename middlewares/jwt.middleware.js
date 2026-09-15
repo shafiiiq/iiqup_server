@@ -1,29 +1,12 @@
 const jwt = require('jsonwebtoken');
+const logger = require('#shared/logger/logger');
 
-// JWT Secret key - should be stored in environment variables in production
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
-
-/**
- * Generate a JWT token for a user
- * @param {Object} user - User object
- * @returns {String} JWT token
- */
-const generateToken = (user) => {
-  return jwt.sign(
-    {
-      id: user._id,
-      email: user.email,
-      role: user.role,
-      uniqueCode: user.uniqueCode,
-      userType: user.userType,
-      name: user.name,
-    },
-    JWT_SECRET,
-    { expiresIn: '24h' }
-  );
+const getJwtSecret = () => {
+  if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is not set');
+  return process.env.JWT_SECRET;
 };
 
-const generateTokens = (user) => {
+const generateAuthTokens = (user) => {
   const accessToken = jwt.sign(
     {
       id: user._id,
@@ -34,7 +17,7 @@ const generateTokens = (user) => {
       name: user.name,
       type: 'access',
     },
-    JWT_SECRET,
+    getJwtSecret(),
     { expiresIn: '365d' }
   );
 
@@ -48,94 +31,76 @@ const generateTokens = (user) => {
       name: user.name,
       type: 'refresh',
     },
-    JWT_SECRET,
+    getJwtSecret(),
     { expiresIn: '365d' }
   );
 
   return { accessToken, refreshToken };
 };
 
-/**
- * Verify a JWT token
- * @param {String} token - JWT token
- * @returns {Object} Decoded token payload
- */
-const verifyToken = (token) => {
-  try {
-    return jwt.verify(token, JWT_SECRET);
-  } catch (error) {
-    console.log('[JWT] Token verification error:', error.message);
-    throw error; // Re-throw so middleware can handle it
-  }
+const generateRenderToken = (user) => {
+  return jwt.sign(
+    {
+      id: user._id || user.id,
+      email: user.email,
+      role: user.role,
+      uniqueCode: user.uniqueCode,
+      userType: user.userType,
+      name: user.name,
+    },
+    getJwtSecret(),
+    { expiresIn: '2m' }
+  );
 };
 
-/**
- * Middleware to authenticate JWT token
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next function
- */
+
 const authMiddleware = (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res
-        .status(401)
-        .json({ message: 'Access denied. No token provided.' });
+      return res.status(401).json({ message: 'Access denied. No token provided.' });
     }
 
     const token = authHeader.split(' ')[1];
     if (!token) {
-      return res
-        .status(401)
-        .json({ message: 'Access denied. No token provided.' });
+      return res.status(401).json({ message: 'Access denied. No token provided.' });
     }
 
-    const decoded = verifyToken(token);
+    const decoded = verifyAuthToken(token);
 
     req.user = decoded;
     req.userId = decoded.id;
     next();
   } catch (error) {
-    console.log('[JWT Middleware] Auth middleware error:', error.message);
+    logger.error('[jwt.middleware] authMiddleware', error);
     return res.status(403).json({ message: 'Invalid token.', status: 401 });
   }
 };
 
-/**
- * Middleware to check if user has required role(s)
- * @param {Array|String} roles - Required role(s)
- * @returns {Function} Express middleware
- */
-const roleCheck = (roles) => {
-  return (req, res, next) => {
+const checkUserAuthorization = (req, res, next) => {
+  try {
     if (!req.user) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const userRole = req.user.role;
-    const allowedRoles = Array.isArray(roles) ? roles : [roles];
+    // const isUserAuthorized = //what is we actualy need here is, resolve the who user type by userType, find who is user from corresponding user module with the help of service functions, check their permissions to access contents.
 
-    if (!allowedRoles.includes(userRole)) {
-      return res
-        .status(403)
-        .json({ message: 'Access denied. Insufficient permissions.' });
-    }
+    // if (!isUserAuthorized) {
+    //   return res.status(403).json({ message: 'Access denied. Insufficient permissions.' });
+    // }
 
     next();
-  };
+  } catch (error) {
+    logger.error('[jwt.middleware] checkUserAuthorization', error);
+    return res.status(403).json({ message: 'Access denied. Insufficient permissions.' });
+  }
+
 };
 
-/**
- * Refresh JWT token
- * @param {String} refreshToken - Refresh token
- * @returns {Object} New access token and refresh token
- */
-const refreshToken = (refreshToken) => {
+const refreshAuthTokens = (currentRefreshToken) => {
   try {
-    const decoded = jwt.verify(refreshToken, JWT_SECRET);
+    const decoded = verifyAuthToken(currentRefreshToken)
 
-    // Verify it's a refresh token type
     if (decoded.type !== 'refresh') {
       throw new Error('Invalid token type');
     }
@@ -149,23 +114,27 @@ const refreshToken = (refreshToken) => {
       name: decoded.name,
     };
 
-    // Generate BOTH new access and refresh tokens
-    const { accessToken, refreshToken: newRefreshToken } = generateTokens(user);
-
-    return {
-      accessToken,
-      refreshToken: newRefreshToken, // Return new refresh token too
-    };
+    return generateAuthTokens(user);
   } catch (error) {
-    throw new Error('Invalid refresh token', error);
+    logger.error('[jwt.middleware] refreshAuthTokens', error.message);
+    throw new Error('Invalid refresh token', { cause: error });
+  }
+};
+
+const verifyAuthToken = (token) => {
+  try {
+    return jwt.verify(token, getJwtSecret());
+  } catch (error) {
+    logger.error('[jwt.middleware] verifyAuthToken', error);
+    throw error;
   }
 };
 
 module.exports = {
-  generateToken,
-  verifyToken,
+  verifyAuthToken,
   authMiddleware,
-  roleCheck,
-  refreshToken,
-  generateTokens,
+  checkUserAuthorization,
+  refreshAuthTokens,
+  generateAuthTokens,
+  generateRenderToken
 };

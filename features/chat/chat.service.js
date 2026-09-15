@@ -1,10 +1,10 @@
-const logger = require('../../shared/logger/logger');
+const logger = require('#shared/logger/logger');
 
-const HTTP = require('../../shared/constants/httpStatus.constant.js');
+const HTTP = require('#shared/response/response.status')
 // services/chat.service.js
 const Chat = require('./chats.model');
 const Message = require('./message/messages.model');
-const User = require('../user/user.model');
+const User = require('#features/user/staff/staff.model')
 const mongoose = require('mongoose');
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ const enrichParticipants = async (participants) => {
     );
     return {
       userId: p.userId,
-      userType: p.userType || 'office',
+      userType: p.userType || 'staff',
       uniqueCode: p.uniqueCode,
       name: user?.name || 'Unknown',
       avatar: toAvatar(user?.name),

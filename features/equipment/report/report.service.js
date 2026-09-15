@@ -1,57 +1,27 @@
-const logger = require('../../../shared/logger/logger');
+const logger = require('#shared/logger/logger');
+const HTTP = require('#shared/response/response.status');
 
-const AppError = require('../../../shared/errors/AppError.js');
-const HTTP = require('../../../shared/constants/httpStatus.constant.js');
-// services/report.service.js
 const ServiceHistoryModel = require('../history/history.model');
 const ServiceReportModel = require('./report.model');
 const ComplaintModel = require('../../complaint/complaint.model');
-const { createNotification } = require('../../notification/notification.service');
-const PushNotificationService = require('../../notification/notification.push');
-const { default: wsUtils } = require('../../../socket/socket');
-const analyser = require('../../dashboard/dashboard.analyser');
+const wsUtils = require('#core/socket/socket.io');
+const dashboardServices = require('#features/dashboard/dashboard.service');
+const { notifyUser } = require('#shared/notify/notify.user');
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────────────────────
-
-const VALID_TYPES = ['oil', 'normal', 'tyre', 'battery', 'major'];
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Converts DD-MM-YYYY → YYYY-MM-DD for MongoDB date queries.
- */
-const toISODate = (dateStr) => {
-  const [d, m, y] = dateStr.split('-');
+const toISODate = (ddmmyyyy) => {
+  const [d, m, y] = ddmmyyyy.split('-');
   return `${y}-${m}-${d}`;
 };
 
-/**
- * Formats a Date object to YYYY-MM-DD.
- */
 const formatDate = (date) => {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
-/**
- * Groups a flat report array by serviceType and by regNo.
- * Supports all 5 types — unknown types fall into 'other'.
- */
 const groupReports = (reports) => {
-  const groupedByType = {
-    oil: [],
-    normal: [],
-    tyre: [],
-    battery: [],
-    major: [],
-    other: [],
-  };
+  const groupedByType = { oil: [], normal: [], tyre: [], battery: [], major: [], other: [] };
   const groupedByRegNo = {};
 
   reports.forEach((report) => {
@@ -65,9 +35,6 @@ const groupReports = (reports) => {
   return { groupedByType, groupedByRegNo };
 };
 
-/**
- * Builds summary statistics from a grouped report set.
- */
 const buildStats = (reports, { groupedByType, groupedByRegNo }) => ({
   total: reports.length,
   totalEquipment: Object.keys(groupedByRegNo).length,
@@ -81,59 +48,37 @@ const buildStats = (reports, { groupedByType, groupedByRegNo }) => ({
   },
 });
 
-/**
- * Inspects checklist items at the given IDs and returns 'Change' or 'Check'.
- * Used when syncing a history record after a report update.
- */
-const getFilterStatus = (checklistItems, itemIds) => {
+const resolveChecklistStatus = (checklistItems, itemIds) => {
   if (!checklistItems?.length) return 'Check';
   const relevant = checklistItems.filter((item) => itemIds.includes(item.id));
   if (!relevant.length) return 'Check';
-  return relevant.some((item) =>
-    item.description?.toLowerCase().includes('change')
-  )
-    ? 'Change'
-    : 'Check';
+  return relevant.some((item) => item.description?.toLowerCase().includes('change')) ? 'Change' : 'Check';
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Write
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Creates a new service report and links it to the corresponding history record.
- * Looks up history by historyId if provided, otherwise by regNo + date.
- */
 const insertServiceReport = async (data) => {
   try {
     if (!data?.regNo) throw new Error('regNo is required');
     if (!data?.date) throw new Error('date is required');
     if (!data?.serviceType) throw new Error('serviceType is required');
 
-    // ── Find corresponding history record ─────────────────────────────────────
     const history = data.historyId
       ? await ServiceHistoryModel.findById(data.historyId)
       : await ServiceHistoryModel.findOne({
-          regNo: String(data.regNo),
-          serviceType: data.serviceType,
-          date: data.date,
-        });
+        regNo: String(data.regNo),
+        serviceType: data.serviceType,
+        date: data.date,
+      });
 
     if (!history) {
       throw new Error(
-        `No history record found for ${
-          data.historyId
-            ? 'historyId: ' + data.historyId
-            : `regNo: ${data.regNo}, type: ${data.serviceType}, date: ${data.date}`
+        `No history record found for ${data.historyId
+          ? 'historyId: ' + data.historyId
+          : `regNo: ${data.regNo}, type: ${data.serviceType}, date: ${data.date}`
         }`
       );
     }
 
-    // ── Create report ─────────────────────────────────────────────────────────
-    const report = await ServiceReportModel.create({
-      ...data,
-      historyId: history._id.toString(),
-    });
+    const report = await ServiceReportModel.create({ ...data, historyId: history._id.toString() });
 
     if (data.complaintId) {
       const complaint = await ComplaintModel.findById(data.complaintId);
@@ -141,11 +86,7 @@ const insertServiceReport = async (data) => {
         await ComplaintModel.findByIdAndUpdate(
           data.complaintId,
           {
-            $set: {
-              workflowStatus: 'fulfilled',
-              status: 'resolved',
-              updatedAt: new Date(),
-            },
+            $set: { workflowStatus: 'fulfilled', status: 'resolved', updatedAt: new Date() },
             $push: {
               approvalTrail: {
                 approvedBy: 'SYSTEM',
@@ -161,33 +102,25 @@ const insertServiceReport = async (data) => {
       }
     }
 
-    // ── Back-link on history ──────────────────────────────────────────────────
     history.reportId = report._id.toString();
     await history.save();
 
-    // ── Notification ──────────────────────────────────────────────────────────
-    const officeMain = JSON.parse(process.env.OFFICE_MAIN);
+    const staffMain = JSON.parse(process.env.STAFF_MAIN);
     const title = `${data.machine} - ${data.regNo} serviced`;
     const body = `${data.date}\nAt ${data.location}\nServiced Hours: ${data.serviceHrs}\nNext Service: ${data.nextServiceHrs}\n${data.remarks}\nMechanics: ${data.mechanics}`;
 
-    await createNotification({
-      title,
-      description: body,
-      priority: 'high',
-      sourceId: 'from applications',
-      recipient: officeMain,
-      time: new Date(),
-    });
-    await PushNotificationService.sendGeneralNotification(
-      officeMain,
-      title,
-      body,
-      'high',
-      'normal'
-    );
+    await notifyUser(staffMain,
+      {
+        title,
+        description: body,
+        priority: 'high',
+        type: 'normal',
+        sourceId: 'from applications',
+        time: new Date(),
+      });
 
-    analyser.clearCache();
-    wsUtils.sendDashboardUpdate('serviceReport');
+    dashboardServices.clearDashboardCache()
+    wsUtils.dispatchDashboardUpdate('serviceReport');
 
     return {
       status: HTTP.OK,
@@ -196,7 +129,7 @@ const insertServiceReport = async (data) => {
       data: { serviceReport: report },
     };
   } catch (error) {
-    logger.error('[ReportService] insertServiceReport:', error);
+    logger.error('[report.service] insertServiceReport:', error);
     throw {
       status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
@@ -206,21 +139,15 @@ const insertServiceReport = async (data) => {
   }
 };
 
-/**
- * Updates a service report and syncs the filter/fluid flags on the linked history record.
- * Only syncs oil/normal fields when the serviceType is oil or normal.
- */
-const updateServiceReportWith = async (id, updateData) => {
+const updateServiceReportById = async (id, updateData) => {
   try {
     const updated = await ServiceReportModel.findByIdAndUpdate(
       id,
       { ...updateData, updatedAt: new Date() },
       { new: true, runValidators: true }
     );
-    if (!updated)
-      throw { ok: false, message: 'Service report not found', status: HTTP.NOT_FOUND };
+    if (!updated) throw { ok: false, message: 'Service report not found', status: HTTP.NOT_FOUND };
 
-    // ── Sync history record ───────────────────────────────────────────────────
     let updatedHistory = null;
 
     if (updated.historyId) {
@@ -230,26 +157,21 @@ const updateServiceReportWith = async (id, updateData) => {
         nextServiceHrs: updated.nextServiceHrs || null,
       };
 
-      // Only oil/normal records carry filter flags
       if (updated.serviceType === 'oil' || updated.serviceType === 'normal') {
-        historyUpdate.oil = getFilterStatus(updated.checklistItems, [1]);
-        historyUpdate.oilFilter = getFilterStatus(updated.checklistItems, [1]);
-        historyUpdate.fuelFilter = getFilterStatus(updated.checklistItems, [2]);
-        historyUpdate.airFilter = getFilterStatus(updated.checklistItems, [3]);
+        historyUpdate.oil = resolveChecklistStatus(updated.checklistItems, [1]);
+        historyUpdate.oilFilter = resolveChecklistStatus(updated.checklistItems, [1]);
+        historyUpdate.fuelFilter = resolveChecklistStatus(updated.checklistItems, [2]);
+        historyUpdate.airFilter = resolveChecklistStatus(updated.checklistItems, [3]);
         historyUpdate.waterSeparator = 'Check';
       }
 
-      updatedHistory = await ServiceHistoryModel.findByIdAndUpdate(
-        updated.historyId,
-        historyUpdate,
-        { new: true, runValidators: true }
-      );
+      updatedHistory = await ServiceHistoryModel.findByIdAndUpdate(updated.historyId, historyUpdate, {
+        new: true,
+        runValidators: true,
+      });
 
       if (!updatedHistory) {
-        logger.warn(
-          '[ReportService] updateServiceReportWith — history not found for historyId:',
-          updated.historyId
-        );
+        logger.warn('[report.service] updateServiceReportById — history not found for historyId:', updated.historyId);
       }
     }
 
@@ -260,7 +182,7 @@ const updateServiceReportWith = async (id, updateData) => {
       data: { serviceReport: updated, serviceHistory: updatedHistory },
     };
   } catch (error) {
-    logger.error('[ReportService] updateServiceReportWith:', error);
+    logger.error('[report.service] updateServiceReportById:', error);
     throw {
       ok: false,
       message: 'Failed to update service report',
@@ -270,22 +192,15 @@ const updateServiceReportWith = async (id, updateData) => {
   }
 };
 
-/**
- * Deletes a service report and its linked history record.
- */
-const deleteServiceReportWith = async (id) => {
+const deleteServiceReportById = async (id) => {
   try {
     const report = await ServiceReportModel.findById(id);
-    if (!report)
-      throw { ok: false, message: 'Service report not found', status: HTTP.NOT_FOUND };
+    if (!report) throw { ok: false, message: 'Service report not found', status: HTTP.NOT_FOUND };
 
     const { historyId } = report;
-
     await ServiceReportModel.findByIdAndDelete(id);
 
-    const deletedHistory = historyId
-      ? await ServiceHistoryModel.findByIdAndDelete(historyId)
-      : null;
+    const deletedHistory = historyId ? await ServiceHistoryModel.findByIdAndDelete(historyId) : null;
 
     return {
       ok: true,
@@ -300,16 +215,16 @@ const deleteServiceReportWith = async (id) => {
         },
         deletedServiceHistory: deletedHistory
           ? {
-              id: deletedHistory._id,
-              regNo: deletedHistory.regNo,
-              date: deletedHistory.date,
-              serviceType: deletedHistory.serviceType,
-            }
+            id: deletedHistory._id,
+            regNo: deletedHistory.regNo,
+            date: deletedHistory.date,
+            serviceType: deletedHistory.serviceType,
+          }
           : null,
       },
     };
   } catch (error) {
-    logger.error('[ReportService] deleteServiceReportWith:', error);
+    logger.error('[report.service] deleteServiceReportById:', error);
     throw {
       ok: false,
       message: 'Failed to delete service report',
@@ -319,41 +234,23 @@ const deleteServiceReportWith = async (id) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Read — Single / By regNo + date
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Returns reports matching regNo and date (date param is DD-MM-YYYY).
- */
 const fetchServiceReport = async (regNo, date) => {
   try {
-    const data = await ServiceReportModel.find({
-      regNo,
-      date: toISODate(date),
-    });
+    const data = await ServiceReportModel.find({ regNo, date: toISODate(date) });
     return { status: HTTP.OK, ok: true, data };
   } catch (error) {
-    logger.error('[ReportService] fetchServiceReport:', error);
-    throw {
-      status: HTTP.INTERNAL_SERVER_ERROR,
-      ok: false,
-      message: error.message || 'Error fetching report',
-    };
+    logger.error('[report.service] fetchServiceReport:', error);
+    throw { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message || 'Error fetching report' };
   }
 };
 
-/**
- * Returns a single service report by ID.
- */
-const fetchServiceReportWith = async (id) => {
+const fetchServiceReportById = async (id) => {
   try {
     const report = await ServiceReportModel.findById(id);
-    if (!report)
-      throw { status: HTTP.NOT_FOUND, ok: false, message: 'Service report not found' };
+    if (!report) throw { status: HTTP.NOT_FOUND, ok: false, message: 'Service report not found' };
     return { status: HTTP.OK, ok: true, data: report };
   } catch (error) {
-    logger.error('[ReportService] fetchServiceReportWith:', error);
+    logger.error('[report.service] fetchServiceReportById:', error);
     throw {
       status: error.status || HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
@@ -362,13 +259,6 @@ const fetchServiceReportWith = async (id) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Read — Filtered queries
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Returns all reports for a regNo, optionally filtered by an array of serviceTypes.
- */
 const fetchAllServiceHistories = async (regNo, serviceTypes = []) => {
   try {
     const query = { regNo };
@@ -377,7 +267,7 @@ const fetchAllServiceHistories = async (regNo, serviceTypes = []) => {
     const data = await ServiceReportModel.find(query).sort({ date: -1 });
     return { status: HTTP.OK, ok: true, data };
   } catch (error) {
-    logger.error('[ReportService] fetchAllServiceHistories:', error);
+    logger.error('[report.service] fetchAllServiceHistories:', error);
     throw {
       status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
@@ -386,20 +276,12 @@ const fetchAllServiceHistories = async (regNo, serviceTypes = []) => {
   }
 };
 
-/**
- * Returns reports for a regNo filtered by a single serviceType, newest first.
- */
 const fetchServicesByType = async (regNo, serviceType) => {
   try {
-    const data = await ServiceReportModel.find({ regNo, serviceType }).sort({
-      date: -1,
-    });
+    const data = await ServiceReportModel.find({ regNo, serviceType }).sort({ date: -1 });
     return { status: HTTP.OK, ok: true, data };
   } catch (error) {
-    logger.error(
-      `[ReportService] fetchServicesByType (${serviceType}):`,
-      error
-    );
+    logger.error(`[report.service] fetchServicesByType (${serviceType}):`, error);
     throw {
       status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
@@ -408,51 +290,44 @@ const fetchServicesByType = async (regNo, serviceType) => {
   }
 };
 
-/**
- * Returns reports across all equipment within a named period.
- * Includes grouping by type and regNo, plus summary statistics.
- */
+const PERIOD_TO_RANGE = {
+  daily: (now) => {
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return { start, end: start };
+  },
+  yesterday: (now) => {
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const start = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
+    return { start, end: start };
+  },
+  weekly: (now) => {
+    const start = new Date(now);
+    start.setDate(now.getDate() - 7);
+    return { start, end: now };
+  },
+  monthly: (now) => {
+    const start = new Date(now);
+    start.setDate(now.getDate() - 30);
+    return { start, end: now };
+  },
+  yearly: (now) => {
+    const start = new Date(now);
+    start.setDate(now.getDate() - 365);
+    return { start, end: now };
+  },
+};
+
 const fetchServicesByPeriod = async (period) => {
   try {
-    const now = new Date();
-    let startDate, endDate;
+    const resolveRange = PERIOD_TO_RANGE[period];
+    if (!resolveRange) throw new Error('Invalid period specified');
 
-    switch (period) {
-      case 'daily':
-        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        break;
-      case 'yesterday': {
-        const y = new Date(now);
-        y.setDate(y.getDate() - 1);
-        startDate = new Date(y.getFullYear(), y.getMonth(), y.getDate());
-        endDate = new Date(y.getFullYear(), y.getMonth(), y.getDate());
-        break;
-      }
-      case 'weekly':
-        startDate = new Date(now);
-        startDate.setDate(now.getDate() - 7);
-        endDate = new Date(now);
-        break;
-      case 'monthly':
-        startDate = new Date(now);
-        startDate.setDate(now.getDate() - 30);
-        endDate = new Date(now);
-        break;
-      case 'yearly':
-        startDate = new Date(now);
-        startDate.setDate(now.getDate() - 365);
-        endDate = new Date(now);
-        break;
-      default:
-        throw new Error('Invalid period specified');
-    }
+    const { start, end } = resolveRange(new Date());
+    const from = formatDate(start);
+    const to = formatDate(end);
 
-    const from = formatDate(startDate);
-    const to = formatDate(endDate);
-    const reports = await ServiceReportModel.find({
-      date: { $gte: from, $lte: to },
-    }).sort({ date: -1, regNo: 1 });
+    const reports = await ServiceReportModel.find({ date: { $gte: from, $lte: to } }).sort({ date: -1, regNo: 1 });
     const grouped = groupReports(reports);
 
     return {
@@ -462,14 +337,12 @@ const fetchServicesByPeriod = async (period) => {
       dateRange: { from, to },
       statistics: {
         ...buildStats(reports, grouped),
-        byEquipment: Object.entries(grouped.groupedByRegNo).map(
-          ([regNo, items]) => ({ regNo, count: items.length })
-        ),
+        byEquipment: Object.entries(grouped.groupedByRegNo).map(([regNo, items]) => ({ regNo, count: items.length })),
       },
       data: { all: reports, ...grouped },
     };
   } catch (error) {
-    logger.error(`[ReportService] fetchServicesByPeriod (${period}):`, error);
+    logger.error(`[report.service] fetchServicesByPeriod (${period}):`, error);
     throw {
       status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
@@ -478,9 +351,6 @@ const fetchServicesByPeriod = async (period) => {
   }
 };
 
-/**
- * Returns reports for a regNo within a DD-MM-YYYY date range.
- */
 const fetchServicesByDateRange = async (regNo, startDate, endDate) => {
   try {
     const data = await ServiceReportModel.find({
@@ -489,7 +359,7 @@ const fetchServicesByDateRange = async (regNo, startDate, endDate) => {
     }).sort({ date: -1 });
     return { status: HTTP.OK, ok: true, data };
   } catch (error) {
-    logger.error('[ReportService] fetchServicesByDateRange:', error);
+    logger.error('[report.service] fetchServicesByDateRange:', error);
     throw {
       status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
@@ -498,27 +368,19 @@ const fetchServicesByDateRange = async (regNo, startDate, endDate) => {
   }
 };
 
-/**
- * Returns reports for a regNo from the last N calendar months.
- */
+const monthsAgoRange = (monthsCount) => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() - monthsCount + 1, 1);
+  return { from: formatDate(start), to: formatDate(now) };
+};
+
 const fetchServicesByLastMonths = async (regNo, monthsCount) => {
   try {
-    const now = new Date();
-    const start = new Date(
-      now.getFullYear(),
-      now.getMonth() - monthsCount + 1,
-      1
-    );
-    const from = formatDate(start);
-    const to = formatDate(now);
-
-    const data = await ServiceReportModel.find({
-      regNo,
-      date: { $gte: from, $lte: to },
-    }).sort({ date: -1 });
+    const { from, to } = monthsAgoRange(monthsCount);
+    const data = await ServiceReportModel.find({ regNo, date: { $gte: from, $lte: to } }).sort({ date: -1 });
     return { status: HTTP.OK, ok: true, data };
   } catch (error) {
-    logger.error('[ReportService] fetchServicesByLastMonths:', error);
+    logger.error('[report.service] fetchServicesByLastMonths:', error);
     throw {
       status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
@@ -527,17 +389,11 @@ const fetchServicesByLastMonths = async (regNo, monthsCount) => {
   }
 };
 
-/**
- * Returns all reports across all equipment within a DD-MM-YYYY date range.
- * Includes grouping and statistics.
- */
 const fetchAllServicesByDateRange = async (startDate, endDate) => {
   try {
     const from = toISODate(startDate);
     const to = toISODate(endDate);
-    const reports = await ServiceReportModel.find({
-      date: { $gte: from, $lte: to },
-    }).sort({ date: -1, regNo: 1 });
+    const reports = await ServiceReportModel.find({ date: { $gte: from, $lte: to } }).sort({ date: -1, regNo: 1 });
     const grouped = groupReports(reports);
 
     return {
@@ -549,7 +405,7 @@ const fetchAllServicesByDateRange = async (startDate, endDate) => {
       data: { all: reports, ...grouped },
     };
   } catch (error) {
-    logger.error('[ReportService] fetchAllServicesByDateRange:', error);
+    logger.error('[report.service] fetchAllServicesByDateRange:', error);
     throw {
       status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
@@ -558,24 +414,10 @@ const fetchAllServicesByDateRange = async (startDate, endDate) => {
   }
 };
 
-/**
- * Returns all reports across all equipment for the last N calendar months.
- * Includes grouping and statistics.
- */
 const fetchAllServicesByLastMonths = async (monthsCount) => {
   try {
-    const now = new Date();
-    const start = new Date(
-      now.getFullYear(),
-      now.getMonth() - monthsCount + 1,
-      1
-    );
-    const from = formatDate(start);
-    const to = formatDate(now);
-
-    const reports = await ServiceReportModel.find({
-      date: { $gte: from, $lte: to },
-    }).sort({ date: -1, regNo: 1 });
+    const { from, to } = monthsAgoRange(monthsCount);
+    const reports = await ServiceReportModel.find({ date: { $gte: from, $lte: to } }).sort({ date: -1, regNo: 1 });
     const grouped = groupReports(reports);
 
     return {
@@ -587,7 +429,7 @@ const fetchAllServicesByLastMonths = async (monthsCount) => {
       data: { all: reports, ...grouped },
     };
   } catch (error) {
-    logger.error('[ReportService] fetchAllServicesByLastMonths:', error);
+    logger.error('[report.service] fetchAllServicesByLastMonths:', error);
     throw {
       status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
@@ -596,58 +438,27 @@ const fetchAllServicesByLastMonths = async (monthsCount) => {
   }
 };
 
-/**
- * Returns reports for a regNo filtered by type and date range.
- * serviceTypes array takes priority over single serviceType string.
- */
-const fetchServicesByTypeAndDateRange = async (
-  regNo,
-  serviceType,
-  startDate,
-  endDate,
-  serviceTypes = []
-) => {
+const fetchServicesByTypeAndDateRange = async (regNo, serviceType, startDate, endDate, serviceTypes = []) => {
   try {
-    const query = {
-      regNo,
-      date: { $gte: toISODate(startDate), $lte: toISODate(endDate) },
-    };
+    const query = { regNo, date: { $gte: toISODate(startDate), $lte: toISODate(endDate) } };
     if (serviceTypes?.length) query.serviceType = { $in: serviceTypes };
     else if (serviceType) query.serviceType = serviceType;
 
     const data = await ServiceReportModel.find(query).sort({ date: -1 });
     return { status: HTTP.OK, ok: true, data };
   } catch (error) {
-    logger.error('[ReportService] fetchServicesByTypeAndDateRange:', error);
+    logger.error('[report.service] fetchServicesByTypeAndDateRange:', error);
     throw {
       status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
-      message:
-        error.message || 'Error fetching services by type and date range',
+      message: error.message || 'Error fetching services by type and date range',
     };
   }
 };
 
-/**
- * Returns reports for a regNo filtered by type from the last N months.
- * serviceTypes array takes priority over single serviceType string.
- */
-const fetchServicesByTypeAndLastMonths = async (
-  regNo,
-  serviceType,
-  monthsCount,
-  serviceTypes = []
-) => {
+const fetchServicesByTypeAndLastMonths = async (regNo, serviceType, monthsCount, serviceTypes = []) => {
   try {
-    const now = new Date();
-    const start = new Date(
-      now.getFullYear(),
-      now.getMonth() - monthsCount + 1,
-      1
-    );
-    const from = formatDate(start);
-    const to = formatDate(now);
-
+    const { from, to } = monthsAgoRange(monthsCount);
     const query = { regNo, date: { $gte: from, $lte: to } };
     if (serviceTypes?.length) query.serviceType = { $in: serviceTypes };
     else if (serviceType) query.serviceType = serviceType;
@@ -655,26 +466,21 @@ const fetchServicesByTypeAndLastMonths = async (
     const data = await ServiceReportModel.find(query).sort({ date: -1 });
     return { status: HTTP.OK, ok: true, data };
   } catch (error) {
-    logger.error('[ReportService] fetchServicesByTypeAndLastMonths:', error);
+    logger.error('[report.service] fetchServicesByTypeAndLastMonths:', error);
     throw {
       status: HTTP.INTERNAL_SERVER_ERROR,
       ok: false,
-      message:
-        error.message || 'Error fetching services by type and last months',
+      message: error.message || 'Error fetching services by type and last months',
     };
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Exports
-// ─────────────────────────────────────────────────────────────────────────────
-
 module.exports = {
   insertServiceReport,
-  updateServiceReportWith,
-  deleteServiceReportWith,
+  updateServiceReportById,
+  deleteServiceReportById,
   fetchServiceReport,
-  fetchServiceReportWith,
+  fetchServiceReportById,
   fetchAllServiceHistories,
   fetchServicesByType,
   fetchServicesByPeriod,

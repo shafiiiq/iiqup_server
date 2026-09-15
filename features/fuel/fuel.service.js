@@ -1,6 +1,6 @@
-const logger = require('../../shared/logger/logger');
+const logger = require('#shared/logger/logger');
 
-const HTTP = require('../../shared/constants/httpStatus.constant.js');
+const HTTP = require('#shared/response/response.status')
 // services/fuel.service.js
 const fuelsModel = require('./fuel.model');
 const equipmentModel = require('../equipment/equipment.model');

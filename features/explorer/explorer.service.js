@@ -1,9 +1,9 @@
-const logger = require('../../shared/logger/logger');
+const logger = require('#shared/logger/logger');
 
-const HTTP = require('../../shared/constants/httpStatus.constant.js');
+const HTTP = require('#shared/response/response.status')
 // services/explorer.service.js
 const Explorer = require('./explorer.model');
-const { paginationUtil: { paginate } } = require('../../shared/pagination');
+const { paginate } = require('#shared/pagination/pagination')
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Read
