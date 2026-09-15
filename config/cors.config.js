@@ -1,10 +1,8 @@
 const corsOptions = {
   origin: [
-    'https://iiqup.vercel.app',
+    'https://alansariconnect.vercel.app',
     'https://ansarigroup.online',
     'https://www.ansarigroup.online',
-    'http://localhost:3000',
-    'http://192.168.100.78:3000'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [
