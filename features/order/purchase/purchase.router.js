@@ -8,7 +8,7 @@ const router = express.Router()
 const upload = multer({ storage: multer.memoryStorage() })
 
 router.get('/', paginationMiddleware, controller.getPurchaseOrders)
-router.get('/', paginationMiddleware, controller.getPurchaseOrders)
+router.post('/', controller.createPurchaseOrder)
 router.get('/company-details', controller.getCompanyDetails)
 router.get('/by-date', controller.getPurchaseOrdersByDateRange)
 router.get('/by-company/:vendorName', controller.getPurchaseOrdersByCompany)
