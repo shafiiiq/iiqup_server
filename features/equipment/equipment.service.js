@@ -542,6 +542,7 @@ const autoDemobilizeOverdueEquipment = async () => {
           time: equipment.scheduledDemobTime || 'N/A',
           selectedDate: demobDateTime,
           remarks: equipment.scheduledDemobRemarks || 'Auto demobilized after one-day mobilization period ended',
+          sendEmail: false,
         });
 
         await equipmentModel.updateOne(

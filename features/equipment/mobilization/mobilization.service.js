@@ -238,6 +238,7 @@ const mobilizeEquipment = async (data) => {
             hiredFrom: updatedEquipment.hiredFrom || '',
             remarks,
             date: mobilizationDate,
+            sendEmail: false,
           })
         )
     );
@@ -335,6 +336,7 @@ const demobilizeEquipment = async (data) => {
     time,
     selectedDate,
     remarks,
+    sendEmail = true,
   } = data;
 
   const currentEquipment = await equipmentModel.findById(equipmentId);
@@ -473,6 +475,7 @@ const demobilizeEquipment = async (data) => {
           machine,
           remarks,
           date: selectedDate,
+          sendEmail: false,
         })
       )
   );
@@ -484,12 +487,9 @@ const demobilizeEquipment = async (data) => {
     sourceId: updatedEquipment._id,
   });
 
-  // Chain lineage is only tracked if this equipment ever went through
-  // a mobilize/replace flow that stamped a chainId, so this is best-effort
-  // and never blocks the demobilization itself.
   const chainInfo = await safeFetchChainInfo(chainId);
 
-  await alertMobilizationViaEmail({
+  if (sendEmail) await alertMobilizationViaEmail({
     action: MOBILIZATION_ACTIONS.DEMOBILIZED,
     regNo,
     machine,
@@ -642,6 +642,7 @@ const addShifts = async (data) => {
           hiredFrom: currentEquipment.hiredFrom || '',
           remarks,
           date: selectedDate,
+          sendEmail: false,
         })
       )
   );

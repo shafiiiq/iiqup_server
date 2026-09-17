@@ -3,6 +3,9 @@ const corsOptions = {
     'https://alansariconnect.vercel.app',
     'https://ansarigroup.online',
     'https://www.ansarigroup.online',
+    'https://www.ansarigroup.online',
+    "http://192.168.100.124:3000",
+    "http://localhost:3000"
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [
@@ -14,7 +17,7 @@ const corsOptions = {
     'Cache-Control',
   ],
   credentials: true,
-  optionsSuccessStatus: 200,
+  optionsSuccessStatus: 200, 
 };
 
 module.exports = corsOptions;

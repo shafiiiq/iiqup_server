@@ -39,6 +39,8 @@ const decryptAndVerifyDeviceData = (encryptedData, iv, originalData) => {
 
 const activateSignatureAccess = async (userId, activationKey, signType, deviceInfo) => {
   try {
+    console.log("signType", signType);
+    
     const user = await User.findById(userId);
     if (!user) throw { status: 404, message: 'User not found' };
 

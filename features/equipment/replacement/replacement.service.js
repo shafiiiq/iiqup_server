@@ -71,20 +71,20 @@ const replaceOperator = async (data) => {
 
   const updatedShifts = replaceAll
     ? [{
-        operatorName: replacedOperator,
-        operatorId: replacedOperatorId,
-        shiftName: '',
-        shiftStart: '',
-        shiftEnd: '',
-        assignedAt: new Date(),
-      }]
+      operatorName: replacedOperator,
+      operatorId: replacedOperatorId,
+      shiftName: '',
+      shiftStart: '',
+      shiftEnd: '',
+      assignedAt: new Date(),
+    }]
     : buildReplacedShift(existingShifts, targetShiftName, {
-        replacedOperator,
-        replacedOperatorId,
-        shiftName,
-        shiftStart,
-        shiftEnd,
-      });
+      replacedOperator,
+      replacedOperatorId,
+      shiftName,
+      shiftStart,
+      shiftEnd,
+    });
 
   const allPreviousOperatorIds = replaceAll
     ? existingShifts.map((s) => s.operatorId).filter(Boolean)
@@ -182,6 +182,7 @@ const replaceOperator = async (data) => {
           machine,
           remarks,
           date: selectedDate,
+          sendEmail: false,
         })
       )
     );
@@ -195,6 +196,7 @@ const replaceOperator = async (data) => {
       machine,
       remarks,
       date: selectedDate,
+      sendEmail: false,
     });
   }
 
@@ -219,6 +221,7 @@ const replaceOperator = async (data) => {
       hiredFrom: updatedEquipment.hiredFrom || '',
       remarks,
       date: selectedDate,
+      sendEmail: false,
     });
   }
 
@@ -484,6 +487,7 @@ const replaceEquipment = async (data) => {
       hiredFrom: updatedReplacedEquipment.hiredFrom || '',
       remarks,
       date: selectedDate,
+      sendEmail: false,
     });
   }
 
@@ -501,6 +505,7 @@ const replaceEquipment = async (data) => {
         machine: replacedEquipmentMachine,
         remarks,
         date: selectedDate,
+        sendEmail: false,
       })
     )
   );

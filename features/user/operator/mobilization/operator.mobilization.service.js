@@ -52,6 +52,7 @@ const syncOperatorMobilizedFromEquipment = async ({
   rentRate = null,
   remarks = '',
   date = null,
+  sendEmail = true,
 }) => {
   if (!operatorId) return null;
 
@@ -118,14 +119,13 @@ const syncOperatorMobilizedFromEquipment = async ({
 
     await notifySafely(STAFF_MAIN, {
       title: `${operator.name} Mobilized`,
-      description: `${operator.name} has been mobilized to ${
-        deployType === 'company' ? `client: ${clientCompany}` : `site: ${site}`
-      }${regNo ? ` on ${machine} (${regNo})` : ''}`,
+      description: `${operator.name} has been mobilized to ${deployType === 'company' ? `client: ${clientCompany}` : `site: ${site}`
+        }${regNo ? ` on ${machine} (${regNo})` : ''}`,
       priority: NOTIFICATION_PRIORITY.MEDIUM,
       sourceId: operator._id,
     });
 
-    alertOperatorMobilizationViaEmail({
+    if (sendEmail) alertOperatorMobilizationViaEmail({
       action: OPERATOR_MOB_ACTIONS.MOBILIZED,
       operatorName: operator.name,
       qatarId: operator.qatarId,
@@ -168,6 +168,7 @@ const syncOperatorDemobilizedFromEquipment = async ({
   machine = '',
   remarks = '',
   date = null,
+  sendEmail = true,
 }) => {
   if (!operatorId) return null;
 
@@ -216,7 +217,7 @@ const syncOperatorDemobilizedFromEquipment = async ({
       sourceId: operator._id,
     });
 
-    alertOperatorMobilizationViaEmail({
+    if (sendEmail) alertOperatorMobilizationViaEmail({
       action: OPERATOR_MOB_ACTIONS.DEMOBILIZED,
       operatorName: operator.name,
       qatarId: operator.qatarId,
