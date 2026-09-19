@@ -1,7 +1,7 @@
 const logger = require('#shared/logger/logger')
 const HTTP = require('#shared/response/response.status')
 const HireOrder = require('./hire.model')
-const { buildSignatures, resolveVendorCode, calculateTotal, wrapServiceError } = require('./hire.helper')
+const { buildSignatures, resolveVendorCode, resolveTotal, wrapServiceError } = require('./hire.helper')
 const { notifyStaffMain, notifyStaffHero } = require('./hire.notification')
 const { DEFAULT_TERMS } = require('./hire.constant')
 
@@ -17,7 +17,7 @@ const UPLOAD_ALLOWED_STATUSES = [
 
 const createHireOrder = async (hireOrderData) => {
   try {
-    const totalAmount = calculateTotal(hireOrderData.items, hireOrderData.showDiscountInTotal, hireOrderData.discount)
+    const totalAmount = resolveTotal(hireOrderData.items, hireOrderData.showDiscountInTotal, hireOrderData.discount, hireOrderData.manualTotal)
     const signatures = buildSignatures(hireOrderData.signatures)
     const { vendorCode, vendorMail } = await resolveVendorCode(hireOrderData.company.vendor)
 
@@ -73,6 +73,10 @@ const updateHireOrder = async (refNo, updateData) => {
 
       if (updateData.company) amendment.amendedCompany = updateData.company
       if (updateData.quoteNo) amendment.amendedQuoteNo = updateData.quoteNo
+      if (updateData.customFields) amendment.amendedCustomFields = updateData.customFields
+      if (updateData.manualTotal != null) amendment.amendedTotalAmount = updateData.manualTotal
+      amendment.amendedManualTotal = updateData.manualTotal ?? null
+      amendment.amendedShowTotalRow = updateData.showTotalRow ?? true
       if (updateData.requestText) amendment.amendedRequestText = updateData.requestText
       if (updateData.termsAndConditions) amendment.amendedTermsAndConditions = updateData.termsAndConditions
 
@@ -100,6 +104,8 @@ const updateHireOrder = async (refNo, updateData) => {
     if (updateData.showDiscountInTotal && updateData.discount) {
       updateData.totalAmount = (updateData.totalAmount || 0) - (updateData.discount || 0)
     }
+
+    if (updateData.manualTotal != null) updateData.totalAmount = updateData.manualTotal
 
     delete updateData.amendedBy
     delete updateData.amendmentReason

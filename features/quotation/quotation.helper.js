@@ -54,6 +54,9 @@ const calculateTotal = (items, showDiscountInTotal, discount) => {
   return showDiscountInTotal && discount ? subtotal - discount : subtotal
 }
 
+const resolveTotal = (items, showDiscountInTotal, discount, manualTotal) =>
+  manualTotal ?? calculateTotal(items, showDiscountInTotal, discount)
+
 const wrapServiceError = (serviceName, error) =>
   new Error(`[quotation.helper] ${serviceName}:${error.message}`, { cause: error })
 
@@ -65,5 +68,6 @@ module.exports = {
   resolveVendorCode,
   itemsSubtotal,
   calculateTotal,
+  resolveTotal,
   wrapServiceError,
 }

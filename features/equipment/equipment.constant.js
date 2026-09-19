@@ -36,6 +36,7 @@ export const EQUIPMENT_TABS = {
   SITE_BASED: 'site-based',
   ANSARI_STAFF: 'ansari-staff',
   RECORDS: 'records',
+  IDLE_LIST: 'idle-list',
 };
 
 export const EQUIPMENT_GRID_TABS = [

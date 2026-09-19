@@ -64,7 +64,7 @@ const resolveSupplierMail = async (supplierCode) => {
   return record?.supplierMail || null
 }
 
-const getAllBackchargeReports = async (pagination = { page: 1, limit: 20 }) => {
+const getAllBackchargeReports = async (pagination = { page: 1, limit: 20, skip: 0 }) => {
   try {
     return await paginate(Backcharge, {}, pagination, { sort: { createdAt: -1 } })
   } catch (error) {
@@ -77,14 +77,6 @@ const getBackchargeById = async (id) => {
     return await Backcharge.findById(id).lean()
   } catch (error) {
     throw wrapServiceError('getBackchargeById', error)
-  }
-}
-
-const getBackchargeByReportNo = async (reportNo) => {
-  try {
-    return await Backcharge.findOne({ reportNo }).lean()
-  } catch (error) {
-    throw wrapServiceError('getBackchargeByReportNo', error)
   }
 }
 
@@ -101,10 +93,11 @@ const getLatestBackchargeRef = async () => {
     const latest = await Backcharge.findOne().sort({ createdAt: -1 }).select('refNo').lean()
     if (!latest?.refNo) return 140
 
-    const parts = latest.refNo.split('-')
-    if (parts.length >= 1 && parts[0].startsWith('ATE')) {
-      return parseInt(parts[0].replace('ATE', '')) || 140
-    }
+    const newFormat = latest.refNo.match(/^ATE-BC-\d{8}-(\d+)$/)
+    if (newFormat) return parseInt(newFormat[1], 10) || 140
+
+    const legacyFormat = latest.refNo.match(/^ATE(\d+)-/)
+    if (legacyFormat) return parseInt(legacyFormat[1], 10) || 140
 
     return 140
   } catch (error) {
@@ -166,8 +159,7 @@ const addBackcharge = async (data) => {
     const supplierMail = await resolveSupplierMail(supplierCode)
 
     const newBackcharge = new Backcharge({
-      reportNo: data.reportNo,
-      refNo: data.refNo || 'ATE193-09-25',
+      refNo: data.refNo,
       equipmentType: data.equipmentType,
       plateNo: data.plateNo,
       model: data.model,
@@ -450,7 +442,7 @@ const getPendingSignatures = async (uniqueCode) => {
     }
 
     return await Backcharge.find(query)
-      .select('refNo reportNo supplierName equipmentType plateNo date signatures')
+      .select('refNo supplierName equipmentType plateNo date signatures')
       .sort({ createdAt: -1 })
       .lean()
   } catch (error) {
@@ -483,7 +475,6 @@ const getSignedByUser = async (uniqueCode) => {
 module.exports = {
   getAllBackchargeReports,
   getBackchargeById,
-  getBackchargeByReportNo,
   getBackchargeByRefNo,
   getLatestBackchargeRef,
   searchEquipmentByPlate,

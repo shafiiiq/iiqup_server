@@ -34,6 +34,15 @@ const columnSchema = new mongoose.Schema(
   { _id: false }
 )
 
+const customFieldSchema = new mongoose.Schema(
+  {
+    id: { type: String, required: true },
+    label: { type: String, default: '' },
+    value: { type: String, default: '' },
+  },
+  { _id: false }
+)
+
 const amendmentSchema = new mongoose.Schema(
   {
     amendmentDate: { type: Date, default: Date.now },
@@ -47,6 +56,9 @@ const amendmentSchema = new mongoose.Schema(
       designation: { type: String },
     },
     amendedQuoteNo: { type: String },
+    amendedCustomFields: { type: [customFieldSchema], default: [] },
+    amendedManualTotal: { type: Number },
+    amendedShowTotalRow: { type: Boolean },
     amendedRequestText: { type: String },
     amendedTermsAndConditions: { type: [String], default: [] },
     amendedDiscount: { type: Number },
@@ -71,6 +83,7 @@ const hireOrderSchema = new mongoose.Schema(
     vendorMail: { type: [String], default: [] },
 
     quoteNo: { type: String },
+    customFields: { type: [customFieldSchema], default: [] },
     requestText: { type: String },
     columns: { type: [columnSchema], default: [] },
     items: { type: [mongoose.Schema.Types.Mixed], default: [] },
@@ -78,6 +91,8 @@ const hireOrderSchema = new mongoose.Schema(
     discount: { type: Number, default: 0 },
     showDiscountInTotal: { type: Boolean, default: false },
     totalDiscountAmount: { type: Number },
+    manualTotal: { type: Number, default: null },
+    showTotalRow: { type: Boolean, default: true },
 
     termsAndConditions: {
       type: [String],

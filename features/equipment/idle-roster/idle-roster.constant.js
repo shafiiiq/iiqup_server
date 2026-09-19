@@ -1,0 +1,7 @@
+const IDLE_ROSTER_STATUSES = ['idle', 'maintenance'];
+const IDLE_ROSTER_HISTORY_PAGE_SIZE = 10;
+
+module.exports = {
+  IDLE_ROSTER_STATUSES,
+  IDLE_ROSTER_HISTORY_PAGE_SIZE,
+};

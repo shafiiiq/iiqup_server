@@ -124,7 +124,7 @@ const getLatestPurchaseOrderRefNo = async () => {
     const latestPurchaseOrder = await PurchaseOrder.findOne({}).sort({ createdAt: -1 }).select('purchaseorderRef')
     if (!latestPurchaseOrder?.purchaseorderRef) return null
 
-    const match = latestPurchaseOrder.purchaseorderRef.match(/^ATE(\d+)\/SP/)
+    const match = latestPurchaseOrder.purchaseorderRef.match(/-(\d+)$/)
     return match ? match[1] : null
   } catch (error) {
     throw wrapServiceError('getLatestPurchaseOrderRefNo', error)

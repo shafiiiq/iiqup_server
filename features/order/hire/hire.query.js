@@ -41,10 +41,7 @@ const getAllCompanyDetails = async () => {
 const getLatestHireOrderRef = async () => {
   try {
     const latest = await HireOrder.findOne({}).sort({ createdAt: -1 }).select('hireOrderRef')
-    if (!latest?.hireOrderRef) return null
-
-    const match = latest.hireOrderRef.match(/^ATE(\d+)\/HO/)
-    return match ? match[1] : null
+    return latest?.hireOrderRef || null
   } catch (error) {
     throw wrapServiceError('getLatestHireOrderRef', error)
   }

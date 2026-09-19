@@ -78,8 +78,7 @@ const approvalTrailSchema = new mongoose.Schema(
 
 const backchargeSchema = new mongoose.Schema(
   {
-    reportNo: { type: String, required: true, unique: true, trim: true },
-    refNo: { type: String, default: 'ATE193-09-25', trim: true },
+    refNo: { type: String, trim: true },
     date: { type: String, required: true },
     workDate: { type: String, default: '' },
 
@@ -173,9 +172,6 @@ backchargeSchema.pre('save', function (next) {
   next()
 })
 
-backchargeSchema.statics.findByReportNo = function (reportNo) {
-  return this.findOne({ reportNo })
-}
 backchargeSchema.statics.findByEquipmentType = function (equipmentType) {
   return this.find({ equipmentType: new RegExp(equipmentType, 'i') })
 }
@@ -209,7 +205,6 @@ backchargeSchema.methods.submit = function () {
   return this.save()
 }
 
-backchargeSchema.index({ reportNo: 1 })
 backchargeSchema.index({ equipmentType: 1 })
 backchargeSchema.index({ supplierName: 1 })
 backchargeSchema.index({ status: 1 })

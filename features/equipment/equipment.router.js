@@ -8,6 +8,7 @@ const imagesRouter = require('./images/images.router');
 const mobilizationRouter = require('./mobilization/mobilization.router');
 const replacementRouter = require('./replacement/replacement.router');
 const chainRouter = require('./chain/chain.router');
+const idleRosterRouter = require('./idle-roster/idle-roster.router');
 
 router.get('/', paginationMiddleware, controller.getEquipments);
 router.get('/export', controller.getEquipmentsForExport);
@@ -26,6 +27,7 @@ router.use(imagesRouter);
 router.use(mobilizationRouter);
 router.use(replacementRouter);
 router.use(chainRouter);
+router.use(idleRosterRouter);
 
 router.get('/:id', controller.getEquipmentsById);
 router.put('/:regNo/idle-location', controller.updateIdleLocation);

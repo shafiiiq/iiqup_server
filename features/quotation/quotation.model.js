@@ -53,6 +53,8 @@ const amendmentSchema = new mongoose.Schema(
     amendedTermsAndConditions: { type: [String], default: [] },
     amendedDiscount: { type: Number },
     amendedTotalAmount: { type: Number },
+    amendedManualTotal: { type: Number },
+    amendedShowTotalRow: { type: Boolean },
   },
   { _id: false }
 )
@@ -86,6 +88,8 @@ const quotationSchema = new mongoose.Schema(
     showDiscountInTotal: { type: Boolean, default: true },
     totalAmount: { type: Number },
     totalDiscountAmount: { type: Number },
+    manualTotal: { type: Number, default: null },
+    showTotalRow: { type: Boolean, default: true },
 
     termsAndConditions: { type: [String], default: [] },
 

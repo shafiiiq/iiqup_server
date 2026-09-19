@@ -1,12 +1,12 @@
 const logger = require('#shared/logger/logger')
 const Quotation = require('./quotation.model')
-const { buildSignatures, resolveVendorCode, calculateTotal, wrapServiceError } = require('./quotation.helper')
+const { buildSignatures, resolveVendorCode, resolveTotal, wrapServiceError } = require('./quotation.helper')
 const { notifyQuotationCreated, notifyQuotationSent } = require('./quotation.notification')
 const { DEFAULT_TERMS, STATUS } = require('./quotation.constant')
 
 const createQuotation = async (quotationData) => {
   try {
-    const totalAmount = calculateTotal(quotationData.items, quotationData.showDiscountInTotal, quotationData.discount)
+    const totalAmount = resolveTotal(quotationData.items, quotationData.showDiscountInTotal, quotationData.discount, quotationData.manualTotal)
     const signatures = buildSignatures(quotationData.signatures)
     const { vendorCode, vendorMail } = await resolveVendorCode(quotationData.company.vendor)
 
@@ -65,6 +65,9 @@ const updateQuotation = async (refNo, updateData) => {
       if (updateData.priceStatementText) amendment.amendedPriceStatementText = updateData.priceStatementText
       if (updateData.contactText) amendment.amendedContactText = updateData.contactText
       if (updateData.termsAndConditions) amendment.amendedTermsAndConditions = updateData.termsAndConditions
+      if (updateData.manualTotal != null) amendment.amendedTotalAmount = updateData.manualTotal
+      amendment.amendedManualTotal = updateData.manualTotal ?? null
+      amendment.amendedShowTotalRow = updateData.showTotalRow ?? true
 
       return await Quotation.findOneAndUpdate(
         { quotationRef: refNo.trim() },
@@ -80,6 +83,8 @@ const updateQuotation = async (refNo, updateData) => {
     if (updateData.showDiscountInTotal && updateData.discount) {
       updateData.totalAmount = (updateData.totalAmount || 0) - (updateData.discount || 0)
     }
+
+    if (updateData.manualTotal != null) updateData.totalAmount = updateData.manualTotal
 
     delete updateData.amendedBy
     delete updateData.amendmentReason

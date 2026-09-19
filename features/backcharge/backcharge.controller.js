@@ -21,11 +21,7 @@ const requireMinLength = (value, min, fieldLabel) => {
 }
 
 const getAllBackchargeReports = handleRoute('getAllBackchargeReports', async (req) => {
-  const pagination = {
-    page: parseInt(req.query.page) || 1,
-    limit: parseInt(req.query.limit) || 20,
-  }
-  const result = await backchargeService.getAllBackchargeReports(pagination)
+  const result = await backchargeService.getAllBackchargeReports(req.pagination)
   return { message: 'Backcharge reports retrieved successfully', data: result.data, pagination: result.pagination }
 })
 
@@ -48,13 +44,13 @@ const getBackchargeByRefNo = handleRoute('getBackchargeByRefNo', async (req) => 
 })
 
 const addBackcharge = handleRoute('addBackcharge', async (req) => {
-  const { reportNo, equipmentType, plateNo } = req.body
-  if (!reportNo || !equipmentType || !plateNo) {
-    throw httpError('Report number, equipment type, and plate number are required', HTTP.BAD_REQUEST)
+  const { refNo, equipmentType, plateNo } = req.body
+  if (!refNo || !equipmentType || !plateNo) {
+    throw httpError('Ref number, equipment type, and plate number are required', HTTP.BAD_REQUEST)
   }
 
-  const existing = await backchargeService.getBackchargeByReportNo(reportNo)
-  if (existing) throw httpError('Backcharge report with this report number already exists', HTTP.BAD_REQUEST)
+  const existing = await backchargeService.getBackchargeByRefNo(refNo)
+  if (existing) throw httpError('Backcharge report with this ref number already exists', HTTP.BAD_REQUEST)
 
   const data = await backchargeService.addBackcharge(req.body)
   return { message: 'Backcharge report created successfully', data }

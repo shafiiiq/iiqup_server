@@ -31,7 +31,7 @@ const searchRegistry = {
   },
   equipments: {
     model: require('#features/equipment/equipment.model'),
-    searchableFields: ['machine', 'regNo', 'brand', 'company', 'coc', 'istimaraExpiry', 'insuranceExpiry', 'tpcExpiry', 'hiredFrom', 'location', 'status'],
+    searchableFields: ['machine', 'regNo', 'brand', 'company', 'coc', 'istimaraExpiry', 'insuranceExpiry', 'tpcExpiry', 'hiredFrom', 'location', 'status', 'certificationBody.operatorName'],
     defaultFields: ['machine', 'regNo', 'brand', 'location'],
   },
   servicehistories: {
