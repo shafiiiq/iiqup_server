@@ -93,7 +93,7 @@ const waitForDocumentReady = async (page) => {
   try {
     await page.waitForFunction(
       () =>
-        document.querySelector('.a2-paper[data-a2-paper-ready="true"]') ||
+        document.querySelector('.a2-paper[data-a2-paper-ready="true"]:not(.a2-paper-probe)') ||
         document.querySelector('[class*="error-state"], [class*="error state"]'),
       { timeout: 45000 }
     )
@@ -121,6 +121,20 @@ const waitForDocumentReady = async (page) => {
     }))
   })
 
+  await page.waitForFunction(
+    () => {
+      const count = document.querySelectorAll('.a2-paper:not(.a2-paper-probe)').length
+      if (window.__a2PrevPageCount === count) {
+        window.__a2StableTicks = (window.__a2StableTicks || 0) + 1
+      } else {
+        window.__a2StableTicks = 0
+      }
+      window.__a2PrevPageCount = count
+      return window.__a2StableTicks >= 5
+    },
+    { timeout: 15000, polling: 100 }
+  )
+
   await new Promise((resolve) => setTimeout(resolve, 300))
 }
 
@@ -144,8 +158,8 @@ const renderPageToPdfInternal = async (path, user, options = {}) => {
 
     const separator = path.includes('?') ? '&' : '?'
     await page.goto(`${FRONTEND_URL}${path}${separator}pdf=1`, { waitUntil: 'domcontentloaded', timeout: 60000 })
-    await waitForDocumentReady(page)
     await page.emulateMediaType('print')
+    await waitForDocumentReady(page)
     await page.evaluate(() => {
       document.querySelectorAll('.main-header, .navigation-buttons, .spacer, .no-print')
         .forEach((element) => element.remove())
