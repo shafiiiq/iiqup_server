@@ -4,7 +4,10 @@ const { wrapServiceError } = require('./quotation.helper')
 
 const getQuotations = async (pagination) => {
   try {
-    return await paginate(Quotation, {}, pagination, { sort: { createdAt: -1 } })
+    return await paginate(Quotation, {}, pagination, {
+      sort: { createdAt: -1 },
+      select: '-items.image',
+    })
   } catch (error) {
     throw wrapServiceError('getQuotations', error)
   }

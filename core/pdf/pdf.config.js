@@ -2,6 +2,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000'
 
 const PUPPETEER_LAUNCH_OPTIONS = {
   headless: 'new',
+  protocolTimeout: 120000,
   args: [
     '--no-sandbox',
     '--disable-setuid-sandbox',

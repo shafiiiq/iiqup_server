@@ -95,7 +95,7 @@ const waitForDocumentReady = async (page) => {
       () =>
         document.querySelector('.a2-paper[data-a2-paper-ready="true"]') ||
         document.querySelector('[class*="error-state"], [class*="error state"]'),
-      { timeout: 20000 }
+      { timeout: 45000 }
     )
     const errorText = await page.$eval(
       '.purchase.order.report.error.message',
@@ -143,7 +143,7 @@ const renderPageToPdfInternal = async (path, user, options = {}) => {
     await seedAuthTokens(page, tokens, user)
 
     const separator = path.includes('?') ? '&' : '?'
-    await page.goto(`${FRONTEND_URL}${path}${separator}pdf=1`, { waitUntil: 'domcontentloaded', timeout: 30000 })
+    await page.goto(`${FRONTEND_URL}${path}${separator}pdf=1`, { waitUntil: 'domcontentloaded', timeout: 60000 })
     await waitForDocumentReady(page)
     await page.emulateMediaType('print')
     await page.evaluate(() => {
