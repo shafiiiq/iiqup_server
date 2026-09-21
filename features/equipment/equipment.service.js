@@ -5,7 +5,7 @@ const { notifySafely } = require('#shared/notify/notify.user');
 const wsUtils = require('#core/socket/socket.io');
 
 const equipmentModel = require('./equipment.model');
-const { normalizeMachineName } = require('./equipment.machine-normalizer');
+const { normalizeMachineName } = require('./equipment.normalizer');
 const mobilizationModel = require('./mobilization/mobilization.model');
 const mobilizationService = require('./mobilization/mobilization.service');
 const dashboardServices = require('#features/dashboard/dashboard.service');
