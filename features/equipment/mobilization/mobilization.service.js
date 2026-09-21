@@ -326,6 +326,91 @@ const mobilizeEquipment = async (data) => {
   };
 };
 
+const demobilizeSingleShift = async ({
+  currentEquipment, equipmentId, regNo, machine, month, year, time,
+  selectedDate, remarks, sendEmail, targetShiftName, targetOperatorName, targetOperatorId,
+}) => {
+  const existingShifts = currentEquipment?.certificationBody || [];
+  const removedShift = existingShifts.find((s) =>
+    targetOperatorId ? s.operatorId === targetOperatorId : (s.shiftName || s.operatorName) === targetShiftName
+  );
+  const remainingShifts = existingShifts.filter((s) => s !== removedShift);
+
+  const demobilization = await mobilizationModel.create({
+    equipmentId, regNo, machine,
+    action: MOBILIZATION_ACTIONS.DEMOBILIZED,
+    withOperator: false,
+    operator: removedShift?.operatorName || targetOperatorName,
+    previousOperators: removedShift ? [removedShift] : [],
+    hired: currentEquipment?.hired || false,
+    hiredFrom: currentEquipment?.hiredFrom || '',
+    rentRate: currentEquipment?.rentRate || null,
+    location: currentEquipment?.location || '',
+    site: Array.isArray(currentEquipment?.site) ? currentEquipment.site.at(-1) || '' : currentEquipment?.site || '',
+    month, year,
+    date: selectedDate ? new Date(selectedDate) : new Date(),
+    time, remarks,
+    status: currentEquipment.status,
+    chainId: currentEquipment?.activeChainId || null,
+  });
+
+  const updatedEquipment = await equipmentModel.findOneAndUpdate(
+    { _id: equipmentId },
+    {
+      $set: { certificationBody: remainingShifts, updatedAt: new Date() },
+      $inc: { 'mobilizationsRecord.demobilization': 1 },
+      ...(removedShift && { $push: { lastCertificationBody: removedShift } }),
+    },
+    { new: true }
+  );
+
+  if (removedShift?.operatorId) {
+    await safeUpdateOperator(removedShift.operatorId, { equipmentNumber: '' });
+    await operatorMobilizationService.syncOperatorDemobilizedFromEquipment({
+      operatorId: removedShift.operatorId,
+      operatorName: removedShift.operatorName,
+      regNo, machine, remarks,
+      date: selectedDate,
+      sendEmail: false,
+    });
+  }
+
+  await notifySafely(STAFF_MAIN, {
+    title: `${machine} (${regNo}) Shift Demobilized`,
+    description: `${removedShift?.shiftName || removedShift?.operatorName || 'A shift'} demobilized on ${machine} (${regNo})`,
+    priority: NOTIFICATION_PRIORITY.MEDIUM,
+    sourceId: updatedEquipment._id,
+  });
+
+  if (sendEmail) await alertMobilizationViaEmail({
+    action: MOBILIZATION_ACTIONS.DEMOBILIZED,
+    regNo, machine, month, year, time,
+    date: selectedDate ? new Date(selectedDate) : new Date(),
+    remarks,
+    site: Array.isArray(currentEquipment?.site) ? currentEquipment.site.at(-1) || '' : currentEquipment?.site || '',
+    hired: currentEquipment?.hired || false,
+    hiredFrom: currentEquipment?.hiredFrom || '',
+    rentRate: currentEquipment?.rentRate || null,
+    location: currentEquipment?.location ? [currentEquipment.location] : [],
+    operator: removedShift?.operatorName || '',
+    withOperator: !!removedShift,
+    previousOperators: removedShift ? [removedShift] : [],
+    allOperators: remainingShifts,
+    isPartialDemob: true,
+    targetShiftName: removedShift?.shiftName || '',
+  }).catch((err) => logger.error('[mobilization.service] demobilizeSingleShift: email failed:', err));
+
+  dashboardServices.clearDashboardCache();
+  wsUtils.dispatchDashboardUpdate('mobilization');
+
+  return {
+    status: HTTP.CREATED,
+    ok: true,
+    message: 'Shift demobilized successfully',
+    data: { demobilization, updatedEquipment },
+  };
+};
+
 const demobilizeEquipment = async (data) => {
   const {
     equipmentId,
@@ -337,9 +422,21 @@ const demobilizeEquipment = async (data) => {
     selectedDate,
     remarks,
     sendEmail = true,
+    demobAll = true,
+    targetShiftName = '',
+    targetOperatorName = '',
+    targetOperatorId = '',
   } = data;
 
   const currentEquipment = await equipmentModel.findById(equipmentId);
+  const activeShifts = currentEquipment?.certificationBody || [];
+
+  if (!demobAll && activeShifts.length > 1) {
+    return demobilizeSingleShift({
+      currentEquipment, equipmentId, regNo, machine, month, year, time,
+      selectedDate, remarks, sendEmail, targetShiftName, targetOperatorName, targetOperatorId,
+    });
+  }
 
   const currentOperatorIds =
     currentEquipment?.certificationBody

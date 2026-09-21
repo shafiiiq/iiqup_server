@@ -130,6 +130,8 @@ const generateMobilizationTemplate = (
     remarks = '',
     allOperators = [],
     previousOperators = [],
+    isPartialDemob = false,
+    targetShiftName: partialTargetShiftName = '',
     lastMobilizedDate = '',
     lastMobilizedTime = '',
     demobDate = '',
@@ -197,9 +199,18 @@ const generateMobilizationTemplate = (
           action === 'demobilized'
             ? `
         <tr>
-          <td style="color:#666;">Removed from Site</td>
+          <td style="color:#666;">${isPartialDemob ? 'Site' : 'Removed from Site'}</td>
           <td>${site || 'N/A'}</td>
         </tr>
+        ${
+          isPartialDemob && partialTargetShiftName
+            ? `
+        <tr>
+          <td style="color:#666;">Demobilized Shift</td>
+          <td><strong>${partialTargetShiftName}</strong></td>
+        </tr>`
+            : ''
+        }
         ${
           previousOperators?.filter((op) => op.operatorName)?.length
             ? `
@@ -234,6 +245,23 @@ const generateMobilizationTemplate = (
         </tr>`
           )
           .join('')}`
+            : ''
+        }
+        ${
+          isPartialDemob
+            ? `
+        <tr style="background:#f5f5f5;">
+          <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Remaining Active Operator(s)</td>
+        </tr>
+        ${
+          allOperators.filter((op) => op.operatorName).length
+            ? allOperators.filter((op) => op.operatorName).map((op, i) => `
+        <tr>
+          <td style="color:#666;">Operator ${allOperators.filter((o) => o.operatorName).length > 1 ? i + 1 : ''}</td>
+          <td><strong>${op.operatorName}</strong>${op.shiftName ? ` &nbsp;<span style="color:#888;">${op.shiftName}</span>` : ''}</td>
+        </tr>`).join('')
+            : `<tr><td colspan="2">No shifts remaining — equipment is now idle</td></tr>`
+        }`
             : ''
         }`
             : ''

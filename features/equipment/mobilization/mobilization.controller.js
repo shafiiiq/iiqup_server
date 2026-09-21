@@ -128,6 +128,10 @@ const demobilizeEquipment = async (req, res) => {
       ...req.body,
       selectedDate: req.body.selectedDate || null,
       remarks: req.body.remarks || '',
+      demobAll: req.body.demobAll !== false,
+      targetShiftName: req.body.targetShiftName || '',
+      targetOperatorName: req.body.targetOperatorName || '',
+      targetOperatorId: req.body.targetOperatorId || '',
     });
     respond(res, result);
   } catch (error) {

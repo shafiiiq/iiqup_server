@@ -129,7 +129,7 @@ export const EQUIPMENT_OUTSIDE_FORM_DEFAULTS = {
   machine: '', regNo: '', brand: '', operator: '', company: 'OUTSIDE', hired: true,
 };
 
-export const EQUIPMENT_DEMOBILIZE_FORM_DEFAULTS = { date: '', time: '', remarks: '' };
+export const EQUIPMENT_DEMOBILIZE_FORM_DEFAULTS = { date: '', time: '', remarks: '', allShifts: [], selectedShift: '', demobAll: true };
 
 export const EQUIPMENT_ADD_SHIFT_FORM_DEFAULTS = { operators: [], date: '', time: '', remarks: '' };
 
