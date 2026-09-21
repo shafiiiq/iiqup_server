@@ -5,6 +5,7 @@ const { notifySafely } = require('#shared/notify/notify.user');
 const wsUtils = require('#core/socket/socket.io');
 
 const equipmentModel = require('./equipment.model');
+const { normalizeMachineName } = require('./equipment.machine-normalizer');
 const mobilizationModel = require('./mobilization/mobilization.model');
 const mobilizationService = require('./mobilization/mobilization.service');
 const dashboardServices = require('#features/dashboard/dashboard.service');
@@ -39,6 +40,13 @@ const insertEquipment = async (data) => {
     }
 
     data.id = await resolveNextId();
+    if (data.machine) {
+      const normalized = normalizeMachineName(data.machine);
+      data.machine = normalized.machine;
+      data.machineOriginal = normalized.machineOriginal;
+      data.category = normalized.category;
+      data.subCategory = normalized.subCategory;
+    }
     const equipment = await equipmentModel.create(data);
     const isHired = data.company === 'HIRED';
 
@@ -594,6 +602,14 @@ const updateEquipment = async (regNo, updatedData, equipmentNumber = null, opera
 
     if (cleanUpdatedData.company !== undefined) {
       cleanUpdatedData.hired = cleanUpdatedData.company === 'HIRED';
+    }
+
+    if (cleanUpdatedData.machine !== undefined && cleanUpdatedData.machine !== originalEquipment.machine) {
+      const normalized = normalizeMachineName(cleanUpdatedData.machine);
+      cleanUpdatedData.machine = normalized.machine;
+      cleanUpdatedData.machineOriginal = normalized.machineOriginal;
+      cleanUpdatedData.category = normalized.category;
+      cleanUpdatedData.subCategory = normalized.subCategory;
     }
 
     const setFields = { ...cleanUpdatedData, updatedAt: new Date() };

@@ -55,6 +55,9 @@ const equipmentSchema = new mongoose.Schema(
   {
     id: { type: Number, required: true, unique: true },
     machine: { type: String, required: true },
+    machineOriginal: { type: String, default: null },
+    category: { type: String, default: null },
+    subCategory: { type: String, default: null },
     regNo: { type: String, required: true },
     brand: { type: String, required: true },
     year: { type: Number, required: true },
@@ -175,6 +178,8 @@ const equipmentSchema = new mongoose.Schema(
 );
 
 equipmentSchema.index({ machine: 1 });
+equipmentSchema.index({ category: 1 });
+equipmentSchema.index({ category: 1, subCategory: 1 });
 equipmentSchema.index({ regNo: 1 });
 equipmentSchema.index({ brand: 1 });
 equipmentSchema.index({ year: -1 });
