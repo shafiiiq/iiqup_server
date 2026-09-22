@@ -46,6 +46,7 @@ const publicRoutes = [
   { path: '/api/v1/attendance', router: attendanceRouter },
   { path: '/api/v1/backcharge', router: backchargeRouter },
   { path: '/api/v1/webpush', router: webPushRouter },
+  { path: '/api/v1/authz', router: authZRouter },
 ];
 
 const privateRoutes = [
@@ -62,7 +63,6 @@ const privateRoutes = [
   { path: '/api/v1/uploads', router: uploadRouter },
   { path: '/api/v1/s3', router: s3Router },
   { path: '/api/v1/search', router: searchRouter },
-  { path: '/api/v1/authz', router: authZRouter },
   { path: '/api/v1/pdf', router: pdfRouter },
 ];
 

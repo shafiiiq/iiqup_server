@@ -4,6 +4,21 @@ const { sendSuccess, sendError } = require('#shared/response/response.sender')
 const userService = require('#features/user/staff/staff.service')
 const authZServices = require('./authZ.service')
 
+const registerSignature = async (req, res) => {
+  try {
+    const { userId, activationKey, signTypes } = req.body;
+    if (!userId || !activationKey) {
+      return res.status(HTTP.BAD_REQUEST).json({ success: false, message: 'userId and activationKey are required' });
+    }
+
+    const result = await authZServices.registerSignatureAccess(userId, activationKey, signTypes);
+    sendSuccess(res, result);
+  } catch (error) {
+    logger.error('[authZ.controller] registerSignature', error);
+    res.status(error.status || HTTP.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+  }
+};
+
 const verifyDocAuthUser = async (req, res) => {
   try {
     const { password } = req.body;
@@ -112,6 +127,7 @@ const activateSignature = async (req, res) => {
 };
 
 module.exports = {
+  registerSignature,
   verifyDocAuthUser,
   getSignKey,
   getSignWmKey,

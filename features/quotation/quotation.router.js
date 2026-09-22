@@ -2,6 +2,7 @@ const express = require('express')
 const multer = require('multer')
 const controller = require('./quotation.controller')
 const { paginationMiddleware } = require('#middlewares/pagination.middleware')
+const statisticsController = require('./quotation.statistics.controller')
 
 const router = express.Router()
 const upload = multer({ storage: multer.memoryStorage() })
@@ -23,6 +24,11 @@ router.post(
   controller.emailQuotation
 )
 
+router.get('/stats/totals', statisticsController.getQuotationTotals)
+router.get('/stats/summary', statisticsController.getQuotationSummary)
+router.get('/stats/series', statisticsController.getQuotationSeries)
+router.get('/stats/growth', statisticsController.getQuotationGrowth)
+
 router.get('/:refNo(*)', controller.getQuotationByRef)
 router.put('/:refNo(*)', controller.updateQuotation)
 router.delete('/:refNo', controller.deleteQuotation)
@@ -35,6 +41,7 @@ router.post(
   ]),
   controller.sendQuotationViaEmail
 )
+
 router.put('/vendor-email/:vendorCode', controller.updateVendorEmail)
 
 module.exports = router

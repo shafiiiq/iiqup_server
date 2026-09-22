@@ -19,7 +19,7 @@ router.get('/records-summary', controller.getEquipmentRecordsSummary);
 router.get('/status', paginationMiddleware, controller.getEquipmentsByStatus);
 router.get('/sites', controller.getSites);
 router.get('/site-machine-breakdown', controller.getSiteMachineBreakdown);
-router.get('/by-reg/:regNo', controller.getEquipmentByRegNo);
+router.put('/by-reg/:regNo', controller.getEquipmentByRegNo);
 router.post('/', controller.addEquipment);
 router.post('/mark-sold', controller.markEquipmentSold);
 

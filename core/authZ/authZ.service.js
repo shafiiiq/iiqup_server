@@ -7,6 +7,39 @@ const { verifyDocAuthUserCreds } = require('#features/user/staff/staff.service')
 const ALGORITHM = 'aes-256-cbc';
 const ENCRYPTION_KEY = process.env.DEVICE_ENCRYPTION_KEY;
 
+const SIGNATURE_TYPES = ['pm', 'wm', 'accounts', 'manager', 'authorized', 'seal'];
+
+const registerSignatureAccess = async (userId, activationKey, signTypes = SIGNATURE_TYPES) => {
+  try {
+    const user = await User.findById(userId);
+    if (!user) throw { status: 404, message: 'User not found' };
+
+    const hashedKey = await bcrypt.hash(activationKey, 10);
+
+    for (const signType of signTypes) {
+      const existing = user.signatureActivation.find((s) => s.signType === signType);
+      if (existing) {
+        existing.activationKey = hashedKey;
+        existing.isActivated = false;
+        existing.trustedDevices = [];
+      } else {
+        user.signatureActivation.push({
+          signType,
+          activationKey: hashedKey,
+          isActivated: false,
+          trustedDevices: [],
+        });
+      }
+    }
+    await user.save({ validateModifiedOnly: true });
+
+    return { status: 200, message: 'Signature registered successfully', data: { signTypes } };
+  } catch (error) {
+    logger.error('[authZ.service] registerSignatureAccess', error);
+    throw error;
+  }
+};
+
 const getEncryptionKey = () => {
   if (!ENCRYPTION_KEY) throw new Error('DEVICE_ENCRYPTION_KEY is not set');
   if (/^[0-9a-fA-F]{64}$/.test(ENCRYPTION_KEY)) return Buffer.from(ENCRYPTION_KEY, 'hex');
@@ -40,7 +73,7 @@ const decryptAndVerifyDeviceData = (encryptedData, iv, originalData) => {
 const activateSignatureAccess = async (userId, activationKey, signType, deviceInfo) => {
   try {
     console.log("signType", signType);
-    
+
     const user = await User.findById(userId);
     if (!user) throw { status: 404, message: 'User not found' };
 
@@ -179,6 +212,7 @@ const getAuthorizedAuthSignKey = async (userId, deviceInfo, authRole) => {
 const getAuthSealKey = (userId, deviceInfo) => getSignKey(userId, 'seal', 'SEAL_KEY', deviceInfo);
 
 module.exports = {
+  registerSignatureAccess,
   encryptDeviceData,
   decryptAndVerifyDeviceData,
   activateSignatureAccess,
