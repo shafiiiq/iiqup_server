@@ -21,7 +21,6 @@ const BLOCKED_URL_PATTERNS = [
   '/webpush',
   '/explorer/release/latest',
   '/socket.io',
-  '/authn/verify/device-trust',
 ]
 
 module.exports = {
