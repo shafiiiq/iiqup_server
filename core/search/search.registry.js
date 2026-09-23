@@ -99,15 +99,10 @@ const searchRegistry = {
     searchableFields: ['name', 'type', 'toolkitId', 'toolkitName', 'variantId', 'size', 'color', 'status', 'assignedDate', 'reason', 'fileName', 'originalName', 'filePath', 'mimeType', 'url', 'token', 'platform', 'name', 'uniqueCode', 'userType', 'qatarId', 'nationality', 'sponsorship', 'workingIn', 'contactNo', 'passportNo', 'licenceType'],
     defaultFields: ['name', 'uniqueCode', 'userType', 'contactNo'],
   },
-  otps: {
-    model: require('#features/otp/otp.model'),
-    searchableFields: ['email', 'otp'],
-    defaultFields: ['email', 'otp'],
-  },
   quotations: {
-    model: null,
-    searchableFields: [],
-    defaultFields: [],
+    model: require('#features/quotation/quotation.model'),
+    searchableFields: ['quotationRef', 'date', 'complaintId', 'requestText', 'company.vendor', 'company.attention', 'company.designation', 'location'],
+    defaultFields: ['quotationRef', 'company.vendor', 'company.attention'],
   },
   stocks: {
     model: require('#features/stock/parts/parts.model'),
