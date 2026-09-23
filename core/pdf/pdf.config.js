@@ -1,4 +1,5 @@
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000'
+const PDF_RENDER_SECRET = process.env.PDF_RENDER_SECRET
 
 const PUPPETEER_LAUNCH_OPTIONS = {
   headless: 'new',
@@ -25,6 +26,7 @@ const BLOCKED_URL_PATTERNS = [
 
 module.exports = {
   FRONTEND_URL,
+  PDF_RENDER_SECRET,
   PUPPETEER_LAUNCH_OPTIONS,
   DEFAULT_PDF_OPTIONS,
   MAX_CONCURRENT_RENDERS,

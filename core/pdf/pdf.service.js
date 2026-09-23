@@ -4,6 +4,7 @@ const logger = require('#shared/logger/logger')
 const { generateAuthTokens } = require('#middlewares/jwt.middleware')
 const {
   FRONTEND_URL,
+  PDF_RENDER_SECRET,
   PUPPETEER_LAUNCH_OPTIONS,
   DEFAULT_PDF_OPTIONS,
   MAX_CONCURRENT_RENDERS,
@@ -58,8 +59,8 @@ const blockNonEssentialRequests = async (page) => {
   })
 }
 
-const seedAuthTokens = async (page, tokens, user) => {
-  await page.evaluateOnNewDocument((accessToken, userData) => {
+const seedAuthTokens = async (page, tokens, user, pdfRenderSecret) => {
+  await page.evaluateOnNewDocument((accessToken, userData, renderSecret) => {
     const now = new Date()
     const userSession = {
       userId: userData.id,
@@ -86,7 +87,8 @@ const seedAuthTokens = async (page, tokens, user) => {
     window.localStorage.setItem('user', JSON.stringify(storedUser))
     window.localStorage.setItem('isUserLoggedIn', 'true')
     window.localStorage.setItem('hasSeenIntro', 'true')
-  }, tokens.accessToken, { ...user, refreshToken: tokens.refreshToken })
+    window.localStorage.setItem('pdfRenderSecret', renderSecret || '')
+  }, tokens.accessToken, { ...user, refreshToken: tokens.refreshToken }, pdfRenderSecret)
 }
 
 const waitForDocumentReady = async (page) => {
@@ -154,7 +156,7 @@ const renderPageToPdfInternal = async (path, user, options = {}) => {
 
   try {
     await blockNonEssentialRequests(page)
-    await seedAuthTokens(page, tokens, user)
+    await seedAuthTokens(page, tokens, user, PDF_RENDER_SECRET)
 
     const separator = path.includes('?') ? '&' : '?'
     await page.goto(`${FRONTEND_URL}${path}${separator}pdf=1`, { waitUntil: 'domcontentloaded', timeout: 60000 })

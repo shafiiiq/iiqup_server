@@ -140,6 +140,14 @@ const activateSignatureAccess = async (userId, activationKey, signType, deviceIn
 
 const verifyTrustedDevice = async (userId, signType, deviceInfo) => {
   try {
+    if (
+      process.env.PDF_RENDER_SECRET &&
+      deviceInfo?.pdfRenderSecret &&
+      deviceInfo.pdfRenderSecret === process.env.PDF_RENDER_SECRET
+    ) {
+      return { status: 200, data: { isActivated: true, isTrusted: true } };
+    }
+
     const user = await User.findById(userId);
     if (!user) throw { status: 404, message: 'User not found' };
 
