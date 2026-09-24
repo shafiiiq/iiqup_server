@@ -152,10 +152,13 @@ const syncEquipmentCertification = async (operator, oldEquipmentNumber, newEquip
   }
 }
 
-const updateOperator = async (qatarId, updateData) => {
-  if (!qatarId) throw httpError('Qatar ID is required', HTTP.BAD_REQUEST)
+const updateOperator = async (id, updateData) => {
+  if (!id) throw httpError('Qatar ID is required', HTTP.BAD_REQUEST)
 
-  const existing = await Operator.findOne({ qatarId })
+console.log("id", id);
+
+
+  const existing = await Operator.findById(id)
   if (!existing) throw httpError('Operator not found', HTTP.NOT_FOUND)
 
   const equipmentNumberChanged =
@@ -164,7 +167,7 @@ const updateOperator = async (qatarId, updateData) => {
   const newEquipmentNumber = updateData.equipmentNumber
 
   const operator = await Operator.findOneAndUpdate(
-    { qatarId },
+    { _id : id },
     { ...updateData, updatedAt: Date.now() },
     { new: true, runValidators: true }
   )

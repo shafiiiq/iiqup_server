@@ -13,7 +13,7 @@ router.get('/designations', controller.getDesignations)
 router.use(mobilizationRouter)
 
 router.get('/:qatarId', controller.getOperatorByQatarId)
-router.put('/:qatarId', controller.updateOperator)
+router.put('/:id', controller.updateOperator)
 router.delete('/:qatarId', controller.deleteOperator)
 
 module.exports = router

@@ -101,7 +101,7 @@ const getOperatorByQatarId = async (req, res) => {
 
 const updateOperator = async (req, res) => {
   try {
-    const errors = validate({ qatarId: { required: true } }, req.params)
+    const errors = validate({ id: { required: true } }, req.params)
     if (errors.length) return sendValidationError(res, errors)
 
     if (req.body.equipmentNumber?.trim()) {
@@ -114,7 +114,7 @@ const updateOperator = async (req, res) => {
       }
     }
 
-    const operator = await operatorService.updateOperator(req.params.qatarId, req.body)
+    const operator = await operatorService.updateOperator(req.params.id, req.body)
 
     sendSuccess(res, { success: true, data: operator, message: 'Operator updated successfully' })
   } catch (error) {
