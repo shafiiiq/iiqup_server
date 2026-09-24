@@ -8,6 +8,7 @@ const router = express.Router()
 router.get('/', paginationMiddleware, controller.getAllOperators)
 router.post('/', controller.createOperator)
 router.post('/profile', controller.uploadProfilePic)
+router.get('/designations', controller.getDesignations)
 
 router.use(mobilizationRouter)
 

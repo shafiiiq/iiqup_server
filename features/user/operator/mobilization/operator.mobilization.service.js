@@ -9,7 +9,7 @@ const OperatorModel = require('../operator.model');
 const EquipmentModel = require('#features/equipment/equipment.model');
 
 const OperatorMobilizationModel = require('./operator.mobilization.model');
-const { alertOperatorMobilizationViaEmail } = require('./operator.mobilization.email');
+const { alertOperatorMobilizationViaEmail, alertOperatorReplacementViaEmail } = require('./operator.mobilization.email');
 const { RECENT_LIMIT, NOTIFICATION_PRIORITY, OPERATOR_MOB_ACTIONS, STAFF_MAIN } = require('./operator.mobilization.constant');
 
 const getCurrentDateTime = () => {
@@ -73,6 +73,7 @@ const syncOperatorMobilizedFromEquipment = async ({
       qatarId: operator.qatarId,
       action: OPERATOR_MOB_ACTIONS.MOBILIZED,
       status: 'mobilized',
+      mode: regNo ? 'with-equipment' : 'operator-only',
       regNo,
       machine,
       site: deployLocation || '',
@@ -107,7 +108,8 @@ const syncOperatorMobilizedFromEquipment = async ({
     await OperatorModel.findByIdAndUpdate(operator._id, {
       $set: {
         status: 'mobilized',
-        equipmentNumber: regNo || operator.equipmentNumber,
+        equipmentNumber: regNo || '',
+        mode: regNo ? 'with-equipment' : 'operator-only',
         site: deployLocation ? [deployLocation] : operator.site,
         mobDate: eventDate,
         designation: resolvedDesignation,
@@ -189,6 +191,7 @@ const syncOperatorDemobilizedFromEquipment = async ({
       qatarId: operator.qatarId,
       action: OPERATOR_MOB_ACTIONS.DEMOBILIZED,
       status: 'demobilized',
+      mode: regNo ? 'with-equipment' : 'operator-only',
       regNo,
       machine,
       site: Array.isArray(operator.site) ? operator.site.at(-1) || '' : operator.site || '',
@@ -206,7 +209,7 @@ const syncOperatorDemobilizedFromEquipment = async ({
     if (operator.demobDate) pushFields.lastDemobDate = operator.demobDate;
 
     await OperatorModel.findByIdAndUpdate(operator._id, {
-      $set: { status: 'demobilized', equipmentNumber: '', site: [], demobDate: eventDate, updatedAt: new Date() },
+      $set: { status: 'demobilized', equipmentNumber: '', mode: null, site: [], demobDate: eventDate, updatedAt: new Date() },
       ...(Object.keys(pushFields).length && { $push: pushFields }),
     });
 
@@ -271,6 +274,13 @@ const mobilizeOperator = async (data) => {
     if (!equipment) return { status: HTTP.NOT_FOUND, ok: false, message: 'Equipment not found' };
   }
 
+  if (!regNo && operator.equipmentNumber) {
+    await EquipmentModel.findOneAndUpdate(
+      { regNo: operator.equipmentNumber },
+      { $pull: { certificationBody: { operatorId: operator._id.toString() } }, $set: { updatedAt: new Date() } }
+    );
+  }
+
   const record = await syncOperatorMobilizedFromEquipment({
     operatorId: operator._id,
     operatorName: operator.name,
@@ -324,7 +334,7 @@ const mobilizeOperator = async (data) => {
 };
 
 const demobilizeOperator = async (data) => {
-  const { operatorId, remarks = '', selectedDate = null } = data;
+  const { operatorId, remarks = '', selectedDate = null, demobilizeMode = 'operator-only' } = data;
 
   const operator = await OperatorModel.findById(operatorId);
   if (!operator) return { status: HTTP.NOT_FOUND, ok: false, message: 'Operator not found' };
@@ -344,6 +354,23 @@ const demobilizeOperator = async (data) => {
           $set: { updatedAt: new Date() },
         }
       );
+
+      if (demobilizeMode === 'with-equipment') {
+        await EquipmentModel.findOneAndUpdate(
+          { regNo },
+          {
+            $set: {
+              status: 'idle',
+              site: null,
+              certificationBody: [],
+              activeChainId: null,
+              demobDate: new Date(),
+              updatedAt: new Date(),
+            },
+            $inc: { 'mobilizationsRecord.demobilization': 1 },
+          }
+        );
+      }
     }
   }
 
@@ -373,6 +400,124 @@ const demobilizeOperator = async (data) => {
   };
 };
 
+const replaceOperator = async (data) => {
+  const {
+    currentOperatorId,
+    newOperatorId,
+    regNo = '',
+    site = '',
+    deployType = 'site',
+    clientCompany = '',
+    assignmentAction = 'demobilize',
+    remarks = '',
+    selectedDate = null,
+  } = data;
+
+  const currentOperator = await OperatorModel.findById(currentOperatorId);
+  if (!currentOperator) return { status: HTTP.NOT_FOUND, ok: false, message: 'Current operator not found' };
+
+  const newOperator = await OperatorModel.findById(newOperatorId);
+  if (!newOperator) return { status: HTTP.NOT_FOUND, ok: false, message: 'New operator not found' };
+
+  const oldRegNo = currentOperator.equipmentNumber;
+
+  if (oldRegNo) {
+    await EquipmentModel.findOneAndUpdate(
+      { regNo: oldRegNo },
+      { $pull: { certificationBody: { operatorId: currentOperator._id.toString() } }, $set: { updatedAt: new Date() } }
+    );
+  }
+
+  await syncOperatorDemobilizedFromEquipment({
+    operatorId: currentOperator._id,
+    operatorName: currentOperator.name,
+    regNo: oldRegNo,
+    machine: '',
+    remarks,
+    date: selectedDate,
+    sendEmail: false,
+  });
+
+  let mobilizationRecord = null;
+
+  if (assignmentAction === 'mobilize') {
+    mobilizationRecord = await syncOperatorMobilizedFromEquipment({
+      operatorId: newOperator._id,
+      operatorName: newOperator.name,
+      regNo,
+      machine: '',
+      site,
+      deployType,
+      clientCompany,
+      hired: newOperator.hired,
+      hiredFrom: newOperator.hiredFrom,
+      designation: newOperator.designation,
+      rentRate: newOperator.rentRate,
+      remarks,
+      date: selectedDate,
+      sendEmail: false,
+    });
+
+    if (regNo) {
+      const equipment = await EquipmentModel.findOne({ regNo });
+      if (equipment) {
+        const alreadyCertified = equipment.certificationBody?.some((c) => c.operatorId === newOperator._id.toString());
+        if (!alreadyCertified) {
+          await EquipmentModel.findOneAndUpdate(
+            { regNo },
+            {
+              $push: {
+                certificationBody: {
+                  operatorName: newOperator.name,
+                  operatorId: newOperator._id.toString(),
+                  assignedAt: new Date(),
+                },
+              },
+              $set: { updatedAt: new Date() },
+            }
+          );
+        }
+      }
+    }
+  }
+
+  await notifySafely(STAFF_MAIN, {
+    title: 'Operator Replaced',
+    description: `${currentOperator.name} has been replaced by ${newOperator.name}${oldRegNo ? ` on ${oldRegNo}` : ''}`,
+    priority: NOTIFICATION_PRIORITY.MEDIUM,
+    sourceId: newOperator._id,
+  });
+
+  const { month, year, time } = getCurrentDateTime();
+
+  alertOperatorReplacementViaEmail({
+    outgoingOperatorName: currentOperator.name,
+    incomingOperatorName: newOperator.name,
+    regNo: oldRegNo || regNo,
+    site,
+    deployType,
+    clientCompany,
+    month,
+    year,
+    time,
+    date: selectedDate ? new Date(selectedDate) : new Date(),
+    remarks,
+  }).catch((err) => logger.error('[OperatorMobilization] replacement email failed:', err));
+
+  dashboardServices.clearDashboardCache();
+  wsUtils.dispatchDashboardUpdate('operatorMobilization');
+
+  const updatedCurrentOperator = await OperatorModel.findById(currentOperatorId);
+  const updatedNewOperator = await OperatorModel.findById(newOperatorId);
+
+  return {
+    status: HTTP.CREATED,
+    ok: true,
+    message: 'Operator replaced successfully',
+    data: { currentOperator: updatedCurrentOperator, newOperator: updatedNewOperator, mobilizationRecord },
+  };
+};
+
 const getMobilizationHistory = async (operatorId, pagination) => {
   const result = await paginate(OperatorMobilizationModel, { operatorId }, pagination, { sort: { date: -1, createdAt: -1 } });
   return { status: HTTP.OK, ok: true, data: result.data, pagination: result.pagination };
@@ -388,6 +533,7 @@ module.exports = {
   syncOperatorDemobilizedFromEquipment,
   mobilizeOperator,
   demobilizeOperator,
+  replaceOperator,
   getMobilizationHistory,
   fetchAllOperatorMobilizations,
 };

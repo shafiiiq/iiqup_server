@@ -137,6 +137,16 @@ const deleteOperator = async (req, res) => {
   }
 }
 
+const getDesignations = async (req, res) => {
+  try {
+    const designations = await operatorService.getDistinctDesignations()
+    sendSuccess(res, { success: true, data: designations, message: 'Designations retrieved successfully' })
+  } catch (error) {
+    logger.error('[Operator] getDesignations:', error)
+    sendError(res, { success: false, message: error.message || 'Failed to retrieve designations' })
+  }
+}
+
 module.exports = {
   createOperator,
   uploadProfilePic,
@@ -144,4 +154,5 @@ module.exports = {
   getOperatorByQatarId,
   updateOperator,
   deleteOperator,
+  getDesignations,
 }

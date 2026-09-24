@@ -8,6 +8,7 @@ const operatorMobilizationSchema = new mongoose.Schema(
 
     action: { type: String, required: true, enum: ['mobilized', 'demobilized'] },
     status: { type: String, required: true, enum: ['mobilized', 'demobilized'] },
+    mode: { type: String, enum: ['operator-only', 'with-equipment'], default: 'with-equipment' },
 
     regNo: { type: String, default: '' },
     machine: { type: String, default: '' },

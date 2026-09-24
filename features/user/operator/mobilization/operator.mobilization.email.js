@@ -134,7 +134,69 @@ const alertOperatorMobilizationViaEmail = async (data = {}) => {
   return operationsGmailClient.sendEmail(to, subject, htmlContent, textContent, [], cc);
 };
 
+const generateOperatorReplacementTemplate = (recipientName = 'Team', data = {}) => {
+  const {
+    outgoingOperatorName = '',
+    incomingOperatorName = '',
+    regNo = '',
+    site = '',
+    deployType = 'site',
+    clientCompany = '',
+    month = '',
+    year = '',
+    time = '',
+    date = '',
+    remarks = '',
+  } = data;
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="font-family:Arial,sans-serif;color:#333;">
+      <p>Dear ${recipientName},</p>
+      <p>This is to inform you that an operator <strong>REPLACEMENT</strong> event has been recorded in the system. Please find the details below.</p>
+
+      <table cellpadding="8" cellspacing="0" border="1" style="border-collapse:collapse;width:100%;max-width:560px;margin:16px 0;border-color:#ddd;">
+        <tr style="background:#f5f5f5;">
+          <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Operator Replacement</td>
+        </tr>
+        <tr><td style="width:180px;color:#666;">Outgoing Operator</td><td>${outgoingOperatorName}</td></tr>
+        <tr><td style="color:#666;">Incoming Operator</td><td><strong>${incomingOperatorName}</strong></td></tr>
+        ${regNo ? `<tr><td style="color:#666;">Equipment</td><td>${regNo}</td></tr>` : ''}
+        ${deployType === 'company' && clientCompany ? `<tr><td style="color:#666;">Client Company</td><td>${clientCompany}</td></tr>` : ''}
+        ${deployType !== 'company' && site ? `<tr><td style="color:#666;">Site</td><td>${site}</td></tr>` : ''}
+        <tr style="background:#f5f5f5;">
+          <td colspan="2" style="font-weight:bold;font-size:14px;padding:10px 12px;">Date &amp; Time</td>
+        </tr>
+        <tr><td style="color:#666;">Date</td><td>${formatDate(date)}</td></tr>
+        <tr><td style="color:#666;">Month / Year</td><td>${MONTH_NAMES[month] ?? month} ${year}</td></tr>
+        <tr><td style="color:#666;">Time</td><td>${time}</td></tr>
+        ${remarks ? `<tr><td style="color:#666;">Remarks</td><td>${remarks}</td></tr>` : ''}
+      </table>
+
+      ${buildEmailFooter(SIGN_OFF)}
+    </body>
+    </html>
+  `;
+};
+
+const alertOperatorReplacementViaEmail = async (data = {}) => {
+  const toList = JSON.parse(process.env.OPERATOR_MOBILIZATION_TO || process.env.MOBILIZATION_TO || '[]');
+  const to = toList.join(', ');
+  const ccList = JSON.parse(process.env.OPERATOR_MOBILIZATION_CC || process.env.MOBILIZATION_CC || '[]');
+  const cc = ccList.join(', ');
+  const subject = `Operator Replaced - ${data.outgoingOperatorName || ''} to ${data.incomingOperatorName || ''}${data.regNo ? ` - ${data.regNo}` : ''}`;
+
+  const htmlContent = generateOperatorReplacementTemplate('Team', data);
+  const textContent = `Operator replaced: ${data.outgoingOperatorName} -> ${data.incomingOperatorName}. ${data.regNo ? `Equipment: ${data.regNo}. ` : ''}Date: ${data.date}. Remarks: ${data.remarks || 'None'}.`;
+
+  return operationsGmailClient.sendEmail(to, subject, htmlContent, textContent, [], cc);
+};
+
 module.exports = {
   alertOperatorMobilizationViaEmail,
+  alertOperatorReplacementViaEmail,
   generateOperatorMobilizationTemplate,
+  generateOperatorReplacementTemplate,
 };

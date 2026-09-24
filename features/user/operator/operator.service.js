@@ -200,6 +200,11 @@ const getOperatorsByNames = async (names) => {
   return Operator.find({ name: { $in: names } }).lean()
 }
 
+const getDistinctDesignations = async () => {
+  const designations = await Operator.distinct('designation')
+  return designations.filter((d) => d && d.trim()).sort()
+}
+
 module.exports = {
   createOperator,
   verifyOperator,
@@ -209,4 +214,5 @@ module.exports = {
   getAllOperators,
   getOperatorByQatarId,
   getOperatorsByNames,
+  getDistinctDesignations,
 }

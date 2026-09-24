@@ -65,9 +65,25 @@ const demobilizeOperator = async (req, res) => {
   }
 };
 
+const replaceOperator = async (req, res) => {
+  try {
+    const { currentOperatorId, newOperatorId } = req.body;
+    if (!currentOperatorId || !newOperatorId) {
+      return respond(res, { status: HTTP.BAD_REQUEST, ok: false, message: 'currentOperatorId and newOperatorId are required' });
+    }
+
+    const result = await service.replaceOperator(req.body);
+    respond(res, result);
+  } catch (error) {
+    logger.error('[operator.mobilization.controller] replaceOperator:', error);
+    respond(res, { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message });
+  }
+};
+
 module.exports = {
   getAllOperatorMobilizations,
   getOperatorMobilizationHistory,
   mobilizeOperator,
   demobilizeOperator,
+  replaceOperator,
 };

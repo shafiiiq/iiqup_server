@@ -5,7 +5,7 @@ const logger = require('#shared/logger/logger');
 require('dotenv').config();
 
 module.exports = mongoose
-  .connect(process.env.MONGO_URI)
+  .connect(process.env.LOCAL_MONGO_URI)
   .then(async (result) => { 
     logger.info('[ansarigroup.db] connected');
     await fixDuplicateIndexes();

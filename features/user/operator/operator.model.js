@@ -101,6 +101,7 @@ const operatorSchema = new mongoose.Schema(
     ],
 
     status: { type: String, enum: ['mobilized', 'demobilized'], default: 'demobilized' },
+    mode: { type: String, enum: ['operator-only', 'with-equipment', null], default: null },
     site: { type: [String], default: [] },
     lastSite: { type: [String], default: [] },
     mobDate: { type: Date, default: null },
