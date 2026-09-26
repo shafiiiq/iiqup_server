@@ -289,8 +289,7 @@ const replaceEquipment = async (data) => {
     time,
     selectedDate,
     remarks,
-    operator,
-    operatorId,
+    operators = [],
   } = data;
 
   const currentEquipment = await equipmentModel.findById(equipmentId);
@@ -330,31 +329,29 @@ const replaceEquipment = async (data) => {
     ? new mongoose.Types.ObjectId()
     : null;
 
-  const finalOperatorName =
-    operator ||
-    currentEquipment.certificationBody?.at(-1)?.operatorName ||
-    '';
+  const validOperators = operators.filter((op) => op.operatorName);
 
-  const finalOperatorId =
-    operatorId ||
-    currentEquipment.certificationBody?.at(-1)?.operatorId ||
-    '';
+  const finalOperatorName = validOperators.map((op) => op.operatorName).join(', ')
+    || currentEquipment.certificationBody?.map((cb) => cb.operatorName).filter(Boolean).join(', ')
+    || '';
+
+  const finalOperatorId = validOperators[0]?.operatorId
+    || currentEquipment.certificationBody?.at(-1)?.operatorId
+    || '';
 
   const outgoingOperator =
-    currentEquipment.certificationBody?.at(-1)?.operatorName || '';
+    currentEquipment.certificationBody?.map((cb) => cb.operatorName).filter(Boolean).join(', ') || '';
 
   const outgoingOperatorId =
     currentEquipment.certificationBody?.at(-1)?.operatorId || '';
 
-  const incomingOperator =
-    operator ||
-    replacedEquipment.certificationBody?.at(-1)?.operatorName ||
-    '';
+  const incomingOperator = finalOperatorName
+    || replacedEquipment.certificationBody?.map((cb) => cb.operatorName).filter(Boolean).join(', ')
+    || '';
 
-  const incomingOperatorId =
-    operatorId ||
-    replacedEquipment.certificationBody?.at(-1)?.operatorId ||
-    '';
+  const incomingOperatorId = finalOperatorId
+    || replacedEquipment.certificationBody?.at(-1)?.operatorId
+    || '';
 
   const replacement = await replacementModel.create({
     equipmentId,
@@ -406,7 +403,7 @@ const replaceEquipment = async (data) => {
     }),
   };
 
-  if (finalOperatorName && finalOperatorId) {
+  if (validOperators.length) {
     if (replacedEquipment.certificationBody?.length > 0) {
       incomingEquipmentUpdate.$push = {
         ...(incomingEquipmentUpdate.$push || {}),
@@ -414,11 +411,12 @@ const replaceEquipment = async (data) => {
       };
     }
 
-    incomingEquipmentUpdate.$set.certificationBody = {
-      operatorName: finalOperatorName,
-      operatorId: finalOperatorId,
+    incomingEquipmentUpdate.$set.certificationBody = validOperators.map((op) => ({
+      operatorName: op.operatorName,
+      operatorId: op.operatorId,
+      shiftName: op.shiftName || '',
       assignedAt: new Date(),
-    };
+    }));
   }
 
   const [updatedReplacedEquipment, updatedCurrentEquipment] =
@@ -457,45 +455,44 @@ const replaceEquipment = async (data) => {
     };
   }
 
-  if (finalOperatorId) {
-    const previousOperatorId =
-      replacedEquipment.certificationBody?.at(-1)?.operatorId;
+  if (validOperators.length) {
+    const previousOperatorIds = (replacedEquipment.certificationBody || [])
+      .map((cb) => cb.operatorId)
+      .filter(Boolean);
 
-    if (
-      previousOperatorId &&
-      previousOperatorId !== finalOperatorId
-    ) {
-      await safeUpdateOperator(previousOperatorId, {
-        equipmentNumber: '',
-      });
-    }
+    await Promise.all(
+      previousOperatorIds
+        .filter((id) => !validOperators.some((op) => op.operatorId === id))
+        .map((id) => safeUpdateOperator(id, { equipmentNumber: '' }))
+    );
 
-    await safeUpdateOperator(finalOperatorId, {
-      equipmentNumber: replacedEquipmentRegNo,
-    });
+    await Promise.all(
+      validOperators.map((op) => safeUpdateOperator(op.operatorId, { equipmentNumber: replacedEquipmentRegNo }))
+    );
 
-    await operatorMobilizationService.syncOperatorMobilizedFromEquipment({
-      operatorId: finalOperatorId,
-      operatorName: finalOperatorName,
-      regNo: replacedEquipmentRegNo,
-      machine: replacedEquipmentMachine,
-      site: Array.isArray(currentSite)
-        ? currentSite.at(-1)
-        : currentSite || '',
-      deployType: 'site',
-      hired: updatedReplacedEquipment.hired || false,
-      hiredFrom: updatedReplacedEquipment.hiredFrom || '',
-      remarks,
-      date: selectedDate,
-      sendEmail: false,
-    });
+    await Promise.all(
+      validOperators.map((op) =>
+        operatorMobilizationService.syncOperatorMobilizedFromEquipment({
+          operatorId: op.operatorId,
+          operatorName: op.operatorName,
+          regNo: replacedEquipmentRegNo,
+          machine: replacedEquipmentMachine,
+          site: Array.isArray(currentSite) ? currentSite.at(-1) : currentSite || '',
+          deployType: 'site',
+          shiftName: op.shiftName || '',
+          hired: updatedReplacedEquipment.hired || false,
+          hiredFrom: updatedReplacedEquipment.hiredFrom || '',
+          remarks,
+          date: selectedDate,
+          sendEmail: false,
+        })
+      )
+    );
   }
 
-  const displacedOperatorIds = (
-    replacedEquipment.certificationBody || []
-  )
+  const displacedOperatorIds = (replacedEquipment.certificationBody || [])
     .map((cb) => cb.operatorId)
-    .filter((id) => id && id !== finalOperatorId);
+    .filter((id) => id && !validOperators.some((op) => op.operatorId === id));
 
   await Promise.all(
     displacedOperatorIds.map((id) =>

@@ -153,7 +153,7 @@ export const EQUIPMENT_REPLACE_OPERATOR_FORM_DEFAULTS = {
 export const EQUIPMENT_REPLACE_EQUIPMENT_FORM_DEFAULTS = {
   replacedEquipmentId: '', replacedEquipmentRegNo: '',
   replacedEquipmentMachine: '', newSiteForReplaced: '', remarks: '', date: '', time: '',
-  operator: '', operatorId: '',
+  operators: [],
 };
 
 export const EQUIPMENT_FUEL_PROGRESS_TICK_MS = 150;
