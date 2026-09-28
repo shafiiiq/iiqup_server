@@ -1,25 +1,15 @@
 const HTTP = require('#shared/response/response.status')
 const Backcharge = require('./backcharge.model')
 const { paginate } = require('#shared/pagination/pagination')
-const { createNotification } = require('#core/notification/notification.service')
-const PushNotificationService = require('#core/notification/notification.push')
+const { notifyUser } = require('#shared/notify/notify.user')
 const wsUtils = require('#core/socket/socket.io')
 const dashboardServices = require('#features/dashboard/dashboard.service')
 
 const wrapServiceError = (serviceName, error) =>
-  new Error(`[BackchargeService] ${serviceName}:${error.message}`, { cause: error })
+  new Error(`[backcharge.service] ${serviceName}:${error.message}`, { cause: error })
 
 const notify = async (notifPayload, recipient, title, description, priority = 'high') => {
-  const notification = await createNotification({ ...notifPayload, recipient, time: new Date() })
-
-  await PushNotificationService.sendGeneralNotification(
-    recipient,
-    title,
-    description,
-    priority,
-    'normal',
-    notification.data._id.toString()
-  )
+  await notifyUser(recipient, { ...notifPayload, title, description, priority })
 }
 
 const buildTextLines = (...lines) => {
