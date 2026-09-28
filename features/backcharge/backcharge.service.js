@@ -286,6 +286,10 @@ const signBackcharge = async (refNo, signData) => {
   const backcharge = await Backcharge.findOne({ refNo })
   if (!backcharge) throw { status: HTTP.NOT_FOUND, message: `Backcharge not found: ${refNo}` }
 
+  if (backcharge.status === 'draft') {
+    throw { status: HTTP.BAD_REQUEST, message: 'Document must be sent for approval before it can be signed' }
+  }
+
   if (matched.field === 'authorizedSignatory') {
     const savedMode = backcharge.signatures?.authorizedSignatory?.authorizedSignatoryMode || 'CEO'
     const expectedRole = savedMode === 'MANAGING DIRECTOR' ? 'MANAGING_DIRECTOR' : 'CEO'
