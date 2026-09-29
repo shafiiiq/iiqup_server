@@ -38,6 +38,29 @@ const getAllCompanyDetails = async () => {
   }
 }
 
+const getAllItemDescriptions = async () => {
+  try {
+    const quotations = await Quotation.find({}, 'items').sort({ createdAt: -1 })
+    const map = new Map()
+
+    quotations.forEach((q) => {
+      (q.items || []).forEach((item) => {
+        const desc = (item.description || '').trim()
+        if (!desc) return
+        const key = desc.toLowerCase()
+        const existing = map.get(key)
+        if (!existing || (item.image && !existing.image)) {
+          map.set(key, { description: desc, image: item.image || existing?.image || null })
+        }
+      })
+    })
+
+    return Array.from(map.values())
+  } catch (error) {
+    throw wrapServiceError('getAllItemDescriptions', error)
+  }
+}
+
 const getLatestQuotationRefNo = async () => {
   try {
     const latest = await Quotation.findOne({}).sort({ createdAt: -1 }).select('quotationRef')
@@ -86,6 +109,7 @@ module.exports = {
   getQuotations,
   getQuotationByRef,
   getAllCompanyDetails,
+  getAllItemDescriptions,
   getLatestQuotationRefNo,
   getLatestQuotation,
   getNextQuotationCounter,

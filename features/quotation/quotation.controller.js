@@ -119,6 +119,21 @@ const getCompanyDetails = async (req, res) => {
   }
 }
 
+const getItemDescriptions = async (req, res) => {
+  try {
+    const descriptions = await quotationQuery.getAllItemDescriptions()
+
+    sendSuccess(res, {
+      success: true,
+      message: 'Item descriptions retrieved successfully',
+      data: descriptions,
+      count: descriptions.length,
+    })
+  } catch (error) {
+    genericError(res, 'getItemDescriptions', error)
+  }
+}
+
 const getQuotationsByDateRange = async (req, res) => {
   try {
     const { startDate, endDate } = req.query
@@ -330,6 +345,7 @@ module.exports = {
   updateQuotation,
   deleteQuotation,
   getCompanyDetails,
+  getItemDescriptions,
   getQuotationsByDateRange,
   getQuotationsByCompany,
   getLatestQuotation,
