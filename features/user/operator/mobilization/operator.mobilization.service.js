@@ -12,12 +12,12 @@ const OperatorMobilizationModel = require('./operator.mobilization.model');
 const { alertOperatorMobilizationViaEmail, alertOperatorReplacementViaEmail } = require('./operator.mobilization.email');
 const { RECENT_LIMIT, NOTIFICATION_PRIORITY, OPERATOR_MOB_ACTIONS, STAFF_MAIN } = require('./operator.mobilization.constant');
 
-const getCurrentDateTime = () => {
-  const now = new Date();
+const getCurrentDateTime = (date = null) => {
+  const now = date ? new Date(date) : new Date();
   return {
     month: now.getMonth() + 1,
     year: now.getFullYear(),
-    time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
+    time: now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Qatar' }),
   };
 };
 
@@ -60,8 +60,8 @@ const syncOperatorMobilizedFromEquipment = async ({
     const operator = await OperatorModel.findById(operatorId);
     if (!operator) return null;
 
-    const { month, year, time } = getCurrentDateTime();
     const eventDate = date ? new Date(date) : new Date();
+    const { month, year, time } = getCurrentDateTime(eventDate);
     const deployLocation = deployType === 'company' ? clientCompany : site;
 
     const resolvedRentRate = resolveRentRate(rentRate, operator.rentRate);
@@ -182,8 +182,8 @@ const syncOperatorDemobilizedFromEquipment = async ({
     if (!operator) return null;
     if (operator.status === 'demobilized') return null;
 
-    const { month, year, time } = getCurrentDateTime();
     const eventDate = date ? new Date(date) : new Date();
+    const { month, year, time } = getCurrentDateTime(eventDate);
 
     const record = await OperatorMobilizationModel.create({
       operatorId: operator._id,
