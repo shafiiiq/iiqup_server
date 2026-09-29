@@ -34,40 +34,60 @@ const createQuotation = async (quotationData) => {
   }
 }
 
+const buildAmendmentFields = (updateData, existing) => {
+  const amendment = {
+    amendmentDate: new Date(),
+    amendedBy: updateData.amendedBy || 'System',
+    reason: updateData.amendmentReason || 'Amendment requested',
+  }
+
+  if (updateData.items?.length > 0) {
+    amendment.amendedItems = updateData.items
+    amendment.amendedColumns = updateData.columns || existing.columns
+    amendment.amendedTotalAmount = updateData.items.reduce((sum, item) => sum + (item.totalPrice || 0), 0)
+
+    if (updateData.showDiscountInTotal && updateData.discount) {
+      amendment.amendedTotalAmount -= updateData.discount
+      amendment.amendedDiscount = updateData.discount
+    }
+  }
+
+  if (updateData.company) amendment.amendedCompany = updateData.company
+  if (updateData.location) amendment.amendedLocation = updateData.location
+  if (updateData.customFields) amendment.amendedCustomFields = updateData.customFields
+  if (updateData.requestText) amendment.amendedRequestText = updateData.requestText
+  if (updateData.noticeText) amendment.amendedNoticeText = updateData.noticeText
+  if (updateData.priceStatementText) amendment.amendedPriceStatementText = updateData.priceStatementText
+  if (updateData.contactText) amendment.amendedContactText = updateData.contactText
+  if (updateData.termsAndConditions) amendment.amendedTermsAndConditions = updateData.termsAndConditions
+  if (updateData.manualTotal != null) amendment.amendedTotalAmount = updateData.manualTotal
+  amendment.amendedManualTotal = updateData.manualTotal ?? null
+  amendment.amendedShowTotalRow = updateData.showTotalRow ?? true
+
+  return amendment
+}
+
 const updateQuotation = async (refNo, updateData) => {
   try {
     const existing = await Quotation.findOne({ quotationRef: refNo.trim() })
     if (!existing) throw new Error('Quotation not found')
 
+    if (updateData.isAmendmented === true && updateData.editLastAmendment === true) {
+      const lastIndex = existing.amendments.length - 1
+      if (lastIndex < 0) throw new Error('No amendment exists to edit')
+
+      const previous = existing.amendments[lastIndex].toObject()
+      const amendment = { ...previous, ...buildAmendmentFields(updateData, existing), amendmentDate: previous.amendmentDate }
+
+      return await Quotation.findOneAndUpdate(
+        { quotationRef: refNo.trim() },
+        { $set: { [`amendments.${lastIndex}`]: amendment } },
+        { new: true, runValidators: true }
+      )
+    }
+
     if (updateData.isAmendmented === true) {
-      const amendment = {
-        amendmentDate: new Date(),
-        amendedBy: updateData.amendedBy || 'System',
-        reason: updateData.amendmentReason || 'Amendment requested',
-      }
-
-      if (updateData.items?.length > 0) {
-        amendment.amendedItems = updateData.items
-        amendment.amendedColumns = updateData.columns || existing.columns
-        amendment.amendedTotalAmount = updateData.items.reduce((sum, item) => sum + (item.totalPrice || 0), 0)
-
-        if (updateData.showDiscountInTotal && updateData.discount) {
-          amendment.amendedTotalAmount -= updateData.discount
-          amendment.amendedDiscount = updateData.discount
-        }
-      }
-
-      if (updateData.company) amendment.amendedCompany = updateData.company
-      if (updateData.location) amendment.amendedLocation = updateData.location
-      if (updateData.customFields) amendment.amendedCustomFields = updateData.customFields
-      if (updateData.requestText) amendment.amendedRequestText = updateData.requestText
-      if (updateData.noticeText) amendment.amendedNoticeText = updateData.noticeText
-      if (updateData.priceStatementText) amendment.amendedPriceStatementText = updateData.priceStatementText
-      if (updateData.contactText) amendment.amendedContactText = updateData.contactText
-      if (updateData.termsAndConditions) amendment.amendedTermsAndConditions = updateData.termsAndConditions
-      if (updateData.manualTotal != null) amendment.amendedTotalAmount = updateData.manualTotal
-      amendment.amendedManualTotal = updateData.manualTotal ?? null
-      amendment.amendedShowTotalRow = updateData.showTotalRow ?? true
+      const amendment = buildAmendmentFields(updateData, existing)
 
       return await Quotation.findOneAndUpdate(
         { quotationRef: refNo.trim() },
