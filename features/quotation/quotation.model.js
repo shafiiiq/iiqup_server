@@ -55,6 +55,10 @@ const amendmentSchema = new mongoose.Schema(
     amendedTotalAmount: { type: Number },
     amendedManualTotal: { type: Number },
     amendedShowTotalRow: { type: Boolean },
+    amendedSignatures: {
+      authorizedSignatory: { type: String },
+      authorizedSignatoryTitle: { type: String, enum: ['CEO', 'MANAGING DIRECTOR'] },
+    },
   },
   { _id: false }
 )

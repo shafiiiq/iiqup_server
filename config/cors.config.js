@@ -4,6 +4,7 @@ const corsOptions = {
     'https://ansarigroup.online',
     'https://www.ansarigroup.online',
     'https://www.ansarigroup.online',
+    "http://192.168.100.155:3000",
     "http://localhost:3000"
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],

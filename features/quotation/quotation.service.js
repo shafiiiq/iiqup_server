@@ -63,10 +63,10 @@ const buildAmendmentFields = (updateData, existing) => {
   if (updateData.manualTotal != null) amendment.amendedTotalAmount = updateData.manualTotal
   amendment.amendedManualTotal = updateData.manualTotal ?? null
   amendment.amendedShowTotalRow = updateData.showTotalRow ?? true
+  if (updateData.signatures) amendment.amendedSignatures = updateData.signatures
 
   return amendment
 }
-
 const updateQuotation = async (refNo, updateData) => {
   try {
     const existing = await Quotation.findOne({ quotationRef: refNo.trim() })
