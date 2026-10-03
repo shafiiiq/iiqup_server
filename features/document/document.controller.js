@@ -145,7 +145,48 @@ const moveDocument = handleRoute('moveDocument', async (req) =>
   documentService.moveDocument({ documentId: req.params.documentId, folderId: req.body.folderId || null })
 );
 
+const moveFolder = handleRoute('moveFolder', async (req) =>
+  documentService.moveFolder({
+    folderId: req.params.folderId,
+    parentFolderId: req.body.parentFolderId || null,
+  })
+);
+
+const copyFolder = handleRoute('copyFolder', async (req) =>
+  documentService.copyFolder({
+    folderId: req.params.folderId,
+    parentFolderId: req.body.parentFolderId || null,
+    uploadedBy: req.userId,
+  })
+);
+
+const deleteFolder = handleRoute('deleteFolder', async (req) =>
+  documentService.deleteFolder({ folderId: req.params.folderId })
+);
+
+const editDocumentPages = handleRoute('editDocumentPages', async (req) => {
+  const { pages } = req.body;
+  if (!Array.isArray(pages) || pages.length === 0) {
+    throw new AppError('pages array is required', HTTP.BAD_REQUEST);
+  }
+  return documentService.editDocumentPages({ documentId: req.params.documentId, pages });
+});
+
+const mergeDocumentPages = handleRoute('mergeDocumentPages', async (req) => {
+  const { sourceType, sourceId, pages } = req.body;
+  assertSourceType(sourceType);
+  if (!sourceId || !Array.isArray(pages) || pages.length === 0) {
+    throw new AppError('sourceId and pages are required', HTTP.BAD_REQUEST);
+  }
+  return documentService.mergeDocumentPages({ sourceType, sourceId, pages, uploadedBy: req.userId });
+});
+
 module.exports = {
+  moveFolder,
+  copyFolder,
+  deleteFolder,
+  editDocumentPages,
+  mergeDocumentPages,
   copyDocument,
   getFoldersBySource,
   createFolder,

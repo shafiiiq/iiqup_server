@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { PDFDocument } = require('pdf-lib');
+const { PDFDocument, degrees } = require('pdf-lib');
 const logger = require('#shared/logger/logger');
 const HTTP = require('#shared/response/response.status');
 const { AppError } = require('#shared/errors/error.http');
@@ -337,7 +337,265 @@ const moveDocument = async ({ documentId, folderId }) => {
   return { status: HTTP.OK, message: 'Document moved', data: await serializeDocument(documentItem) };
 };
 
+const normalizeRotation = (value) => {
+  const rotation = Number(value || 0);
+  if (!Number.isInteger(rotation) || rotation % 90 !== 0) throw new AppError('Invalid rotation', HTTP.BAD_REQUEST);
+  return ((rotation % 360) + 360) % 360;
+};
+
+const applyPageRotation = (page, rotation) => {
+  if (rotation === 0) return;
+  page.setRotation(degrees((page.getRotation().angle + rotation) % 360));
+};
+
+const collectFolderTreeIds = async (rootFolder) => {
+  const allFolders = await documentFolderModel
+    .find({ sourceType: rootFolder.sourceType, sourceId: rootFolder.sourceId })
+    .select('_id parentFolderId');
+  const childIdsByParentId = new Map();
+  allFolders.forEach((folderItem) => {
+    if (!folderItem.parentFolderId) return;
+    const parentId = folderItem.parentFolderId.toString();
+    childIdsByParentId.set(parentId, [...(childIdsByParentId.get(parentId) || []), folderItem._id.toString()]);
+  });
+  const treeIds = [];
+  const pendingIds = [rootFolder._id.toString()];
+  while (pendingIds.length > 0) {
+    const currentId = pendingIds.pop();
+    treeIds.push(currentId);
+    pendingIds.push(...(childIdsByParentId.get(currentId) || []));
+  }
+  return treeIds;
+};
+
+const requireFolderById = async (folderId) => {
+  if (!mongoose.isValidObjectId(folderId)) throw new AppError('Invalid folder ID', HTTP.BAD_REQUEST);
+  const folderItem = await documentFolderModel.findById(folderId);
+  if (!folderItem) throw new AppError('Folder not found', HTTP.NOT_FOUND);
+  return folderItem;
+};
+
+const buildAvailableFolderName = async ({ sourceType, sourceId, parentFolderId, name }) => {
+  let candidate = name;
+  let counter = 1;
+  while (
+    await documentFolderModel
+      .exists({ sourceType, sourceId, parentFolderId, name: candidate })
+      .collation({ locale: 'en', strength: 2 })
+  ) {
+    candidate = counter === 1 ? `${name} (Copy)` : `${name} (Copy ${counter})`;
+    counter += 1;
+  }
+  return candidate;
+};
+
+const copyFolderTree = async ({ sourceFolder, targetParentId, name, uploadedBy }) => {
+  const createdFolder = await documentFolderModel.create({
+    sourceType: sourceFolder.sourceType,
+    sourceId: sourceFolder.sourceId,
+    parentFolderId: targetParentId,
+    name,
+  });
+
+  const folderDocuments = await documentModel.find({ folderId: sourceFolder._id });
+  for (const sourceDocument of folderDocuments) {
+    const copiedS3Key = buildS3Key(
+      DOCUMENT_UPLOAD_FEATURE,
+      buildDocumentKeyPrefix(sourceDocument.sourceType, sourceDocument.sourceId),
+      sourceDocument.originalFileName
+    );
+    await copyObject(sourceDocument.s3Key, copiedS3Key);
+    await documentModel.create({
+      folderId: createdFolder._id,
+      sourceType: sourceDocument.sourceType,
+      sourceId: sourceDocument.sourceId,
+      displayName: sourceDocument.displayName,
+      originalFileName: sourceDocument.originalFileName,
+      s3Key: copiedS3Key,
+      mimeType: sourceDocument.mimeType,
+      fileSize: sourceDocument.fileSize,
+      issueDate: sourceDocument.issueDate,
+      expiryDate: sourceDocument.expiryDate,
+      uploadedBy,
+    });
+  }
+
+  const childFolders = await documentFolderModel.find({ parentFolderId: sourceFolder._id });
+  for (const childFolder of childFolders) {
+    await copyFolderTree({
+      sourceFolder: childFolder,
+      targetParentId: createdFolder._id,
+      name: childFolder.name,
+      uploadedBy,
+    });
+  }
+
+  return createdFolder;
+};
+
+const moveFolder = async ({ folderId, parentFolderId }) => {
+  const folderItem = await requireFolderById(folderId);
+  const { sourceType, sourceId } = folderItem;
+  const targetParentId = parentFolderId || null;
+
+  if (targetParentId) {
+    await requireFolder(targetParentId, sourceType, sourceId);
+    const treeIds = await collectFolderTreeIds(folderItem);
+    if (treeIds.includes(String(targetParentId))) {
+      throw new AppError('A folder cannot be moved into itself', HTTP.BAD_REQUEST);
+    }
+  }
+
+  await assertFolderNameAvailable({
+    sourceType,
+    sourceId,
+    parentFolderId: targetParentId,
+    name: folderItem.name,
+    excludeFolderId: folderItem._id,
+  });
+
+  folderItem.parentFolderId = targetParentId;
+  await folderItem.save();
+  return { status: HTTP.OK, message: 'Folder moved', data: serializeFolder(folderItem) };
+};
+
+const copyFolder = async ({ folderId, parentFolderId, uploadedBy }) => {
+  const sourceFolder = await requireFolderById(folderId);
+  const { sourceType, sourceId } = sourceFolder;
+  const targetParentId = parentFolderId || null;
+
+  if (targetParentId) {
+    await requireFolder(targetParentId, sourceType, sourceId);
+    const treeIds = await collectFolderTreeIds(sourceFolder);
+    if (treeIds.includes(String(targetParentId))) {
+      throw new AppError('A folder cannot be copied into itself', HTTP.BAD_REQUEST);
+    }
+  }
+
+  const name = await buildAvailableFolderName({
+    sourceType,
+    sourceId,
+    parentFolderId: targetParentId,
+    name: sourceFolder.name,
+  });
+
+  const createdFolder = await copyFolderTree({ sourceFolder, targetParentId, name, uploadedBy });
+  refreshDashboard();
+  return { status: HTTP.CREATED, message: 'Folder copied', data: serializeFolder(createdFolder) };
+};
+
+const deleteFolder = async ({ folderId }) => {
+  const folderItem = await requireFolderById(folderId);
+  const treeIds = await collectFolderTreeIds(folderItem);
+
+  const folderDocuments = await documentModel.find({ folderId: { $in: treeIds } });
+  for (const documentItem of folderDocuments) {
+    try {
+      await deleteObject(documentItem.s3Key);
+    } catch (storageError) {
+      logger.error('[document.service] deleteFolder storage delete failed', storageError);
+    }
+  }
+
+  await documentModel.deleteMany({ folderId: { $in: treeIds } });
+  await documentFolderModel.deleteMany({ _id: { $in: treeIds } });
+
+  refreshDashboard();
+  return { status: HTTP.OK, message: 'Folder deleted', data: { _id: folderId } };
+};
+
+const editDocumentPages = async ({ documentId, pages }) => {
+  const documentItem = await requireDocument(documentId);
+  if (!isPdfMimeType(documentItem.mimeType)) throw new AppError('Only PDF files can be edited', HTTP.BAD_REQUEST);
+
+  const sourcePdf = await PDFDocument.load(await downloadPdfBufferFromS3(documentItem.s3Key));
+  const totalPages = sourcePdf.getPageCount();
+
+  const pageEdits = pages.map((entry) => {
+    const pageNumber = Number(entry?.pageNumber);
+    if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > totalPages) {
+      throw new AppError('Invalid page number', HTTP.BAD_REQUEST);
+    }
+    return { pageNumber, rotation: normalizeRotation(entry?.rotation) };
+  });
+
+  const editedPdf = await PDFDocument.create();
+  const copiedPages = await editedPdf.copyPages(
+    sourcePdf,
+    pageEdits.map((pageEdit) => pageEdit.pageNumber - 1)
+  );
+  copiedPages.forEach((page, index) => {
+    applyPageRotation(page, pageEdits[index].rotation);
+    editedPdf.addPage(page);
+  });
+
+  const pdfBytes = await editedPdf.save();
+  await uploadPdfBytesToS3(pdfBytes, documentItem.s3Key);
+
+  documentItem.fileSize = pdfBytes.length;
+  await documentItem.save();
+
+  refreshDashboard();
+  return { status: HTTP.OK, message: 'Document updated', data: await serializeDocument(documentItem) };
+};
+
+const mergeDocumentPages = async ({ sourceType, sourceId, pages, uploadedBy }) => {
+  await requireSource(sourceType, sourceId);
+
+  const documentIds = [...new Set(pages.map((entry) => String(entry?.documentId)))];
+  if (!documentIds.every((documentId) => mongoose.isValidObjectId(documentId))) {
+    throw new AppError('Invalid document ID', HTTP.BAD_REQUEST);
+  }
+
+  const documents = await documentModel.find({ _id: { $in: documentIds }, sourceType, sourceId });
+  if (documents.length !== documentIds.length) throw new AppError('One or more documents not found', HTTP.NOT_FOUND);
+
+  const nonPdfDocument = documents.find((documentItem) => !isPdfMimeType(documentItem.mimeType));
+  if (nonPdfDocument) throw new AppError(`${nonPdfDocument.displayName} is not a PDF`, HTTP.BAD_REQUEST);
+
+  const sourcePdfById = new Map();
+  for (const documentItem of documents) {
+    sourcePdfById.set(
+      documentItem._id.toString(),
+      await PDFDocument.load(await downloadPdfBufferFromS3(documentItem.s3Key))
+    );
+  }
+
+  const mergedPdf = await PDFDocument.create();
+  for (const entry of pages) {
+    const sourcePdf = sourcePdfById.get(String(entry.documentId));
+    const pageNumber = Number(entry.pageNumber);
+    if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > sourcePdf.getPageCount()) {
+      throw new AppError('Invalid page number', HTTP.BAD_REQUEST);
+    }
+    const [copiedPage] = await mergedPdf.copyPages(sourcePdf, [pageNumber - 1]);
+    applyPageRotation(copiedPage, normalizeRotation(entry.rotation));
+    mergedPdf.addPage(copiedPage);
+  }
+
+  const firstDocument = documents.find((documentItem) => documentItem._id.toString() === String(pages[0].documentId));
+
+  const mergedDocument = await saveGeneratedPdf({
+    pdfBytes: await mergedPdf.save(),
+    sourceType,
+    sourceId,
+    displayName: 'Merged Document',
+    folderId: firstDocument.folderId,
+    issueDate: null,
+    expiryDate: null,
+    uploadedBy,
+  });
+
+  refreshDashboard();
+  return { status: HTTP.CREATED, message: 'Documents merged', data: await serializeDocument(mergedDocument) };
+};
+
 module.exports = {
+  moveFolder,
+  copyFolder,
+  deleteFolder,
+  editDocumentPages,
+  mergeDocumentPages,
   copyDocument,
   getFoldersBySource,
   createFolder,
