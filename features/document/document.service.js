@@ -1,461 +1,354 @@
+const mongoose = require('mongoose');
+const { PDFDocument } = require('pdf-lib');
 const logger = require('#shared/logger/logger');
 const HTTP = require('#shared/response/response.status');
-const documentModel = require('./document.model');
-const path = require('path');
-const { PDFDocument } = require('pdf-lib');
-const { putObject, deleteObject } = require('#core/s3/s3.config');
-const { paginate } = require('#shared/pagination/pagination');
-const PushNotificationService = require('#core/notification/notification.push');
+const { AppError } = require('#shared/errors/error.http');
+const { deleteObject, copyObject } = require('#core/s3/s3.config');
+const { getCompletedSessions } = require('#core/upload/upload.service');
+const { buildS3Key } = require('#core/upload/upload.helper');
 const wsUtils = require('#core/socket/socket.io');
 const dashboardServices = require('#features/dashboard/dashboard.service');
+const documentModel = require('./document.model');
+const documentFolderModel = require('./documentFolder.model');
 const {
-  formatDate,
-  formatTimestampForFilename,
-  resolveSourceAndBuildS3Key,
-  resolveSourceDisplayName,
+  DOCUMENT_UPLOAD_FEATURE,
+  RENEWAL_STATUS,
+  findSourceEntity,
+  buildDocumentKeyPrefix,
+  stripFileExtension,
+  isPdfMimeType,
+  toDateOrNull,
   downloadPdfBufferFromS3,
   uploadPdfBytesToS3,
+  serializeDocument,
 } = require('./document.helper');
 
-const saveDocument = async (sourceId, sourceType, documentType, file, description, category, date, expiry) => {
+const refreshDashboard = () => {
+  dashboardServices.clearDashboardCache();
+  wsUtils.dispatchDashboardUpdate('documents');
+};
+
+const requireSource = async (sourceType, sourceId) => {
+  const sourceEntity = await findSourceEntity(sourceType, sourceId);
+  if (!sourceEntity) throw new AppError(`${sourceType} not found`, HTTP.NOT_FOUND);
+  return sourceEntity;
+};
+
+const requireDocument = async (documentId) => {
+  if (!mongoose.isValidObjectId(documentId)) throw new AppError('Invalid document ID', HTTP.BAD_REQUEST);
+  const documentItem = await documentModel.findById(documentId);
+  if (!documentItem) throw new AppError('Document not found', HTTP.NOT_FOUND);
+  return documentItem;
+};
+
+const serializeFolder = (folderItem) => ({
+  _id: folderItem._id.toString(),
+  sourceType: folderItem.sourceType,
+  sourceId: folderItem.sourceId,
+  parentFolderId: folderItem.parentFolderId ? folderItem.parentFolderId.toString() : null,
+  name: folderItem.name,
+});
+
+const requireFolder = async (folderId, sourceType, sourceId) => {
+  if (!mongoose.isValidObjectId(folderId)) throw new AppError('Invalid folder ID', HTTP.BAD_REQUEST);
+  const folderItem = await documentFolderModel.findOne({ _id: folderId, sourceType, sourceId });
+  if (!folderItem) throw new AppError('Folder not found', HTTP.NOT_FOUND);
+  return folderItem;
+};
+
+const assertFolderNameAvailable = async ({ sourceType, sourceId, parentFolderId, name, excludeFolderId }) => {
+  const filter = { sourceType, sourceId, parentFolderId, name };
+  if (excludeFolderId) filter._id = { $ne: excludeFolderId };
+  const existingFolder = await documentFolderModel.exists(filter).collation({ locale: 'en', strength: 2 });
+  if (existingFolder) throw new AppError('A folder with this name already exists here', HTTP.CONFLICT);
+};
+
+const assertSessionBelongsToSource = (session, sourceType, sourceId) => {
+  if (session.context !== sourceType || session.entityId !== sourceId) {
+    throw new AppError('Upload session does not belong to this source', HTTP.BAD_REQUEST);
+  }
+};
+
+const buildDocumentFromSession = (session, uploadedBy, folderId = null) => ({
+  folderId,
+  sourceType: session.context,
+  sourceId: session.entityId,
+  displayName: stripFileExtension(session.originalName),
+  originalFileName: session.originalName,
+  s3Key: session.s3Key,
+  mimeType: session.mimeType,
+  fileSize: session.fileSize,
+  uploadSessionId: session._id.toString(),
+  uploadedBy,
+});
+
+const saveGeneratedPdf = async ({ pdfBytes, sourceType, sourceId, displayName, issueDate, expiryDate, uploadedBy, folderId = null }) => {
+  const s3Key = buildS3Key(DOCUMENT_UPLOAD_FEATURE, buildDocumentKeyPrefix(sourceType, sourceId), 'document.pdf');
+  await uploadPdfBytesToS3(pdfBytes, s3Key);
+  return documentModel.create({
+    folderId,
+    sourceType,
+    sourceId,
+    displayName,
+    originalFileName: `${displayName}.pdf`,
+    s3Key,
+    mimeType: 'application/pdf',
+    fileSize: pdfBytes.length,
+    issueDate,
+    expiryDate,
+    uploadedBy,
+  });
+};
+
+const getDocumentsBySource = async ({ sourceType, sourceId }) => {
+  await requireSource(sourceType, sourceId);
+  const documents = await documentModel.find({ sourceType, sourceId }).sort({ createdAt: -1 });
+  const data = await Promise.all(documents.map(serializeDocument));
+  return { status: HTTP.OK, message: 'Documents retrieved', data };
+};
+
+const registerUploadedDocuments = async ({ sourceType, sourceId, sessionIds, uploadedBy, folderId }) => {
+  await requireSource(sourceType, sourceId);
+  if (folderId) await requireFolder(folderId, sourceType, sourceId);
+
+  const sessions = await getCompletedSessions({ sessionIds, uploadedBy, feature: DOCUMENT_UPLOAD_FEATURE });
+  sessions.forEach((session) => assertSessionBelongsToSource(session, sourceType, sourceId));
+
+  const alreadyRegisteredSessionIds = await documentModel.distinct('uploadSessionId', {
+    uploadSessionId: { $in: sessionIds },
+  });
+  const pendingSessions = sessions.filter((session) => !alreadyRegisteredSessionIds.includes(session._id.toString()));
+
+  const createdDocuments = await documentModel.insertMany(
+    pendingSessions.map((session) => buildDocumentFromSession(session, uploadedBy, folderId))
+  );
+
+  refreshDashboard();
+  const data = await Promise.all(createdDocuments.map(serializeDocument));
+  return { status: HTTP.CREATED, message: 'Documents added', data };
+};
+
+const renewDocument = async ({ documentId, uploadSessionId, issueDate, expiryDate, uploadedBy }) => {
+  const previousDocument = await requireDocument(documentId);
+  if (previousDocument.renewalStatus === RENEWAL_STATUS.EXPIRED) {
+    throw new AppError('Expired documents cannot be renewed', HTTP.CONFLICT);
+  }
+
+  const [session] = await getCompletedSessions({
+    sessionIds: [uploadSessionId],
+    uploadedBy,
+    feature: DOCUMENT_UPLOAD_FEATURE,
+  });
+  assertSessionBelongsToSource(session, previousDocument.sourceType, previousDocument.sourceId);
+
+  const renewedDocument = await documentModel.create({
+    ...buildDocumentFromSession(session, uploadedBy, previousDocument.folderId),
+    displayName: previousDocument.displayName,
+    issueDate: toDateOrNull(issueDate),
+    expiryDate: toDateOrNull(expiryDate),
+    renewalStatus: RENEWAL_STATUS.RENEWED,
+    renewedFromDocumentId: previousDocument._id,
+  });
+
+  previousDocument.renewalStatus = RENEWAL_STATUS.EXPIRED;
+  await previousDocument.save();
+
+  refreshDashboard();
+  return { status: HTTP.OK, message: 'Document renewed', data: await serializeDocument(renewedDocument) };
+};
+
+const updateDocumentDates = async ({ documentId, issueDate, expiryDate }) => {
+  const documentItem = await requireDocument(documentId);
+  documentItem.issueDate = toDateOrNull(issueDate);
+  documentItem.expiryDate = toDateOrNull(expiryDate);
+  await documentItem.save();
+  refreshDashboard();
+  return { status: HTTP.OK, message: 'Dates updated', data: await serializeDocument(documentItem) };
+};
+
+const renameDocument = async ({ documentId, newFileName }) => {
+  const documentItem = await requireDocument(documentId);
+  documentItem.displayName = newFileName;
+  await documentItem.save();
+  return { status: HTTP.OK, message: 'Document renamed', data: await serializeDocument(documentItem) };
+};
+
+const deleteDocument = async ({ documentId }) => {
+  const documentItem = await requireDocument(documentId);
+
   try {
-    const extension = path.extname(file.fileName);
-    const finalFilename = `${documentType}-${formatTimestampForFilename()}${extension}`;
+    await deleteObject(documentItem.s3Key);
+  } catch (storageError) {
+    logger.error('[document.service] deleteDocument storage delete failed', storageError);
+  }
 
-    const { sourceData, s3Key, sourceModel } = await resolveSourceAndBuildS3Key(sourceId, sourceType, documentType, finalFilename);
+  await documentModel.deleteOne({ _id: documentItem._id });
+  refreshDashboard();
+  return { status: HTTP.OK, message: 'Document deleted', data: { _id: documentId } };
+};
 
-    const uploadUrl = await putObject(file.fileName, s3Key, file.mimeType);
+const mergeDocuments = async ({ sourceType, sourceId, documentIds, uploadedBy }) => {
+  await requireSource(sourceType, sourceId);
 
-    let document = await documentModel.findOne({ SourceId: sourceId, documentType });
+  const uniqueDocumentIds = [...new Set(documentIds)];
+  if (!uniqueDocumentIds.every((documentId) => mongoose.isValidObjectId(documentId))) {
+    throw new AppError('Invalid document ID', HTTP.BAD_REQUEST);
+  }
 
-    if (!document) {
-      document = new documentModel({
-        SourceId: sourceId,
-        documentType,
-        description,
-        category,
-        files: [],
-        documentSource: [{ source: sourceType, sourceId, sourceModel }],
-      });
-    }
+  const documents = await documentModel.find({ _id: { $in: uniqueDocumentIds }, sourceType, sourceId });
+  if (documents.length !== uniqueDocumentIds.length) throw new AppError('One or more documents not found', HTTP.NOT_FOUND);
 
-    const formattedDate = date ? formatDate(date) : null;
-    const formattedExpiry = expiry ? formatDate(expiry) : null;
+  const documentById = new Map(documents.map((documentItem) => [documentItem._id.toString(), documentItem]));
+  const orderedDocuments = uniqueDocumentIds.map((documentId) => documentById.get(documentId));
 
-    if (!formattedDate || !formattedExpiry) {
-      throw new Error('Date and expiry are required and must be valid dates');
-    }
+  const nonPdfDocument = orderedDocuments.find((documentItem) => !isPdfMimeType(documentItem.mimeType));
+  if (nonPdfDocument) throw new AppError(`${nonPdfDocument.displayName} is not a PDF`, HTTP.BAD_REQUEST);
 
-    document.files.push({
-      date: formattedDate,
-      expiry: formattedExpiry,
-      filename: finalFilename,
-      path: s3Key,
-      mimetype: file.mimeType || file.fileName.split('.').pop(),
+  const mergedPdf = await PDFDocument.create();
+  for (const documentItem of orderedDocuments) {
+    const sourcePdf = await PDFDocument.load(await downloadPdfBufferFromS3(documentItem.s3Key));
+    const copiedPages = await mergedPdf.copyPages(sourcePdf, sourcePdf.getPageIndices());
+    copiedPages.forEach((page) => mergedPdf.addPage(page));
+  }
+
+  const mergedDocument = await saveGeneratedPdf({
+    pdfBytes: await mergedPdf.save(),
+    sourceType,
+    sourceId,
+    displayName: 'Merged Document',
+    folderId: orderedDocuments[0].folderId,
+    issueDate: null,
+    expiryDate: null,
+    uploadedBy,
+  });
+
+  refreshDashboard();
+  return { status: HTTP.CREATED, message: 'Documents merged', data: await serializeDocument(mergedDocument) };
+};
+
+const splitDocument = async ({ documentId, splitType, pages, uploadedBy }) => {
+  const sourceDocument = await requireDocument(documentId);
+  if (!isPdfMimeType(sourceDocument.mimeType)) throw new AppError('Only PDF files can be split', HTTP.BAD_REQUEST);
+
+  const sourcePdf = await PDFDocument.load(await downloadPdfBufferFromS3(sourceDocument.s3Key));
+  const totalPages = sourcePdf.getPageCount();
+
+  const pageGroups =
+    splitType === 'every'
+      ? Array.from({ length: totalPages }, (_, index) => [index + 1])
+      : [
+          [...new Set(pages)]
+            .filter((pageNumber) => Number.isInteger(pageNumber) && pageNumber >= 1 && pageNumber <= totalPages)
+            .sort((firstPage, secondPage) => firstPage - secondPage),
+        ];
+
+  const validPageGroups = pageGroups.filter((pageGroup) => pageGroup.length > 0);
+  if (validPageGroups.length === 0) throw new AppError('No valid pages to extract', HTTP.BAD_REQUEST);
+
+  const createdDocuments = [];
+  for (const pageGroup of validPageGroups) {
+    const splitPdf = await PDFDocument.create();
+    const copiedPages = await splitPdf.copyPages(sourcePdf, pageGroup.map((pageNumber) => pageNumber - 1));
+    copiedPages.forEach((page) => splitPdf.addPage(page));
+
+    const pageLabel = pageGroup.length === 1 ? `Page ${pageGroup[0]}` : `Pages ${pageGroup.join(', ')}`;
+    const createdDocument = await saveGeneratedPdf({
+      pdfBytes: await splitPdf.save(),
+      sourceType: sourceDocument.sourceType,
+      sourceId: sourceDocument.sourceId,
+      displayName: `${sourceDocument.displayName} (${pageLabel})`,
+      folderId: sourceDocument.folderId,
+      issueDate: sourceDocument.issueDate,
+      expiryDate: sourceDocument.expiryDate,
+      uploadedBy,
     });
-
-    const sourceDisplayName = resolveSourceDisplayName(sourceType, sourceData);
-    const notificationMessage = `Document ${documentType} is uploaded for ${sourceDisplayName} (${sourceType}), Now you can access new one`;
-
-    notifyUsers(null, {
-      priority: 'high',
-      title: 'New document added',
-      description: notificationMessage,
-      priority: 'high',
-      type: 'normal',
-      sourceId: 'documents',
-      time: new Date(),
-    })
-
-    dashboardServices.clearDashboardCache();
-    wsUtils.dispatchDashboardUpdate('documents');
-
-    await document.save();
-
-    return {
-      status: HTTP.OK,
-      message: 'Document uploaded successfully',
-      uploadUrl,
-      finalFilename,
-      s3Key,
-      document,
-    };
-  } catch (error) {
-    logger.error('[document.service] saveDocument', error);
-    return { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to save document', error: error.message };
+    createdDocuments.push(createdDocument);
   }
+
+  refreshDashboard();
+  const data = await Promise.all(createdDocuments.map(serializeDocument));
+  return { status: HTTP.CREATED, message: 'PDF split', data };
 };
 
-const renameFile = async (documentId, newFileName) => {
-  try {
-    const document = await documentModel.findOne({ 'files._id': documentId });
-    if (!document) return { status: HTTP.NOT_FOUND, message: 'Document not found' };
+const copyDocument = async ({ documentId, folderId, uploadedBy }) => {
+  const sourceDocument = await requireDocument(documentId);
+  if (folderId) await requireFolder(folderId, sourceDocument.sourceType, sourceDocument.sourceId);
 
-    const file = document.files.find((f) => f._id.toString() === documentId);
-    if (!file) return { status: HTTP.NOT_FOUND, message: 'File not found' };
+  const copiedS3Key = buildS3Key(
+    DOCUMENT_UPLOAD_FEATURE,
+    buildDocumentKeyPrefix(sourceDocument.sourceType, sourceDocument.sourceId),
+    sourceDocument.originalFileName
+  );
+  await copyObject(sourceDocument.s3Key, copiedS3Key);
 
-    file.displayFileName = newFileName;
-    await document.save();
+  const copiedDocument = await documentModel.create({
+    folderId: folderId || null,
+    sourceType: sourceDocument.sourceType,
+    sourceId: sourceDocument.sourceId,
+    displayName: `${sourceDocument.displayName} (Copy)`,
+    originalFileName: sourceDocument.originalFileName,
+    s3Key: copiedS3Key,
+    mimeType: sourceDocument.mimeType,
+    fileSize: sourceDocument.fileSize,
+    issueDate: sourceDocument.issueDate,
+    expiryDate: sourceDocument.expiryDate,
+    uploadedBy,
+  });
 
-    return {
-      status: HTTP.OK,
-      message: 'File renamed successfully',
-      file: { _id: file._id, displayFileName: file.displayFileName, filename: file.filename },
-    };
-  } catch (error) {
-    logger.error('[document.service] renameFile', error);
-    return { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to rename file', error: error.message };
-  }
+  refreshDashboard();
+  return { status: HTTP.CREATED, message: 'Document copied', data: await serializeDocument(copiedDocument) };
 };
 
-const deleteDocument = async (documentId) => {
-  try {
-    const document = await documentModel.findOne({ 'files._id': documentId });
-    if (!document) return { status: HTTP.NOT_FOUND, message: 'Document not found' };
-
-    const file = document.files.find((f) => f._id.toString() === documentId);
-    if (!file) return { status: HTTP.NOT_FOUND, message: 'File not found' };
-
-    try {
-      await deleteObject(file.path);
-    } catch (s3Error) {
-      logger.error('[document.service] deleteDocument S3 delete failed', s3Error);
-    }
-
-    document.files = document.files.filter((f) => f._id.toString() !== documentId);
-
-    if (document.files.length === 0) {
-      await documentModel.findByIdAndDelete(document._id);
-    } else {
-      await document.save();
-    }
-
-    const sourceType = document.documentSource[0]?.source;
-    let sourceDisplayName = document.SourceId;
-
-    try {
-      const { sourceData } = await resolveSourceAndBuildS3Key(document.SourceId, sourceType, 'temp', 'temp.pdf');
-      sourceDisplayName = resolveSourceDisplayName(sourceType, sourceData);
-    } catch (lookupError) {
-      logger.error('[document.service] deleteDocument source lookup failed', lookupError);
-    }
-
-    const notificationMessage = `Document ${file.filename} was deleted for ${sourceDisplayName} (${sourceType})`;
-
-    notifyUsers(null, {
-      priority: 'high',
-      title: 'Document deleted',
-      description: notificationMessage,
-      priority: 'normal',
-      type: 'normal',
-      sourceId: 'documents',
-      time: new Date(),
-    })
-
-    return {
-      status: HTTP.OK,
-      message: 'Document deleted successfully',
-      deletedFile: { filename: file.filename, path: file.path },
-    };
-  } catch (error) {
-    logger.error('[document.service] deleteDocument', error);
-    return { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to delete document', error: error.message };
-  }
+const getFoldersBySource = async ({ sourceType, sourceId }) => {
+  await requireSource(sourceType, sourceId);
+  const folders = await documentFolderModel.find({ sourceType, sourceId }).sort({ name: 1 });
+  return { status: HTTP.OK, message: 'Folders retrieved', data: folders.map(serializeFolder) };
 };
 
-const getDocumentsBySource = async (sourceType, sourceId, pagination) => {
-  try {
-    const { sourceData } = await resolveSourceAndBuildS3Key(sourceId, sourceType, 'temp', 'temp.pdf');
-    if (!sourceData) return { status: HTTP.NOT_FOUND, message: `${sourceType} not found` };
-
-    const result = await paginate(
-      documentModel,
-      { SourceId: sourceId, 'documentSource.source': sourceType },
-      pagination,
-      { sort: { createdAt: -1 } }
-    );
-
-    return { status: HTTP.OK, data: result.data, pagination: result.pagination };
-  } catch (error) {
-    logger.error('[document.service] getDocumentsBySource', error);
-    return { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to retrieve documents', error: error.message };
-  }
+const createFolder = async ({ sourceType, sourceId, parentFolderId, name }) => {
+  await requireSource(sourceType, sourceId);
+  if (parentFolderId) await requireFolder(parentFolderId, sourceType, sourceId);
+  await assertFolderNameAvailable({ sourceType, sourceId, parentFolderId, name });
+  const createdFolder = await documentFolderModel.create({ sourceType, sourceId, parentFolderId, name });
+  return { status: HTTP.CREATED, message: 'Folder created', data: serializeFolder(createdFolder) };
 };
 
-const getAllDocuments = async (pagination) => {
-  try {
-    const result = await paginate(documentModel, {}, pagination, { sort: { createdAt: -1 } });
-    return { status: HTTP.OK, data: result.data, pagination: result.pagination };
-  } catch (error) {
-    logger.error('[document.service] getAllDocuments', error);
-    return { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to retrieve documents', error: error.message };
-  }
+const renameFolder = async ({ folderId, name }) => {
+  if (!mongoose.isValidObjectId(folderId)) throw new AppError('Invalid folder ID', HTTP.BAD_REQUEST);
+  const folderItem = await documentFolderModel.findById(folderId);
+  if (!folderItem) throw new AppError('Folder not found', HTTP.NOT_FOUND);
+  await assertFolderNameAvailable({
+    sourceType: folderItem.sourceType,
+    sourceId: folderItem.sourceId,
+    parentFolderId: folderItem.parentFolderId,
+    name,
+    excludeFolderId: folderItem._id,
+  });
+  folderItem.name = name;
+  await folderItem.save();
+  return { status: HTTP.OK, message: 'Folder renamed', data: serializeFolder(folderItem) };
 };
 
-const getAllDocumentTypes = async (pagination) => {
-  try {
-    const result = await paginate(documentModel, {}, pagination, { sort: { createdAt: -1 }, projection: 'documentType' });
-    return { status: HTTP.OK, data: result.data, pagination: result.pagination };
-  } catch (error) {
-    logger.error('[document.service] getAllDocumentTypes', error);
-    return { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to retrieve documents', error: error.message };
-  }
-};
-
-const getDocumentFileById = async (documentId) => {
-  try {
-    const document = await documentModel.findOne({ 'files._id': documentId });
-    if (!document) return { status: HTTP.NOT_FOUND, message: 'Document not found' };
-
-    const file = document.files.find((f) => f._id.toString() === documentId);
-    if (!file) return { status: HTTP.NOT_FOUND, message: 'File not found' };
-
-    return {
-      status: HTTP.OK,
-      document: {
-        filePath: file.path,
-        filename: file.filename,
-        mimetype: file.mimetype,
-        sourceId: document.SourceId,
-        documentType: document.documentType,
-        sourceType: document.documentSource[0]?.source,
-      },
-    };
-  } catch (error) {
-    logger.error('[document.service] getDocumentFileById', error);
-    return { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to retrieve document', error: error.message };
-  }
-};
-
-const mergePDFs = async (sourceId, sourceType, documentIds, category, documentType) => {
-  try {
-    const { sourceModel } = await resolveSourceAndBuildS3Key(sourceId, sourceType, 'temp', 'temp.pdf');
-
-    const mergedPdf = await PDFDocument.create();
-
-    const documentsData = await Promise.all(
-      documentIds.map(async (fileId) => {
-        const document = await documentModel.findOne({ 'files._id': fileId });
-        if (!document) throw new Error(`Document with file ID ${fileId} not found`);
-
-        const file = document.files.find((f) => f._id.toString() === fileId);
-        if (!file) throw new Error(`File ${fileId} not found in document`);
-
-        if (!file.mimetype.includes('pdf')) {
-          throw new Error(`File ${file.filename} is not a PDF. Only PDFs can be merged.`);
-        }
-
-        return { file, document };
-      })
-    );
-
-    for (const { file } of documentsData) {
-      try {
-        const pdfBuffer = await downloadPdfBufferFromS3(file.path);
-        const pdf = await PDFDocument.load(pdfBuffer);
-        const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
-        copiedPages.forEach((page) => mergedPdf.addPage(page));
-      } catch (error) {
-        logger.error(`[document.service] mergePDFs processing ${file.filename}`, error);
-        throw new Error(`Failed to process ${file.filename}: ${error.message}`);
-      }
-    }
-
-    const mergedPdfBytes = await mergedPdf.save();
-    const mergedFilename = `${documentType}-merged-${formatTimestampForFilename()}.pdf`;
-
-    const { s3Key } = await resolveSourceAndBuildS3Key(sourceId, sourceType, documentType, mergedFilename);
-
-    await uploadPdfBytesToS3(mergedPdfBytes, s3Key);
-
-    let document = await documentModel.findOne({ SourceId: sourceId, documentType });
-
-    if (!document) {
-      document = new documentModel({
-        SourceId: sourceId,
-        documentType,
-        description: `Merged PDF created from ${documentIds.length} documents`,
-        category,
-        files: [],
-        documentSource: [{ source: sourceType, sourceId, sourceModel }],
-      });
-    }
-
-    const fileDates = documentsData.map((entry) => entry.file.date).filter(Boolean);
-    const fileExpiries = documentsData.map((entry) => entry.file.expiry).filter(Boolean);
-    const earliestDate = fileDates.length > 0 ? fileDates.sort()[0] : formatDate(new Date());
-    const latestExpiry = fileExpiries.length > 0 ? fileExpiries.sort().reverse()[0] : formatDate(new Date());
-
-    document.files.push({
-      date: earliestDate,
-      expiry: latestExpiry,
-      filename: mergedFilename,
-      path: s3Key,
-      mimetype: 'application/pdf',
-    });
-
-    notifyUsers(null, {
-      priority: 'high',
-      title: 'PDFs Merged',
-      description: `${documentIds.length} PDFs merged successfully for ${sourceType}`,
-      priority: 'normal',
-      type: 'normal',
-      sourceId: 'documents',
-      time: new Date(),
-    })
-
-    await document.save();
-
-    return {
-      status: HTTP.OK,
-      message: 'PDFs merged successfully',
-      document: {
-        filename: mergedFilename,
-        path: s3Key,
-        pageCount: mergedPdf.getPageCount(),
-        mergedFrom: documentIds.length,
-      },
-    };
-  } catch (error) {
-    logger.error('[document.service] mergePDFs', error);
-    return { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to merge PDFs', error: error.message };
-  }
-};
-
-const splitPDF = async (sourceId, sourceType, documentId, splitOptions, category) => {
-  try {
-    const { sourceModel } = await resolveSourceAndBuildS3Key(sourceId, sourceType, 'temp', 'temp.pdf');
-
-    const document = await documentModel.findOne({ 'files._id': documentId });
-    if (!document) return { status: HTTP.NOT_FOUND, message: 'Document not found' };
-
-    const file = document.files.find((f) => f._id.toString() === documentId);
-    if (!file) return { status: HTTP.NOT_FOUND, message: 'File not found' };
-    if (!file.mimetype.includes('pdf')) return { status: HTTP.BAD_REQUEST, message: 'Only PDF files can be split' };
-
-    const pdfBuffer = await downloadPdfBufferFromS3(file.path);
-    const pdf = await PDFDocument.load(pdfBuffer);
-    const totalPages = pdf.getPageCount();
-
-    const { pages, splitType } = splitOptions;
-    let pagesToExtract = [];
-
-    if (splitType === 'specific') {
-      pagesToExtract = pages.filter((page) => page > 0 && page <= totalPages);
-    } else if (splitType === 'range') {
-      pages.forEach(([start, end]) => {
-        for (let page = start; page <= end && page <= totalPages; page++) pagesToExtract.push(page);
-      });
-    } else if (splitType === 'every') {
-      const pageSize = pages[0] || 1;
-      for (let page = 1; page <= totalPages; page += pageSize) pagesToExtract.push(page);
-    } else {
-      return { status: HTTP.BAD_REQUEST, message: 'Invalid split type. Use: specific, range, or every' };
-    }
-
-    if (pagesToExtract.length === 0) return { status: HTTP.BAD_REQUEST, message: 'No valid pages to extract' };
-
-    const splitDocuments = [];
-
-    if (splitType === 'every') {
-      const pageSize = pages[0] || 1;
-
-      for (let start = 0; start < totalPages; start += pageSize) {
-        const newPdf = await PDFDocument.create();
-        const endPage = Math.min(start + pageSize, totalPages);
-
-        for (let pageIndex = start; pageIndex < endPage; pageIndex++) {
-          const [copiedPage] = await newPdf.copyPages(pdf, [pageIndex]);
-          newPdf.addPage(copiedPage);
-        }
-
-        const pdfBytes = await newPdf.save();
-        const splitFilename = `${document.documentType}-split-${start + 1}-to-${endPage}-${formatTimestampForFilename()}.pdf`;
-        const { s3Key } = await resolveSourceAndBuildS3Key(sourceId, sourceType, document.documentType, splitFilename);
-
-        await uploadPdfBytesToS3(pdfBytes, s3Key);
-
-        splitDocuments.push({
-          filename: splitFilename,
-          path: s3Key,
-          pages: `${start + 1}-${endPage}`,
-          pageCount: newPdf.getPageCount(),
-        });
-      }
-    } else {
-      const newPdf = await PDFDocument.create();
-      const pageIndices = pagesToExtract.map((page) => page - 1);
-      const copiedPages = await newPdf.copyPages(pdf, pageIndices);
-
-      copiedPages.forEach((page) => newPdf.addPage(page));
-
-      const pdfBytes = await newPdf.save();
-      const splitFilename = `${document.documentType}-split-pages-${pagesToExtract.join('-')}-${formatTimestampForFilename()}.pdf`;
-      const { s3Key } = await resolveSourceAndBuildS3Key(sourceId, sourceType, document.documentType, splitFilename);
-
-      await uploadPdfBytesToS3(pdfBytes, s3Key);
-
-      splitDocuments.push({
-        filename: splitFilename,
-        path: s3Key,
-        pages: pagesToExtract.join(', '),
-        pageCount: newPdf.getPageCount(),
-      });
-    }
-
-    for (const splitDoc of splitDocuments) {
-      let doc = await documentModel.findOne({ SourceId: sourceId, documentType: `${document.documentType} (Split)` });
-
-      if (!doc) {
-        doc = new documentModel({
-          SourceId: sourceId,
-          documentType: `${document.documentType} (Split)`,
-          description: `Split from ${file.filename}`,
-          category: category || document.category,
-          files: [],
-          documentSource: [{ source: sourceType, sourceId, sourceModel }],
-        });
-      }
-
-      doc.files.push({
-        date: file.date,
-        expiry: file.expiry,
-        filename: splitDoc.filename,
-        path: splitDoc.path,
-        mimetype: 'application/pdf',
-      });
-
-      await doc.save();
-    }
-
-    await PushNotificationService.sendGeneralNotification(
-      process.env.SUPER_ADMIN,
-      'PDF Split',
-      `PDF split into ${splitDocuments.length} document(s) for ${sourceType}`,
-      'normal',
-      'normal'
-    );
-
-    return {
-      status: HTTP.OK,
-      message: 'PDF split successfully',
-      documents: splitDocuments,
-      totalSplits: splitDocuments.length,
-    };
-  } catch (error) {
-    logger.error('[document.service] splitPDF', error);
-    return { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to split PDF', error: error.message };
-  }
+const moveDocument = async ({ documentId, folderId }) => {
+  const documentItem = await requireDocument(documentId);
+  if (folderId) await requireFolder(folderId, documentItem.sourceType, documentItem.sourceId);
+  documentItem.folderId = folderId || null;
+  await documentItem.save();
+  return { status: HTTP.OK, message: 'Document moved', data: await serializeDocument(documentItem) };
 };
 
 module.exports = {
-  saveDocument,
-  renameFile,
-  deleteDocument,
+  copyDocument,
+  getFoldersBySource,
+  createFolder,
+  renameFolder,
+  moveDocument,
   getDocumentsBySource,
-  getAllDocuments,
-  getAllDocumentTypes,
-  getDocumentFileById,
-  mergePDFs,
-  splitPDF,
+  registerUploadedDocuments,
+  renewDocument,
+  updateDocumentDates,
+  renameDocument,
+  deleteDocument,
+  mergeDocuments,
+  splitDocument,
 };

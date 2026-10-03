@@ -3,6 +3,7 @@ const {
   GetObjectCommand,
   PutObjectCommand,
   DeleteObjectCommand,
+  CopyObjectCommand,
   HeadObjectCommand,
   CreateMultipartUploadCommand,
   UploadPartCommand,
@@ -47,6 +48,15 @@ const deleteObject = async (key) => {
   return { success: true, message: `Object ${key} deleted successfully` }
 }
 
+const copyObject = async (sourceKey, destinationKey) => {
+  const command = new CopyObjectCommand({
+    Bucket: process.env.BUCKET_NAME,
+    Key: destinationKey,
+    CopySource: encodeURIComponent(`${process.env.BUCKET_NAME}/${sourceKey}`),
+  })
+  await s3Client.send(command)
+}
+
 const objectExists = async (key) => {
   try {
     const command = new HeadObjectCommand({ Bucket: process.env.BUCKET_NAME, Key: key })
@@ -88,6 +98,7 @@ module.exports = {
   getObjectUrl,
   putObject,
   deleteObject,
+  copyObject,
   objectExists,
   createMultipartUpload,
   getUploadPartUrl,

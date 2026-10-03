@@ -4,11 +4,10 @@ const corsOptions = {
     'https://ansarigroup.online',
     'https://www.ansarigroup.online',
     'https://www.ansarigroup.online',
-    "http://192.168.100.124:3000",
     "http://localhost:3000"
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: [
+  allowedHeaders: [ 
     'Origin',
     'X-Requested-With',
     'Content-Type',

@@ -7,7 +7,9 @@ const normaliseImagePath = (rawPath) => {
 };
 
 const normaliseImages = (images = []) =>
-  images.map((image) => ({ ...image, url: normaliseImagePath(image.path) }));
+  [...images]
+    .sort((a, b) => (a.order || 0) - (b.order || 0))
+    .map((image) => ({ ...image, url: normaliseImagePath(image.path) }));
 
 const buildS3Key = (equipmentNo, fileName, index, ext) =>
   `equipment-images/${equipmentNo}/${equipmentNo}-${Date.now()}-${index}${ext}`;

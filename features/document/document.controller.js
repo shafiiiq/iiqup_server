@@ -1,189 +1,162 @@
 const logger = require('#shared/logger/logger');
 const HTTP = require('#shared/response/response.status');
+const { AppError } = require('#shared/errors/error.http');
 const { sendSuccess, sendError } = require('#shared/response/response.sender');
 const documentService = require('./document.service');
+const { SUPPORTED_SOURCE_TYPES, isValidDateInput } = require('./document.helper');
 
-const SUPPORTED_SOURCE_TYPES = ['equipment', 'operator', 'mechanic', 'staff'];
+const MAXIMUM_DISPLAY_NAME_LENGTH = 150;
+const SPLIT_TYPES = ['specific', 'every'];
 
-const uploadDocument = async (req, res) => {
+const handleRoute = (logTag, handler) => async (req, res) => {
   try {
-    const { sourceId, sourceType, documentType, description, category, fileName, mimeType, date, expiry } = req.body;
-
-    if (!sourceId || !sourceType || !documentType) {
-      return sendError(res, { status: HTTP.BAD_REQUEST, message: 'Source ID, Source Type, and Document Type are required' });
-    }
-    if (!fileName) {
-      return res.status(HTTP.BAD_REQUEST).json({ status: HTTP.BAD_REQUEST, message: 'File name is required' });
-    }
-    if (!SUPPORTED_SOURCE_TYPES.includes(sourceType)) {
-      return sendError(res, { status: HTTP.BAD_REQUEST, message: `Invalid source type. Must be: ${SUPPORTED_SOURCE_TYPES.join(', ')}` });
-    }
-
-    const result = await documentService.saveDocument(sourceId, sourceType, documentType, { fileName, mimeType }, description, category, date, expiry);
-
-    sendSuccess(res, {
-      status: HTTP.OK,
-      message: 'Presigned URL generated successfully',
-      uploadUrl: result.uploadUrl,
-      document: { filename: result.finalFilename, path: result.s3Key, type: documentType },
-    });
-  } catch (error) {
-    logger.error('[document.controller] uploadDocument', error);
-    sendError(res, { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to generate upload URL', error: error.message });
-  }
-};
-
-const getDocumentsBySource = async (req, res) => {
-  try {
-    const { type: sourceType, id: sourceId } = req.params;
-
-    if (!sourceType || !sourceId) {
-      return res.status(HTTP.BAD_REQUEST).json({ status: HTTP.BAD_REQUEST, message: 'Type and ID are required' });
-    }
-    if (!SUPPORTED_SOURCE_TYPES.includes(sourceType)) {
-      return sendSuccess(res, { status: HTTP.BAD_REQUEST, message: `Invalid type. Must be: ${SUPPORTED_SOURCE_TYPES.join(', ')}` });
-    }
-
-    const result = await documentService.getDocumentsBySource(sourceType, sourceId, req.pagination);
+    const result = await handler(req);
     sendSuccess(res, result);
   } catch (error) {
-    logger.error('[document.controller] getDocumentsBySource', error);
-    sendSuccess(res, { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Internal server error', error: error.message });
+    logger.error(`[document.controller] ${logTag}`, error);
+    sendError(res, { status: error.status || HTTP.INTERNAL_SERVER_ERROR, message: error.message });
   }
 };
 
-const getAllDocuments = async (req, res) => {
-  try {
-    const result = await documentService.getAllDocuments(req.pagination);
-    sendSuccess(res, result);
-  } catch (error) {
-    logger.error('[document.controller] getAllDocuments', error);
-    sendSuccess(res, { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Internal server error', error: error.message });
+const assertSourceType = (sourceType) => {
+  if (!SUPPORTED_SOURCE_TYPES.includes(sourceType)) {
+    throw new AppError(`Invalid source type. Must be: ${SUPPORTED_SOURCE_TYPES.join(', ')}`, HTTP.BAD_REQUEST);
   }
 };
 
-const getAllDocumentTypes = async (req, res) => {
-  try {
-    const result = await documentService.getAllDocumentTypes(req.pagination);
-    sendSuccess(res, result);
-  } catch (error) {
-    logger.error('[document.controller] getAllDocumentTypes', error);
-    sendSuccess(res, { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Internal server error', error: error.message });
+const assertDateRange = (issueDate, expiryDate) => {
+  if (!isValidDateInput(issueDate) || !isValidDateInput(expiryDate)) {
+    throw new AppError('Dates must be valid', HTTP.BAD_REQUEST);
+  }
+  if (issueDate && expiryDate && new Date(expiryDate) < new Date(issueDate)) {
+    throw new AppError('Expiry date cannot be before issue date', HTTP.BAD_REQUEST);
   }
 };
 
-const downloadDocument = async (req, res) => {
-  try {
-    const { documentId } = req.params;
-    if (!documentId) {
-      return res.status(HTTP.BAD_REQUEST).json({ status: HTTP.BAD_REQUEST, message: 'Document ID is required' });
-    }
-    const result = await documentService.getDocumentFileById(documentId);
-    sendSuccess(res, result);
-  } catch (error) {
-    logger.error('[document.controller] downloadDocument', error);
-    sendSuccess(res, { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to download document', error: error.message });
+const getDocumentsBySource = handleRoute('getDocumentsBySource', async (req) => {
+  const { sourceType, sourceId } = req.params;
+  assertSourceType(sourceType);
+  return documentService.getDocumentsBySource({ sourceType, sourceId });
+});
+
+const registerUploadedDocuments = handleRoute('registerUploadedDocuments', async (req) => {
+  const { sourceType, sourceId, sessionIds, folderId } = req.body;
+  assertSourceType(sourceType);
+  if (!sourceId || !Array.isArray(sessionIds) || sessionIds.length === 0) {
+    throw new AppError('sourceId and sessionIds are required', HTTP.BAD_REQUEST);
   }
+  return documentService.registerUploadedDocuments({
+    sourceType,
+    sourceId,
+    sessionIds,
+    folderId: folderId || null,
+    uploadedBy: req.userId,
+  });
+});
+
+const renewDocument = handleRoute('renewDocument', async (req) => {
+  const { documentId } = req.params;
+  const { uploadSessionId, issueDate, expiryDate } = req.body;
+  if (!uploadSessionId) throw new AppError('uploadSessionId is required', HTTP.BAD_REQUEST);
+  assertDateRange(issueDate, expiryDate);
+  return documentService.renewDocument({ documentId, uploadSessionId, issueDate, expiryDate, uploadedBy: req.userId });
+});
+
+const updateDocumentDates = handleRoute('updateDocumentDates', async (req) => {
+  const { documentId } = req.params;
+  const { issueDate, expiryDate } = req.body;
+  assertDateRange(issueDate, expiryDate);
+  return documentService.updateDocumentDates({ documentId, issueDate, expiryDate });
+});
+
+const renameDocument = handleRoute('renameDocument', async (req) => {
+  const { documentId } = req.params;
+  const newFileName = String(req.body.newFileName || '').trim();
+  if (!newFileName || newFileName.length > MAXIMUM_DISPLAY_NAME_LENGTH || /[\\/]/.test(newFileName)) {
+    throw new AppError('Invalid file name', HTTP.BAD_REQUEST);
+  }
+  return documentService.renameDocument({ documentId, newFileName });
+});
+
+const deleteDocument = handleRoute('deleteDocument', async (req) =>
+  documentService.deleteDocument({ documentId: req.params.documentId })
+);
+
+const mergeDocuments = handleRoute('mergeDocuments', async (req) => {
+  const { sourceType, sourceId, documentIds } = req.body;
+  assertSourceType(sourceType);
+  if (!sourceId || !Array.isArray(documentIds) || documentIds.length < 2) {
+    throw new AppError('sourceId and at least 2 documentIds are required', HTTP.BAD_REQUEST);
+  }
+  return documentService.mergeDocuments({ sourceType, sourceId, documentIds, uploadedBy: req.userId });
+});
+
+const splitDocument = handleRoute('splitDocument', async (req) => {
+  const { documentId } = req.params;
+  const { splitType, pages } = req.body;
+  if (!SPLIT_TYPES.includes(splitType)) throw new AppError('Invalid split type', HTTP.BAD_REQUEST);
+  if (splitType === 'specific' && (!Array.isArray(pages) || pages.length === 0)) {
+    throw new AppError('pages array is required', HTTP.BAD_REQUEST);
+  }
+  return documentService.splitDocument({ documentId, splitType, pages: pages || [], uploadedBy: req.userId });
+});
+
+const MAXIMUM_FOLDER_NAME_LENGTH = 100;
+
+const normalizeFolderName = (value) => {
+  const folderName = String(value || '').trim();
+  if (!folderName || folderName.length > MAXIMUM_FOLDER_NAME_LENGTH || /[\\/]/.test(folderName)) {
+    throw new AppError('Invalid folder name', HTTP.BAD_REQUEST);
+  }
+  return folderName;
 };
 
-const viewDocument = async (req, res) => {
-  try {
-    const { documentId } = req.params;
-    if (!documentId) {
-      return res.status(HTTP.BAD_REQUEST).json({ status: HTTP.BAD_REQUEST, message: 'Document ID is required' });
-    }
-    const result = await documentService.getDocumentFileById(documentId);
-    sendSuccess(res, result);
-  } catch (error) {
-    logger.error('[document.controller] viewDocument', error);
-    sendSuccess(res, { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to view document', error: error.message });
-  }
-};
+const getFoldersBySource = handleRoute('getFoldersBySource', async (req) => {
+  const { sourceType, sourceId } = req.params;
+  assertSourceType(sourceType);
+  return documentService.getFoldersBySource({ sourceType, sourceId });
+});
 
-const mergePDFs = async (req, res) => {
-  try {
-    const { sourceId, sourceType, documentIds, category, documentType } = req.body;
+const createFolder = handleRoute('createFolder', async (req) => {
+  const { sourceType, sourceId, parentFolderId } = req.body;
+  assertSourceType(sourceType);
+  if (!sourceId) throw new AppError('sourceId is required', HTTP.BAD_REQUEST);
+  return documentService.createFolder({
+    sourceType,
+    sourceId,
+    parentFolderId: parentFolderId || null,
+    name: normalizeFolderName(req.body.name),
+  });
+});
 
-    if (!sourceId || !sourceType || !Array.isArray(documentIds) || documentIds.length < 2) {
-      return sendSuccess(res, { status: HTTP.BAD_REQUEST, message: 'Source ID, Source Type, and at least 2 document IDs are required' });
-    }
-    if (!category || !documentType) {
-      return sendSuccess(res, { status: HTTP.BAD_REQUEST, message: 'Category and Document Type are required' });
-    }
+const renameFolder = handleRoute('renameFolder', async (req) =>
+  documentService.renameFolder({ folderId: req.params.folderId, name: normalizeFolderName(req.body.name) })
+);
 
-    const result = await documentService.mergePDFs(sourceId, sourceType, documentIds, category, documentType);
-    sendSuccess(res, result);
-  } catch (error) {
-    logger.error('[document.controller] mergePDFs', error);
-    sendSuccess(res, { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to merge PDFs', error: error.message });
-  }
-};
+const copyDocument = handleRoute('copyDocument', async (req) =>
+  documentService.copyDocument({
+    documentId: req.params.documentId,
+    folderId: req.body.folderId || null,
+    uploadedBy: req.userId,
+  })
+);
 
-const splitPDF = async (req, res) => {
-  try {
-    const { sourceId, sourceType, documentId, splitOptions, category } = req.body;
-
-    if (!sourceId || !sourceType || !documentId) {
-      return sendSuccess(res, { status: HTTP.BAD_REQUEST, message: 'Source ID, Source Type, and Document ID are required' });
-    }
-    if (!splitOptions || !Array.isArray(splitOptions.pages)) {
-      return sendSuccess(res, { status: HTTP.BAD_REQUEST, message: 'Split options with page numbers array is required' });
-    }
-    if (!category) {
-      return res.status(HTTP.BAD_REQUEST).json({ status: HTTP.BAD_REQUEST, message: 'Category is required' });
-    }
-
-    const result = await documentService.splitPDF(sourceId, sourceType, documentId, splitOptions, category);
-    sendSuccess(res, result);
-  } catch (error) {
-    logger.error('[document.controller] splitPDF', error);
-    sendSuccess(res, { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to split PDF', error: error.message });
-  }
-};
-
-const renameFile = async (req, res) => {
-  try {
-    const { documentId } = req.params;
-    const { newFileName } = req.body;
-
-    if (!documentId || !newFileName) {
-      return sendSuccess(res, { status: HTTP.BAD_REQUEST, message: 'Document ID and new file name are required' });
-    }
-    if (!/^[a-zA-Z0-9-_ ]+$/.test(newFileName)) {
-      return sendSuccess(res, { status: HTTP.BAD_REQUEST, message: 'Invalid file name. Only letters, numbers, spaces, hyphens and underscores are allowed' });
-    }
-
-    const result = await documentService.renameFile(documentId, newFileName);
-    sendSuccess(res, result);
-  } catch (error) {
-    logger.error('[document.controller] renameFile', error);
-    sendSuccess(res, { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to rename file', error: error.message });
-  }
-};
-
-const deleteDocument = async (req, res) => {
-  try {
-    const { documentId } = req.params;
-    if (!documentId) {
-      return res.status(HTTP.BAD_REQUEST).json({ status: HTTP.BAD_REQUEST, message: 'Document ID is required' });
-    }
-    const result = await documentService.deleteDocument(documentId);
-    sendSuccess(res, result);
-  } catch (error) {
-    logger.error('[document.controller] deleteDocument', error);
-    sendSuccess(res, { status: HTTP.INTERNAL_SERVER_ERROR, message: 'Failed to delete document', error: error.message });
-  }
-};
+const moveDocument = handleRoute('moveDocument', async (req) =>
+  documentService.moveDocument({ documentId: req.params.documentId, folderId: req.body.folderId || null })
+);
 
 module.exports = {
-  uploadDocument,
+  copyDocument,
+  getFoldersBySource,
+  createFolder,
+  renameFolder,
+  moveDocument,
   getDocumentsBySource,
-  getAllDocuments,
-  getAllDocumentTypes,
-  downloadDocument,
-  viewDocument,
-  mergePDFs,
-  splitPDF,
-  renameFile,
+  registerUploadedDocuments,
+  renewDocument,
+  updateDocumentDates,
+  renameDocument,
   deleteDocument,
+  mergeDocuments,
+  splitDocument,
 };

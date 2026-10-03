@@ -317,7 +317,7 @@ const signPurchaseOrderDocument = async (req, res) => {
     })
 
     if (result.requireOverride) {
-      return sendError(res, {
+      return res.status(202).json({
         success: false,
         requireOverride: true,
         message: result.message,
@@ -409,7 +409,7 @@ const updateVendorEmail = async (req, res) => {
     const { email } = req.body
     if (!email || !email.includes('@')) return badRequest(res, 'Valid email required')
 
-    const result = await purchaseOrderService.saveVendorEmail(vendorCode, email)
+    const result = await purchaseOrderService.sendPurchaseOrderViaEmail(vendorCode, [email])
 
     sendSuccess(res, {
       success: true,

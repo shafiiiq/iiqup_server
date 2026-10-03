@@ -67,8 +67,6 @@ const uploadPurchaseOrder = async (purchaseorderFileData, uploadedBy, purchaseor
       workflowStatus: isAmendment ? 'purchaseorder_amended' : 'purchaseorder_uploaded',
       updatedAt: uploadTimestamp,
       'purchaseorderDetails.purchaseorderFile': { ...purchaseorderFileData, generatedFor: uploadTimestamp.toISOString() },
-      updatedAt: new Date(),
-      'purchaseorderDetails.purchaseorderFile': purchaseorderFileData,
       'purchaseorderDetails.purchaseorderRef': purchaseorderRef,
       'purchaseorderDetails.description': description || '',
       'purchaseorderDetails.uploadedBy': uploadedBy,

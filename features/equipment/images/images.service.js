@@ -1,9 +1,10 @@
 const path = require('path');
 const logger = require('#shared/logger/logger');
 const HTTP = require('#shared/response/response.status');
-const { putObject } = require('#core/s3/s3.config');
+const { putObject, deleteObject } = require('#core/s3/s3.config');
 const EquipmentImageModel = require('./images.model');
 const { normaliseImages, buildS3Key } = require('./images.helper');
+const { CATEGORY_IMAGE_PREFIX } = require('./images.constant');
 
 const fetchImageMap = async (regNos) => {
   const records = await EquipmentImageModel.find({ equipmentNo: { $in: regNos } }).lean();
@@ -44,10 +45,13 @@ const addImage = async (equipmentNo, imagePath, imageLabel, fileName, mimeType) 
 
     const equipmentNoStr = String(equipmentNo);
 
+    const existing = await EquipmentImageModel.findOne({ equipmentNo: equipmentNoStr }, { images: 1 }).lean();
+    const nextOrder = (existing?.images || []).reduce((max, img) => Math.max(max, img.order || 0), 1) + 1;
+
     const equipment = await EquipmentImageModel.findOneAndUpdate(
       { equipmentNo: equipmentNoStr },
       {
-        $push: { images: { path: imagePath, label: imageLabel, fileName, mimeType } },
+        $push: { images: { path: imagePath, label: imageLabel, fileName, mimeType, order: nextOrder } },
         $set: { updatedAt: new Date() },
         $setOnInsert: { equipmentName: `Equipment ${equipmentNoStr}`, createdAt: new Date() },
       },
@@ -86,7 +90,10 @@ const addImage = async (equipmentNo, imagePath, imageLabel, fileName, mimeType) 
 
 const addImages = async (equipmentNo, files) => {
   try {
-    const uploadData = await Promise.all(files.map((file, index) => uploadOneImage(equipmentNo, file, index)));
+    const uploadData = [];
+    for (let index = 0; index < files.length; index += 1) {
+      uploadData.push(await uploadOneImage(equipmentNo, files[index], index));
+    }
 
     return {
       status: HTTP.OK,
@@ -150,7 +157,73 @@ const getBulkImages = async (regNos) => {
   }
 };
 
+const removeImage = async (regNo, imagePath) => {
+  try {
+    const doc = await EquipmentImageModel.findOneAndUpdate(
+      { equipmentNo: regNo, 'images.path': imagePath },
+      { $pull: { images: { path: imagePath } }, $set: { updatedAt: new Date() } },
+      { new: true }
+    );
+    if (!doc) return { status: HTTP.NOT_FOUND, success: false, message: 'Image not found' };
+
+    if (!imagePath.startsWith(CATEGORY_IMAGE_PREFIX)) {
+      await deleteObject(imagePath).catch((err) => logger.warn('[ImagesService] removeImage s3:', err.message));
+    }
+
+    return { status: HTTP.OK, success: true, message: 'Image deleted successfully' };
+  } catch (err) {
+    logger.error('[ImagesService] removeImage:', err);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, success: false, message: err.message };
+  }
+};
+
+const replaceImage = async (regNo, oldPath, file) => {
+  try {
+    const ext = path.extname(file.fileName);
+    const s3Key = buildS3Key(regNo, file.fileName, 0, ext);
+
+    const result = await EquipmentImageModel.updateOne(
+      { equipmentNo: regNo, 'images.path': oldPath },
+      { $set: { 'images.$.path': s3Key, updatedAt: new Date() } }
+    );
+    if (!result.matchedCount) return { status: HTTP.NOT_FOUND, success: false, message: 'Image not found' };
+
+    const uploadUrl = await putObject(file.fileName, s3Key, file.mimeType);
+
+    if (!oldPath.startsWith(CATEGORY_IMAGE_PREFIX)) {
+      await deleteObject(oldPath).catch((err) => logger.warn('[ImagesService] replaceImage s3:', err.message));
+    }
+
+    return { status: HTTP.OK, success: true, message: 'Upload URL generated', data: { path: s3Key, uploadUrl } };
+  } catch (err) {
+    logger.error('[ImagesService] replaceImage:', err);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, success: false, message: err.message };
+  }
+};
+
+const reorderImages = async (regNo, paths) => {
+  try {
+    const doc = await EquipmentImageModel.findOne({ equipmentNo: regNo });
+    if (!doc) return { status: HTTP.NOT_FOUND, success: false, message: 'Equipment images not found' };
+
+    const orderByPath = new Map(paths.map((p, index) => [p, index + 1]));
+    doc.images.forEach((img) => {
+      if (orderByPath.has(img.path)) img.order = orderByPath.get(img.path);
+    });
+    doc.updatedAt = new Date();
+    await doc.save();
+
+    return { status: HTTP.OK, success: true, message: 'Image order updated successfully' };
+  } catch (err) {
+    logger.error('[ImagesService] reorderImages:', err);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, success: false, message: err.message };
+  }
+};
+
 module.exports = {
+  removeImage,
+  replaceImage,
+  reorderImages,
   addImage,
   addImages,
   getImages,

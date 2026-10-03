@@ -61,7 +61,49 @@ const getBulkEquipmentImages = async (req, res) => {
   }
 };
 
+const deleteEquipmentImage = async (req, res) => {
+  try {
+    const { equipmentNo, path } = req.body;
+    if (!equipmentNo || !path) {
+      return respond(res, { status: HTTP.BAD_REQUEST, success: false, message: 'equipmentNo and path are required' });
+    }
+    respond(res, await imagesService.removeImage(equipmentNo, path));
+  } catch (error) {
+    logger.error('[ImagesController] deleteEquipmentImage:', error);
+    respond(res, { status: HTTP.INTERNAL_SERVER_ERROR, success: false, message: error.message });
+  }
+};
+
+const replaceEquipmentImage = async (req, res) => {
+  try {
+    const { equipmentNo, path, file } = req.body;
+    if (!equipmentNo || !path || !file?.fileName || !file?.mimeType) {
+      return respond(res, { status: HTTP.BAD_REQUEST, success: false, message: 'equipmentNo, path and file are required' });
+    }
+    respond(res, await imagesService.replaceImage(equipmentNo, path, file));
+  } catch (error) {
+    logger.error('[ImagesController] replaceEquipmentImage:', error);
+    respond(res, { status: HTTP.INTERNAL_SERVER_ERROR, success: false, message: error.message });
+  }
+};
+
+const reorderEquipmentImages = async (req, res) => {
+  try {
+    const { equipmentNo, paths } = req.body;
+    if (!equipmentNo || !Array.isArray(paths) || !paths.length) {
+      return respond(res, { status: HTTP.BAD_REQUEST, success: false, message: 'equipmentNo and paths are required' });
+    }
+    respond(res, await imagesService.reorderImages(equipmentNo, paths));
+  } catch (error) {
+    logger.error('[ImagesController] reorderEquipmentImages:', error);
+    respond(res, { status: HTTP.INTERNAL_SERVER_ERROR, success: false, message: error.message });
+  }
+};
+
 module.exports = {
+  deleteEquipmentImage,
+  replaceEquipmentImage,
+  reorderEquipmentImages,
   getEquipmentImages,
   addEquipmentImage,
   getBulkEquipmentImages,

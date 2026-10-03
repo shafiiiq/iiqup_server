@@ -1,80 +1,25 @@
-// models/document.model.js
 const mongoose = require('mongoose');
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Sub-schemas
-// ─────────────────────────────────────────────────────────────────────────────
-
-const documentFileSchema = new mongoose.Schema(
-  {
-    date: { type: String },
-    expiry: { type: String },
-    filename: { type: String },
-    displayFileName: { type: String },
-    path: { type: String, required: true },
-    mimetype: {
-      type: String,
-      required: true,
-      default: 'application/octet-stream',
-    },
-  },
-  {
-    timestamps: true,
-  }
-);
-
-const documentSourceSchema = new mongoose.Schema(
-  {
-    source: {
-      type: String,
-      enum: ['staff', 'mechanic', 'operator', 'equipment'],
-    },
-    sourceId: { type: String },
-    sourceModel: {
-      type: String,
-      enum: [
-        'Staff Model',
-        'Mechanic Model',
-        'Opertor Model',
-        'Equipment Model',
-      ],
-    },
-  },
-  {
-    timestamps: true,
-  }
-);
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Main Schema
-// ─────────────────────────────────────────────────────────────────────────────
 
 const documentSchema = new mongoose.Schema(
   {
-    // Identity
-    SourceId: { type: String, required: true, trim: true },
-    documentType: { type: String, required: true, trim: true },
-    category: { type: String, required: true, trim: true },
-    regNo: { type: String, trim: true },
-    description: { type: String, trim: true },
-
-    // Files & Sources
-    files: { type: [documentFileSchema], default: [] },
-    documentSource: { type: [documentSourceSchema], default: [] },
+    sourceType: { type: String, required: true, enum: ['equipment', 'operator', 'mechanic', 'staff'], index: true },
+    sourceId: { type: String, required: true, index: true },
+    displayName: { type: String, required: true, trim: true },
+    originalFileName: { type: String, required: true },
+    s3Key: { type: String, required: true },
+    mimeType: { type: String, required: true, default: 'application/octet-stream' },
+    fileSize: { type: Number, default: 0 },
+    issueDate: { type: Date, default: null },
+    expiryDate: { type: Date, default: null },
+    renewalStatus: { type: String, enum: ['none', 'renewed', 'expired'], default: 'none' },
+    renewedFromDocumentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Document', default: null },
+    uploadSessionId: { type: String, unique: true, sparse: true },
+    folderId: { type: mongoose.Schema.Types.ObjectId, ref: 'DocumentFolder', default: null, index: true },
+    uploadedBy: { type: String },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Indexes
-// ─────────────────────────────────────────────────────────────────────────────
-
-documentSchema.index({ regNo: 1, documentType: 1 });
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Export
-// ─────────────────────────────────────────────────────────────────────────────
+documentSchema.index({ sourceType: 1, sourceId: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Document', documentSchema);

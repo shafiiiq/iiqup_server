@@ -1,21 +1,21 @@
 const express = require('express');
-const router = express.Router();
-
 const controller = require('./document.controller');
-const { paginationMiddleware } = require('#middlewares/pagination.middleware');
 const { authMiddleware } = require('#middlewares/jwt.middleware');
 
-router.get('/get-all-documents', authMiddleware, paginationMiddleware, controller.getAllDocuments);
-router.get('/get-all-documents-types', authMiddleware, paginationMiddleware, controller.getAllDocumentTypes);
-router.get('/get-documents/:type/:id', authMiddleware, paginationMiddleware, controller.getDocumentsBySource);
-router.post('/upload-document', authMiddleware, controller.uploadDocument);
-router.put('/rename-file/:documentId', authMiddleware, controller.renameFile);
-router.delete('/delete/:documentId', authMiddleware, controller.deleteDocument);
+const router = express.Router();
 
-router.post('/merge-pdfs', authMiddleware, controller.mergePDFs);
-router.post('/split-pdf', authMiddleware, controller.splitPDF);
-
-router.get('/download/:documentId', authMiddleware, controller.downloadDocument);
-router.get('/view/:documentId', controller.viewDocument);
+router.get('/source/:sourceType/:sourceId', authMiddleware, controller.getDocumentsBySource);
+router.post('/register-uploads', authMiddleware, controller.registerUploadedDocuments);
+router.post('/merge', authMiddleware, controller.mergeDocuments);
+router.post('/:documentId/renew', authMiddleware, controller.renewDocument);
+router.post('/:documentId/split', authMiddleware, controller.splitDocument);
+router.put('/:documentId/dates', authMiddleware, controller.updateDocumentDates);
+router.put('/:documentId/rename', authMiddleware, controller.renameDocument);
+router.get('/folders/:sourceType/:sourceId', authMiddleware, controller.getFoldersBySource);
+router.post('/folders', authMiddleware, controller.createFolder);
+router.put('/folders/:folderId/rename', authMiddleware, controller.renameFolder);
+router.put('/:documentId/move', authMiddleware, controller.moveDocument);
+router.post('/:documentId/copy', authMiddleware, controller.copyDocument);
+router.delete('/:documentId', authMiddleware, controller.deleteDocument);
 
 module.exports = router;
