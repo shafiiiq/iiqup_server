@@ -67,6 +67,21 @@ const resolvePlacement = async ({ sourceType, sourceId, folderId, area }) => {
   return { folderId: null, area: normalizeArea(area, sourceType) };
 };
 
+const resolveDestination = async ({
+  targetSourceType,
+  targetSourceId,
+  currentSourceType,
+  currentSourceId,
+  folderId,
+  area,
+}) => {
+  const sourceType = targetSourceType || currentSourceType;
+  const sourceId = targetSourceId || currentSourceId;
+  await requireSource(sourceType, sourceId);
+  const placement = await resolvePlacement({ sourceType, sourceId, folderId, area });
+  return { sourceType, sourceId, folderId: placement.folderId, area: placement.area };
+};
+
 const assertFolderNameAvailable = async ({ sourceType, sourceId, parentFolderId, name, area, excludeFolderId }) => {
   const filter = { sourceType, sourceId, parentFolderId, name, area: buildAreaFilter(area || 'all'), deletedAt: null };
   if (excludeFolderId) filter._id = { $ne: excludeFolderId };
@@ -180,7 +195,8 @@ const registerUploadedDocuments = async ({
 
   for (const directoryPath of emptyDirectories) await resolveDirectory(directoryPath);
 
-  const sessions = await getCompletedSessions({ sessionIds, uploadedBy, feature: DOCUMENT_UPLOAD_FEATURE });
+  const sessions =
+    sessionIds.length > 0 ? await getCompletedSessions({ sessionIds, uploadedBy, feature: DOCUMENT_UPLOAD_FEATURE }) : [];
   sessions.forEach((session) => assertSessionBelongsToSource(session, sourceType, sourceId));
 
   const alreadyRegisteredSessionIds = await documentModel.distinct('uploadSessionId', {
@@ -331,41 +347,6 @@ const splitDocument = async ({ documentId, splitType, pages, uploadedBy }) => {
   return { status: HTTP.CREATED, message: 'PDF split', data };
 };
 
-const copyDocument = async ({ documentId, folderId, area, uploadedBy }) => {
-  const sourceDocument = await requireDocument(documentId);
-  const placement = await resolvePlacement({
-    sourceType: sourceDocument.sourceType,
-    sourceId: sourceDocument.sourceId,
-    folderId,
-    area,
-  });
-
-  const copiedS3Key = buildS3Key(
-    DOCUMENT_UPLOAD_FEATURE,
-    buildDocumentKeyPrefix(sourceDocument.sourceType, sourceDocument.sourceId),
-    sourceDocument.originalFileName
-  );
-  await copyObject(sourceDocument.s3Key, copiedS3Key);
-
-  const copiedDocument = await documentModel.create({
-    folderId: placement.folderId,
-    area: placement.area,
-    sourceType: sourceDocument.sourceType,
-    sourceId: sourceDocument.sourceId,
-    displayName: `${sourceDocument.displayName} (Copy)`,
-    originalFileName: sourceDocument.originalFileName,
-    s3Key: copiedS3Key,
-    mimeType: sourceDocument.mimeType,
-    fileSize: sourceDocument.fileSize,
-    issueDate: sourceDocument.issueDate,
-    expiryDate: sourceDocument.expiryDate,
-    uploadedBy,
-  });
-
-  refreshDashboard();
-  return { status: HTTP.CREATED, message: 'Document copied', data: await serializeDocument(copiedDocument) };
-};
-
 const getFoldersBySource = async ({ sourceType, sourceId }) => {
   await requireSource(sourceType, sourceId);
   const folders = await documentFolderModel.find({ sourceType, sourceId, deletedAt: null }).sort({ name: 1 }).lean();
@@ -407,20 +388,6 @@ const renameFolder = async ({ folderId, name }) => {
   folderItem.name = name;
   await folderItem.save();
   return { status: HTTP.OK, message: 'Folder renamed', data: serializeFolder(folderItem) };
-};
-
-const moveDocument = async ({ documentId, folderId, area }) => {
-  const documentItem = await requireDocument(documentId);
-  const placement = await resolvePlacement({
-    sourceType: documentItem.sourceType,
-    sourceId: documentItem.sourceId,
-    folderId,
-    area,
-  });
-  documentItem.folderId = placement.folderId;
-  documentItem.area = placement.area;
-  await documentItem.save();
-  return { status: HTTP.OK, message: 'Document moved', data: await serializeDocument(documentItem) };
 };
 
 const normalizeRotation = (value) => {
@@ -475,12 +442,68 @@ const buildAvailableFolderName = async ({ sourceType, sourceId, parentFolderId, 
   return candidate;
 };
 
-const copyFolderTree = async ({ sourceFolder, targetParentId, area, name, uploadedBy }) => {
-  const createdFolder = await documentFolderModel.create({
-    sourceType: sourceFolder.sourceType,
-    sourceId: sourceFolder.sourceId,
-    parentFolderId: targetParentId,
+const copyDocument = async ({ documentId, folderId, area, targetSourceType, targetSourceId, uploadedBy }) => {
+  const sourceDocument = await requireDocument(documentId);
+  const destination = await resolveDestination({
+    targetSourceType,
+    targetSourceId,
+    currentSourceType: sourceDocument.sourceType,
+    currentSourceId: sourceDocument.sourceId,
+    folderId,
     area,
+  });
+
+  const copiedS3Key = buildS3Key(
+    DOCUMENT_UPLOAD_FEATURE,
+    buildDocumentKeyPrefix(destination.sourceType, destination.sourceId),
+    sourceDocument.originalFileName
+  );
+  await copyObject(sourceDocument.s3Key, copiedS3Key);
+
+  const copiedDocument = await documentModel.create({
+    folderId: destination.folderId,
+    area: destination.area,
+    sourceType: destination.sourceType,
+    sourceId: destination.sourceId,
+    displayName: `${sourceDocument.displayName} (Copy)`,
+    originalFileName: sourceDocument.originalFileName,
+    s3Key: copiedS3Key,
+    mimeType: sourceDocument.mimeType,
+    fileSize: sourceDocument.fileSize,
+    issueDate: sourceDocument.issueDate,
+    expiryDate: sourceDocument.expiryDate,
+    uploadedBy,
+  });
+
+  refreshDashboard();
+  return { status: HTTP.CREATED, message: 'Document copied', data: await serializeDocument(copiedDocument) };
+};
+
+const moveDocument = async ({ documentId, folderId, area, targetSourceType, targetSourceId }) => {
+  const documentItem = await requireDocument(documentId);
+  const destination = await resolveDestination({
+    targetSourceType,
+    targetSourceId,
+    currentSourceType: documentItem.sourceType,
+    currentSourceId: documentItem.sourceId,
+    folderId,
+    area,
+  });
+  documentItem.sourceType = destination.sourceType;
+  documentItem.sourceId = destination.sourceId;
+  documentItem.folderId = destination.folderId;
+  documentItem.area = destination.area;
+  await documentItem.save();
+  refreshDashboard();
+  return { status: HTTP.OK, message: 'Document moved', data: await serializeDocument(documentItem) };
+};
+
+const copyFolderTree = async ({ sourceFolder, targetParentId, destination, name, uploadedBy }) => {
+  const createdFolder = await documentFolderModel.create({
+    sourceType: destination.sourceType,
+    sourceId: destination.sourceId,
+    parentFolderId: targetParentId,
+    area: destination.area,
     name,
   });
 
@@ -488,15 +511,15 @@ const copyFolderTree = async ({ sourceFolder, targetParentId, area, name, upload
   for (const sourceDocument of folderDocuments) {
     const copiedS3Key = buildS3Key(
       DOCUMENT_UPLOAD_FEATURE,
-      buildDocumentKeyPrefix(sourceDocument.sourceType, sourceDocument.sourceId),
+      buildDocumentKeyPrefix(destination.sourceType, destination.sourceId),
       sourceDocument.originalFileName
     );
     await copyObject(sourceDocument.s3Key, copiedS3Key);
     await documentModel.create({
       folderId: createdFolder._id,
-      area,
-      sourceType: sourceDocument.sourceType,
-      sourceId: sourceDocument.sourceId,
+      area: destination.area,
+      sourceType: destination.sourceType,
+      sourceId: destination.sourceId,
       displayName: sourceDocument.displayName,
       originalFileName: sourceDocument.originalFileName,
       s3Key: copiedS3Key,
@@ -513,7 +536,7 @@ const copyFolderTree = async ({ sourceFolder, targetParentId, area, name, upload
     await copyFolderTree({
       sourceFolder: childFolder,
       targetParentId: createdFolder._id,
-      area,
+      destination,
       name: childFolder.name,
       uploadedBy,
     });
@@ -522,59 +545,79 @@ const copyFolderTree = async ({ sourceFolder, targetParentId, area, name, upload
   return createdFolder;
 };
 
-const moveFolder = async ({ folderId, parentFolderId, area }) => {
+const moveFolder = async ({ folderId, parentFolderId, area, targetSourceType, targetSourceId }) => {
   const folderItem = await requireFolderById(folderId);
-  const { sourceType, sourceId } = folderItem;
   const treeIds = await collectFolderTreeIds(folderItem);
-  const placement = await resolvePlacement({ sourceType, sourceId, folderId: parentFolderId, area });
+  const destination = await resolveDestination({
+    targetSourceType,
+    targetSourceId,
+    currentSourceType: folderItem.sourceType,
+    currentSourceId: folderItem.sourceId,
+    folderId: parentFolderId,
+    area,
+  });
 
-  if (placement.folderId && treeIds.includes(String(placement.folderId))) {
+  if (destination.folderId && treeIds.includes(String(destination.folderId))) {
     throw new AppError('A folder cannot be moved into itself', HTTP.BAD_REQUEST);
   }
 
   await assertFolderNameAvailable({
-    sourceType,
-    sourceId,
-    parentFolderId: placement.folderId,
-    area: placement.area,
+    sourceType: destination.sourceType,
+    sourceId: destination.sourceId,
+    parentFolderId: destination.folderId,
+    area: destination.area,
     name: folderItem.name,
     excludeFolderId: folderItem._id,
   });
 
-  const previousArea = folderItem.area || 'all';
-  folderItem.parentFolderId = placement.folderId;
-  folderItem.area = placement.area;
+  const hasPlacementChanged =
+    (folderItem.area || 'all') !== destination.area ||
+    folderItem.sourceType !== destination.sourceType ||
+    folderItem.sourceId !== destination.sourceId;
+
+  folderItem.parentFolderId = destination.folderId;
+  folderItem.sourceType = destination.sourceType;
+  folderItem.sourceId = destination.sourceId;
+  folderItem.area = destination.area;
   await folderItem.save();
 
-  if (previousArea !== placement.area) {
-    await documentFolderModel.updateMany({ _id: { $in: treeIds } }, { $set: { area: placement.area } });
-    await documentModel.updateMany({ folderId: { $in: treeIds } }, { $set: { area: placement.area } });
+  if (hasPlacementChanged) {
+    const placementFields = { sourceType: destination.sourceType, sourceId: destination.sourceId, area: destination.area };
+    await documentFolderModel.updateMany({ _id: { $in: treeIds } }, { $set: placementFields });
+    await documentModel.updateMany({ folderId: { $in: treeIds } }, { $set: placementFields });
   }
+  refreshDashboard();
   return { status: HTTP.OK, message: 'Folder moved', data: serializeFolder(folderItem) };
 };
 
-const copyFolder = async ({ folderId, parentFolderId, area, uploadedBy }) => {
+const copyFolder = async ({ folderId, parentFolderId, area, targetSourceType, targetSourceId, uploadedBy }) => {
   const sourceFolder = await requireFolderById(folderId);
-  const { sourceType, sourceId } = sourceFolder;
-  const placement = await resolvePlacement({ sourceType, sourceId, folderId: parentFolderId, area });
   const treeIds = await collectFolderTreeIds(sourceFolder);
+  const destination = await resolveDestination({
+    targetSourceType,
+    targetSourceId,
+    currentSourceType: sourceFolder.sourceType,
+    currentSourceId: sourceFolder.sourceId,
+    folderId: parentFolderId,
+    area,
+  });
 
-  if (placement.folderId && treeIds.includes(String(placement.folderId))) {
+  if (destination.folderId && treeIds.includes(String(destination.folderId))) {
     throw new AppError('A folder cannot be copied into itself', HTTP.BAD_REQUEST);
   }
 
   const name = await buildAvailableFolderName({
-    sourceType,
-    sourceId,
-    parentFolderId: placement.folderId,
-    area: placement.area,
+    sourceType: destination.sourceType,
+    sourceId: destination.sourceId,
+    parentFolderId: destination.folderId,
+    area: destination.area,
     name: sourceFolder.name,
   });
 
   const createdFolder = await copyFolderTree({
     sourceFolder,
-    targetParentId: placement.folderId,
-    area: placement.area,
+    targetParentId: destination.folderId,
+    destination,
     name,
     uploadedBy,
   });

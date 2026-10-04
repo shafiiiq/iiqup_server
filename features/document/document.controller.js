@@ -47,7 +47,7 @@ const MAXIMUM_EMPTY_DIRECTORIES = 5000;
 const registerUploadedDocuments = handleRoute('registerUploadedDocuments', async (req) => {
   const { sourceType, sourceId, sessionIds, folderId, area, directoryBySessionId, emptyDirectories } = req.body;
   assertSourceType(sourceType);
-  if (!sourceId || !Array.isArray(sessionIds) || sessionIds.length === 0) {
+  if (!sourceId || !Array.isArray(sessionIds)) {
     throw new AppError('sourceId and sessionIds are required', HTTP.BAD_REQUEST);
   }
   return documentService.registerUploadedDocuments({
@@ -140,11 +140,21 @@ const renameFolder = handleRoute('renameFolder', async (req) =>
   documentService.renameFolder({ folderId: req.params.folderId, name: normalizeFolderName(req.body.name) })
 );
 
+const parseTargetSource = (body) => {
+  if (!body.targetSourceType) return {};
+  assertSourceType(body.targetSourceType);
+  if (!body.targetSourceId || typeof body.targetSourceId !== 'string') {
+    throw new AppError('targetSourceId is required', HTTP.BAD_REQUEST);
+  }
+  return { targetSourceType: body.targetSourceType, targetSourceId: body.targetSourceId };
+};
+
 const copyDocument = handleRoute('copyDocument', async (req) =>
   documentService.copyDocument({
     documentId: req.params.documentId,
     folderId: req.body.folderId || null,
     area: req.body.area,
+    ...parseTargetSource(req.body),
     uploadedBy: req.userId,
   })
 );
@@ -154,6 +164,7 @@ const moveDocument = handleRoute('moveDocument', async (req) =>
     documentId: req.params.documentId,
     folderId: req.body.folderId || null,
     area: req.body.area,
+    ...parseTargetSource(req.body),
   })
 );
 
@@ -162,6 +173,7 @@ const moveFolder = handleRoute('moveFolder', async (req) =>
     folderId: req.params.folderId,
     parentFolderId: req.body.parentFolderId || null,
     area: req.body.area,
+    ...parseTargetSource(req.body),
   })
 );
 
@@ -170,6 +182,7 @@ const copyFolder = handleRoute('copyFolder', async (req) =>
     folderId: req.params.folderId,
     parentFolderId: req.body.parentFolderId || null,
     area: req.body.area,
+    ...parseTargetSource(req.body),
     uploadedBy: req.userId,
   })
 );
