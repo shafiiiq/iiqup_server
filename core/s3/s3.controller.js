@@ -6,9 +6,10 @@ const s3Service = require('./s3.service')
 const retrivePresignedUrl = async (req, res) => {
   try {
     const { key, isLong, isAuthSign } = req.body
+    const downloadFileName = typeof req.body.downloadFileName === 'string' ? req.body.downloadFileName.slice(0, 255) : ''
     if (!key) return res.status(HTTP.BAD_REQUEST).json({ success: false, message: 'key is required' })
 
-    const result = await s3Service.fetchPresignedURL(key, isLong, isAuthSign)
+    const result = await s3Service.fetchPresignedURL(key, isLong, isAuthSign, downloadFileName)
 
     if (!result.ok) {
       return res.status(result.status).json({ success: false, message: result.message })

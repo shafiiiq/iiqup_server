@@ -51,6 +51,18 @@ const pushTokenSchema = new mongoose.Schema(
 );
 
 
+const profilePicSchema = new mongoose.Schema(
+  {
+    fileName: { type: String },
+    originalName: { type: String },
+    filePath: { type: String },
+    mimeType: { type: String },
+    uploadDate: { type: Date, default: Date.now },
+    url: { type: String },
+  },
+  { _id: false }
+);
+
 const mechanicSchema = new mongoose.Schema(
   {
     name: { type: String, required: [true, 'Mechanic name is required'], trim: true, },
@@ -67,6 +79,7 @@ const mechanicSchema = new mongoose.Schema(
     toolkits: { type: [toolkitSchema], default: [] },
     attendance: { type: [attendanceRecordSchema], default: [] },
     pushTokens: { type: [pushTokenSchema], default: [] },
+    profilePic: { type: profilePicSchema, default: () => ({}) },
     permissions: {type: Array, default: []},
   },
   {

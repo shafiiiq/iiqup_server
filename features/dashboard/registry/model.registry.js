@@ -65,7 +65,7 @@ const REGISTRY = [
   { key: 'complaints', label: 'Complaints', direction: DIRECTION.LOSS, model: complaintModel },
   { key: 'lpo', label: 'LPO', direction: DIRECTION.LOSS, model: lpoModel },
   { key: 'backcharge', label: 'Backcharge', direction: DIRECTION.GROWTH, model: backchargeModel },
-  { key: 'document', label: 'Documents', direction: DIRECTION.NEUTRAL, model: documentModel },
+  { key: 'document', label: 'Documents', direction: DIRECTION.NEUTRAL, model: createFilteredModel(documentModel, 'deletedAt', null) },
 ];
 
 module.exports = { REGISTRY, DIRECTION };

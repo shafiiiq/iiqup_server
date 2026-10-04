@@ -11,6 +11,7 @@ const {
   AbortMultipartUploadCommand,
 } = require('@aws-sdk/client-s3')
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner')
+const { Upload } = require('@aws-sdk/lib-storage')
 require('dotenv').config()
 
 const AUTH_SIGN_EXPIRY_SECONDS = 100
@@ -32,9 +33,37 @@ const getExpiresIn = (isLong, isAuthSign) => {
   return DEFAULT_EXPIRY_SECONDS
 }
 
-const getObjectUrl = async (key, isLong, isAuthSign = false) => {
-  const command = new GetObjectCommand({ Bucket: process.env.BUCKET_NAME, Key: key })
+const buildContentDisposition = (downloadFileName) => {
+  const asciiFileName = downloadFileName.replace(/[^\x20-\x7E]|["\\;]/g, '_')
+  const encodedFileName = encodeURIComponent(downloadFileName).replace(
+    /['()*]/g,
+    (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+  )
+  return `attachment; filename="${asciiFileName}"; filename*=UTF-8''${encodedFileName}`
+}
+
+const getObjectUrl = async (key, isLong, isAuthSign = false, downloadFileName = '') => {
+  const command = new GetObjectCommand({
+    Bucket: process.env.BUCKET_NAME,
+    Key: key,
+    ...(downloadFileName ? { ResponseContentDisposition: buildContentDisposition(downloadFileName) } : {}),
+  })
   return getSignedUrl(s3Client, command, { expiresIn: getExpiresIn(isLong, isAuthSign) })
+}
+
+const getObjectStream = async (key) => {
+  const response = await s3Client.send(new GetObjectCommand({ Bucket: process.env.BUCKET_NAME, Key: key }))
+  return response.Body
+}
+
+const uploadStream = async (key, bodyStream, contentType) => {
+  const upload = new Upload({
+    client: s3Client,
+    params: { Bucket: process.env.BUCKET_NAME, Key: key, Body: bodyStream, ContentType: contentType },
+    queueSize: 4,
+    partSize: 8 * 1024 * 1024,
+  })
+  await upload.done()
 }
 
 const putObject = async (fileName, key, contentType) => {
@@ -99,6 +128,8 @@ module.exports = {
   putObject,
   deleteObject,
   copyObject,
+  getObjectStream,
+  uploadStream,
   objectExists,
   createMultipartUpload,
   getUploadPartUrl,

@@ -11,6 +11,7 @@ const mechanicRouter = require('#features/user/mechanic/mechanic.router');
 const operatorRouter = require('#features/user/operator/operator.router');
 const authNRouter = require('#core/authN/authN.router');
 const authZRouter = require('#core/authZ/authZ.router');
+const oauthRouter =require('#core/oauth/oauth.router')
 const fuelRouter = require('#features/fuel/fuel.router');
 const attendanceRouter = require('#features/attendance/attendance.router');
 const backchargeRouter = require('#features/backcharge/backcharge.router');
@@ -42,6 +43,7 @@ const publicRoutes = [
   { path: '/api/v1/users/mechanics', router: mechanicRouter },
   { path: '/api/v1/users/operators', router: operatorRouter },
   { path: '/api/v1/authn', router: authNRouter },
+  { path: '/api/v1/oauth', router: oauthRouter },
   { path: '/api/v1/fuels', router: fuelRouter },
   { path: '/api/v1/attendance', router: attendanceRouter },
   { path: '/api/v1/backcharge', router: backchargeRouter },

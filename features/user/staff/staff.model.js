@@ -72,6 +72,18 @@ const exploredFeatureSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const profilePicSchema = new mongoose.Schema(
+  {
+    fileName: { type: String },
+    originalName: { type: String },
+    filePath: { type: String },
+    mimeType: { type: String },
+    uploadDate: { type: Date, default: Date.now },
+    url: { type: String },
+  },
+  { _id: false }
+);
+
 const userSchema = new mongoose.Schema(
   {
     name: { type: String, required: [true, 'Name is required'], trim: true },
@@ -84,6 +96,8 @@ const userSchema = new mongoose.Schema(
     userType: { type: String, required: [true, 'UserType is required'], default: 'staff' },
     tag: { type: String, required: [true, 'tag is required'], default: process.env.TAG_CODE },
     department: { type: String, trim: true },
+    designation: { type: String, trim: true, default: '' },
+    profilePic: { type: profilePicSchema, default: () => ({}) },
     password: {
       type: String,
       required: [true, 'Password is required'],

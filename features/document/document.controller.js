@@ -3,6 +3,9 @@ const HTTP = require('#shared/response/response.status');
 const { AppError } = require('#shared/errors/error.http');
 const { sendSuccess, sendError } = require('#shared/response/response.sender');
 const documentService = require('./document.service');
+const trashService = require('./document.trash.service');
+const archiveService = require('./document.archive.service');
+const convertService = require('./document.convert.service');
 const { SUPPORTED_SOURCE_TYPES, isValidDateInput } = require('./document.helper');
 
 const MAXIMUM_DISPLAY_NAME_LENGTH = 150;
@@ -39,8 +42,10 @@ const getDocumentsBySource = handleRoute('getDocumentsBySource', async (req) => 
   return documentService.getDocumentsBySource({ sourceType, sourceId });
 });
 
+const MAXIMUM_EMPTY_DIRECTORIES = 5000;
+
 const registerUploadedDocuments = handleRoute('registerUploadedDocuments', async (req) => {
-  const { sourceType, sourceId, sessionIds, folderId } = req.body;
+  const { sourceType, sourceId, sessionIds, folderId, area, directoryBySessionId, emptyDirectories } = req.body;
   assertSourceType(sourceType);
   if (!sourceId || !Array.isArray(sessionIds) || sessionIds.length === 0) {
     throw new AppError('sourceId and sessionIds are required', HTTP.BAD_REQUEST);
@@ -50,6 +55,11 @@ const registerUploadedDocuments = handleRoute('registerUploadedDocuments', async
     sourceId,
     sessionIds,
     folderId: folderId || null,
+    area,
+    directoryBySessionId: directoryBySessionId && typeof directoryBySessionId === 'object' ? directoryBySessionId : {},
+    emptyDirectories: Array.isArray(emptyDirectories)
+      ? emptyDirectories.filter((entry) => typeof entry === 'string').slice(0, MAXIMUM_EMPTY_DIRECTORIES)
+      : [],
     uploadedBy: req.userId,
   });
 });
@@ -77,10 +87,6 @@ const renameDocument = handleRoute('renameDocument', async (req) => {
   }
   return documentService.renameDocument({ documentId, newFileName });
 });
-
-const deleteDocument = handleRoute('deleteDocument', async (req) =>
-  documentService.deleteDocument({ documentId: req.params.documentId })
-);
 
 const mergeDocuments = handleRoute('mergeDocuments', async (req) => {
   const { sourceType, sourceId, documentIds } = req.body;
@@ -118,13 +124,14 @@ const getFoldersBySource = handleRoute('getFoldersBySource', async (req) => {
 });
 
 const createFolder = handleRoute('createFolder', async (req) => {
-  const { sourceType, sourceId, parentFolderId } = req.body;
+  const { sourceType, sourceId, parentFolderId, area } = req.body;
   assertSourceType(sourceType);
   if (!sourceId) throw new AppError('sourceId is required', HTTP.BAD_REQUEST);
   return documentService.createFolder({
     sourceType,
     sourceId,
     parentFolderId: parentFolderId || null,
+    area,
     name: normalizeFolderName(req.body.name),
   });
 });
@@ -137,18 +144,24 @@ const copyDocument = handleRoute('copyDocument', async (req) =>
   documentService.copyDocument({
     documentId: req.params.documentId,
     folderId: req.body.folderId || null,
+    area: req.body.area,
     uploadedBy: req.userId,
   })
 );
 
 const moveDocument = handleRoute('moveDocument', async (req) =>
-  documentService.moveDocument({ documentId: req.params.documentId, folderId: req.body.folderId || null })
+  documentService.moveDocument({
+    documentId: req.params.documentId,
+    folderId: req.body.folderId || null,
+    area: req.body.area,
+  })
 );
 
 const moveFolder = handleRoute('moveFolder', async (req) =>
   documentService.moveFolder({
     folderId: req.params.folderId,
     parentFolderId: req.body.parentFolderId || null,
+    area: req.body.area,
   })
 );
 
@@ -156,12 +169,9 @@ const copyFolder = handleRoute('copyFolder', async (req) =>
   documentService.copyFolder({
     folderId: req.params.folderId,
     parentFolderId: req.body.parentFolderId || null,
+    area: req.body.area,
     uploadedBy: req.userId,
   })
-);
-
-const deleteFolder = handleRoute('deleteFolder', async (req) =>
-  documentService.deleteFolder({ folderId: req.params.folderId })
 );
 
 const editDocumentPages = handleRoute('editDocumentPages', async (req) => {
@@ -181,10 +191,102 @@ const mergeDocumentPages = handleRoute('mergeDocumentPages', async (req) => {
   return documentService.mergeDocumentPages({ sourceType, sourceId, pages, uploadedBy: req.userId });
 });
 
+const MAXIMUM_BULK_ITEMS = 500;
+
+const parseIdList = (value) => {
+  const ids = Array.isArray(value) ? value.map(String) : [];
+  if (ids.length > MAXIMUM_BULK_ITEMS) throw new AppError(`At most ${MAXIMUM_BULK_ITEMS} items per request`, HTTP.BAD_REQUEST);
+  return ids;
+};
+
+const parseSelection = (body) => {
+  const documentIds = parseIdList(body.documentIds);
+  const folderIds = parseIdList(body.folderIds);
+  if (documentIds.length + folderIds.length === 0) throw new AppError('Nothing selected', HTTP.BAD_REQUEST);
+  return { documentIds, folderIds };
+};
+
+const trashItems = handleRoute('trashItems', async (req) =>
+  trashService.trashItems({ ...parseSelection(req.body), deletedBy: req.userId })
+);
+
+const getTrashSources = handleRoute('getTrashSources', async () => trashService.getTrashSources());
+
+const getTrashItems = handleRoute('getTrashItems', async (req) => {
+  const { sourceType, sourceId } = req.params;
+  assertSourceType(sourceType);
+  return trashService.getTrashItems({ sourceType, sourceId });
+});
+
+const restoreTrashItems = handleRoute('restoreTrashItems', async (req) =>
+  trashService.restoreItems(parseSelection(req.body))
+);
+
+const deleteItemsPermanently = handleRoute('deleteItemsPermanently', async (req) =>
+  trashService.permanentlyDeleteItems(parseSelection(req.body))
+);
+
+const emptyTrash = handleRoute('emptyTrash', async (req) => {
+  const { sourceType, sourceId } = req.body;
+  if (sourceType || sourceId) assertSourceType(sourceType);
+  return trashService.emptyTrash({ sourceType, sourceId });
+});
+
+const compressItems = handleRoute('compressItems', async (req) => {
+  const { sourceType, sourceId, folderId } = req.body;
+  assertSourceType(sourceType);
+  if (!sourceId) throw new AppError('sourceId is required', HTTP.BAD_REQUEST);
+  return archiveService.compressItems({
+    sourceType,
+    sourceId,
+    ...parseSelection(req.body),
+    targetFolderId: folderId || null,
+    area: req.body.area,
+    uploadedBy: req.userId,
+  });
+});
+
+const extractDocument = handleRoute('extractDocument', async (req) =>
+  archiveService.extractDocument({ documentId: req.params.documentId, uploadedBy: req.userId })
+);
+
+const RENEWAL_STATUSES = ['none', 'renewed', 'expired'];
+
+const setRenewalStatus = handleRoute('setRenewalStatus', async (req) => {
+  const { renewalStatus } = req.body;
+  if (!RENEWAL_STATUSES.includes(renewalStatus)) throw new AppError('Invalid renewal status', HTTP.BAD_REQUEST);
+  return documentService.setRenewalStatus({ documentId: req.params.documentId, renewalStatus });
+});
+
+const getStorageSummary = handleRoute('getStorageSummary', async () => documentService.getStorageSummary());
+
+const convertDocuments = handleRoute('convertDocuments', async (req) => {
+  const { sourceType, sourceId, conversion } = req.body;
+  assertSourceType(sourceType);
+  if (!sourceId) throw new AppError('sourceId is required', HTTP.BAD_REQUEST);
+  const { documentIds } = parseSelection({ documentIds: req.body.documentIds, folderIds: [] });
+  return convertService.convertDocuments({ sourceType, sourceId, conversion, documentIds, uploadedBy: req.userId });
+});
+
+const getPreviewPdfUrl = handleRoute('getPreviewPdfUrl', async (req) =>
+  convertService.getPreviewPdfUrl({ documentId: req.params.documentId })
+);
+
 module.exports = {
+  getStorageSummary,
+  convertDocuments,
+  getPreviewPdfUrl,
+  setRenewalStatus,
+  trashItems,
+  getTrashSources,
+  getTrashItems,
+  restoreTrashItems,
+  deleteItemsPermanently,
+  emptyTrash,
+  compressItems,
+  extractDocument,
   moveFolder,
   copyFolder,
-  deleteFolder,
   editDocumentPages,
   mergeDocumentPages,
   copyDocument,
@@ -197,7 +299,6 @@ module.exports = {
   renewDocument,
   updateDocumentDates,
   renameDocument,
-  deleteDocument,
   mergeDocuments,
   splitDocument,
 };

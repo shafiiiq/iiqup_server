@@ -6,7 +6,7 @@ const NOT_FOUND_STATUS = 404
 const OK_STATUS = 200
 const SERVER_ERROR_STATUS = 500
 
-const fetchPresignedURL = async (s3Key, isLong, isAuthSign = false) => {
+const fetchPresignedURL = async (s3Key, isLong, isAuthSign = false, downloadFileName = '') => {
   try {
     const exists = await objectExists(s3Key)
     if (!exists) {
@@ -14,7 +14,7 @@ const fetchPresignedURL = async (s3Key, isLong, isAuthSign = false) => {
       return { status: NOT_FOUND_STATUS, ok: false, message: 'S3 object not found' }
     }
 
-    const dataUrl = await getObjectUrl(s3Key, isLong, isAuthSign)
+    const dataUrl = await getObjectUrl(s3Key, isLong, isAuthSign, downloadFileName)
     logger.info('[S3Service] fetchPresignedURL success', { s3Key, isLong, isAuthSign })
 
     return { status: OK_STATUS, ok: true, dataUrl }

@@ -2,6 +2,7 @@ const logger = require('#shared/logger/logger')
 const { resolveAuthHandler } = require('./authN.resolver');
 const HTTP = require('#shared/response/response.status')
 const { sendSuccess, sendError } = require('#shared/response/response.sender')
+const profileService = require('./authN.profile');
 const services = {
   authN: require('./authN.service'),
   biometric: require('#core/authN/authN.biometric'),
@@ -165,6 +166,16 @@ const verifyDeviceTrust = async (req, res) => {
   }
 };
 
+const updateProfile = async (req, res) => {
+  try {
+    const result = await profileService.updateProfile(req.user.id, req.user.userType, req.body);
+    sendSuccess(res, result);
+  } catch (error) {
+    logger.error('[authN.controller] updateProfile', error);
+    res.status(error.status || HTTP.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
+  }
+};
+
 const checkTokenValidity = async (req, res) => {
   try {
     res.status(HTTP.OK).json({ success: true, valid: true, message: 'Token is valid' });
@@ -230,6 +241,7 @@ module.exports = {
   biometricLogin,
   revokeBiometricToken,
   verifyDeviceTrust,
+  updateProfile,
   checkTokenValidity,
   getUserSessions,
   blockDevice,

@@ -8,7 +8,7 @@ const {
   completeMultipartUpload,
   abortMultipartUpload,
 } = require('#core/s3/s3.config');
-const { MAX_FILE_SIZE, PART_URL_BATCH_SIZE } = require('./upload.config');
+const { PART_URL_BATCH_SIZE } = require('./upload.config');
 const { sanitizeFileName, buildS3Key, calculatePartPlan } = require('./upload.helper');
 
 const completionHandlers = {};
@@ -30,13 +30,6 @@ const initiateUpload = async ({
   if (!feature || !fileName || !mimeType || !fileSize || !uploadedBy) {
     throw new AppError(
       'feature, fileName, mimeType, fileSize and uploadedBy are required',
-      HTTP.BAD_REQUEST
-    );
-  }
-
-  if (fileSize > MAX_FILE_SIZE) {
-    throw new AppError(
-      `File exceeds maximum allowed size of ${MAX_FILE_SIZE} bytes`,
       HTTP.BAD_REQUEST
     );
   }

@@ -12,6 +12,7 @@ router.put('/email', controller.updateAuthMail);
 router.post('/generate/biometric-token', controller.generateBiometricToken);
 router.post('/revoke/biometric-token', controller.revokeBiometricToken);
 router.post('/biometric-login', controller.biometricLogin);
+router.put('/profile', authMiddleware, controller.updateProfile);
 router.post('/verify/device-trust', authMiddleware, controller.verifyDeviceTrust);
 router.get('/verify/token', authMiddleware, controller.checkTokenValidity);
 router.get('/sessions', authMiddleware, controller.getUserSessions);
