@@ -285,7 +285,29 @@ const getPreviewPdfUrl = handleRoute('getPreviewPdfUrl', async (req) =>
   convertService.getPreviewPdfUrl({ documentId: req.params.documentId })
 );
 
+const MAXIMUM_ANNOTATED_PAGES = 1000;
+
+const searchDocuments = handleRoute('searchDocuments', async (req) =>
+  documentService.searchDocuments({ query: req.query.q })
+);
+
+const annotateDocument = handleRoute('annotateDocument', async (req) => {
+  const { pages, images, asCopy } = req.body;
+  if (!Array.isArray(pages) || pages.length === 0 || pages.length > MAXIMUM_ANNOTATED_PAGES) {
+    throw new AppError('pages array is required', HTTP.BAD_REQUEST);
+  }
+  return documentService.annotateDocument({
+    documentId: req.params.documentId,
+    pages,
+    images: images && typeof images === 'object' ? images : {},
+    asCopy: asCopy === true,
+    uploadedBy: req.userId,
+  });
+});
+
 module.exports = {
+  searchDocuments,
+  annotateDocument,
   getStorageSummary,
   convertDocuments,
   getPreviewPdfUrl,

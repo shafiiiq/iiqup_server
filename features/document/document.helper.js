@@ -17,8 +17,30 @@ const sourceModelBySourceType = {
   staff: staffModel,
 };
 
+const decodeLayerId = (layerId) => {
+  try {
+    return decodeURIComponent(
+      String(layerId).replace(/~([0-9a-f]{2})/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    );
+  } catch {
+    return String(layerId);
+  }
+};
+
+const prettifyLayerLabel = (layerId) => {
+  const nodeKey = decodeLayerId(layerId);
+  if (nodeKey === 'root') return 'Root';
+  if (nodeKey === 'equipments') return 'Equipments';
+  if (nodeKey === 'users') return 'Users';
+  return nodeKey.replace(/^equipment-category-/, 'Equipments / ').replace(/^user-section-/, 'Users / ');
+};
+
 const findSourceEntity = async (sourceType, sourceId) => {
-  if (sourceType === 'root') return sourceId === 'root' ? { _id: 'root', name: 'Root' } : null;
+  if (sourceType === 'root') {
+    return typeof sourceId === 'string' && sourceId && sourceId.length <= 400
+      ? { _id: sourceId, name: prettifyLayerLabel(sourceId) }
+      : null;
+  }
   const sourceModel = sourceModelBySourceType[sourceType];
   if (!sourceModel || !mongoose.isValidObjectId(sourceId)) return null;
   return sourceModel.findById(sourceId);

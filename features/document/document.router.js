@@ -5,6 +5,7 @@ const { authMiddleware } = require('#middlewares/jwt.middleware');
 const router = express.Router();
 
 router.get('/storage', authMiddleware, controller.getStorageSummary);
+router.get('/search', authMiddleware, controller.searchDocuments);
 router.post('/convert', authMiddleware, controller.convertDocuments);
 router.get('/trash/sources', authMiddleware, controller.getTrashSources);
 router.get('/trash/:sourceType/:sourceId', authMiddleware, controller.getTrashItems);
@@ -29,6 +30,7 @@ router.post('/:documentId/renew', authMiddleware, controller.renewDocument);
 router.post('/:documentId/split', authMiddleware, controller.splitDocument);
 router.post('/:documentId/edit-pages', authMiddleware, controller.editDocumentPages);
 router.post('/:documentId/extract', authMiddleware, controller.extractDocument);
+router.post('/:documentId/annotate', authMiddleware, controller.annotateDocument);
 router.get('/:documentId/preview-pdf', authMiddleware, controller.getPreviewPdfUrl);
 router.post('/:documentId/copy', authMiddleware, controller.copyDocument);
 router.put('/:documentId/dates', authMiddleware, controller.updateDocumentDates);

@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const { PDFDocument, degrees } = require('pdf-lib');
+const { PDFDocument, StandardFonts, degrees, rgb } = require('pdf-lib');
 const logger = require('#shared/logger/logger');
 const HTTP = require('#shared/response/response.status');
 const { AppError } = require('#shared/errors/error.http');
@@ -23,6 +23,8 @@ const {
   serializeDocument,
   normalizeArea,
   buildAreaFilter,
+  SOURCE_TYPE_LABELS,
+  resolveSourceLabel,
 } = require('./document.helper');
 
 const refreshDashboard = () => {
@@ -734,7 +736,7 @@ const getStorageSummary = async () => {
     },
   ]);
 
-  const bytesBySourceKey = new Map();
+  const sourceByKey = new Map();
   let totalBytes = 0;
   let trashBytes = 0;
   rows.forEach((row) => {
@@ -744,17 +746,298 @@ const getStorageSummary = async () => {
       return;
     }
     const sourceKey = `${row._id.sourceType}:${row._id.sourceId}`;
-    bytesBySourceKey.set(sourceKey, (bytesBySourceKey.get(sourceKey) || 0) + row.bytes);
+    const existing = sourceByKey.get(sourceKey);
+    sourceByKey.set(sourceKey, {
+      sourceType: row._id.sourceType,
+      sourceId: row._id.sourceId,
+      bytes: (existing?.bytes || 0) + row.bytes,
+    });
   });
 
-  const sources = [...bytesBySourceKey.entries()].map(([sourceKey, bytes]) => {
-    const [sourceType, sourceId] = sourceKey.split(':');
-    return { sourceType, sourceId, bytes };
-  });
-  return { status: HTTP.OK, message: 'Storage retrieved', data: { totalBytes, trashBytes, sources } };
+  return {
+    status: HTTP.OK,
+    message: 'Storage retrieved',
+    data: { totalBytes, trashBytes, sources: [...sourceByKey.values()] },
+  };
+};
+
+const SEARCH_RESULT_LIMIT = 100;
+
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const searchDocuments = async ({ query }) => {
+  const term = String(query || '').trim().slice(0, 100);
+  if (!term) return { status: HTTP.OK, message: 'Search finished', data: { documents: [], folders: [] } };
+  const pattern = new RegExp(escapeRegex(term), 'i');
+
+  const [documents, folders] = await Promise.all([
+    documentModel
+      .find({ deletedAt: null, $or: [{ displayName: pattern }, { originalFileName: pattern }] })
+      .sort({ createdAt: -1 })
+      .limit(SEARCH_RESULT_LIMIT)
+      .lean(),
+    documentFolderModel.find({ deletedAt: null, name: pattern }).sort({ name: 1 }).limit(SEARCH_RESULT_LIMIT).lean(),
+  ]);
+
+  const locationLabelByKey = new Map();
+  const resolveLocationLabel = async (sourceType, sourceId) => {
+    const key = `${sourceType}:${sourceId}`;
+    if (!locationLabelByKey.has(key)) {
+      const entity = await findSourceEntity(sourceType, sourceId).catch(() => null);
+      locationLabelByKey.set(
+        key,
+        `${SOURCE_TYPE_LABELS[sourceType]} · ${entity ? resolveSourceLabel(sourceType, entity) : 'Deleted source'}`
+      );
+    }
+    return locationLabelByKey.get(key);
+  };
+
+  const serializedDocuments = await Promise.all(
+    documents.map(async (documentItem) => ({
+      ...(await serializeDocument(documentItem)),
+      locationLabel: await resolveLocationLabel(documentItem.sourceType, documentItem.sourceId),
+    }))
+  );
+  const serializedFolders = await Promise.all(
+    folders.map(async (folderItem) => ({
+      ...serializeFolder(folderItem),
+      locationLabel: await resolveLocationLabel(folderItem.sourceType, folderItem.sourceId),
+    }))
+  );
+
+  return {
+    status: HTTP.OK,
+    message: 'Search finished',
+    data: { documents: serializedDocuments, folders: serializedFolders },
+  };
+};
+
+const PDF_FONT_FAMILIES = {
+  Helvetica: {
+    regular: StandardFonts.Helvetica,
+    bold: StandardFonts.HelveticaBold,
+    italic: StandardFonts.HelveticaOblique,
+    boldItalic: StandardFonts.HelveticaBoldOblique,
+  },
+  Times: {
+    regular: StandardFonts.TimesRoman,
+    bold: StandardFonts.TimesRomanBold,
+    italic: StandardFonts.TimesRomanItalic,
+    boldItalic: StandardFonts.TimesRomanBoldItalic,
+  },
+  Courier: {
+    regular: StandardFonts.Courier,
+    bold: StandardFonts.CourierBold,
+    italic: StandardFonts.CourierOblique,
+    boldItalic: StandardFonts.CourierBoldOblique,
+  },
+};
+
+const MAXIMUM_ANNOTATIONS = 2000;
+const TEXT_BASELINE_RATIO = 0.93;
+const TEXT_LINE_HEIGHT_RATIO = 1.2;
+const IMAGE_DATA_URL_PREFIX = /^data:image\/(png|jpeg);base64,/;
+
+const toBoundedNumber = (value, fallback, minimum, maximum) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? Math.min(maximum, Math.max(minimum, parsed)) : fallback;
+};
+
+const parseHexColor = (value, fallback = '#000000') => {
+  const match = /^#([0-9a-f]{6})$/i.exec(String(value || '')) || /^#([0-9a-f]{6})$/i.exec(fallback);
+  const packed = parseInt(match[1], 16);
+  return rgb(((packed >> 16) & 255) / 255, ((packed >> 8) & 255) / 255, (packed & 255) / 255);
+};
+
+const buildPageMapper = (page) => {
+  const rotation = ((page.getRotation().angle % 360) + 360) % 360;
+  const box = page.getMediaBox();
+  const pageWidth = box.width;
+  const pageHeight = box.height;
+  const isSideways = rotation % 180 !== 0;
+  const displayWidth = isSideways ? pageHeight : pageWidth;
+  const displayHeight = isSideways ? pageWidth : pageHeight;
+
+  const toPagePoint = (fractionX, fractionY) => {
+    const u = fractionX * displayWidth;
+    const v = fractionY * displayHeight;
+    let point;
+    if (rotation === 90) point = { x: v, y: u };
+    else if (rotation === 180) point = { x: pageWidth - u, y: v };
+    else if (rotation === 270) point = { x: pageWidth - v, y: pageHeight - u };
+    else point = { x: u, y: pageHeight - v };
+    return { x: point.x + box.x, y: point.y + box.y };
+  };
+
+  return { rotation, displayWidth, displayHeight, toPagePoint };
+};
+
+const drawAnnotation = async ({ page, mapper, element, getFont, getImage }) => {
+  const x = toBoundedNumber(element.x, 0, -1, 2);
+  const y = toBoundedNumber(element.y, 0, -1, 2);
+  const w = toBoundedNumber(element.w, 0, 0, 3);
+  const h = toBoundedNumber(element.h, 0, 0, 3);
+  const opacity = toBoundedNumber(element.opacity, 1, 0, 1);
+  const rotate = degrees(mapper.rotation);
+  const width = w * mapper.displayWidth;
+  const height = h * mapper.displayHeight;
+  const origin = mapper.toPagePoint(x, y + h);
+  const strokeWidth = toBoundedNumber(element.strokeWidth, 2, 0, 50);
+  const strokeColor = parseHexColor(element.strokeColor, '#d32f2f');
+  const fillColor = element.fillColor ? parseHexColor(element.fillColor) : undefined;
+
+  if (element.type === 'text') {
+    const text = String(element.text || '').slice(0, 20000);
+    if (!text.trim()) return;
+    const size = toBoundedNumber(element.size, 14, 1, 500);
+    const font = await getFont(element.fontFamily, element.bold === true, element.italic === true);
+    const start = mapper.toPagePoint(x, y + (size * TEXT_BASELINE_RATIO) / mapper.displayHeight);
+    try {
+      page.drawText(text, {
+        x: start.x,
+        y: start.y,
+        size,
+        font,
+        color: parseHexColor(element.color),
+        rotate,
+        lineHeight: size * TEXT_LINE_HEIGHT_RATIO,
+        maxWidth: width > 0 ? width : undefined,
+        opacity,
+      });
+    } catch {
+      throw new AppError('The text has characters the PDF font cannot show. Use Latin characters.', HTTP.BAD_REQUEST);
+    }
+    return;
+  }
+
+  if (element.type === 'rect') {
+    page.drawRectangle({
+      x: origin.x,
+      y: origin.y,
+      width,
+      height,
+      rotate,
+      borderColor: strokeColor,
+      borderWidth: strokeWidth,
+      color: fillColor,
+      opacity,
+      borderOpacity: opacity,
+    });
+    return;
+  }
+
+  if (element.type === 'ellipse') {
+    const center = mapper.toPagePoint(x + w / 2, y + h / 2);
+    page.drawEllipse({
+      x: center.x,
+      y: center.y,
+      xScale: width / 2,
+      yScale: height / 2,
+      rotate,
+      borderColor: strokeColor,
+      borderWidth: strokeWidth,
+      color: fillColor,
+      opacity,
+      borderOpacity: opacity,
+    });
+    return;
+  }
+
+  if (element.type === 'line') {
+    const isFlipped = element.flip === true;
+    page.drawLine({
+      start: mapper.toPagePoint(x, isFlipped ? y + h : y),
+      end: mapper.toPagePoint(x + w, isFlipped ? y : y + h),
+      thickness: Math.max(strokeWidth, 0.25),
+      color: strokeColor,
+      opacity,
+    });
+    return;
+  }
+
+  if (element.type === 'image') {
+    const image = await getImage(element.imageKey);
+    page.drawImage(image, { x: origin.x, y: origin.y, width, height, rotate, opacity });
+    return;
+  }
+
+  throw new AppError('Unsupported element type', HTTP.BAD_REQUEST);
+};
+
+const annotateDocument = async ({ documentId, pages, images, asCopy, uploadedBy }) => {
+  const documentItem = await requireDocument(documentId);
+  if (!isPdfMimeType(documentItem.mimeType)) throw new AppError('Only PDF files can be edited', HTTP.BAD_REQUEST);
+
+  const pdf = await PDFDocument.load(await downloadPdfBufferFromS3(documentItem.s3Key));
+  const fontCache = new Map();
+  const imageCache = new Map();
+
+  const getFont = async (family, isBold, isItalic) => {
+    const names = PDF_FONT_FAMILIES[family] || PDF_FONT_FAMILIES.Helvetica;
+    let fontName = names.regular;
+    if (isBold && isItalic) fontName = names.boldItalic;
+    else if (isBold) fontName = names.bold;
+    else if (isItalic) fontName = names.italic;
+    if (!fontCache.has(fontName)) fontCache.set(fontName, await pdf.embedFont(fontName));
+    return fontCache.get(fontName);
+  };
+
+  const getImage = async (imageKey) => {
+    if (imageCache.has(imageKey)) return imageCache.get(imageKey);
+    const dataUrl = images?.[imageKey];
+    const prefix = typeof dataUrl === 'string' ? IMAGE_DATA_URL_PREFIX.exec(dataUrl) : null;
+    if (!prefix) throw new AppError('Invalid image data', HTTP.BAD_REQUEST);
+    const bytes = Buffer.from(dataUrl.slice(prefix[0].length), 'base64');
+    const embedded = prefix[1] === 'png' ? await pdf.embedPng(bytes) : await pdf.embedJpg(bytes);
+    imageCache.set(imageKey, embedded);
+    return embedded;
+  };
+
+  let annotationCount = 0;
+  for (const pageEntry of pages) {
+    const pageNumber = Number(pageEntry?.pageNumber);
+    if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > pdf.getPageCount()) {
+      throw new AppError('Invalid page number', HTTP.BAD_REQUEST);
+    }
+    const page = pdf.getPage(pageNumber - 1);
+    const mapper = buildPageMapper(page);
+    const elements = Array.isArray(pageEntry.elements) ? pageEntry.elements : [];
+    for (const element of elements) {
+      annotationCount += 1;
+      if (annotationCount > MAXIMUM_ANNOTATIONS) throw new AppError('Too many elements', HTTP.BAD_REQUEST);
+      await drawAnnotation({ page, mapper, element, getFont, getImage });
+    }
+  }
+  if (annotationCount === 0) throw new AppError('Nothing to save', HTTP.BAD_REQUEST);
+
+  const pdfBytes = await pdf.save();
+
+  if (asCopy) {
+    const copiedDocument = await saveGeneratedPdf({
+      pdfBytes,
+      sourceType: documentItem.sourceType,
+      sourceId: documentItem.sourceId,
+      displayName: `${documentItem.displayName} (Edited)`,
+      folderId: documentItem.folderId,
+      area: documentItem.area || 'all',
+      issueDate: documentItem.issueDate,
+      expiryDate: documentItem.expiryDate,
+      uploadedBy,
+    });
+    refreshDashboard();
+    return { status: HTTP.CREATED, message: 'Edited copy saved', data: await serializeDocument(copiedDocument) };
+  }
+
+  await uploadPdfBytesToS3(pdfBytes, documentItem.s3Key);
+  await documentModel.updateOne({ _id: documentItem._id }, { $set: { fileSize: pdfBytes.length } });
+  const updatedDocument = await documentModel.findById(documentItem._id);
+  refreshDashboard();
+  return { status: HTTP.OK, message: 'Document updated', data: await serializeDocument(updatedDocument) };
 };
 
 module.exports = {
+  searchDocuments,
+  annotateDocument,
   getStorageSummary,
   setRenewalStatus,
   moveFolder,
