@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const equipmentModel = require('../equipment/equipment.model');
+const equipmentModel = require('../fleet/equipment/equipment.model');
 const operatorModel = require('#features/user/operator/operator.model');
 const mechanicModel = require('#features/user/mechanic/mechanic.model');
 const staffModel = require('#features/user/staff/staff.model');
@@ -149,7 +149,23 @@ const uploadBytesToS3 = async (bytes, s3Key, mimeType) => {
   if (!uploadResponse.ok) throw new Error(`S3 upload failed with status: ${uploadResponse.status}`);
 };
 
+const createLocationLabelResolver = () => {
+  const labelByKey = new Map();
+  return async (sourceType, sourceId) => {
+    const key = `${sourceType}:${sourceId}`;
+    if (!labelByKey.has(key)) {
+      const sourceEntity = await findSourceEntity(sourceType, sourceId).catch(() => null);
+      labelByKey.set(
+        key,
+        `${SOURCE_TYPE_LABELS[sourceType]} · ${sourceEntity ? resolveSourceLabel(sourceType, sourceEntity) : 'Deleted source'}`
+      );
+    }
+    return labelByKey.get(key);
+  };
+};
+
 module.exports = {
+  createLocationLabelResolver,
   normalizeArea,
   buildAreaFilter,
   buildPreviewKey,

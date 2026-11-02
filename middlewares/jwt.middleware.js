@@ -1,5 +1,12 @@
 const jwt = require('jsonwebtoken');
 const logger = require('#shared/logger/logger');
+const { isMobileClient } = require('#shared/request/request.client.context');
+const { isPrintToken, isRequestAllowedForPrintToken } = require('#core/pdf/pdf.token.scope');
+
+const WEB_TOKEN_LIFETIME = '365d';
+const MOBILE_TOKEN_LIFETIME = '3650d';
+
+const resolveTokenLifetime = () => (isMobileClient() ? MOBILE_TOKEN_LIFETIME : WEB_TOKEN_LIFETIME);
 
 const getJwtSecret = () => {
   if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is not set');
@@ -18,7 +25,7 @@ const generateAuthTokens = (user) => {
       type: 'access',
     },
     getJwtSecret(),
-    { expiresIn: '365d' }
+    { expiresIn: resolveTokenLifetime() }
   );
 
   const refreshToken = jwt.sign(
@@ -32,27 +39,11 @@ const generateAuthTokens = (user) => {
       type: 'refresh',
     },
     getJwtSecret(),
-    { expiresIn: '365d' }
+    { expiresIn: resolveTokenLifetime() }
   );
 
   return { accessToken, refreshToken };
 };
-
-const generateRenderToken = (user) => {
-  return jwt.sign(
-    {
-      id: user._id || user.id,
-      email: user.email,
-      role: user.role,
-      uniqueCode: user.uniqueCode,
-      userType: user.userType,
-      name: user.name,
-    },
-    getJwtSecret(),
-    { expiresIn: '2m' }
-  );
-};
-
 
 const authMiddleware = (req, res, next) => {
   try {
@@ -67,6 +58,10 @@ const authMiddleware = (req, res, next) => {
     }
 
     const decoded = verifyAuthToken(token);
+
+    if (isPrintToken(decoded) && !isRequestAllowedForPrintToken(req)) {
+      return res.status(403).json({ message: 'Print token cannot perform this action.', status: 403 });
+    }
 
     req.user = decoded;
     req.userId = decoded.id;
@@ -136,5 +131,4 @@ module.exports = {
   checkUserAuthorization,
   refreshAuthTokens,
   generateAuthTokens,
-  generateRenderToken
 };

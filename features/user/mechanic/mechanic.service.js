@@ -3,14 +3,14 @@ const logger = require('#shared/logger/logger');
 const { AppError } = require('#shared/errors/error.http');
 const HTTP = require('#shared/response/response.status')
 const Mechanic = require('./mechanic.model');
+const { verifyQatarAccount, loginQatarAccount } = require('#core/authN/authN.qatar');
 const Attendance = require('../../attendance/attendance.model');
 const {
-  getMonthYearString,
   formatValidationError,
   buildAttendanceFilter,
 } = require('./mechanic.helper');
 const { paginate } = require('#shared/pagination/pagination');
-
+const { putObject } = require('#core/s3/s3.config');
 
 const findMechanicByPin = async (zktecoPin) => {
   const mechanic = await Mechanic.findOne({ zktecoPin: parseInt(zktecoPin) });
@@ -18,80 +18,10 @@ const findMechanicByPin = async (zktecoPin) => {
   return mechanic;
 };
 
-const verifyMechanicCredentials = async (email, password, deviceInfo) => {
-  const PushNotificationService = require('#core/notification/notification.push');
-  const { createSession } = require('#core/session/session.service');
-  const { generateAuthTokens } = require('#middlewares/jwt.middleware');
+const verifyMechanic = (qatarId) => verifyQatarAccount(Mechanic, qatarId);
 
-  try {
-    const mechanic = await Mechanic.findOne({ email });
-
-    if (!mechanic) {
-      return { status: HTTP.UNAUTHORIZED, success: false, message: 'Invalid email or password' };
-    }
-    if (!mechanic.isActive) {
-      return { status: HTTP.FORBIDDEN, success: false, message: 'Your account has been deactivated. Please contact an administrator.' };
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, mechanic.password);
-    if (!isPasswordValid) {
-      return { status: HTTP.UNAUTHORIZED, success: false, message: 'Invalid email or password' };
-    }
-
-    await PushNotificationService.sendGeneralNotification(
-      mechanic.uniqueCode,
-      'Are you certain this is you?',
-      "login attempt detected. If this wasn't you, your credentials may be compromised. Update them immediately",
-      'high',
-      'normal'
-    );
-
-    const deviceData = {
-      deviceName: deviceInfo?.deviceName || 'Unknown Device',
-      deviceModel: deviceInfo?.deviceModel || 'Unknown Model',
-      deviceId: deviceInfo?.deviceId || 'Unknown ID',
-      brand: deviceInfo?.brand || 'Unknown',
-      osName: deviceInfo?.osName || 'Unknown OS',
-      osVersion: deviceInfo?.osVersion || 'Unknown',
-      platform: deviceInfo?.platform || 'Unknown',
-      loginTime: deviceInfo?.loginTime || new Date().toISOString(),
-      ipAddress: deviceInfo?.ipAddress || 'Unknown IP',
-      locationAddress: deviceInfo?.locationAddress || 'Unknown',
-    };
-
-    const sessionToken = await createSession(mechanic._id, 'Mechanic', deviceData, deviceInfo?.location || null);
-
-    const tokens = generateAuthTokens({
-      _id: mechanic._id,
-      email: mechanic.email,
-      role: mechanic.role,
-      uniqueCode: mechanic.uniqueCode,
-      userType: mechanic.userType,
-      name: mechanic.name,
-    });
-
-    return {
-      status: HTTP.OK,
-      success: true,
-      message: 'Authentication successful',
-      data: {
-        _id: mechanic._id,
-        name: mechanic.name,
-        email: mechanic.email,
-        role: mechanic.role,
-        uniqueCode: mechanic.uniqueCode,
-        lastLogin: mechanic.lastLogin,
-        authMail: mechanic.authMail,
-      },
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-      sessionToken,
-    };
-  } catch (error) {
-    logger.error('[mechanic.service.js] verifyMechanicCredentials', error);
-    return { status: HTTP.INTERNAL_SERVER_ERROR, success: false, message: 'Authentication failed', error: error.message };
-  }
-};
+const loginMechanic = (qatarId, deviceInfo) =>
+  loginQatarAccount({ Model: Mechanic, sessionUserModel: 'Mechanic', qatarId, deviceInfo });
 
 const insertMechanics = async (mechanicData) => {
   try {
@@ -214,6 +144,44 @@ const addToolkit = async (mechanicId, toolkitData) => {
   }
 };
 
+const createProfilePhotoUpload = async (mechanicId, fileName, mimeType) => {
+  try {
+    const mechanic = await Mechanic.findById(mechanicId);
+    if (!mechanic) throw new AppError('Mechanic not found', HTTP.NOT_FOUND);
+
+    const fileExtension = fileName.split('.').pop() || 'jpg';
+    const finalFileName = `${mechanic.name.replace(/\s+/g, '-')}-${mechanic._id}-${Date.now()}.${fileExtension}`;
+    const s3Key = `mechanics/profiles/${finalFileName}`;
+
+    const uploadUrl = await putObject(fileName, s3Key, mimeType);
+
+    const profilePicData = {
+      fileName: finalFileName,
+      originalName: fileName,
+      filePath: s3Key,
+      mimeType,
+      uploadDate: new Date(),
+      url: s3Key,
+    };
+
+    await Mechanic.findByIdAndUpdate(
+      mechanicId,
+      { $set: { profilePic: profilePicData } },
+      { new: true, runValidators: true }
+    );
+
+    return {
+      status: HTTP.OK,
+      message: 'Profile photo upload prepared',
+      data: { uploadUrl, profilePicData },
+    };
+  } catch (error) {
+    logger.error('[MechanicService] createProfilePhotoUpload:', error);
+    if (error.status) throw error;
+    throw { status: HTTP.INTERNAL_SERVER_ERROR, message: error.message || 'Error preparing profile photo upload' };
+  }
+};
+
 const fetchAttendance = async (zktecoPin, query, pagination) => {
   try {
     const mechanic = await findMechanicByPin(zktecoPin);
@@ -300,7 +268,8 @@ const fetchRecentActivity = async (limit) => {
 };
 
 module.exports = {
-  verifyMechanicCredentials,
+  verifyMechanic,
+  loginMechanic,
   insertMechanics,
   fetchMechanic,
   fetchMechanicById,
@@ -308,6 +277,7 @@ module.exports = {
   mechanicUpdate,
   mechanicDelete,
   addToolkit,
+  createProfilePhotoUpload,
   fetchAttendance,
   fetchRecentActivity,
 };

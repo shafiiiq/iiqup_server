@@ -40,7 +40,8 @@ const globalSearch = async (req, res, next) => {
       }
 
       const model = entry.model;
-      const query = buildSearchQuery(entry.searchableFields, q);
+      const searchQuery = buildSearchQuery(entry.searchableFields, q);
+      const query = entry.scope ? { $and: [searchQuery, entry.scope(req.user)] } : searchQuery;
       const result = await paginate(model, query, req.pagination, {
         sort: { createdAt: -1 },
       });

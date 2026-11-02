@@ -1,6 +1,7 @@
 const logger = require('#shared/logger/logger');
 const { sendError } = require('#shared/response/response.sender');
 const { renderPageToPdf } = require('./pdf.service');
+const { checkDocumentPdfReady } = require('./document.pdf.access');
 
 const renderPdf = async (req, res) => {
   try {
@@ -33,4 +34,20 @@ const renderPdf = async (req, res) => {
   }
 };
 
-module.exports = { renderPdf };
+const getDocumentPdfStatus = async (req, res) => {
+  try {
+    const { sourceKey } = req.params;
+    const { documentId } = req.query;
+    if (!documentId) {
+      return res.status(400).json({ success: false, message: 'documentId is required' });
+    }
+
+    const isReady = await checkDocumentPdfReady({ sourceKey, documentId, user: req.user });
+    return res.status(200).json({ success: true, data: { isReady } });
+  } catch (error) {
+    logger.error('[pdf.controller] getDocumentPdfStatus:', error);
+    return sendError(res, { status: error.status || 500, message: error.message });
+  }
+};
+
+module.exports = { renderPdf, getDocumentPdfStatus };

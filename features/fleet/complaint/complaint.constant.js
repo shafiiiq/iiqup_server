@@ -1,0 +1,54 @@
+const { USER_ROLES } = require('#features/user/staff/staff.constant');
+
+const COMPLAINT_STATUS = {
+  PENDING: 'pending',
+  RESOLVED: 'resolved',
+};
+
+const COMPLAINT_WORKFLOW_STATUS = {
+  REGISTERED: 'registered',
+  COMPLETED: 'completed',
+};
+
+const COMPLAINT_MEDIA_TYPE = {
+  PHOTO: 'photo',
+  VIDEO: 'video',
+  AUDIO: 'audio',
+};
+
+const EQUIPMENT_STATUS = {
+  MAINTENANCE: 'maintenance',
+  ACTIVE: 'active',
+};
+
+const VIDEO_EXTENSIONS = ['.mp4', '.webm', '.avi', '.mov', '.wmv', '.flv', '.m4v', '.3gp', '.mkv'];
+
+const AUDIO_EXTENSIONS = ['.m4a', '.mp3', '.wav', '.aac', '.ogg', '.amr'];
+
+const COMPLAINT_ACTIVITY_SOURCE_KEY = 'complaint';
+const COMPLAINT_SOCKET_EVENT = 'complaint_update';
+const COMPLAINT_NOTIFICATION_SOURCE_KEY = 'complaints';
+const COMPLAINT_UNSEEN_WINDOW_DAYS = 7;
+const COMPLAINT_RECTIFY_TOKEN_PATTERN = /(^|\s)&rectify(?=\s|$)/i;
+const COMPLAINT_RECTIFY_DEFAULT_TEXT = 'Work completed';
+const COMPLAINT_NOTIFICATION_RECIPIENT_ROLES = [
+  USER_ROLES.WORKSHOP_MANAGER,
+  USER_ROLES.MAINTENANCE_HEAD,
+  USER_ROLES.MECHANIC_HEAD,
+];
+
+module.exports = {
+  COMPLAINT_ACTIVITY_SOURCE_KEY,
+  COMPLAINT_SOCKET_EVENT,
+  COMPLAINT_NOTIFICATION_SOURCE_KEY,
+  COMPLAINT_UNSEEN_WINDOW_DAYS,
+  COMPLAINT_RECTIFY_TOKEN_PATTERN,
+  COMPLAINT_RECTIFY_DEFAULT_TEXT,
+  COMPLAINT_NOTIFICATION_RECIPIENT_ROLES,
+  COMPLAINT_STATUS,
+  COMPLAINT_WORKFLOW_STATUS,
+  COMPLAINT_MEDIA_TYPE,
+  EQUIPMENT_STATUS,
+  VIDEO_EXTENSIONS,
+  AUDIO_EXTENSIONS,
+};

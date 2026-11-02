@@ -1,6 +1,5 @@
-// utils/db.js
 const mongoose = require('mongoose');
-const { fixDuplicateIndexes } = require('../workers/indexing.worker');
+const { fixDuplicateIndexes } = require('../workers/indexing.worker'); 
 const logger = require('#shared/logger/logger');
 require('dotenv').config();
 
@@ -15,3 +14,4 @@ module.exports = mongoose
     logger.error('[ansarigroup.db] connection failed:', err);
     throw err;
   });
+  

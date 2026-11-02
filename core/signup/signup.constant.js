@@ -1,0 +1,22 @@
+const SIGNUP_STATUS = {
+  PENDING: 'pending',
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
+}
+
+const ACCOUNT_TYPES = ['staff', 'mechanic', 'operator']
+const PENDING_TTL_MS = 24 * 60 * 60 * 1000
+const RESOLVED_TTL_MS = 60 * 60 * 1000
+const APPROVAL_CODE_MIN = 100
+const APPROVAL_CODE_MAX = 999
+const MIN_SIGNUP_PASSWORD_LENGTH = 8
+
+module.exports = {
+  SIGNUP_STATUS,
+  ACCOUNT_TYPES,
+  PENDING_TTL_MS,
+  RESOLVED_TTL_MS,
+  APPROVAL_CODE_MIN,
+  APPROVAL_CODE_MAX,
+  MIN_SIGNUP_PASSWORD_LENGTH,
+}

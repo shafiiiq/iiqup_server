@@ -4,7 +4,14 @@ const Session = require('./session.model');
 const User = require('#features/user/staff/staff.model');
 const sessionEvents = require('./session.events');
 
+const UNKNOWN_DEVICE_ID = 'Unknown ID';
+
 const createSession = async (userId, userModel, deviceInfo, location) => {
+  const deviceId = deviceInfo?.deviceId;
+  if (deviceId && deviceId !== UNKNOWN_DEVICE_ID) {
+    await Session.deleteMany({ userId, userModel, 'deviceInfo.deviceId': deviceId });
+  }
+
   const sessionToken = crypto.randomBytes(32).toString('hex');
   const expiresAt = new Date();
   expiresAt.setFullYear(expiresAt.getFullYear() + 10);
@@ -50,10 +57,26 @@ const logoutSession = async (sessionId, userId, currentSessionToken) => {
   }
 };
 
-const blockDevice = async (sessionId, userId) => {
+const logoutCurrentSession = async (userId, currentSessionToken) => {
+  try {
+    if (!currentSessionToken) return { status: 400, success: false, message: 'Session token is required' };
+
+    await Session.deleteOne({ userId, sessionToken: currentSessionToken });
+
+    return { status: 200, success: true, message: 'Session logged out successfully' };
+  } catch (error) {
+    return { status: 500, success: false, message: 'Failed to logout session', error: error.message };
+  }
+};
+
+const blockDevice = async (sessionId, userId, currentSessionToken) => {
   try {
     const session = await Session.findOne({ _id: sessionId, userId });
     if (!session) return { status: 404, success: false, message: 'Session not found' };
+
+    if (session.sessionToken === currentSessionToken) {
+      return { status: 400, success: false, message: 'Cannot block the current device.' };
+    }
 
     await Session.deleteOne({ _id: sessionId });
 
@@ -75,6 +98,12 @@ const blockDevice = async (sessionId, userId) => {
 
 const logoutAllSessions = async (userId, currentSessionToken) => {
   try {
+    const sessionsToEnd = await Session.find({
+      userId,
+      sessionToken: { $ne: currentSessionToken },
+      isActive: true,
+    });
+
     const result = await Session.updateMany(
       { userId, sessionToken: { $ne: currentSessionToken }, isActive: true },
       { $set: { isActive: false } }
@@ -82,11 +111,13 @@ const logoutAllSessions = async (userId, currentSessionToken) => {
 
     const userToLogout = await User.findById(userId);
     if (userToLogout) {
-      sessionEvents.emit('force-logout', {
-        uniqueCode: userToLogout.uniqueCode,
-        userId: userToLogout._id,
-        sessionToken: null,
-        reason: 'Logged out from all devices',
+      sessionsToEnd.forEach((endedSession) => {
+        sessionEvents.emit('force-logout', {
+          uniqueCode: userToLogout.uniqueCode,
+          userId: userToLogout._id,
+          sessionToken: endedSession.sessionToken,
+          reason: 'Logged out from all devices',
+        });
       });
     }
 
@@ -148,6 +179,8 @@ const checkSessionStatus = async (sessionId, userId) => {
       };
     }
 
+    await Session.updateOne({ _id: session._id }, { $set: { lastActivity: new Date() } });
+
     return {
       status: 200,
       success: true,
@@ -165,11 +198,26 @@ const checkSessionStatus = async (sessionId, userId) => {
   }
 };
 
+const buildDeviceData = (deviceInfo) => ({
+  deviceName: deviceInfo?.deviceName || 'Unknown Device',
+  deviceModel: deviceInfo?.deviceModel || 'Unknown Model',
+  deviceId: deviceInfo?.deviceId || 'Unknown ID',
+  brand: deviceInfo?.brand || 'Unknown',
+  osName: deviceInfo?.osName || 'Unknown OS',
+  osVersion: deviceInfo?.osVersion || 'Unknown',
+  platform: deviceInfo?.platform || 'Unknown',
+  loginTime: deviceInfo?.loginTime || new Date().toISOString(),
+  ipAddress: deviceInfo?.ipAddress || 'Unknown IP',
+  locationAddress: deviceInfo?.locationAddress || 'Unknown',
+});
+
 module.exports = {
   createSession,
+  buildDeviceData,
   getUserSessions,
   checkSessionStatus,
   logoutSession,
+  logoutCurrentSession,
   blockDevice,
   logoutAllSessions,
 };

@@ -7,6 +7,7 @@ const {
   HeadObjectCommand,
   CreateMultipartUploadCommand,
   UploadPartCommand,
+  ListPartsCommand,
   CompleteMultipartUploadCommand,
   AbortMultipartUploadCommand,
 } = require('@aws-sdk/client-s3')
@@ -108,6 +109,43 @@ const getUploadPartUrl = async (key, uploadId, partNumber) => {
   return getSignedUrl(s3Client, command, { expiresIn: DEFAULT_EXPIRY_SECONDS })
 }
 
+const listUploadedParts = async (key, uploadId) => {
+  const parts = [];
+  let partNumberMarker;
+  let isTruncated;
+
+  do {
+    const response = await s3Client.send(
+      new ListPartsCommand({
+        Bucket: process.env.BUCKET_NAME,
+        Key: key,
+        UploadId: uploadId,
+        PartNumberMarker: partNumberMarker,
+      })
+    );
+
+    parts.push(
+      ...(response.Parts || []).map((part) => ({
+        partNumber: part.PartNumber,
+        etag: part.ETag,
+        size: part.Size,
+      }))
+    );
+
+    isTruncated = response.IsTruncated === true;
+    if (isTruncated) {
+      if (response.NextPartNumberMarker == null) {
+        throw new Error(
+          'S3 returned a truncated part list without a next part marker'
+        );
+      }
+      partNumberMarker = response.NextPartNumberMarker;
+    }
+  } while (isTruncated);
+
+  return parts;
+};
+
 const completeMultipartUpload = async (key, uploadId, parts) => {
   const command = new CompleteMultipartUploadCommand({
     Bucket: process.env.BUCKET_NAME,
@@ -133,6 +171,7 @@ module.exports = {
   objectExists,
   createMultipartUpload,
   getUploadPartUrl,
+  listUploadedParts,
   completeMultipartUpload,
   abortMultipartUpload,
 }

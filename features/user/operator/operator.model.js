@@ -87,6 +87,7 @@ const operatorSchema = new mongoose.Schema(
     profilePic: { type: profilePicSchema, default: () => ({}) },
     toolkits: { type: [toolkitSchema], default: [] },
     pushTokens: { type: [pushTokenSchema], default: [] },
+    voipPushToken: { type: String, default: null },
     permissions: { type: Array, default: [] },
 
     designation: { type: String, default: '' },

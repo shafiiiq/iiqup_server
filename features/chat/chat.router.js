@@ -1,44 +1,10 @@
 const express = require('express');
+
 const router = express.Router();
 
-const controller = require('./chat.controller');
-const { paginationMiddleware } = require('#middlewares/pagination.middleware');
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Chat Routes
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ── Chats ─────────────────────────────────────────────────────────────────────
-router.get('/chats', controller.getUserChats);
-router.get('/chats/:chatId', controller.getChatDetails);
-router.get('/chats/:chatId/presence', controller.getChatPresence);
-router.post('/chats/individual', controller.getOrCreateIndividualChat);
-router.post('/chats/group', controller.createGroupChat);
-router.put('/chats/:chatId', controller.updateGroupChat);
-router.post('/chats/:chatId/leave', controller.leaveGroupChat);
-router.delete('/chats/:chatId', controller.deleteChat);
-
-// ── Messages ──────────────────────────────────────────────────────────────────
-router.get(
-  '/chats/:chatId/messages',
-  paginationMiddleware,
-  controller.getMessages
-);
-router.post('/chats/:chatId/read', controller.markAsRead);
-router.post('/messages/text', controller.sendTextMessage);
-router.delete('/messages/:messageId', controller.deleteMessage);
-router.put('/messages/:messageId/edit', controller.editMessage);
-router.put('/messages/:messageId/caption', controller.updateCaption);
-router.post('/messages/:messageId/forward', controller.forwardMessage);
-
-// ── Uploads ───────────────────────────────────────────────────────────────────
-router.post('/upload/audio', controller.uploadVoiceMessage);
-router.post('/upload/image', controller.uploadImage);
-router.post('/upload/video', controller.uploadVideo);
-router.post('/upload/document', controller.uploadDocument);
-
-// ── Calls ─────────────────────────────────────────────────────────────────────
-router.get('/calls/history', paginationMiddleware, controller.getCallHistory);
-router.post('/calls/record', controller.saveCallRecord);
+router.use(require('./list/list.router'));
+router.use(require('./group/group.router'));
+router.use(require('./message/message.router'));
+router.use(require('./call/call.router'));
 
 module.exports = router;

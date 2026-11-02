@@ -25,7 +25,7 @@ const createGmailTransporter = () => {
 
 const getFromEmail = () => normalizeEnvValue(process.env.OTP_MAILER) || 'noreply@alansari.com';
 
-const sendOTPEmail = async (email, otp, username = '', demo_opr = false) => {
+const sendOTPEmail = async (email, otp, username = '') => {
   if (!email?.includes('@')) throw new Error('Invalid email address');
   if (!otp || otp.length < 4) throw new Error('Invalid OTP');
 
@@ -52,7 +52,7 @@ const sendOTPEmail = async (email, otp, username = '', demo_opr = false) => {
       await transporter.verify();
 
       const includeOtpInSubject = boolEnv(process.env.OTP_INCLUDE_IN_SUBJECT);
-      const subjectBase = demo_opr ? `${username} Trying to login` : 'Your One-Time Password';
+      const subjectBase = 'Your One-Time Password';
       const subject = includeOtpInSubject ? `${subjectBase}: ${otp}` : subjectBase;
 
       const info = await transporter.sendMail({

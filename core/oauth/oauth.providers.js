@@ -14,6 +14,7 @@ const verifyGoogle = async (token) => {
     audience: splitEnv(process.env.GOOGLE_CLIENT_IDS),
   })
   return {
+    subject: payload.sub,
     email: payload.email,
     emailVerified: payload.email_verified === true || payload.email_verified === 'true',
     name: payload.name,
@@ -26,6 +27,7 @@ const verifyApple = async (token) => {
     audience: splitEnv(process.env.APPLE_CLIENT_ID),
   })
   return {
+    subject: payload.sub,
     email: payload.email,
     emailVerified: payload.email_verified === true || payload.email_verified === 'true',
     name: null,
@@ -45,7 +47,7 @@ const verifyFacebook = async (token) => {
     `https://graph.facebook.com/me?fields=id,name,email&access_token=${encodeURIComponent(token)}`
   )
   const profile = await profileResponse.json()
-  return { email: profile.email, emailVerified: !!profile.email, name: profile.name }
+  return { subject: profile.id, email: profile.email, emailVerified: !!profile.email, name: profile.name }
 }
 
 const VERIFIERS = { google: verifyGoogle, apple: verifyApple, facebook: verifyFacebook }

@@ -1,8 +1,10 @@
 const { checkSessionStatus } = require('#core/session/session.service');
 const sessionEvents = require('#core/session/session.events');
-const notificationEvents = require('#core/notification/notification.events');
+const notificationEvents = require('#core/notification/events/notification.events');
 const messageService = require('#features/chat/message/message.service');
-const chatService = require('#features/chat/chat.service');
+const callService = require('#features/chat/call/call.service');
+const { getUserChats } = require('#features/chat/list/list.service');
+const { getChatById } = require('#features/chat/shared/chat.access.service');
 const logger = require('#shared/logger/logger');
 
 let ioInstance = null;
@@ -23,7 +25,7 @@ const broadcastToParticipants = (participants, excludeUniqueCode, event, payload
 };
 
 const notifyChatParticipantsPresence = async (userId, uniqueCode, isOnline) => {
-  const chats = await chatService.getUserChats(userId);
+  const chats = await getUserChats(userId);
   chats.forEach((chat) => {
     chat.participants.forEach((participant) => {
       emitToUser(participant.uniqueCode, isOnline ? 'user_online' : 'user_offline', {
@@ -48,17 +50,17 @@ const withErrorLogging = (eventName, handler) => async (...args) => {
 const handleAuthenticate = async (socket, data) => {
   const { uniqueCode, userId, sessionToken } = data;
 
-  if (sessionToken) {
-    const session = await checkSessionStatus(sessionToken, userId);
-    if (!session.success || session.status !== 200) {
-      socket.emit('session_invalid', {
-        success: false,
-        message: session.message || 'Session expired. Please login again.',
-        sessionStatus: session.sessionStatus,
-      });
-      socket.disconnect();
-      return;
-    }
+  const session = sessionToken
+    ? await checkSessionStatus(sessionToken, userId)
+    : { success: false, status: 401, message: 'Session expired. Please login again.', sessionStatus: 'logged_out' };
+  if (!session.success || session.status !== 200) {
+    socket.emit('session_invalid', {
+      success: false,
+      message: session.message || 'Session expired. Please login again.',
+      sessionStatus: session.sessionStatus,
+    });
+    socket.disconnect();
+    return;
   }
 
   if (!uniqueCode) return;
@@ -99,30 +101,51 @@ const handleDisconnect = async (socket) => {
 };
 
 const handleSendMessage = async (socket, data) => {
-  const {
-    chatId, senderId, senderType, senderName, senderAvatar,
-    content, messageType, participants, tempId, caption, replyTo, senderUniqueCode,
-  } = data;
+  const { chatId, content, messageType, tempId, caption, replyTo, fileName, mimeType, fileSize } = data;
 
-  const message = await messageService.sendMessage({
-    chatId, senderId, senderType, senderName, senderAvatar,
-    messageType: messageType || 'text',
-    content, caption, replyTo,
-    recieverId: participants[0]?.userId,
-  });
+  const session = findSessionBySocketId(socket.id);
+  if (!session) {
+    socket.emit('message_error', { tempId, message: 'Not authenticated' });
+    return;
+  }
+
+  const chat = await getChatById(chatId, session.userId);
+  const sender = chat?.participants.find((participant) => String(participant.userId) === String(session.userId));
+  if (!sender) {
+    socket.emit('message_error', { tempId, message: 'Chat not found' });
+    return;
+  }
+
+  let message;
+  try {
+    message = await messageService.sendMessage({
+      chatId,
+      senderId: session.userId,
+      senderType: sender.userType,
+      senderName: sender.name,
+      messageType: messageType || 'text',
+      content,
+      caption,
+      replyTo,
+      fileName,
+      mimeType,
+      fileSize,
+    });
+  } catch (error) {
+    socket.emit('message_error', { tempId, message: error.message });
+    throw error;
+  }
 
   const messageObj = { ...message.toObject(), chatId };
 
-  for (const participant of participants) {
-    if (participant.uniqueCode === senderUniqueCode) continue;
+  for (const participant of chat.participants) {
+    if (participant.uniqueCode === session.uniqueCode) continue;
 
     notificationEvents.emit('dismiss-notification', {
       uniqueCode: participant.uniqueCode,
-      notificationId: `typing_${chatId}_${senderId}`,
+      notificationId: `typing_${chatId}_${session.userId}`,
     });
-    typingNotifications.delete(`${chatId}_${senderId}_${participant.uniqueCode}`);
-
-    emitToUser(participant.uniqueCode, 'user_typing', { chatId, userId: senderId, userName: senderName, isTyping: false });
+    emitToUser(participant.uniqueCode, 'user_typing', { chatId, userId: session.userId, userName: sender.name, isTyping: false });
     emitToUser(participant.uniqueCode, 'new_message', messageObj);
   }
 
@@ -138,7 +161,7 @@ const handleTyping = async (data) => {
   participants.forEach((participant) => {
     if (participant.uniqueCode === senderUniqueCode) return;
     emitToUser(participant.uniqueCode, 'user_typing', { chatId, userId, userName, isTyping: true });
-    notificationEvents.emit('send-general-notification', {
+    notificationEvents.emit('typing-push-notification', {
       uniqueCode: participant.uniqueCode,
       title: userName,
       description: 'is typing...',
@@ -230,13 +253,16 @@ const handleCallEnd = async (data) => {
   const { callerId, callerUniqueCode, receiverId, receiverUniqueCode, duration, chatId, callType } = data;
 
   if (chatId && duration) {
-    await messageService.saveCallRecord({
-      chatId, callerId, receiverId, duration,
-      callType: callType || 'voice',
-      status: 'ended',
-      senderType: 'staff',
-      messageType: 'voice call',
-    });
+    try {
+      const record = await callService.saveCallRecord({
+        chatId, callerId, receiverId, duration, callType: callType || 'voice', status: 'ended',
+      });
+      const recordPayload = { ...record.toObject(), chatId };
+      emitToUser(callerUniqueCode, 'new_message', recordPayload);
+      emitToUser(receiverUniqueCode, 'new_message', recordPayload);
+    } catch (error) {
+      logger.error('[socket.io] saveCallRecord', error);
+    }
   }
 
   const callEndData = { callerId, receiverId, duration, timestamp: new Date() };
@@ -244,8 +270,29 @@ const handleCallEnd = async (data) => {
   emitToUser(receiverUniqueCode, 'call_ended', callEndData);
 };
 
+const findSessionBySocketId = (socketId) => {
+  for (const [uniqueCode, sessions] of connectedUsers.entries()) {
+    const session = sessions.find((item) => item.socketId === socketId);
+    if (session) return { uniqueCode, userId: session.userId };
+  }
+  return null;
+};
+
+const handleNotificationTyping = async (socket, data) => {
+  const uniqueCode = findSessionBySocketId(socket.id)?.uniqueCode;
+  if (!uniqueCode || !data?.notificationId) return;
+  const { broadcastNotificationTyping } = require('#features/notification/notification.typing.service');
+  await broadcastNotificationTyping({
+    notificationId: data.notificationId,
+    uniqueCode,
+    isTyping: Boolean(data.isTyping),
+  });
+};
+
 const handleWebrtcOffer = (socket, data) => {
-  emitToUser(data.receiverUniqueCode, 'webrtc_offer', { offer: data.offer, callerSocketId: socket.id });
+  const caller = findSessionBySocketId(socket.id);
+  if (!caller) return;
+  emitToUser(data.receiverUniqueCode, 'webrtc_offer', { offer: data.offer, callerUniqueCode: caller.uniqueCode });
 };
 
 const handleWebrtcAnswer = (data) => {
@@ -306,6 +353,7 @@ const setupWebSocket = (io) => {
     socket.on('call_reject', withErrorLogging('call_reject', handleCallReject));
     socket.on('call_end', withErrorLogging('call_end', handleCallEnd));
 
+    socket.on('notification_typing', withErrorLogging('notification_typing', (data) => handleNotificationTyping(socket, data)));
     socket.on('webrtc_offer', (data) => handleWebrtcOffer(socket, data));
     socket.on('webrtc_answer', handleWebrtcAnswer);
     socket.on('webrtc_ice_candidate', handleWebrtcIceCandidate);
@@ -322,6 +370,11 @@ const dispatchUserWebSocketNotification = (uniqueCode, notification) => {
 const dispatchBroadcastWebSocketNotification = (notification) => {
   if (!ioInstance) return;
   ioInstance.emit('new_notification', notification);
+};
+
+const dispatchBroadcastWebSocketEvent = (eventName, payload) => {
+  if (!ioInstance) return;
+  ioInstance.emit(eventName, payload);
 };
 
 const getConnectedUsersCount = () => connectedUsers.size;
@@ -360,8 +413,10 @@ const dispatchDashboardUpdate = (...collectionKeys) => {
 
 module.exports = {
   setupWebSocket,
+  dispatchUserWebSocketEvent: emitToUser,
   dispatchUserWebSocketNotification,
   dispatchBroadcastWebSocketNotification,
+  dispatchBroadcastWebSocketEvent,
   getConnectedUsersCount,
   isUserConnected,
   forceLogoutUser,

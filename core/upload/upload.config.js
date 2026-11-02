@@ -1,7 +1,7 @@
 const MIN_PART_SIZE = 8 * 1024 * 1024;
 const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024;
 const MAXIMUM_PART_COUNT = 10000;
-const PART_URL_BATCH_SIZE = 25;
+const PART_URL_BATCH_SIZE = 100;
 const SESSION_STALE_HOURS = 24;
 
 module.exports = {

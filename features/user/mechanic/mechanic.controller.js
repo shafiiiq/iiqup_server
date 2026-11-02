@@ -116,6 +116,27 @@ const addToolkit = async (req, res) => {
   }
 };
 
+const createProfilePhotoUpload = async (req, res) => {
+  try {
+    const { mechanicId, fileName, mimeType } = req.body;
+
+    if (!mechanicId || !fileName || !mimeType) {
+      return res
+        .status(HTTP.BAD_REQUEST)
+        .json({ success: false, message: 'mechanicId, fileName and mimeType are required' });
+    }
+
+    const result = await mechanicServices.createProfilePhotoUpload(mechanicId, fileName, mimeType);
+
+    sendSuccess(res, result);
+  } catch (error) {
+    logger.error('[Mechanic] createProfilePhotoUpload:', error);
+    res
+      .status(error.status || HTTP.INTERNAL_SERVER_ERROR)
+      .json({ success: false, message: error.message });
+  }
+};
+
 const getAttendance = async (req, res) => {
   try {
     const { zktecoPin } = req.params;
@@ -126,10 +147,7 @@ const getAttendance = async (req, res) => {
         .json({ success: false, message: 'zktecoPin is required' });
     }
 
-    const result = await mechanicServices.fetchAttendance(zktecoPin, req.query, req.pagination);
-
-    console.log(result);
-    
+    const result = await mechanicServices.fetchAttendance(zktecoPin, req.query, req.pagination);    
 
     sendSuccess(res, result);
   } catch (error) {
@@ -162,6 +180,7 @@ module.exports = {
   updateMechanic,
   deleteMechanic,
   addToolkit,
+  createProfilePhotoUpload,
   getAttendance,
   getRecentActivity,
 };

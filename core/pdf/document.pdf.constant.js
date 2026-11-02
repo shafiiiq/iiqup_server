@@ -1,0 +1,22 @@
+const PDF_STATUS = {
+  PENDING: 'pending',
+  READY: 'ready',
+  FAILED: 'failed',
+}
+
+const PDF_RENDER_MAX_ATTEMPTS = 3
+const PDF_FAILURE_COOLDOWN_MS = 60 * 1000
+const PDF_STATUS_SOCKET_EVENT = 'document_pdf_status'
+const PDF_PAPER_WIDTH_MM = 297
+const PDF_PAPER_HEIGHT_MM = 420
+const PDF_MIME_TYPE = 'application/pdf'
+
+module.exports = {
+  PDF_STATUS,
+  PDF_RENDER_MAX_ATTEMPTS,
+  PDF_FAILURE_COOLDOWN_MS,
+  PDF_STATUS_SOCKET_EVENT,
+  PDF_PAPER_WIDTH_MM,
+  PDF_PAPER_HEIGHT_MM,
+  PDF_MIME_TYPE,
+}

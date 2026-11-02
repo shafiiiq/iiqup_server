@@ -6,8 +6,9 @@ const operatorMobilizationSchema = new mongoose.Schema(
     operatorName: { type: String, required: true },
     qatarId: { type: String, default: '' },
 
-    action: { type: String, required: true, enum: ['mobilized', 'demobilized'] },
-    status: { type: String, required: true, enum: ['mobilized', 'demobilized'] },
+    action: { type: String, required: true, enum: ['mobilized', 'demobilized', 'replaced'] },
+    status: { type: String, required: true, enum: ['mobilized', 'demobilized', 'replaced'] },
+    origin: { type: String, enum: ['equipment', 'operator', 'replacement'], default: 'equipment' },
     mode: { type: String, enum: ['operator-only', 'with-equipment'], default: 'with-equipment' },
 
     regNo: { type: String, default: '' },
@@ -32,6 +33,11 @@ const operatorMobilizationSchema = new mongoose.Schema(
     time: { type: String, required: true },
 
     remarks: { type: String, default: '' },
+
+    outgoingOperatorId: { type: String, default: '' },
+    outgoingOperatorName: { type: String, default: '' },
+    incomingOperatorId: { type: String, default: '' },
+    incomingOperatorName: { type: String, default: '' },
   },
   { timestamps: true }
 );
@@ -41,5 +47,6 @@ operatorMobilizationSchema.index({ action: 1 });
 operatorMobilizationSchema.index({ regNo: 1 });
 operatorMobilizationSchema.index({ date: -1 });
 operatorMobilizationSchema.index({ operatorId: 1, action: 1, date: -1 });
+operatorMobilizationSchema.index({ origin: 1, date: -1 });
 
 module.exports = mongoose.model('OperatorMobilization', operatorMobilizationSchema);

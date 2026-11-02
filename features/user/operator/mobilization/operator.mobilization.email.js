@@ -181,12 +181,15 @@ const generateOperatorReplacementTemplate = (recipientName = 'Team', data = {}) 
   `;
 };
 
+const buildOperatorReplacementSubject = (data) =>
+  `Operator Replaced - ${data.outgoingOperatorName || ''} to ${data.incomingOperatorName || ''}${data.regNo ? ` - ${data.regNo}` : ''}`;
+
 const alertOperatorReplacementViaEmail = async (data = {}) => {
   const toList = JSON.parse(process.env.OPERATOR_MOBILIZATION_TO || process.env.MOBILIZATION_TO || '[]');
   const to = toList.join(', ');
   const ccList = JSON.parse(process.env.OPERATOR_MOBILIZATION_CC || process.env.MOBILIZATION_CC || '[]');
   const cc = ccList.join(', ');
-  const subject = `Operator Replaced - ${data.outgoingOperatorName || ''} to ${data.incomingOperatorName || ''}${data.regNo ? ` - ${data.regNo}` : ''}`;
+  const subject = buildOperatorReplacementSubject(data);
 
   const htmlContent = generateOperatorReplacementTemplate('Team', data);
   const textContent = `Operator replaced: ${data.outgoingOperatorName} -> ${data.incomingOperatorName}. ${data.regNo ? `Equipment: ${data.regNo}. ` : ''}Date: ${data.date}. Remarks: ${data.remarks || 'None'}.`;
@@ -195,6 +198,9 @@ const alertOperatorReplacementViaEmail = async (data = {}) => {
 };
 
 module.exports = {
+  ACTION_LABEL,
+  ACTION_SUBJECT,
+  buildOperatorReplacementSubject,
   alertOperatorMobilizationViaEmail,
   alertOperatorReplacementViaEmail,
   generateOperatorMobilizationTemplate,

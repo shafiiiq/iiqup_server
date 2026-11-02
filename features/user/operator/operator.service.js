@@ -1,9 +1,9 @@
 const logger = require('#shared/logger/logger')
 const HTTP = require('#shared/response/response.status')
 const Operator = require('./operator.model')
-const Equipment = require('../../equipment/equipment.model')
+const Equipment = require('../../fleet/equipment/equipment.model')
 const User = require('../staff/staff.model')
-const otpServices = require('../../otp/otp.service')
+const { verifyQatarAccount, loginQatarAccount } = require('#core/authN/authN.qatar')
 const { putObject } = require('#core/s3/s3.config')
 const { paginate } = require('#shared/pagination/pagination')
 require('dotenv').config()
@@ -39,38 +39,10 @@ const createOperator = async (operatorData) => {
   return await new Operator(operatorData).save()
 }
 
-const verifyOperator = async (qatarId) => {
-  if (!qatarId) throw httpError('Qatar ID is required', HTTP.BAD_REQUEST)
+const verifyOperator = (qatarId) => verifyQatarAccount(Operator, qatarId)
 
-  const operator = await Operator.findOne({ qatarId })
-  if (!operator) throw httpError('Operator not found', HTTP.NOT_FOUND)
-
-  const authUser = await getAuthUser()
-  if (!authUser?.authMail) throw httpError('Authorization email not found', HTTP.INTERNAL_SERVER_ERROR)
-
-  let otpResult
-  try {
-    otpResult = await otpServices.generateAndSendOTP(authUser.authMail, true, operator.name)
-  } catch (otpError) {
-    logger.error('[operator.service] verifyOperator', otpError)
-    throw httpError('Failed to send OTP', HTTP.INTERNAL_SERVER_ERROR, { details: otpError.message })
-  }
-
-  const updatedOperator = await Operator.findOneAndUpdate(
-    { qatarId },
-    { isVerified: true, updatedAt: Date.now(), verifiedAt: Date.now() },
-    { new: true, runValidators: true }
-  )
-  if (!updatedOperator) throw httpError('Failed to update operator verification status', HTTP.INTERNAL_SERVER_ERROR)
-
-  const response = updatedOperator.toObject()
-  response.authMail = authUser.authMail
-
-  const isDemoOperator = qatarId === process.env.DEMO_OPERATOR_QID
-  if (isDemoOperator) response.otp_for_demo_opr = otpResult.data?.otp
-
-  return response
-}
+const loginOperator = (qatarId, deviceInfo) =>
+  loginQatarAccount({ Model: Operator, sessionUserModel: 'Operator', qatarId, deviceInfo })
 
 const uploadProfilePic = async (qatarId, fileName, mimeType) => {
   if (!qatarId || !fileName || !mimeType) {
@@ -155,9 +127,6 @@ const syncEquipmentCertification = async (operator, oldEquipmentNumber, newEquip
 const updateOperator = async (id, updateData) => {
   if (!id) throw httpError('Qatar ID is required', HTTP.BAD_REQUEST)
 
-console.log("id", id);
-
-
   const existing = await Operator.findById(id)
   if (!existing) throw httpError('Operator not found', HTTP.NOT_FOUND)
 
@@ -211,6 +180,7 @@ const getDistinctDesignations = async () => {
 module.exports = {
   createOperator,
   verifyOperator,
+  loginOperator,
   uploadProfilePic,
   updateOperator,
   deleteOperator,

@@ -1,16 +1,21 @@
 const logger = require('#shared/logger/logger');
 const HTTP = require('#shared/response/response.status');
 const { paginate } = require('#shared/pagination/pagination');
-const { notifySafely } = require('#shared/notify/notify.user');
 const wsUtils = require('#core/socket/socket.io');
 const dashboardServices = require('#features/dashboard/dashboard.service');
 
 const OperatorModel = require('../operator.model');
-const EquipmentModel = require('#features/equipment/equipment.model');
+const EquipmentModel = require('#features/fleet/equipment/equipment.model');
 
 const OperatorMobilizationModel = require('./operator.mobilization.model');
 const { alertOperatorMobilizationViaEmail, alertOperatorReplacementViaEmail } = require('./operator.mobilization.email');
-const { RECENT_LIMIT, NOTIFICATION_PRIORITY, OPERATOR_MOB_ACTIONS, STAFF_MAIN } = require('./operator.mobilization.constant');
+const {
+  RECENT_LIMIT,
+  NOTIFICATION_PRIORITY,
+  OPERATOR_MOB_ACTIONS,
+  OPERATOR_MOB_ORIGINS,
+  STAFF_MAIN,
+} = require('./operator.mobilization.constant');
 
 const getCurrentDateTime = (date = null) => {
   const now = date ? new Date(date) : new Date();
@@ -53,6 +58,7 @@ const syncOperatorMobilizedFromEquipment = async ({
   remarks = '',
   date = null,
   sendEmail = true,
+  origin = OPERATOR_MOB_ORIGINS.EQUIPMENT,
 }) => {
   if (!operatorId) return null;
 
@@ -73,6 +79,7 @@ const syncOperatorMobilizedFromEquipment = async ({
       qatarId: operator.qatarId,
       action: OPERATOR_MOB_ACTIONS.MOBILIZED,
       status: 'mobilized',
+      origin,
       mode: regNo ? 'with-equipment' : 'operator-only',
       regNo,
       machine,
@@ -119,14 +126,6 @@ const syncOperatorMobilizedFromEquipment = async ({
       ...(Object.keys(pushFields).length && { $push: pushFields }),
     });
 
-    await notifySafely(STAFF_MAIN, {
-      title: `${operator.name} Mobilized`,
-      description: `${operator.name} has been mobilized to ${deployType === 'company' ? `client: ${clientCompany}` : `site: ${site}`
-        }${regNo ? ` on ${machine} (${regNo})` : ''}`,
-      priority: NOTIFICATION_PRIORITY.MEDIUM,
-      sourceId: operator._id,
-    });
-
     if (sendEmail) alertOperatorMobilizationViaEmail({
       action: OPERATOR_MOB_ACTIONS.MOBILIZED,
       operatorName: operator.name,
@@ -171,6 +170,7 @@ const syncOperatorDemobilizedFromEquipment = async ({
   remarks = '',
   date = null,
   sendEmail = true,
+  origin = OPERATOR_MOB_ORIGINS.EQUIPMENT,
 }) => {
   if (!operatorId) return null;
 
@@ -191,6 +191,7 @@ const syncOperatorDemobilizedFromEquipment = async ({
       qatarId: operator.qatarId,
       action: OPERATOR_MOB_ACTIONS.DEMOBILIZED,
       status: 'demobilized',
+      origin,
       mode: regNo ? 'with-equipment' : 'operator-only',
       regNo,
       machine,
@@ -211,13 +212,6 @@ const syncOperatorDemobilizedFromEquipment = async ({
     await OperatorModel.findByIdAndUpdate(operator._id, {
       $set: { status: 'demobilized', equipmentNumber: '', mode: null, site: [], demobDate: eventDate, updatedAt: new Date() },
       ...(Object.keys(pushFields).length && { $push: pushFields }),
-    });
-
-    await notifySafely(STAFF_MAIN, {
-      title: `${operator.name} Demobilized`,
-      description: `${operator.name} has been demobilized${regNo ? ` from ${machine} (${regNo})` : ''}`,
-      priority: NOTIFICATION_PRIORITY.MEDIUM,
-      sourceId: operator._id,
     });
 
     if (sendEmail) alertOperatorMobilizationViaEmail({
@@ -298,6 +292,7 @@ const mobilizeOperator = async (data) => {
     rentRate,
     remarks,
     date: selectedDate,
+    origin: OPERATOR_MOB_ORIGINS.OPERATOR,
   });
 
   if (!record) return { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: 'Failed to mobilize operator' };
@@ -381,6 +376,7 @@ const demobilizeOperator = async (data) => {
     machine: equipment?.machine || '',
     remarks,
     date: selectedDate,
+    origin: OPERATOR_MOB_ORIGINS.OPERATOR,
   });
 
   if (!record) {
@@ -436,6 +432,7 @@ const replaceOperator = async (data) => {
     remarks,
     date: selectedDate,
     sendEmail: false,
+    origin: OPERATOR_MOB_ORIGINS.REPLACEMENT,
   });
 
   let mobilizationRecord = null;
@@ -456,6 +453,7 @@ const replaceOperator = async (data) => {
       remarks,
       date: selectedDate,
       sendEmail: false,
+      origin: OPERATOR_MOB_ORIGINS.REPLACEMENT,
     });
 
     if (regNo) {
@@ -481,14 +479,30 @@ const replaceOperator = async (data) => {
     }
   }
 
-  await notifySafely(STAFF_MAIN, {
-    title: 'Operator Replaced',
-    description: `${currentOperator.name} has been replaced by ${newOperator.name}${oldRegNo ? ` on ${oldRegNo}` : ''}`,
-    priority: NOTIFICATION_PRIORITY.MEDIUM,
-    sourceId: newOperator._id,
-  });
+  const { month, year, time } = getCurrentDateTime(selectedDate);
 
-  const { month, year, time } = getCurrentDateTime();
+  await OperatorMobilizationModel.create({
+    operatorId: newOperator._id,
+    operatorName: newOperator.name,
+    qatarId: newOperator.qatarId,
+    action: OPERATOR_MOB_ACTIONS.REPLACED,
+    status: OPERATOR_MOB_ACTIONS.REPLACED,
+    mode: oldRegNo || regNo ? 'with-equipment' : 'operator-only',
+    origin: OPERATOR_MOB_ORIGINS.OPERATOR,
+    regNo: oldRegNo || regNo,
+    site,
+    deployType,
+    clientCompany,
+    month,
+    year,
+    date: selectedDate ? new Date(selectedDate) : new Date(),
+    time,
+    remarks,
+    outgoingOperatorId: currentOperator._id.toString(),
+    outgoingOperatorName: currentOperator.name,
+    incomingOperatorId: newOperator._id.toString(),
+    incomingOperatorName: newOperator.name,
+  });
 
   alertOperatorReplacementViaEmail({
     outgoingOperatorName: currentOperator.name,

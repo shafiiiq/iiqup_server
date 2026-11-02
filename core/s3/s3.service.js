@@ -5,8 +5,14 @@ const logger = require('#shared/logger/logger')
 const NOT_FOUND_STATUS = 404
 const OK_STATUS = 200
 const SERVER_ERROR_STATUS = 500
+const FORBIDDEN_STATUS = 403
+const PROTECTED_KEY_PREFIXES = ['signatures/']
 
 const fetchPresignedURL = async (s3Key, isLong, isAuthSign = false, downloadFileName = '') => {
+  if (PROTECTED_KEY_PREFIXES.some((prefix) => String(s3Key).startsWith(prefix))) {
+    return { status: FORBIDDEN_STATUS, ok: false, message: 'Access denied' }
+  }
+
   try {
     const exists = await objectExists(s3Key)
     if (!exists) {

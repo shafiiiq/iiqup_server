@@ -2,7 +2,7 @@ const logger = require('#shared/logger/logger')
 const HTTP = require('#shared/response/response.status')
 const { sendSuccess, sendError } = require('#shared/response/response.sender')
 const operatorService = require('./operator.service')
-const Equipment = require('../../equipment/equipment.model')
+const Equipment = require('../../fleet/equipment/equipment.model')
 require('dotenv').config()
 
 const validate = (fields, source) => {
@@ -37,7 +37,6 @@ const createOperator = async (req, res) => {
     sendSuccess(res, {
       success: true,
       data: operator,
-      authMail: process.env.AUTH_OTP_USER_EMAIL,
       message: 'Operator created successfully',
     })
   } catch (error) {

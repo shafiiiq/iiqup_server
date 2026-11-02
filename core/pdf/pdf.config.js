@@ -1,5 +1,4 @@
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:3000'
-const PDF_RENDER_SECRET = process.env.PDF_RENDER_SECRET
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://alansariconnect.vercel.app'
 
 const PUPPETEER_LAUNCH_OPTIONS = {
   headless: 'new',
@@ -11,7 +10,11 @@ const PUPPETEER_LAUNCH_OPTIONS = {
   ],
 }
 
-const MAX_CONCURRENT_RENDERS = Number(process.env.PDF_MAX_CONCURRENT_RENDERS) || 2 
+const MAX_CONCURRENT_RENDERS = Number(process.env.PDF_MAX_CONCURRENT_RENDERS) || 2
+
+const PRINT_TOKEN_TYPE = 'print'
+const PRINT_TOKEN_LIFETIME = '5m'
+const PRINT_TOKEN_ALLOWED_POST_PATHS = ['/api/v1/s3/pre-signed-url']
 
 const DEFAULT_PDF_OPTIONS = {
   printBackground: true,
@@ -26,9 +29,11 @@ const BLOCKED_URL_PATTERNS = [
 
 module.exports = {
   FRONTEND_URL,
-  PDF_RENDER_SECRET,
   PUPPETEER_LAUNCH_OPTIONS,
   DEFAULT_PDF_OPTIONS,
   MAX_CONCURRENT_RENDERS,
   BLOCKED_URL_PATTERNS,
+  PRINT_TOKEN_TYPE,
+  PRINT_TOKEN_LIFETIME,
+  PRINT_TOKEN_ALLOWED_POST_PATHS,
 }

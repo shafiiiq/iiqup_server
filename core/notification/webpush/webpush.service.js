@@ -1,4 +1,3 @@
-const HTTP = require('#shared/response/response.status')
 const webpush = require('web-push');
 const User = require('#features/user/staff/staff.model');
 
@@ -8,31 +7,20 @@ webpush.setVapidDetails(
   process.env.VAPID_PRIVATE_KEY
 );
 
-const saveSubscription = async (uniqueCode, subscription) => {
-  await User.findOneAndUpdate(
-    { uniqueCode },
-    { $set: { webPushSubscription: subscription } }
-  );
-};
-
 const getSubscription = async (uniqueCode) => {
   const user = await User.findOne({ uniqueCode }).select('webPushSubscription');
   return user?.webPushSubscription || null;
 };
 
 const clearSubscription = async (uniqueCode) => {
-  await User.findOneAndUpdate(
-    { uniqueCode },
-    { $set: { webPushSubscription: null } }
-  );
+  await User.findOneAndUpdate({ uniqueCode }, { $set: { webPushSubscription: null } });
 };
 
-const sendPushNotification = async (subscription, payload) => {
-  await webpush.sendNotification(subscription, JSON.stringify(payload));
+const sendPushNotification = async (subscription, payload, options = {}) => {
+  await webpush.sendNotification(subscription, JSON.stringify(payload), options);
 };
 
 module.exports = {
-  saveSubscription,
   getSubscription,
   clearSubscription,
   sendPushNotification,

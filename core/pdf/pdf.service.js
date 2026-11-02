@@ -1,10 +1,9 @@
 const puppeteer = require('puppeteer')
 const PQueue = require('p-queue').default
 const logger = require('#shared/logger/logger')
-const { generateAuthTokens } = require('#middlewares/jwt.middleware')
+const { buildRenderUser, issuePrintToken } = require('./pdf.token')
 const {
   FRONTEND_URL,
-  PDF_RENDER_SECRET,
   PUPPETEER_LAUNCH_OPTIONS,
   DEFAULT_PDF_OPTIONS,
   MAX_CONCURRENT_RENDERS,
@@ -59,19 +58,13 @@ const blockNonEssentialRequests = async (page) => {
   })
 }
 
-const seedAuthTokens = async (page, tokens, user, pdfRenderSecret) => {
-  await page.evaluateOnNewDocument((accessToken, userData, renderSecret) => {
-    const now = new Date()
-    const userSession = {
-      userId: userData.id,
-      email: userData.email,
-      authMail: userData.email,
-      uniqueCode: userData.uniqueCode,
-      loginTime: now.toISOString(),
-      expiresAt: new Date(now.getTime() + 60 * 60 * 1000).toISOString(),
-    }
-
-    const storedUser = {
+const seedAuthTokens = async (page, printToken, renderUser) => {
+  await page.evaluateOnNewDocument((accessToken, refreshToken, userData) => {
+    const storage = window.localStorage
+    storage.setItem('keys.session.persistence', 'persistent')
+    storage.setItem('credentials.user.access_token', accessToken)
+    storage.setItem('credentials.user.refresh_token', refreshToken)
+    storage.setItem('credentials.user.data', JSON.stringify({
       _id: userData.id,
       email: userData.email,
       authMail: userData.email,
@@ -79,16 +72,10 @@ const seedAuthTokens = async (page, tokens, user, pdfRenderSecret) => {
       role: userData.role,
       userType: userData.userType,
       name: userData.name,
-    }
-
-    window.localStorage.setItem('accessToken', accessToken)
-    window.localStorage.setItem('refreshToken', userData.refreshToken)
-    window.localStorage.setItem('userSession', JSON.stringify(userSession))
-    window.localStorage.setItem('user', JSON.stringify(storedUser))
-    window.localStorage.setItem('isUserLoggedIn', 'true')
-    window.localStorage.setItem('hasSeenIntro', 'true')
-    window.localStorage.setItem('pdfRenderSecret', renderSecret || '')
-  }, tokens.accessToken, { ...user, refreshToken: tokens.refreshToken }, pdfRenderSecret)
+    }))
+    storage.setItem('session.user.expires_at', String(Date.now() + 60 * 60 * 1000))
+    storage.setItem('hasSeenOnboard', 'true')
+  }, printToken, printToken, renderUser)
 }
 
 const waitForDocumentReady = async (page) => {
@@ -142,21 +129,15 @@ const waitForDocumentReady = async (page) => {
 
 const renderPageToPdfInternal = async (path, user, options = {}) => {
   const { width, height } = options
-  const tokens = generateAuthTokens({
-    _id: user._id || user.id,
-    email: user.email,
-    role: user.role,
-    uniqueCode: user.uniqueCode,
-    userType: user.userType,
-    name: user.name,
-  })
+  const renderUser = buildRenderUser(user)
+  const printToken = issuePrintToken(renderUser)
 
   const browser = await getBrowser()
   const page = await browser.newPage()
 
   try {
     await blockNonEssentialRequests(page)
-    await seedAuthTokens(page, tokens, user, PDF_RENDER_SECRET)
+    await seedAuthTokens(page, printToken, renderUser)
 
     const separator = path.includes('?') ? '&' : '?'
     await page.goto(`${FRONTEND_URL}${path}${separator}pdf=1`, { waitUntil: 'domcontentloaded', timeout: 60000 })

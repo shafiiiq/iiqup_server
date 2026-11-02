@@ -5,6 +5,8 @@ const { sendSuccess, sendError } = require('#shared/response/response.sender');
 const documentService = require('./document.service');
 const trashService = require('./document.trash.service');
 const archiveService = require('./document.archive.service');
+const historyService = require('./document.history.service');
+const expiryService = require('./document.expiry.service');
 const convertService = require('./document.convert.service');
 const { SUPPORTED_SOURCE_TYPES, isValidDateInput } = require('./document.helper');
 
@@ -305,7 +307,20 @@ const annotateDocument = handleRoute('annotateDocument', async (req) => {
   });
 });
 
+const getExpiryTracking = handleRoute('getExpiryTracking', async () => expiryService.getExpiryTracking());
+
+const revertRenewal = handleRoute('revertRenewal', async (req) =>
+  historyService.revertRenewal({ renewedDocumentId: req.params.documentId, deletedBy: req.userId })
+);
+
+const reapplyRenewal = handleRoute('reapplyRenewal', async (req) =>
+  historyService.reapplyRenewal({ renewedDocumentId: req.params.documentId })
+);
+
 module.exports = {
+  getExpiryTracking,
+  revertRenewal,
+  reapplyRenewal,
   searchDocuments,
   annotateDocument,
   getStorageSummary,

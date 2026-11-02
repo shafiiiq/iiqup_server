@@ -2,6 +2,7 @@ const logger = require('#shared/logger/logger')
 const HTTP = require('#shared/response/response.status')
 const { sendSuccess, sendError } = require('#shared/response/response.sender')
 const uploadService = require('./upload.service')
+const liveActivityService = require('./liveactivity/liveactivity.service')
 
 const handleRoute = (logTag, fallbackMessage, handler) => async (req, res) => {
   try {
@@ -61,7 +62,44 @@ const getUploadStatus = handleRoute('getUploadStatus', 'Failed to retrieve uploa
   return { status: HTTP.OK, message: 'Upload status retrieved', data }
 })
 
+const saveThumbnail = handleRoute('saveThumbnail', 'Failed to save thumbnail', async (req) => {
+  const { sessionId } = req.params
+  const { imageBase64, contentType } = req.body
+  const data = await uploadService.saveSessionThumbnail({
+    sessionId,
+    uploadedBy: req.userId,
+    imageBase64,
+    contentType,
+  })
+  return { status: HTTP.OK, message: 'Thumbnail saved', data }
+})
+
+const saveLiveActivity = handleRoute('saveLiveActivity', 'Failed to save live activity', async (req) => {
+  const { sessionId } = req.params
+  const { pushToken, displayName, itemNumber, itemCount, bytesBeforeItem, batchTotalBytes } = req.body
+  const data = await liveActivityService.saveSessionLiveActivity({
+    sessionId,
+    uploadedBy: req.userId,
+    pushToken,
+    displayName,
+    itemNumber,
+    itemCount,
+    bytesBeforeItem,
+    batchTotalBytes,
+  })
+  return { status: HTTP.OK, message: 'Live activity saved', data }
+})
+
+const clearLiveActivity = handleRoute('clearLiveActivity', 'Failed to clear live activity', async (req) => {
+  const { sessionId } = req.params
+  const data = await liveActivityService.clearSessionLiveActivity({ sessionId, uploadedBy: req.userId })
+  return { status: HTTP.OK, message: 'Live activity cleared', data }
+})
+
 module.exports = {
+  saveLiveActivity,
+  clearLiveActivity,
+  saveThumbnail,
   initiateUpload,
   getPartUrls,
   acknowledgePart,

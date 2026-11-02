@@ -6,10 +6,11 @@ const User = require('./staff.model')
 const Mechanic = require('../mechanic/mechanic.model')
 const Operator = require('../operator/operator.model')
 const { paginate } = require('#shared/pagination/pagination')
-const notificatonPush = require('#core/notification/notification.push');
 const { createSession } = require('#core/session/session.service');
+const { isMobileClient } = require('#shared/request/request.client.context');
 const { generateAuthTokens } = require('#middlewares/jwt.middleware');
 const { generateUniqueCode } = require('./staff.helper');
+const { resolveOptionalSignedUrl } = require('#core/s3/s3.signed.url');
 
 const insertUser = async (userData) => {
   try {
@@ -96,7 +97,7 @@ const updateUserAuthMail = async (userId, authMail, type) => {
       return { status: HTTP.BAD_REQUEST, success: false, message: 'Please provide a valid email' };
     }
 
-    const update = { authMail, updatedAt: new Date() };
+    const update = { authMail: String(authMail).trim().toLowerCase(), updatedAt: new Date() };
     const options = { new: true };
 
     let updatedUser;
@@ -114,11 +115,11 @@ const updateUserAuthMail = async (userId, authMail, type) => {
       status: HTTP.OK,
       success: true,
       message: 'Authentication email updated successfully',
-      data: { _id: updatedUser._id, phone: updatedUser.phone },
+      data: { _id: updatedUser._id, authMail: updatedUser.authMail },
     };
   } catch (error) {
     logger.error('[staff.service] updateUserAuthMail', error);
-    return { status: HTTP.INTERNAL_SERVER_ERROR, success: false, message: 'Failed to update phone number', error: error.message };
+    return { status: HTTP.INTERNAL_SERVER_ERROR, success: false, message: 'Failed to update authentication email', error: error.message };
   }
 };
 
@@ -177,14 +178,6 @@ const verifyStaffCredentials = async (email, password, deviceInfo) => {
       return { status: HTTP.UNAUTHORIZED, success: false, message: 'Invalid email or password' };
     }
 
-    await notificatonPush.dispatchNotificationToUser(
-      user.uniqueCode,
-      'Are you certain this is you?',
-      "login attempt detected. If this wasn't you, your credentials may be compromised. Update them immediately",
-      'high',
-      'normal'
-    );
-
     const deviceData = {
       deviceName: deviceInfo?.deviceName || 'Unknown Device',
       deviceModel: deviceInfo?.deviceModel || 'Unknown Model',
@@ -198,16 +191,9 @@ const verifyStaffCredentials = async (email, password, deviceInfo) => {
       locationAddress: deviceInfo?.locationAddress || 'Unknown',
     };
 
-    const sessionToken = await createSession(user._id, 'User', deviceData, deviceInfo?.location || null);
-
-    const tokens = generateAuthTokens({
-      _id: user._id,
-      email: user.email,
-      role: user.role,
-      uniqueCode: user.uniqueCode,
-      userType: user.userType,
-      name: user.name,
-    });
+    const sessionToken = isMobileClient()
+      ? null
+      : await createSession(user._id, 'User', deviceData, deviceInfo?.location || null);
 
     return {
       status: HTTP.OK,
@@ -220,12 +206,15 @@ const verifyStaffCredentials = async (email, password, deviceInfo) => {
         role: user.role,
         phone: user.phone,
         department: user.department,
+        designation: user.designation,
+        profilePic: {
+          filePath: user.profilePic?.filePath ?? '',
+          signedUrl: await resolveOptionalSignedUrl(user.profilePic?.filePath),
+        },
         uniqueCode: user.uniqueCode,
         lastLogin: user.lastLogin,
         authMail: user.authMail,
       },
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
       sessionToken,
     };
   } catch (error) {
@@ -293,6 +282,30 @@ const changePassword = async (email, currentPassword, newPassword) => {
   }
 };
 
+const changePasswordById = async (userId, currentPassword, newPassword) => {
+  try {
+    const user = await User.findById(userId);
+    if (!user) return { status: HTTP.NOT_FOUND, success: false, message: 'User not found' };
+    if (!user.isActive) {
+      return { status: HTTP.FORBIDDEN, success: false, message: 'Your account has been deactivated. Please contact an administrator.' };
+    }
+
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isPasswordValid) {
+      return { status: HTTP.BAD_REQUEST, success: false, message: 'Current password is incorrect' };
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+    await User.findByIdAndUpdate(userId, { password: hashedPassword, updatedAt: new Date() });
+
+    return { status: HTTP.OK, success: true, message: 'Password changed successfully' };
+  } catch (error) {
+    logger.error('[staff.service] changePasswordById', error);
+    return { status: HTTP.INTERNAL_SERVER_ERROR, success: false, message: 'Password change failed', error: error.message };
+  }
+};
+
 const resetPassword = async (email, type) => {
   try {
     let user;
@@ -349,6 +362,7 @@ module.exports = {
   verifyCEOcreds,
   verifyDocAuthUserCreds,
   changePassword,
+  changePasswordById,
   resetPassword,
   getTutorialsSeen,
   completeTutorial,

@@ -10,6 +10,11 @@ const {
 } = require('#core/s3/s3.config');
 const { PART_URL_BATCH_SIZE } = require('./upload.config');
 const { sanitizeFileName, buildS3Key, calculatePartPlan } = require('./upload.helper');
+const { registerVideoAsset, applyThumbnailToAsset } = require('#core/cdn/cdn.service');
+const liveActivityService = require('./liveactivity/liveactivity.service');
+
+const MAX_THUMBNAIL_BYTES = 300 * 1024;
+const ALLOWED_THUMBNAIL_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const completionHandlers = {};
 
@@ -156,6 +161,10 @@ const completeUpload = async ({ sessionId, uploadedBy, parts }) => {
     feature: session.feature,
   });
 
+  liveActivityService.handleSessionCompleted(session).catch((error) =>
+    logger.error('[upload.service] live activity completion push failed', { sessionId, error: error.message })
+  );
+
   const handler = completionHandlers[session.feature];
   if (handler) {
     try {
@@ -169,7 +178,40 @@ const completeUpload = async ({ sessionId, uploadedBy, parts }) => {
     }
   }
 
+  try {
+    await registerVideoAsset(session);
+  } catch (error) {
+    logger.error('[upload.service] video processing registration failed', {
+      sessionId,
+      feature: session.feature,
+      error: error.message,
+    });
+  }
+
   return { sessionId, s3Key: session.s3Key, alreadyCompleted: false };
+};
+
+const saveSessionThumbnail = async ({ sessionId, uploadedBy, imageBase64, contentType }) => {
+  const session = await UploadSession.findById(sessionId);
+  if (!session) throw new AppError('Upload session not found', HTTP.NOT_FOUND);
+  if (session.uploadedBy !== uploadedBy) {
+    throw new AppError('Not authorized for this upload session', HTTP.FORBIDDEN);
+  }
+  if (!imageBase64 || typeof imageBase64 !== 'string') {
+    throw new AppError('imageBase64 is required', HTTP.BAD_REQUEST);
+  }
+
+  const thumbnailData = Buffer.from(imageBase64, 'base64');
+  if (thumbnailData.length === 0 || thumbnailData.length > MAX_THUMBNAIL_BYTES) {
+    throw new AppError('Thumbnail size is invalid', HTTP.BAD_REQUEST);
+  }
+
+  const thumbnailContentType = ALLOWED_THUMBNAIL_TYPES.includes(contentType) ? contentType : 'image/jpeg';
+
+  await UploadSession.updateOne({ _id: sessionId }, { $set: { thumbnailData, thumbnailContentType } });
+  await applyThumbnailToAsset(String(sessionId), thumbnailData, thumbnailContentType);
+
+  return { sessionId };
 };
 
 const abortUpload = async ({ sessionId, uploadedBy }) => {
@@ -203,6 +245,8 @@ const getSessionStatus = async ({ sessionId, uploadedBy }) => {
     totalParts: session.totalParts,
     fileSize: session.fileSize,
     s3Key: session.s3Key,
+    partSize: session.partSize,
+    parts: session.parts.map((part) => ({ partNumber: part.partNumber, etag: part.etag, size: part.size })),
   };
 };
 
@@ -245,4 +289,5 @@ module.exports = {
   abortUpload,
   getSessionStatus,
   getCompletedSessions,
+  saveSessionThumbnail,
 };

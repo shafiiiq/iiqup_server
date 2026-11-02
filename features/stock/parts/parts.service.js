@@ -10,64 +10,10 @@ const HTTP = require('#shared/response/response.status')
 const Stock = require('./parts.model')
 const mongoose = require('mongoose');
 
-const { createNotification } = require('#core/notification/notification.service')
-const PushNotificationService = require('#core/notification/notification.push')
 const wsUtils = require('#core/socket/socket.io')
 const dashboardServices = require('#features/dashboard/dashboard.service')
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Internal: Notification helper
-// ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Fire-and-forget: creates an in-app notification + push notification.
- * Errors are logged but never surfaced to callers.
- * @param {string}      title
- * @param {string}      description
- * @param {string}      [priority='high']
- * @param {string|null} [recipient]
- * @param {string|null} [sourceId]
- */
-const _sendNotification = async (
-  title,
-  description,
-  priority = 'high',
-  recipient = null,
-  sourceId = null
-) => {
-  try {
-    const notification = await createNotification({
-      title,
-      description,
-      priority,
-      type: 'normal',
-      sourceId,
-      target: recipient,
-      time: new Date(),
-    });
-
-    await PushNotificationService.sendGeneralNotification(
-      recipient,
-      title,
-      description,
-      priority,
-      'normal',
-      notification.data._id.toString()
-    );
-  } catch (err) {
-    logger.error('[StockService] Notification failed:', err.message);
-  }
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Stock CRUD
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Inserts a new stock record.
- * @param {object} data
- * @returns {Promise<object>}
- */
 const insertStocks = async (data) => {
   try {
     if (
@@ -132,15 +78,6 @@ const insertStocks = async (data) => {
           (parseInt(data.subUnitCapacity) || 0)
         : 0,
     }).save();
-
-    const staffHero = JSON.parse(process.env.STAFF_HERO);
-    await _sendNotification(
-      'New Stock Added',
-      `${data.stockCount} new ${data.serialNumber} - ${data.product} added to stock${newStock.equipments ? ` for ${newStock.equipments}` : ''}`,
-      'high',
-      staffHero,
-      newStock._id
-    );
 
     dashboardServices.clearDashboardCache()
     wsUtils.dispatchDashboardUpdate('stocks');
@@ -604,29 +541,6 @@ const updateStock = async (stockId, updateData) => {
         stockId,
         { ...regularUpdateData, updatedAt: new Date() },
         { new: true, runValidators: true }
-      );
-    }
-
-    // ── Low / out-of-stock alerts ─────────────────────────────────────────
-    if (updatedStock.stockCount < 10) {
-      const message =
-        updatedStock.stockCount === 0
-          ? `Urgent Requirement: ${currentStock.product} with part number ${currentStock.serialNumber} is out of stock`
-          : `Urgent Requirement: ${currentStock.product} with part number ${currentStock.serialNumber} is low in stock — only ${updatedStock.stockCount} items left`;
-
-      await PushNotificationService.sendGeneralNotification(
-        staffHero,
-        'Low Stock',
-        message,
-        'high',
-        'normal'
-      );
-    } else {
-      await _sendNotification(
-        'Stock Update',
-        `${quantityChange} ${currentStock.product} with part number ${currentStock.serialNumber} is used by ${updateData.mechanicName} for ${updateData.equipmentName} ${updateData.equipmentNumber}`,
-        'high',
-        staffHero
       );
     }
 

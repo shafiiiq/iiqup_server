@@ -13,7 +13,7 @@ const GMAIL_SCOPES = [
 
 const GMAIL_ACCOUNTS = {
   SERVICE: {
-    refreshTokenEnv: 'SERVICE_GMAIL_REFRESH_TOKEN',
+    refreshTokenEnv: 'SERVICE_GMAIL_REFRESH_TOKEN',  
     clientIdEnv: 'SERVICE_GOOGLE_CLIENT_ID',
     clientSecretEnv: 'SERVICE_GOOGLE_CLEINT_SECRET',
     mailerEnv: 'SERVICE_OTP_MAILER',

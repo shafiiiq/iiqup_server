@@ -1,673 +1,207 @@
-const logger = require('#shared/logger/logger');
+const mongoose = require('mongoose');
+const HTTP = require('#shared/response/response.status');
+const { AppError } = require('#shared/errors/error.http');
+const { paginate } = require('#shared/pagination/pagination');
+const Message = require('./message.model');
+const Chat = require('../shared/chat.model');
+const { verifyUserAccess } = require('../shared/chat.access.service');
+const { recordMessage, resetUnreadCount } = require('../shared/chat.activity.service');
+const { FILE_MESSAGE_TYPES, EDIT_WINDOW_MS, DELETED_MESSAGE_TEXT } = require('./message.constant');
 
-const HTTP = require('#shared/response/response.status')
-const Message = require('./messages.model');
-const Chat = require('../chats.model');
-const User = require('#features/user/staff/staff.model')
-const chatService = require('../chat.service');
-const { paginate } = require('#shared/pagination/pagination')
-const { putObject, getObjectUrl } = require('#core/s3/s3.config')
+const DEFAULT_PAGINATION = { page: 1, limit: 50, skip: 0 };
+const NON_FORWARDABLE_TYPES = ['system', 'voice call'];
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────────────────────
+const toObjectId = (value) => new mongoose.Types.ObjectId(String(value));
 
-const { FILE_MESSAGE_TYPES } = require('./message.constant');
+const buildPreview = (messageType, content) => (messageType === 'text' ? content : `${messageType} message`);
 
-const shouldMarkMessageAsRead = (chat, message, userId) => {
-  const otherParticipantCount = (chat?.participants || []).filter(
-    (participant) => String(participant.userId) !== String(message?.senderId)
-  ).length;
-  if (otherParticipantCount === 0) return true;
-
-  const readByUserIds = new Set(
-    (message?.readBy || []).map((entry) => String(entry.userId))
-  );
-  return (
-    readByUserIds.has(String(userId)) &&
-    readByUserIds.size >= otherParticipantCount
-  );
+const assertChangeable = (message) => {
+  if (!message) throw new AppError('Message not found or not yours', HTTP.NOT_FOUND);
+  if (message.isDeleted) throw new AppError('Message was deleted', HTTP.CONFLICT);
+  if (Date.now() - new Date(message.createdAt).getTime() > EDIT_WINDOW_MS) {
+    throw new AppError('Messages older than 1 hour cannot be changed', HTTP.FORBIDDEN);
+  }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Messages
-// ─────────────────────────────────────────────────────────────────────────────
+const getMessages = async (chatId, pagination = DEFAULT_PAGINATION, userId) => {
+  const result = await paginate(Message, { chatId, deletedFor: { $ne: userId } }, pagination, {
+    sort: { createdAt: -1 },
+  });
+  return { data: [...result.data].reverse(), pagination: result.pagination };
+};
 
-/**
- * Returns paginated messages for a chat, with signed URLs for file messages.
- * @param {string} chatId
- * @param {number} page
- * @param {number} limit
- * @param {string} userId
- * @returns {Promise<object[]>}
- */
-const getMessages = async (
+const sendMessage = async ({
   chatId,
-  pagination = { page: 1, limit: 50, skip: 0 },
-  userId
-) => {
-  try {
-    logger.info('getMessages called for chatId:', chatId, 'userId:', userId);
-
-    const result = await paginate(
-      Message,
-      { chatId, deletedFor: { $ne: userId } },
-      pagination,
-      { sort: { createdAt: -1 } }
-    );
-
-    const messagesWithUrls = await Promise.all(
-      result.data.map(async (msg) => {
-        if (!FILE_MESSAGE_TYPES.includes(msg.messageType)) return msg;
-
-        msg.content = await getObjectUrl(msg.content, false);
-        if (msg.thumbnail)
-          msg.thumbnail = await getObjectUrl(msg.thumbnail, false);
-
-        return msg;
-      })
-    );
-
-    logger.info('Returning messages count:', messagesWithUrls.length);
-    return {
-      data: messagesWithUrls.reverse(),
-      pagination: result.pagination,
-    };
-  } catch (error) {
-    logger.error('[MessageService] getMessages:', error);
-    throw error;
-  }
-};
-
-/**
- * Creates a new message, updates the chat's last message, increments unread counts,
- * and sends a push notification to the receiver.
- * @param {object} messageData
- * @returns {Promise<object>}
- */
-const createGroupSystemMessage = async ({
-  chatId,
-  actorId,
-  actorName,
-  event,
-  updates,
-  targetNames = [],
-  groupName,
-  chat,
-}) => {
-  try {
-    if (!event) return null;
-
-    const actorProfile = actorId
-      ? await User.findById(actorId).select('name').lean()
-      : null;
-    const resolvedActorName = actorName || actorProfile?.name || 'Someone';
-
-    let resolvedTargetNames = [...(targetNames || [])];
-
-    if (event === 'added' && updates?.addParticipants?.length > 0) {
-      const ids = updates.addParticipants
-        .map((participant) => participant.userId || participant._id)
-        .filter(Boolean);
-      const users = await User.find({ _id: { $in: ids } })
-        .select('name')
-        .lean();
-      resolvedTargetNames = users.map((user) => user.name || 'a member');
-    }
-
-    if (event === 'removed' && updates?.removeParticipants?.length > 0) {
-      const ids = updates.removeParticipants.filter(Boolean);
-      const users = await User.find({ _id: { $in: ids } })
-        .select('name')
-        .lean();
-      resolvedTargetNames = users.map((user) => user.name || 'a member');
-    }
-
-    if (event === 'promoted' && updates?.promoteParticipants?.length > 0) {
-      const ids = updates.promoteParticipants.filter(Boolean);
-      const users = await User.find({ _id: { $in: ids } })
-        .select('name')
-        .lean();
-      resolvedTargetNames = users.map((user) => user.name || 'a member');
-    }
-
-    if (event === 'removed' && resolvedTargetNames.length === 0) {
-      const removedMembers = await User.find({
-        _id: {
-          $in:
-            chat?.participants?.map((participant) => participant.userId) || [],
-        },
-      })
-        .select('name')
-        .lean();
-      resolvedTargetNames.push(
-        ...removedMembers.map((member) => member.name || 'a member')
-      );
-    }
-
-    const content = chatService.buildGroupSystemMessage({
-      event,
-      actorName: resolvedActorName,
-      targetNames: resolvedTargetNames,
-      groupName: groupName || chat?.name,
-    });
-
-    const systemMessage = await Message.create({
-      chatId,
-      senderId: actorId,
-      senderType: 'staff',
-      senderName: actorName || 'System',
-      messageType: 'system',
-      content,
-      status: 'sent',
-      readBy: [],
-      deliveredTo: [],
-    });
-
-    return systemMessage;
-  } catch (error) {
-    logger.error('[MessageService] createGroupSystemMessage:', error);
-    return null;
-  }
-};
-
-const sendMessage = async (messageData) => {
-  try {
-    const {
-      chatId,
-      senderId,
-      senderType,
-      senderName,
-      senderAvatar,
-      messageType,
-      content,
-      recieverId,
-      fileName,
-      fileSize,
-      duration,
-      thumbnail,
-      replyTo,
-      caption,
-    } = messageData;
-
-    const message = await Message.create({
-      chatId,
-      senderId,
-      senderType,
-      senderName,
-      senderAvatar,
-      messageType,
-      content,
-      fileName,
-      fileSize,
-      duration,
-      thumbnail,
-      caption,
-      replyTo,
-      status: 'sent',
-      readBy: [],
-      deliveredTo: [],
-    });
-
-    const lastMessageContent =
-      messageType === 'text' ? content : `${messageType} message`;
-
-    await chatService.updateLastMessage(
-      chatId,
-      lastMessageContent,
-      senderId,
-      senderName,
-      messageType
-    );
-    await chatService.incrementUnreadCount(chatId, senderId);
-
-    const PushNotificationService = require('#core/notification/notification.push')
-    const chat = await Chat.findById(chatId).lean();
-    if (chat) {
-      const recipientCodes = chat.participants
-        .filter((p) => p.userId.toString() !== senderId.toString())
-        .map((p) => p.uniqueCode)
-        .filter(Boolean);
-      if (recipientCodes.length > 0) {
-        await PushNotificationService.sendGeneralNotification(
-          recipientCodes,
-          senderName,
-          lastMessageContent,
-          'high',
-          'message',
-          undefined,
-          { chatId, senderName }
-        );
-      }
-    }
-
-    return message;
-  } catch (error) {
-    logger.error('[MessageService] sendMessage:', error);
-    throw error;
-  }
-};
-
-/**
- * Marks a list of messages as delivered for a given user.
- * @param {string[]} messageIds
- * @param {string}   userId
- * @returns {Promise<boolean>}
- */
-const markMessagesAsDelivered = async (messageIds, userId) => {
-  try {
-    await Message.updateMany(
-      { _id: { $in: messageIds }, 'deliveredTo.userId': { $ne: userId } },
-      {
-        $push: { deliveredTo: { userId, deliveredAt: new Date() } },
-        $set: { status: 'delivered' },
-      }
-    );
-
-    return true;
-  } catch (error) {
-    logger.error('[MessageService] markMessagesAsDelivered:', error);
-    throw error;
-  }
-};
-
-/**
- * Marks a list of messages as read for a given user and resets their unread count.
- * @param {string}   chatId
- * @param {string[]} messageIds
- * @param {string}   userId
- * @returns {Promise<boolean>}
- */
-const markMessagesAsRead = async (chatId, messageIds, userId) => {
-  try {
-    const chat = await Chat.findById(chatId).lean();
-    const messages = await Message.find({
-      _id: { $in: messageIds },
-      chatId,
-    }).lean();
-
-    await Promise.all(
-      messages.map(async (message) => {
-        const existingReads = message.readBy || [];
-        const alreadyRead = existingReads.some(
-          (entry) => entry.userId?.toString() === userId.toString()
-        );
-        const nextReadBy = alreadyRead
-          ? existingReads
-          : [...existingReads, { userId, readAt: new Date() }];
-        const shouldMarkRead = shouldMarkMessageAsRead(
-          chat,
-          { ...message, readBy: nextReadBy },
-          userId
-        );
-
-        await Message.findByIdAndUpdate(message._id, {
-          $set: {
-            readBy: nextReadBy,
-            status: shouldMarkRead ? 'read' : message.status,
-          },
-        });
-      })
-    );
-
-    await chatService.resetUnreadCount(chatId, userId);
-
-    return true;
-  } catch (error) {
-    logger.error('[MessageService] markMessagesAsRead:', error);
-    throw error;
-  }
-};
-
-/**
- * Deletes a message — either for everyone (sender only, within 1 hour) or just for the requesting user.
- * @param {string}  messageId
- * @param {string}  userId
- * @param {boolean} deleteForEveryone
- * @returns {Promise<boolean>}
- */
-const deleteMessage = async (messageId, userId, deleteForEveryone = false) => {
-  try {
-    if (deleteForEveryone) {
-      const message = await Message.findOne({
-        _id: messageId,
-        senderId: userId,
-      });
-      if (!message) throw new Error('Unauthorized to delete this message');
-
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-      if (message.createdAt < oneHourAgo)
-        throw new Error('Cannot delete messages older than 1 hour');
-
-      await Message.findByIdAndUpdate(messageId, {
-        isDeleted: true,
-        content: 'This message was deleted',
-      });
-    } else {
-      await Message.findByIdAndUpdate(messageId, {
-        $addToSet: { deletedFor: userId },
-      });
-    }
-
-    return true;
-  } catch (error) {
-    logger.error('[MessageService] deleteMessage:', error);
-    throw error;
-  }
-};
-
-const editMessage = async (messageId, userId, content) => {
-  try {
-    const message = await Message.findOne({ _id: messageId, senderId: userId });
-    if (!message) throw new Error('Unauthorized to edit this message');
-
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-    if (message.createdAt < oneHourAgo)
-      throw new Error('Cannot edit messages older than 1 hour');
-
-    message.content = content;
-    message.isEdited = true;
-    await message.save();
-    return message.toObject();
-  } catch (error) {
-    logger.error('[MessageService] editMessage:', error);
-    throw error;
-  }
-};
-
-const updateMessageCaption = async (messageId, userId, caption) => {
-  try {
-    const message = await Message.findOne({ _id: messageId, senderId: userId });
-    if (!message) throw new Error('Unauthorized to update message caption');
-
-    message.caption = caption;
-    await message.save();
-    return message.toObject();
-  } catch (error) {
-    logger.error('[MessageService] updateMessageCaption:', error);
-    throw error;
-  }
-};
-
-const forwardMessage = async (
-  messageId,
-  targetChatId,
   senderId,
   senderType,
   senderName,
-  senderAvatar
-) => {
-  try {
-    const original = await Message.findById(messageId).lean();
-    if (!original) throw new Error('Original message not found');
+  messageType = 'text',
+  content,
+  fileName,
+  mimeType,
+  fileSize,
+  duration,
+  replyTo,
+  caption,
+}) => {
+  if (!(await verifyUserAccess(chatId, senderId))) throw new AppError('Access denied to this chat', HTTP.FORBIDDEN);
 
-    const forwarded = await Message.create({
-      chatId: targetChatId,
-      senderId,
-      senderType,
-      senderName,
-      senderAvatar,
-      messageType: original.messageType,
-      content: original.content,
-      fileName: original.fileName,
-      fileSize: original.fileSize,
-      duration: original.duration,
-      thumbnail: original.thumbnail,
-      caption: original.caption,
-      replyTo: original.replyTo,
-      status: 'sent',
-      readBy: [],
-      deliveredTo: [],
-    });
+  const message = await Message.create({
+    chatId,
+    senderId,
+    senderType,
+    senderName,
+    messageType,
+    content,
+    fileName,
+    mimeType,
+    fileSize,
+    duration,
+    caption,
+    replyTo,
+  });
 
-    const lastMessageContent =
-      forwarded.messageType === 'text'
-        ? forwarded.content
-        : `${forwarded.messageType} message`;
-    await chatService.updateLastMessage(
-      targetChatId,
-      lastMessageContent,
-      senderId,
-      senderName,
-      forwarded.messageType
-    );
-    await chatService.incrementUnreadCount(targetChatId, senderId);
-
-    return forwarded.toObject();
-  } catch (error) {
-    logger.error('[MessageService] forwardMessage:', error);
-    throw error;
-  }
+  await recordMessage({ chatId, senderId, senderName, messageType, preview: buildPreview(messageType, content) });
+  return message;
 };
 
-/**
- * Searches text messages in a chat by query string.
- * @param {string} chatId
- * @param {string} searchQuery
- * @param {string} userId
- * @returns {Promise<object[]>}
- */
-const searchMessages = async (chatId, searchQuery, userId) => {
-  try {
-    return await Message.find({
-      chatId,
-      messageType: 'text',
-      content: { $regex: searchQuery, $options: 'i' },
-      deletedFor: { $ne: userId },
-    })
-      .sort({ createdAt: -1 })
-      .limit(50)
-      .lean();
-  } catch (error) {
-    logger.error('[MessageService] searchMessages:', error);
-    throw error;
-  }
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Files
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Generates a presigned S3 upload URL for a chat file.
- * @param {string} userEmail
- * @param {string} fileType
- * @param {string} mimeType
- * @returns {Promise<{ uploadUrl: string, fileKey: string }>}
- */
-const uploadFile = async (userEmail, fileType, mimeType) => {
-  try {
-    const timestamp = Date.now();
-    const sanitizedFileName = `${timestamp}-${userEmail}`;
-    const key = `chat/${fileType}/${sanitizedFileName}`;
-    const uploadUrl = await putObject(sanitizedFileName, key, mimeType);
-
-    return { uploadUrl, fileKey: key };
-  } catch (error) {
-    logger.error('[MessageService] uploadFile:', error);
-    throw error;
-  }
-};
-
-/**
- * Returns a signed URL for a stored file.
- * @param {string}  fileKey
- * @param {boolean} isLongExpiry
- * @returns {Promise<string>}
- */
-const getFileUrl = async (fileKey, isLongExpiry = false) => {
-  try {
-    return await getObjectUrl(fileKey, isLongExpiry);
-  } catch (error) {
-    logger.error('[MessageService] getFileUrl:', error);
-    throw error;
-  }
-};
-
-/**
- * Placeholder for video thumbnail generation via ffmpeg.
- * @param {string} videoKey
- * @returns {Promise<null>}
- */
-const generateThumbnail = async (videoKey) => {
-  try {
-    // TODO: Implement thumbnail generation with ffmpeg / AWS Lambda
-    return null;
-  } catch (error) {
-    logger.error('[MessageService] generateThumbnail:', error);
-    return null;
-  }
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Calls
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Returns paginated call history for a user across all their chats.
- * @param {string} userId
- * @param {number} page
- * @param {number} limit
- * @returns {Promise<object[]>}
- */
-const getCallHistory = async (
-  userId,
-  pagination = { page: 1, limit: 20, skip: 0 }
-) => {
-  try {
-    const userChats = await Chat.find({ 'participants.userId': userId })
-      .select('_id')
-      .lean();
-    const chatIds = userChats.map((chat) => chat._id);
-
-    const query = {
-      chatId: { $in: chatIds },
-      messageType: 'call',
-      $or: [{ senderId: userId }, { 'callData.receiverId': userId }],
-    };
-
-    const result = await paginate(Message, query, pagination, {
-      sort: { createdAt: -1 },
-    });
-
-    return {
-      data: result.data,
-      pagination: result.pagination,
-    };
-  } catch (error) {
-    logger.error('[MessageService] getCallHistory:', error);
-    throw error;
-  }
-};
-
-/**
- * Saves a call record as a message in the chat.
- * @param {object} callData
- * @returns {Promise<object>}
- */
-const saveCallRecord = async (callData) => {
-  try {
-    const {
-      chatId,
-      callerId,
-      receiverId,
-      duration,
-      callType,
-      status,
-      senderType,
-      messageType,
-    } = callData;
-
-    const chat = await Chat.findById(chatId);
-    const caller = chat.participants.find(
-      (p) => p.userId.toString() === callerId.toString()
-    );
-
-    return await Message.create({
-      chatId,
-      senderId: callerId,
-      senderName: caller?.name || 'Unknown',
-      senderType,
-      messageType,
-      content: `${callType} call - ${status}`,
-      callData: {
-        receiverId,
-        duration,
-        callType,
-        status,
-        startTime: new Date(),
-        endTime: duration ? new Date(Date.now() + duration * 1000) : new Date(),
+const markMessagesAsDelivered = async (messageIds, userId) => {
+  const userObjectId = toObjectId(userId);
+  await Message.updateMany(
+    { _id: { $in: messageIds }, senderId: { $ne: userObjectId }, 'deliveredTo.userId': { $ne: userObjectId } },
+    [
+      {
+        $set: {
+          deliveredTo: {
+            $concatArrays: [{ $ifNull: ['$deliveredTo', []] }, [{ userId: userObjectId, deliveredAt: new Date() }]],
+          },
+          status: { $cond: [{ $eq: ['$status', 'sent'] }, 'delivered', '$status'] },
+        },
       },
-      status: 'sent',
-    });
-  } catch (error) {
-    logger.error('[MessageService] saveCallRecord:', error);
-    throw error;
-  }
+    ]
+  );
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Statistics
-// ─────────────────────────────────────────────────────────────────────────────
+const markMessagesAsRead = async (chatId, messageIds, userId) => {
+  const chat = await Chat.findById(chatId).select('participants').lean();
+  if (!chat) throw new AppError('Chat not found', HTTP.NOT_FOUND);
 
-/**
- * Returns all unread messages in a chat that were not sent by the given user.
- * @param {string} chatId
- * @param {string} userId
- * @returns {Promise<object[]>}
- */
-const getUnreadMessagesForUser = async (chatId, userId) => {
-  try {
-    return await Message.find({
-      chatId,
-      senderId: { $ne: userId },
-      'readBy.userId': { $ne: userId },
-    }).lean();
-  } catch (error) {
-    logger.error('[MessageService] getUnreadMessagesForUser:', error);
-    throw error;
-  }
+  const userObjectId = toObjectId(userId);
+  const requiredReads = Math.max(chat.participants.length - 1, 1);
+
+  await Message.updateMany(
+    { _id: { $in: messageIds }, chatId, senderId: { $ne: userObjectId }, 'readBy.userId': { $ne: userObjectId } },
+    [
+      {
+        $set: {
+          readBy: { $concatArrays: [{ $ifNull: ['$readBy', []] }, [{ userId: userObjectId, readAt: new Date() }]] },
+        },
+      },
+      { $set: { status: { $cond: [{ $gte: [{ $size: '$readBy' }, requiredReads] }, 'read', '$status'] } } },
+    ]
+  );
+
+  await resetUnreadCount(chatId, userId);
 };
 
-/**
- * Returns the total unread message count across all chats for a user.
- * @param {string} userId
- * @returns {Promise<number>}
- */
-const getUnreadCount = async (userId) => {
-  try {
-    const chats = await Chat.find({ 'participants.userId': userId }).lean();
+const getUnreadMessagesForUser = (chatId, userId) =>
+  Message.find({ chatId, senderId: { $ne: userId }, 'readBy.userId': { $ne: userId }, deletedFor: { $ne: userId } })
+    .select('_id senderId')
+    .lean();
 
-    return chats.reduce((total, chat) => {
-      return total + (chat.unreadCount?.get(userId.toString()) || 0);
-    }, 0);
-  } catch (error) {
-    logger.error('[MessageService] getUnreadCount:', error);
-    throw error;
+const deleteMessage = async (messageId, userId, deleteForEveryone = false) => {
+  const message = await Message.findById(messageId).lean();
+  if (!message) throw new AppError('Message not found', HTTP.NOT_FOUND);
+
+  if (!deleteForEveryone) {
+    if (!(await verifyUserAccess(message.chatId, userId))) throw new AppError('Access denied to this chat', HTTP.FORBIDDEN);
+    await Message.updateOne({ _id: messageId }, { $addToSet: { deletedFor: userId } });
+    return { chatId: String(message.chatId), message: null };
   }
+
+  if (String(message.senderId) !== String(userId)) {
+    throw new AppError('Only the sender can delete for everyone', HTTP.FORBIDDEN);
+  }
+  assertChangeable(message);
+
+  const updated = await Message.findByIdAndUpdate(
+    messageId,
+    {
+      $set: { isDeleted: true, messageType: 'system', content: DELETED_MESSAGE_TEXT },
+      $unset: { caption: 1, replyTo: 1, fileName: 1, mimeType: 1 },
+    },
+    { new: true }
+  ).lean();
+  return { chatId: String(message.chatId), message: updated };
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Exports
-// ─────────────────────────────────────────────────────────────────────────────
+const editMessage = async (messageId, userId, content) => {
+  const text = String(content || '').trim();
+  if (!text) throw new AppError('Content is required', HTTP.BAD_REQUEST);
+
+  const message = await Message.findOne({ _id: messageId, senderId: userId, messageType: 'text' });
+  assertChangeable(message);
+
+  message.content = text;
+  message.editedAt = new Date();
+  await message.save();
+  return message.toObject();
+};
+
+const updateMessageCaption = async (messageId, userId, caption) => {
+  const message = await Message.findOne({ _id: messageId, senderId: userId, messageType: { $in: FILE_MESSAGE_TYPES } });
+  assertChangeable(message);
+
+  message.caption = String(caption || '').trim();
+  await message.save();
+  return message.toObject();
+};
+
+const forwardMessage = async ({ messageId, targetChatId, sender }) => {
+  const original = await Message.findById(messageId).lean();
+  if (!original || original.isDeleted) throw new AppError('Message not found', HTTP.NOT_FOUND);
+  if (NON_FORWARDABLE_TYPES.includes(original.messageType)) {
+    throw new AppError('This message cannot be forwarded', HTTP.BAD_REQUEST);
+  }
+
+  const [canReadSource, canWriteTarget] = await Promise.all([
+    verifyUserAccess(original.chatId, sender.id),
+    verifyUserAccess(targetChatId, sender.id),
+  ]);
+  if (!canReadSource || !canWriteTarget) throw new AppError('Access denied to this chat', HTTP.FORBIDDEN);
+
+  const forwarded = await Message.create({
+    chatId: targetChatId,
+    senderId: sender.id,
+    senderType: sender.type,
+    senderName: sender.name,
+    messageType: original.messageType,
+    content: original.content,
+    caption: original.caption,
+    fileName: original.fileName,
+    mimeType: original.mimeType,
+    fileSize: original.fileSize,
+    duration: original.duration,
+  });
+
+  await recordMessage({
+    chatId: targetChatId,
+    senderId: sender.id,
+    senderName: sender.name,
+    messageType: forwarded.messageType,
+    preview: buildPreview(forwarded.messageType, forwarded.content),
+  });
+  return forwarded.toObject();
+};
 
 module.exports = {
   getMessages,
-  createGroupSystemMessage,
   sendMessage,
   markMessagesAsDelivered,
   markMessagesAsRead,
+  getUnreadMessagesForUser,
   deleteMessage,
   editMessage,
   updateMessageCaption,
   forwardMessage,
-  searchMessages,
-  shouldMarkMessageAsRead,
-  uploadFile,
-  getFileUrl,
-  generateThumbnail,
-  getCallHistory,
-  saveCallRecord,
-  getUnreadMessagesForUser,
-  getUnreadCount,
 };

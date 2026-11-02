@@ -6,6 +6,7 @@ const cors = require('cors');
 
 const corsOptions = require('./cors.config');
 const loggerMiddleware = require('#middlewares/logger.middleware');
+const { clientContextMiddleware } = require('#shared/request/request.client.context');
 
 const registerMiddlewares = (app) => {
   app.use(morganLogger('dev'));
@@ -15,6 +16,7 @@ const registerMiddlewares = (app) => {
   app.use(cookieParser());
   app.use(express.static(path.join(__dirname, '..', 'public')));
   app.use(loggerMiddleware);
+  app.use(clientContextMiddleware);
 };
 
 module.exports = registerMiddlewares;

@@ -4,16 +4,19 @@ require('dotenv').config();
 
 require('./config/db.config');
 require('./workers/backup.worker');
+require('./workers/notification.wake.worker');
 
-const registerMiddlewares = require('./config/middlewares.config');
+const registerMiddlewares = require('./config/middlewares.config'); 
 const registerRoutes = require('./config/routes.config');
 const initializeSocket = require('./core/socket/socket.init');
+const { registerSignupSocket } = require('./core/signup/signup.socket');
 const { notFoundHandler, errorHandler } = require('#middlewares/error.middleware');
 
 const app = express();
 const server = http.createServer(app);
 
 app.set('io', initializeSocket(server));
+registerSignupSocket(app.get('io'));
 
 registerMiddlewares(app);
 registerRoutes(app);

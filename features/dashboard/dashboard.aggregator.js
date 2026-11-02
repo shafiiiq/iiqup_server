@@ -2,6 +2,7 @@ const { REGISTRY } = require('./registry/model.registry');
 const { getRegistryEntry } = require('./registry/registry.util');
 const { buildDateRangeQuery } = require('./dashboard.query');
 const { buildProjection } = require('./dashboard.sanitizer');
+const { buildProjectionForKey, buildDisplayRows } = require('./dashboard.display');
 const { paginate } = require('#shared/pagination/pagination');
 
 const sumCounts = (countsByKey) => Object.values(countsByKey).reduce((sum, n) => sum + n, 0);
@@ -40,11 +41,15 @@ const fetchModelRecordsPage = async (key, start, end, pagination) => {
 };
 
 const fetchRecentDocsAcrossModels = async (limitPerModel) => {
-  const projection = buildProjection();
   const perModel = await Promise.all(
     REGISTRY.map(async ({ model, key, label }) => {
-      const docs = await model.find({}, projection).sort({ createdAt: -1 }).limit(limitPerModel).lean();
-      return docs.map((doc) => ({ ...doc, _collection: key, _label: label }));
+      const docs = await model.find({}, buildProjectionForKey(key)).sort({ createdAt: -1 }).limit(limitPerModel).lean();
+      return docs.map((doc) => ({
+        ...doc,
+        _collection: key,
+        _label: label,
+        _display: buildDisplayRows(key, doc),
+      }));
     })
   );
   return perModel.flat();

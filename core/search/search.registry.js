@@ -5,22 +5,22 @@ const searchRegistry = {
     defaultFields: ['empName', 'pin', 'location', 'punchTime'],
   },
   backcharges: {
-    model: require('#features/backcharge/backcharge.model'),
+    model: require('#features/commercials/backcharge/backcharge.model'),
     searchableFields: ['reportNo', 'refNo', 'date', 'workDate', 'equipmentType', 'plateNo', 'model', 'supplierName', 'supplierMail', 'supplierCode', 'description', 'comments'],
     defaultFields: ['reportNo', 'plateNo', 'supplierName', 'description'],
   },
   chats: {
-    model: require('#features/chat/chats.model'),
+    model: require('#features/chat/shared/chat.model'),
     searchableFields: ['type', 'teamType', 'name', 'avatar', 'lastMessage', 'lastMessageType'],
     defaultFields: ['name', 'lastMessage', 'type'],
   },
   messages: {
-    model: require('#features/chat/message/messages.model'),
+    model: require('#features/chat/message/message.model'),
     searchableFields: ['senderType', 'senderName', 'senderAvatar', 'messageType', 'content', 'fileName', 'thumbnail', 'caption', 'status'],
     defaultFields: ['senderName', 'content', 'status'],
   },
   complaints: {
-    model: require('#features/complaint/complaint.model'),
+    model: require('#features/fleet/complaint/complaint.model'),
     searchableFields: ['uniqueCode', 'complaintId', 'regNo', 'brand', 'machine', 'name', 'remarks', 'rectificationRemarks', 'workflowStatus', 'status'],
     defaultFields: ['complaintId', 'regNo', 'machine', 'status'],
   },
@@ -30,32 +30,27 @@ const searchRegistry = {
     defaultFields: ['regNo', 'documentType', 'category', 'description'],
   },
   equipments: {
-    model: require('#features/equipment/equipment.model'),
+    model: require('#features/fleet/equipment/equipment.model'),
     searchableFields: ['machine', 'regNo', 'brand', 'company', 'coc', 'istimaraExpiry', 'insuranceExpiry', 'tpcExpiry', 'hiredFrom', 'location', 'status', 'certificationBody.operatorName'],
     defaultFields: ['machine', 'regNo', 'brand', 'location'],
   },
-  servicehistories: {
-    model: require('#features/equipment/history/history.model'),
-    searchableFields: ['regNo', 'serviceType', 'date', 'equipment', 'location', 'operator', 'mechanics', 'remarks', 'serviceHrs', 'nextServiceHrs'],
-    defaultFields: ['regNo', 'serviceType', 'equipment', 'remarks'],
-  },
   equipmenthandovers: {
-    model: require('#features/equipment/images/images.model'),
+    model: require('#features/fleet/images/images.model'),
     searchableFields: ['equipmentName', 'equipmentNo', 'path', 'label'],
     defaultFields: ['equipmentName', 'equipmentNo'],
   },
   mobilizations: {
-    model: require('#features/equipment/mobilization/mobilization.model'),
+    model: require('#features/fleet/mobilization/mobilization.model'),
     searchableFields: ['regNo', 'machine', 'action', 'previousStatus', 'newStatus', 'status', 'deployType', 'clientCompany', 'site', 'time', 'demobRemarks', 'operator', 'operatorName'],
     defaultFields: ['regNo', 'machine', 'status', 'site'],
   },
   replacements: {
-    model: require('#features/equipment/replacement/replacement.model'),
+    model: require('#features/fleet/replacement/replacement.model'),
     searchableFields: ['regNo', 'machine', 'type', 'status', 'time', 'currentOperator', 'currentOperatorId', 'outgoingOperator', 'outgoingOperatorId', 'incomingOperator', 'incomingOperatorId', 'replacedOperator', 'replacedOperatorId', 'shiftName', 'shiftStart', 'shiftEnd'],
     defaultFields: ['regNo', 'machine', 'status', 'time'],
   },
-  servicereports: {
-    model: require('#features/equipment/report/report.model'),
+  maintenance: {
+    model: require('#features/fleet/maintenance/maintenance.model'),
     searchableFields: ['regNo', 'machine', 'date', 'serviceType', 'serviceHrs', 'nextServiceHrs', 'location', 'mechanics', 'operatorName', 'remarks', 'description', 'status'],
     defaultFields: ['regNo', 'machine', 'serviceType', 'remarks'],
   },
@@ -70,12 +65,12 @@ const searchRegistry = {
     defaultFields: ['customerName', 'beneficiaryName', 'stationName', 'productName'],
   },
   hireorders: {
-    model: require('#features/order/hire/hire.model'),
+    model: require('#features/commercials/hire/hire.model'),
     searchableFields: ['hireOrderRef', 'date', 'complaintId', 'company.vendor', 'company.attention', 'company.designation', 'quoteNo', 'requestText', 'note', 'signatures.accountsDept', 'comments', 'action', 'approvedBy'],
     defaultFields: ['hireOrderRef', 'complaintId', 'company.vendor', 'quoteNo'],
   },
   purchaseorders: {
-    model: require('#features/order/purchase/purchase.model'),
+    model: require('#features/commercials/purchase/purchase.model'),
     searchableFields: ['purchaseorderRef', 'date', 'complaintId', 'workingHrs', 'runningKm', 'quoteNo', 'requestText', 'company.vendor', 'company.attention', 'company.designation', 'description', 'approvedBy', 'comments', 'action'],
     defaultFields: ['purchaseorderRef', 'complaintId', 'company.vendor', 'quoteNo'],
   },
@@ -85,9 +80,10 @@ const searchRegistry = {
     defaultFields: ['name', 'uniqueCode', 'userType', 'email'],
   },
   notifications: {
-    model: require('#core/notification/notification.model'),
-    searchableFields: ['title', 'priority', 'navigateText', 'navigateTo', 'navigteToId', 'sourceId', 'type', 'category', 'approvalPort'],
-    defaultFields: ['title', 'category', 'type', 'priority'],
+    model: require('#features/notification/notification.model'),
+    searchableFields: ['title', 'body', 'priority', 'kind', 'source.modelKey', 'actor.name'],
+    defaultFields: ['title', 'body', 'actor.name'],
+    scope: (user) => ({ audience: user.uniqueCode }),
   },
   oauths: {
     model: require('#core/authN/authN.model'),
@@ -100,7 +96,7 @@ const searchRegistry = {
     defaultFields: ['name', 'uniqueCode', 'userType', 'contactNo'],
   },
   quotations: {
-    model: require('#features/quotation/quotation.model'),
+    model: require('#features/commercials/quotation/quotation.model'),
     searchableFields: ['quotationRef', 'date', 'complaintId', 'requestText', 'company.vendor', 'company.attention', 'company.designation', 'location'],
     defaultFields: ['quotationRef', 'company.vendor', 'company.attention'],
   },

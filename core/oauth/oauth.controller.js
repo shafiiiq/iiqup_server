@@ -1,7 +1,7 @@
 const logger = require('#shared/logger/logger')
 const HTTP = require('#shared/response/response.status')
 const { sendSuccess } = require('#shared/response/response.sender')
-const oauthService = require('./oauth.service')
+const oauthService = require('./oauth.login.service')
 
 const socialLogin = async (req, res) => {
   try {

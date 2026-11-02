@@ -10,6 +10,7 @@ const wsUtils = require('#core/socket/socket.io');
 const dashboardServices = require('#features/dashboard/dashboard.service');
 const documentModel = require('./document.model');
 const documentFolderModel = require('./documentFolder.model');
+const { groupExpiredLineage } = require('./document.history.service');
 const {
   DOCUMENT_UPLOAD_FEATURE,
   RENEWAL_STATUS,
@@ -243,6 +244,7 @@ const renewDocument = async ({ documentId, uploadSessionId, issueDate, expiryDat
 
   previousDocument.renewalStatus = RENEWAL_STATUS.EXPIRED;
   await previousDocument.save();
+  await groupExpiredLineage(renewedDocument._id);
 
   refreshDashboard();
   return { status: HTTP.OK, message: 'Document renewed', data: await serializeDocument(renewedDocument) };

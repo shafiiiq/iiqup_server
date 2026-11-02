@@ -47,6 +47,16 @@ const signatureActivationSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const mobileSigningKeySchema = new mongoose.Schema(
+  {
+    deviceId: { type: String, required: true },
+    keyHash: { type: String, required: true },
+    isActive: { type: Boolean, default: true },
+    registeredAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
 const biometricTokenSchema = new mongoose.Schema(
   {
     token: { type: String, required: true },
@@ -120,7 +130,7 @@ const userSchema = new mongoose.Schema(
     voipPushToken: { type: String, default: null },
     webPushSubscription: { type: Object, default: null },
     biometricTokens: { type: [biometricTokenSchema], default: [] },
-    signatureActivation: { type: [signatureActivationSchema], default: [] },
+    mobileSigningKeys: { type: [mobileSigningKeySchema], default: [] },
     exploredFeatures: { type: [exploredFeatureSchema], default: [] },
     lastExploredVersion: { type: String, default: null },
     tutorialsSeen: { type: [String], default: [] },

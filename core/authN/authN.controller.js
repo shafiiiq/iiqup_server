@@ -1,5 +1,5 @@
 const logger = require('#shared/logger/logger')
-const { resolveAuthHandler } = require('./authN.resolver');
+const { resolveAuthHandler, resolveQatarLoginHandler, isQatarIdUserType } = require('./authN.resolver');
 const HTTP = require('#shared/response/response.status')
 const { sendSuccess, sendError } = require('#shared/response/response.sender')
 const profileService = require('./authN.profile');
@@ -8,23 +8,22 @@ const services = {
   biometric: require('#core/authN/authN.biometric'),
   user: require('#features/user/staff/staff.service'),
   session: require('#core/session/session.service'),
-  authZ: require('#core/authZ/authZ.service')
 }
 
 const verifyUser = async (req, res) => {
   try {
     const { type, qatarId, email, password, deviceInfo } = req.body;
-    const isOperator = type === 'operator';
+    const usesQatarId = isQatarIdUserType(type);
 
-    if (isOperator && !qatarId) {
+    if (usesQatarId && !qatarId) {
       return res.status(HTTP.BAD_REQUEST).json({ success: false, message: 'Qatar ID is required' });
     }
-    if (!isOperator && (!email || !password)) {
+    if (!usesQatarId && (!email || !password)) {
       return res.status(HTTP.BAD_REQUEST).json({ success: false, message: 'Email and password are required' });
     }
 
     const authHandler = resolveAuthHandler(type);
-    const result = isOperator
+    const result = usesQatarId
       ? await authHandler(qatarId)
       : await authHandler(email, password, deviceInfo);
 
@@ -32,6 +31,25 @@ const verifyUser = async (req, res) => {
   } catch (error) {
     logger.error('[authN.controller] verifyUser', error);
     res.status(error.status || HTTP.INTERNAL_SERVER_ERROR).json({ success: false, message: 'Authentication failed' });
+  }
+};
+
+const loginWithQatarId = async (req, res) => {
+  try {
+    const { type, qatarId, deviceInfo } = req.body;
+
+    if (!isQatarIdUserType(type)) {
+      return res.status(HTTP.BAD_REQUEST).json({ success: false, message: 'Qatar ID login is only for operators and mechanics' });
+    }
+    if (!qatarId) {
+      return res.status(HTTP.BAD_REQUEST).json({ success: false, message: 'Qatar ID is required' });
+    }
+
+    const result = await resolveQatarLoginHandler(type)(qatarId, deviceInfo);
+    sendSuccess(res, result);
+  } catch (error) {
+    logger.error('[authN.controller] loginWithQatarId', error);
+    res.status(error.status || HTTP.INTERNAL_SERVER_ERROR).json({ success: false, message: 'Login failed' });
   }
 };
 
@@ -70,6 +88,30 @@ const changePassword = async (req, res) => {
     sendSuccess(res, result);
   } catch (error) {
     logger.error('[authN.controller] changePassword', error);
+    res.status(error.status || HTTP.INTERNAL_SERVER_ERROR).json({ success: false, message: 'Password change failed' });
+  }
+};
+
+const changeOwnPassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(HTTP.BAD_REQUEST).json({ success: false, message: 'Current password and new password are required' });
+    }
+    if (currentPassword === newPassword) {
+      return res.status(HTTP.BAD_REQUEST).json({ success: false, message: 'New password must be different from current password' });
+    }
+
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
+    if (!passwordRegex.test(newPassword)) {
+      return res.status(HTTP.BAD_REQUEST).json({ success: false, message: 'New password does not meet security requirements' });
+    }
+
+    const result = await services.user.changePasswordById(req.user.id, currentPassword, newPassword);
+    sendSuccess(res, result);
+  } catch (error) {
+    logger.error('[authN.controller] changeOwnPassword', error);
     res.status(error.status || HTTP.INTERNAL_SERVER_ERROR).json({ success: false, message: 'Password change failed' });
   }
 };
@@ -151,18 +193,13 @@ const revokeBiometricToken = async (req, res) => {
   }
 };
 
-const verifyDeviceTrust = async (req, res) => {
+const getProfile = async (req, res) => {
   try {
-    const { signType, deviceInfo } = req.body;
-    if (!signType || !deviceInfo) {
-      return sendError(res, { success: false, message: 'signType and deviceInfo are required' });
-    }
-
-    const result = await services.authZ.verifyTrustedDevice(deviceInfo.userId, signType, deviceInfo);
+    const result = await profileService.getProfile(req.user.id, req.user.userType);
     sendSuccess(res, result);
   } catch (error) {
-    logger.error('[authN.controller] verifyDeviceTrust', error);
-    res.status(error.status || HTTP.INTERNAL_SERVER_ERROR).json({ success: false, message: 'Device verification failed' });
+    logger.error('[authN.controller] getProfile', error);
+    res.status(error.status || HTTP.INTERNAL_SERVER_ERROR).json({ success: false, message: error.message });
   }
 };
 
@@ -187,7 +224,7 @@ const checkTokenValidity = async (req, res) => {
 
 const getUserSessions = async (req, res) => {
   try {
-    const result = await services.session.getUserSessions(req.user.id, req.headers.authorization?.split(' ')[1]);
+    const result = await services.session.getUserSessions(req.user.id, req.headers['x-session-token']);
     sendSuccess(res, result);
   } catch (error) {
     logger.error('[authN.controller] getUserSessions', error);
@@ -200,7 +237,7 @@ const blockDevice = async (req, res) => {
     const { sessionId } = req.params;
     if (!sessionId) return res.status(HTTP.BAD_REQUEST).json({ success: false, message: 'Session ID is required' });
 
-    const result = await services.session.blockDevice(sessionId, req.user.id);
+    const result = await services.session.blockDevice(sessionId, req.user.id, req.headers['x-session-token']);
     sendSuccess(res, result);
   } catch (error) {
     logger.error('[authN.controller] blockDevice', error);
@@ -210,10 +247,20 @@ const blockDevice = async (req, res) => {
 
 const logoutAllSessions = async (req, res) => {
   try {
-    const result = await services.session.logoutAllSessions(req.user.id, req.headers.authorization?.split(' ')[1]);
+    const result = await services.session.logoutAllSessions(req.user.id, req.headers['x-session-token']);
     sendSuccess(res, result);
   } catch (error) {
     logger.error('[authN.controller] logoutAllSessions', error);
+    sendError(res, { success: false, message: error.message });
+  }
+};
+
+const logoutCurrentSession = async (req, res) => {
+  try {
+    const result = await services.session.logoutCurrentSession(req.user.id, req.headers['x-session-token']);
+    sendSuccess(res, result);
+  } catch (error) {
+    logger.error('[authN.controller] logoutCurrentSession', error);
     sendError(res, { success: false, message: error.message });
   }
 };
@@ -223,7 +270,7 @@ const logoutSession = async (req, res) => {
     const { sessionId } = req.params;
     if (!sessionId) return res.status(HTTP.BAD_REQUEST).json({ success: false, message: 'Session ID is required' });
 
-    const result = await services.session.logoutSession(sessionId, req.user.id, req.headers.authorization?.split(' ')[1]);
+    const result = await services.session.logoutSession(sessionId, req.user.id, req.headers['x-session-token']);
     sendSuccess(res, result);
   } catch (error) {
     logger.error('[authN.controller] logoutSession', error);
@@ -238,10 +285,13 @@ module.exports = {
   resetPassword,
   generateBiometricToken,
   verifyUser,
+  loginWithQatarId,
+  logoutCurrentSession,
   biometricLogin,
   revokeBiometricToken,
-  verifyDeviceTrust,
   updateProfile,
+  getProfile,
+  changeOwnPassword,
   checkTokenValidity,
   getUserSessions,
   blockDevice,

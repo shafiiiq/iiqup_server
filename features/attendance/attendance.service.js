@@ -4,8 +4,6 @@ const HTTP = require('#shared/response/response.status')
 // services/attendance.service.js
 const Attendance = require('./attendance.model');
 const moment = require('moment');
-const PushNotificationService = require('#core/notification/notification.push');
-const { createNotification } = require('#core/notification/notification.service');
 require('dotenv').config();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -198,36 +196,6 @@ const addAttendance = async (attendanceData) => {
     });
 
     await recalculatePunchTypes(attendanceData.pin, punchDateTime);
-
-    try {
-      const name = standardizeName(savedAttendance.empName);
-      const timeLabel = formatTime(savedAttendance.timeOnly);
-      const dateLabel = formatDate(savedAttendance.dateOnly);
-      const title = `${name} Punched ${savedAttendance.punchType}`;
-      const description = `${name} punched ${savedAttendance.punchType.toLowerCase()} at ${timeLabel} ${dateLabel}`;
-
-      await createNotification({
-        title,
-        description,
-        priority: 'low',
-        sourceId: 'attendance',
-        recipient: NOTIFICATION_RECIPIENTS,
-        time: new Date(),
-      });
-
-      await PushNotificationService.sendGeneralNotification(
-        NOTIFICATION_RECIPIENTS,
-        title,
-        description,
-        'low',
-        'attendance'
-      );
-    } catch (error) {
-      logger.error(
-        '[AttendanceService] addAttendance — notification error:',
-        error
-      );
-    }
 
     return savedAttendance;
   } catch (error) {

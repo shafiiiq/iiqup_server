@@ -1,0 +1,27 @@
+const DOCUMENT_ACTOR_ROLE = { OWNER: 'owner', PARTICIPANT: 'participant' };
+
+const DOCUMENT_ACTIVITY_TYPE = {
+  EDITED: 'edited',
+  AMENDED: 'amended',
+  SIGNED: 'signed',
+  SUBMITTED: 'submitted',
+};
+
+const DOCUMENT_ACTIVITY_TEXT = {
+  [DOCUMENT_ACTIVITY_TYPE.EDITED]: 'edited this document',
+  [DOCUMENT_ACTIVITY_TYPE.AMENDED]: 'amended this document',
+  [DOCUMENT_ACTIVITY_TYPE.SIGNED]: 'signed this document',
+  [DOCUMENT_ACTIVITY_TYPE.SUBMITTED]: 'sent this document for approval',
+};
+
+const UNSEEN_DOCUMENT_WINDOW_DAYS = 90;
+const UNSEEN_DOCUMENT_WINDOW_MS = UNSEEN_DOCUMENT_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+const UNSEEN_REFERENCE_LIMIT = 500;
+
+module.exports = {
+  DOCUMENT_ACTOR_ROLE,
+  DOCUMENT_ACTIVITY_TYPE,
+  DOCUMENT_ACTIVITY_TEXT,
+  UNSEEN_DOCUMENT_WINDOW_MS,
+  UNSEEN_REFERENCE_LIMIT,
+};

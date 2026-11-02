@@ -121,6 +121,17 @@ const getRecentActivity = async (limit) => {
   return mostRecentFirst;
 };
 
+const getRecentActivityByCollection = async (limitPerCollection) => {
+  const cacheKey = `recent-by-collection:${limitPerCollection}`;
+  const cached = getCache(cacheKey);
+  if (cached) return cached;
+
+  const docs = await fetchRecentDocsAcrossModels(limitPerCollection);
+
+  setCache(cacheKey, docs, 30000);
+  return docs;
+};
+
 const getTotals = async () => {
   const cacheKey = 'totals:all-time';
   const cached = getCache(cacheKey);
@@ -154,6 +165,7 @@ module.exports = {
   getBreakdown,
   getRecords,
   getRecentActivity,
+  getRecentActivityByCollection,
   getSchema,
   clearDashboardCache,
 };

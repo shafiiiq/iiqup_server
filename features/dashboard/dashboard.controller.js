@@ -65,6 +65,17 @@ const getRecentActivity = async (req, res, next) => {
   }
 };
 
+const getRecentActivityByCollection = async (req, res, next) => {
+  try {
+    const requestedLimit = Number(req.query.limit) || 5;
+    const limitPerCollection = Math.min(Math.max(requestedLimit, 1), 20);
+    const data = await dashboardService.getRecentActivityByCollection(limitPerCollection);
+    respond(res, { status: HTTP.OK, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const getSchema = async (req, res, next) => {
   try {
     const data = dashboardService.getSchema();
@@ -90,6 +101,7 @@ module.exports = {
   getBreakdown,
   getRecords,
   getRecentActivity,
+  getRecentActivityByCollection,
   getSchema,
   clearCache,
 };

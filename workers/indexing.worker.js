@@ -86,6 +86,25 @@ const INDEX_FIX_REGISTRY = [
 const fixDuplicateIndexes = async () => {
   logger.info('[indexing.worker] fixing duplicate indexes...');
 
+  const [notificationCollection] = await mongoose.connection.db
+    .listCollections({ name: 'notifications' }, { nameOnly: true })
+    .toArray();
+  if (notificationCollection) {
+    const notifications = mongoose.connection.db.collection('notifications');
+    const indexes = await notifications.indexes();
+
+    for (const index of indexes) {
+      const fields = Object.keys(index.key);
+      if (
+        fields.includes('recipients') &&
+        (fields.includes('mentions') || fields.includes('readBy.uniqueCode'))
+      ) {
+        await notifications.dropIndex(index.name);
+        logger.info(`[indexing.worker] dropped invalid notifications index: ${index.name}`);
+      }
+    }
+  }
+
   for (const { collection, keepIndexes } of INDEX_FIX_REGISTRY) {
     try {
       const col = mongoose.connection.db.collection(collection);

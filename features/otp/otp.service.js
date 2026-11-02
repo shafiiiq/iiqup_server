@@ -4,11 +4,9 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const OTP = require('./otp.model');
 const User = require('#features/user/staff/staff.model');
-const Mechanic = require('#features/user/mechanic/mechanic.model');
-const Operator = require('#features/user/operator/operator.model');
 const emailService = require('./otp.email');
 const { generateAuthTokens } = require('#middlewares/jwt.middleware');
-const { createSession } = require('#core/session/session.service');
+const { createSession, buildDeviceData } = require('#core/session/session.service');
 const { OTP_SALT_ROUNDS, MAX_OTP_ATTEMPTS, OTP_LENGTH, OTP_EXPIRY_MINUTES } = require('./otp.constant');
 
 const generateSecureOTP = () => {
@@ -23,25 +21,22 @@ const hashOTP = async (otp) => {
 
 const verifyOTPHash = async (plain, hashed) => bcrypt.compare(plain, hashed);
 
-const findUserByAuthMail = async (email) => {
-  let user = await User.findOne({ authMail: email });
-  if (!user) user = await Mechanic.findOne({ authMail: email });
-  if (!user) user = await Operator.findOne({ authMail: email });
-  return user;
-};
+const findStaffByAuthMail = (email) => User.findOne({ authMail: email });
 
-const generateAndSendOTP = async (email, demo_opr = false, name) => {
+const generateAndSendOTP = async (email) => {
   try {
     if (!email || !email.match(/^\S+@\S+\.\S+$/)) {
       return { status: HTTP.BAD_REQUEST, success: false, message: 'Valid email address is required' };
     }
 
-    const user = await findUserByAuthMail(email);
+    const user = await findStaffByAuthMail(email);
     if (!user) {
       return { status: HTTP.NOT_FOUND, success: false, message: 'No user found with this email address' };
     }
 
     const otp = generateSecureOTP();
+    console.log("otp", otp);
+        
     const hashedOTP = await hashOTP(otp);
 
     const expiresAt = new Date();
@@ -53,12 +48,9 @@ const generateAndSendOTP = async (email, demo_opr = false, name) => {
       { upsert: true, new: true }
     );
 
-    await emailService.sendOTPEmail(email, otp, demo_opr ? name : user.name, demo_opr);
+    await emailService.sendOTPEmail(email, otp, user.name);
 
-    const isDemoAccount =
-      process.env.DEMO_STAFF == user.email ||
-      process.env.DEMO_MECHANIC == user.email ||
-      demo_opr;
+    const isDemoAccount = process.env.DEMO_STAFF == user.email;
     const exposeOTP = isDemoAccount || process.env.NODE_ENV === 'development';
 
     return {
@@ -77,63 +69,55 @@ const generateAndSendOTP = async (email, demo_opr = false, name) => {
   }
 };
 
-const findUserForVerification = (email, type, qatarId) => {
-  if (type === 'mechanic') {
-    return Mechanic.findOne({ authMail: email }).select('_id name email role uniqueCode userType');
+const checkOtpCode = async (email, otp) => {
+  if (!otp || otp.length !== OTP_LENGTH) {
+    return { status: HTTP.BAD_REQUEST, success: false, message: 'Invalid OTP format' };
   }
-  if (type === 'operator') {
-    return Operator.findOne({ qatarId }).select('_id name uniqueCode userType equipmentNumber qatarId');
+
+  const otpRecord = await OTP.findOne({ email });
+  if (!otpRecord) return { status: HTTP.NOT_FOUND, success: false, message: 'Invalid OTP' };
+
+  if (otpRecord.expiresAt < new Date()) {
+    await OTP.deleteOne({ email });
+    return { status: HTTP.BAD_REQUEST, success: false, message: 'OTP has expired. Please request a new one.' };
   }
-  return User.findOne({ authMail: email }).select('_id name email role uniqueCode userType');
-};
 
-const sessionUserModel = (type) => {
-  if (type === 'mechanic') return 'Mechanic';
-  if (type === 'operator') return 'Operator';
-  return 'User';
-};
+  if (otpRecord.verified) {
+    return { status: HTTP.BAD_REQUEST, success: false, message: 'OTP has already been used' };
+  }
 
-const verifyOTP = async (email, otp, type, qatarId = null) => {
-  try {
-    if (!otp || otp.length !== OTP_LENGTH) {
-      return { status: HTTP.BAD_REQUEST, success: false, message: 'Invalid OTP format' };
-    }
+  if (otpRecord.attempts >= MAX_OTP_ATTEMPTS) {
+    await OTP.deleteOne({ email });
+    return { status: HTTP.TOO_MANY_REQUESTS, success: false, message: 'Maximum verification attempts exceeded. Please request a new OTP.' };
+  }
 
-    const otpRecord = await OTP.findOne({ email });
-    if (!otpRecord) return { status: HTTP.NOT_FOUND, success: false, message: 'Invalid OTP' };
+  const isValid = await verifyOTPHash(otp, otpRecord.otp);
 
-    if (otpRecord.expiresAt < new Date()) {
-      await OTP.deleteOne({ email });
-      return { status: HTTP.BAD_REQUEST, success: false, message: 'OTP has expired. Please request a new one.' };
-    }
-
-    if (otpRecord.verified) {
-      return { status: HTTP.BAD_REQUEST, success: false, message: 'OTP has already been used' };
-    }
-
-    if (otpRecord.attempts >= MAX_OTP_ATTEMPTS) {
-      await OTP.deleteOne({ email });
-      return { status: HTTP.TOO_MANY_REQUESTS, success: false, message: 'Maximum verification attempts exceeded. Please request a new OTP.' };
-    }
-
-    const isValid = await verifyOTPHash(otp, otpRecord.otp);
-
-    if (!isValid) {
-      otpRecord.attempts = (otpRecord.attempts || 0) + 1;
-      await otpRecord.save();
-      const remaining = MAX_OTP_ATTEMPTS - otpRecord.attempts;
-      return { status: HTTP.BAD_REQUEST, success: false, message: `Invalid OTP. ${remaining} attempt(s) remaining.` };
-    }
-
-    otpRecord.verified = true;
+  if (!isValid) {
+    otpRecord.attempts = (otpRecord.attempts || 0) + 1;
     await otpRecord.save();
+    const remaining = MAX_OTP_ATTEMPTS - otpRecord.attempts;
+    return { status: HTTP.BAD_REQUEST, success: false, message: `Invalid OTP. ${remaining} attempt(s) remaining.` };
+  }
 
-    const user = await findUserForVerification(email, type, qatarId);
+  otpRecord.verified = true;
+  await otpRecord.save();
+  return null;
+};
+
+const verifyOTP = async (email, otp, deviceInfo = null) => {
+  try {
+    const failure = await checkOtpCode(email, otp);
+    if (failure) return failure;
+
+    const user = await User.findOne({ authMail: email }).select(
+      '_id name email role uniqueCode userType designation profilePic'
+    );
     if (!user) return { status: HTTP.NOT_FOUND, success: false, message: 'User not found' };
 
     const tokens = generateAuthTokens({
       _id: user._id,
-      email: type === 'operator' ? qatarId : user.email,
+      email: user.email,
       role: user.role,
       uniqueCode: user.uniqueCode,
       userType: user.userType,
@@ -142,9 +126,9 @@ const verifyOTP = async (email, otp, type, qatarId = null) => {
 
     const sessionToken = await createSession(
       user._id,
-      sessionUserModel(type),
-      { loginTime: new Date().toISOString() },
-      null
+      'User',
+      deviceInfo ? buildDeviceData(deviceInfo) : { loginTime: new Date().toISOString() },
+      deviceInfo?.location || null
     );
 
     await OTP.deleteOne({ email });
@@ -162,8 +146,8 @@ const verifyOTP = async (email, otp, type, qatarId = null) => {
           role: user.role,
           userType: user.userType,
           uniqueCode: user.uniqueCode,
-          equipmentNumber: user.equipmentNumber || null,
-          qatarId: user.qatarId || null,
+          designation: user.designation || '',
+          profilePic: { filePath: user.profilePic?.filePath ?? '' },
         },
         accessToken: tokens.accessToken,
         refreshToken: tokens.refreshToken,
@@ -176,4 +160,19 @@ const verifyOTP = async (email, otp, type, qatarId = null) => {
   }
 };
 
-module.exports = { generateAndSendOTP, verifyOTP };
+const sendOtpToAddress = async (email, username = 'there') => {
+  const otp = generateSecureOTP();
+  const hashedOTP = await hashOTP(otp);
+  const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+
+  await OTP.findOneAndUpdate(
+    { email },
+    { email, otp: hashedOTP, expiresAt, verified: false, attempts: 0, createdAt: new Date() },
+    { upsert: true, new: true }
+  );
+
+  await emailService.sendOTPEmail(email, otp, username);
+  return { otp, expiresAt };
+};
+
+module.exports = { generateAndSendOTP, verifyOTP, checkOtpCode, sendOtpToAddress };

@@ -1,7 +1,3 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// User Constants
-// ─────────────────────────────────────────────────────────────────────────────
-
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 const USER_ROLES = {
@@ -69,7 +65,6 @@ const ROLE_ENV_KEYS = [
   'PURCHASE_MANAGER',
   'MD',
   'MANAGER',
-  'STORE_KEEPER',
 ];
 
 module.exports = { JWT_SECRET, USER_ROLES, ROLE_PREFIX_MAP, ROLE_ENV_KEYS };

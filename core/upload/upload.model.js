@@ -9,6 +9,20 @@ const partSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const liveActivitySchema = new mongoose.Schema(
+  {
+    pushToken: { type: String },
+    displayName: { type: String },
+    itemNumber: { type: Number },
+    itemCount: { type: Number },
+    bytesBeforeItem: { type: Number },
+    batchTotalBytes: { type: Number },
+    lastProgress: { type: Number, default: 0 },
+    isEnded: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
 const uploadSessionSchema = new mongoose.Schema({
   feature: { type: String, required: true, index: true },
   context: { type: String },
@@ -27,6 +41,11 @@ const uploadSessionSchema = new mongoose.Schema({
   totalParts: { type: Number, required: true },
 
   parts: [partSchema],
+
+  liveActivity: { type: liveActivitySchema },
+
+  thumbnailData: { type: Buffer, select: false },
+  thumbnailContentType: { type: String },
 
   status: {
     type: String,

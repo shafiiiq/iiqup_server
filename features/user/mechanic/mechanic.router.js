@@ -10,6 +10,7 @@ router.get('/attendance/:zktecoPin', paginationMiddleware, controller.getAttenda
 
 router.get('/', authMiddleware, controller.getMechanic);
 router.get('/:id', authMiddleware, controller.getMechanicById);
+router.post('/profile', authMiddleware, controller.createProfilePhotoUpload);
 router.post('/', controller.addMechanic);
 router.put('/:id', controller.updateMechanic);
 router.delete('/:id', controller.deleteMechanic);

@@ -14,8 +14,6 @@ const User = require('#features/user/staff/staff.model');
 const mongoose = require('mongoose');
 const { paginate } = require('#shared/pagination/pagination')
 
-const { createNotification } = require('#core/notification/notification.service');
-const PushNotificationService = require('#core/notification/notification.push');
 const wsUtils = require('#core/socket/socket.io');
 const dashboardServices = require('#features/dashboard/dashboard.service')
 
@@ -65,57 +63,6 @@ const _addStockHistoryEntry = (
   });
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Internal: Notification helper
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Fire-and-forget: creates an in-app notification + push notification.
- * Errors are logged but never surfaced to callers.
- * @param {string}      title
- * @param {string}      description
- * @param {string}      [priority='low']
- * @param {string|null} [sourceId]
- * @param {string|null} [recipient]
- */
-const _sendNotification = async (
-  title,
-  description,
-  priority = 'low',
-  sourceId = null,
-  recipient = null
-) => {
-  try {
-    const notification = await createNotification({
-      title,
-      description,
-      priority,
-      sourceId,
-      time: new Date(),
-    });
-
-    await PushNotificationService.sendGeneralNotification(
-      recipient,
-      title,
-      description,
-      priority,
-      'normal',
-      notification.data._id.toString()
-    );
-  } catch (err) {
-    logger.error('[ToolkitService] Notification failed:', err.message);
-  }
-};
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Insert / Add
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Inserts a new toolkit or adds/updates a variant on an existing toolkit.
- * @param {object} toolkitData
- * @returns {Promise<object>}
- */
 const insertToolkit = async (toolkitData) => {
   try {
     const {
@@ -181,13 +128,6 @@ const insertToolkit = async (toolkitData) => {
       }
 
       const savedToolkit = await existingToolkit.save();
-
-      await _sendNotification(
-        'New Safety Items Added',
-        `New ${stockCount} ${name} added to stock`,
-        'low',
-        savedToolkit._id
-      );
 
       dashboardServices.clearDashboardCache()
       wsUtils.dispatchDashboardUpdate('toolkit');
@@ -536,16 +476,6 @@ const updateVariant = async (toolkitId, variantId, updateData) => {
 
     const savedToolkit = await toolkit.save();
 
-    const changeAmount = Math.abs(
-      (updateData.stockCount ?? previousStock) - (previousStock ?? 0)
-    );
-    await _sendNotification(
-      'Safety Items Update',
-      `${changeAmount} items ${action} in Size:${variant.size} - Color:${variant.color} - ${toolkit.name}`,
-      'low',
-      toolkit._id
-    );
-
     return {
       status: HTTP.OK,
       ok: true,
@@ -628,7 +558,9 @@ const reduceStock = async (
     // Resolve the assigned person across all person collections
     const [staffUser, operator, mechanic] = await Promise.all([
       User.findById(personId).catch(() => null),
-      Operator.findById(personId).catch(() => null),
+      Operator.findById(personId)
+        .select({ profilePic: 0 })
+        .catch(() => null),
       Mechanic.findById(personId).catch(() => null),
     ]);
 
@@ -655,13 +587,6 @@ const reduceStock = async (
     }
 
     const savedToolkit = await toolkit.save();
-
-    await _sendNotification(
-      'Safety Items Update',
-      `${quantity} ${variant.color} color ${variant.size} size ${toolkit.name} handovered to ${person}`,
-      'low',
-      toolkit._id
-    );
 
     return {
       status: HTTP.OK,

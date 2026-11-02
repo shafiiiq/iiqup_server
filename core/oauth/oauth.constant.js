@@ -1,0 +1,17 @@
+const SUPPORTED_PROVIDERS = ['google', 'apple', 'facebook', 'email']
+const EMAIL_PROVIDER = 'email'
+const EMAIL_LINK_TOKEN_EXPIRY = '24h'
+const SOCIAL_LINK_PURPOSE = 'social-link'
+const SOCIAL_CONFIRM_PURPOSE = 'social-link-confirm'
+const LINK_TOKEN_EXPIRY = '30m'
+const CONFIRM_TOKEN_EXPIRY = '10m'
+
+module.exports = {
+  SUPPORTED_PROVIDERS,
+  EMAIL_PROVIDER,
+  EMAIL_LINK_TOKEN_EXPIRY,
+  SOCIAL_LINK_PURPOSE,
+  SOCIAL_CONFIRM_PURPOSE,
+  LINK_TOKEN_EXPIRY,
+  CONFIRM_TOKEN_EXPIRY,
+}

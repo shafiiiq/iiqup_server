@@ -6,6 +6,7 @@ const router = express.Router();
 
 router.get('/storage', authMiddleware, controller.getStorageSummary);
 router.get('/search', authMiddleware, controller.searchDocuments);
+router.get('/expiry-tracking', authMiddleware, controller.getExpiryTracking);
 router.post('/convert', authMiddleware, controller.convertDocuments);
 router.get('/trash/sources', authMiddleware, controller.getTrashSources);
 router.get('/trash/:sourceType/:sourceId', authMiddleware, controller.getTrashItems);
@@ -27,6 +28,8 @@ router.put('/folders/:folderId/move', authMiddleware, controller.moveFolder);
 router.post('/folders/:folderId/copy', authMiddleware, controller.copyFolder);
 
 router.post('/:documentId/renew', authMiddleware, controller.renewDocument);
+router.post('/:documentId/revert-renewal', authMiddleware, controller.revertRenewal);
+router.post('/:documentId/reapply-renewal', authMiddleware, controller.reapplyRenewal);
 router.post('/:documentId/split', authMiddleware, controller.splitDocument);
 router.post('/:documentId/edit-pages', authMiddleware, controller.editDocumentPages);
 router.post('/:documentId/extract', authMiddleware, controller.extractDocument);

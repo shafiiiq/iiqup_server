@@ -1,0 +1,17 @@
+const TASK_KIND = {
+  PURCHASE_ORDER: 'purchaseOrder',
+  HIRE_ORDER: 'hireOrder',
+  QUOTATION: 'quotation',
+  BACKCHARGE: 'backcharge',
+}
+
+const TASK_WINDOW_DAYS = 30
+const TASK_LIST_LIMIT = 100
+const MANAGING_DIRECTOR_TITLE = 'MANAGING DIRECTOR'
+
+module.exports = {
+  TASK_KIND,
+  TASK_WINDOW_DAYS,
+  TASK_LIST_LIMIT,
+  MANAGING_DIRECTOR_TITLE,
+}

@@ -1,0 +1,52 @@
+const express = require('express')
+const multer = require('multer')
+const controller = require('./quotation.controller')
+const { paginationMiddleware } = require('#middlewares/pagination.middleware')
+const statisticsController = require('./quotation.statistics.controller')
+require('./quotation.signature.registration')
+const quotationTasks = require('./quotation.tasks')
+const { createTaskHandler } = require('#shared/tasks/task.handler')
+
+const router = express.Router()
+const upload = multer({ storage: multer.memoryStorage() })
+
+router.post('/', controller.createQuotation)
+router.get('/', paginationMiddleware, controller.getQuotations)
+router.get('/company-details', controller.getCompanyDetails)
+router.get('/item-descriptions', controller.getItemDescriptions)
+router.get('/by-date', controller.getQuotationsByDateRange)
+router.get('/by-company/:vendorName', controller.getQuotationsByCompany)
+router.get('/latest', controller.getLatestQuotation)
+router.get('/latest-refno', controller.getLatestQuotationRefNo)
+router.get('/tasks', createTaskHandler('quotation.tasks', quotationTasks.getTaskEntries))
+router.post('/pending-signatures', controller.getPendingSignatures)
+
+router.get('/pdf/download/:refNo(*)', controller.downloadQuotation)
+router.post('/pdf/submit/:refNo(*)', controller.submitQuotation)
+router.post(
+  '/pdf/email/:refNo(*)',
+  upload.fields([{ name: 'attachments', maxCount: 10 }]),
+  controller.emailQuotation
+)
+
+router.get('/stats/totals', statisticsController.getQuotationTotals)
+router.get('/stats/summary', statisticsController.getQuotationSummary)
+router.get('/stats/series', statisticsController.getQuotationSeries)
+router.get('/stats/growth', statisticsController.getQuotationGrowth)
+
+router.get('/:refNo(*)', controller.getQuotationByRef)
+router.put('/:refNo(*)', controller.updateQuotation)
+router.delete('/:refNo', controller.deleteQuotation)
+
+router.post(
+  '/send-via-email',
+  upload.fields([
+    { name: 'pdf', maxCount: 1 },
+    { name: 'attachments', maxCount: 10 },
+  ]),
+  controller.sendQuotationViaEmail
+)
+
+router.put('/vendor-email/:vendorCode', controller.updateVendorEmail)
+
+module.exports = router
