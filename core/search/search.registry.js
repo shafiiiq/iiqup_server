@@ -34,7 +34,7 @@ const searchRegistry = {
     searchableFields: ['machine', 'regNo', 'brand', 'company', 'coc', 'istimaraExpiry', 'insuranceExpiry', 'tpcExpiry', 'hiredFrom', 'location', 'status', 'certificationBody.operatorName'],
     defaultFields: ['machine', 'regNo', 'brand', 'location'],
   },
-  equipmenthandovers: {
+  equipmentImages: {
     model: require('#features/fleet/images/images.model'),
     searchableFields: ['equipmentName', 'equipmentNo', 'path', 'label'],
     defaultFields: ['equipmentName', 'equipmentNo'],

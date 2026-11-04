@@ -16,7 +16,7 @@ const imageSchema = new mongoose.Schema({
   },
 });
 
-const equipmentHandoverSchema = new mongoose.Schema({
+const equipmentImagesSchema = new mongoose.Schema({
   equipmentName: {
     type: String,
     required: true,
@@ -42,4 +42,4 @@ const equipmentHandoverSchema = new mongoose.Schema({
   },
 });
 
-module.exports = mongoose.model('EquipmentHandover', equipmentHandoverSchema);
+module.exports = mongoose.model('EquipmentImages', equipmentImagesSchema);

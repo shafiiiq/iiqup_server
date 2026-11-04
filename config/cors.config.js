@@ -3,6 +3,7 @@ const corsOptions = {
     'https://alansariconnect.vercel.app',
     'https://ansarigroup.online',
     'https://www.ansarigroup.online',  
+    'https://www.ansarigroup.online',
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [

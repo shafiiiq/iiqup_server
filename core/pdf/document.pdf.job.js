@@ -22,6 +22,7 @@ const renderAndStoreDocumentPdf = async ({ sourceKey, definition, documentId, ve
     await renderPageToPdf(definition.buildRenderPath(document), user, {
       width: PDF_PAPER_WIDTH_MM,
       height: PDF_PAPER_HEIGHT_MM,
+      renderKey: version,
     })
   )
 

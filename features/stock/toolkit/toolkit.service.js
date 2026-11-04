@@ -1,11 +1,7 @@
+// file 2
 const logger = require('#shared/logger/logger');
 
 const HTTP = require('#shared/response/response.status')
-// ─────────────────────────────────────────────────────────────────────────────
-// Toolkit Service
-// Flat named async functions — no prototype objects, no class syntax.
-// Follows the same conventions as equipment.service.js.
-// ─────────────────────────────────────────────────────────────────────────────
 
 const Toolkit = require('./toolkit.model');
 const Mechanic = require('#features/user/mechanic/mechanic.model');
@@ -17,22 +13,6 @@ const { paginate } = require('#shared/pagination/pagination')
 const wsUtils = require('#core/socket/socket.io');
 const dashboardServices = require('#features/dashboard/dashboard.service')
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Internal: Stock history helper
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Appends a stock history entry to a variant in-place.
- * @param {object} variant
- * @param {string} action
- * @param {number} previousStock
- * @param {number} newStock
- * @param {string} [reason]
- * @param {string} [updatedBy]
- * @param {string} [person]
- * @param {string} [personId]
- * @param {Date}   [assignedDate]
- */
 const _addStockHistoryEntry = (
   variant,
   action,
@@ -103,7 +83,6 @@ const insertToolkit = async (toolkitData) => {
           updatedBy || 'System'
         );
       } else {
-        // Add new variant to existing toolkit
         const newVariant = {
           size: size || 'N/A',
           color: color || 'N/A',
@@ -142,7 +121,6 @@ const insertToolkit = async (toolkitData) => {
       };
     }
 
-    // Create brand-new toolkit with first variant
     const newVariant = {
       size: size || 'N/A',
       color: color || 'N/A',
@@ -186,14 +164,6 @@ const insertToolkit = async (toolkitData) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Fetch / Search
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Returns all toolkits sorted by newest first.
- * @returns {Promise<object>}
- */
 const fetchToolkits = async (pagination) => {
   try {
     const result = await paginate(Toolkit, {}, pagination, {
@@ -217,11 +187,6 @@ const fetchToolkits = async (pagination) => {
   }
 };
 
-/**
- * Full-text search across toolkit names.
- * @param {string} searchTerm
- * @returns {Promise<object>}
- */
 const searchToolkits = async (searchTerm, pagination) => {
   try {
     const result = await paginate(
@@ -253,15 +218,6 @@ const searchToolkits = async (searchTerm, pagination) => {
   }
 };
 
-/**
- * Looks up a toolkit by its ObjectId (barcode scan).
- * Handles BOTH toolkit-level barcodes AND variant-level barcodes.
- * When a variant _id is scanned, finds the parent toolkit and marks
- * which variant was scanned via `scannedVariantId`.
- *
- * @param {string} objectId
- * @returns {Promise<object>}
- */
 const scanToolkitByBarcode = async (objectId) => {
   try {
     if (!mongoose.Types.ObjectId.isValid(objectId)) {
@@ -273,11 +229,9 @@ const scanToolkitByBarcode = async (objectId) => {
       };
     }
 
-    // ── 1. Try direct toolkit match ───────────────────────────────────────
     let toolkit = await Toolkit.findById(objectId);
     let scannedVariantId = null;
 
-    // ── 2. If not found, search variants whose _id matches ────────────────
     if (!toolkit) {
       toolkit = await Toolkit.findOne({
         'variants._id': new mongoose.Types.ObjectId(objectId),
@@ -300,20 +254,16 @@ const scanToolkitByBarcode = async (objectId) => {
 
     const result = toolkit.toObject();
 
-    // ── Sort variants: scanned variant first, then by stock status ─────────
     result.variants.sort((a, b) => {
-      // Scanned variant always comes first
       const aIsScanned = a._id.toString() === scannedVariantId;
       const bIsScanned = b._id.toString() === scannedVariantId;
       if (aIsScanned) return -1;
       if (bIsScanned) return 1;
 
-      // Then sort by availability
       const order = { available: 0, low: 1, out: 2 };
       return (order[a.status] ?? 3) - (order[b.status] ?? 3);
     });
 
-    // ── Sort each variant's history newest-first ───────────────────────────
     result.variants.forEach((v) => {
       if (v.stockHistory?.length) {
         v.stockHistory.sort(
@@ -342,7 +292,6 @@ const scanToolkitByBarcode = async (objectId) => {
         : 'Toolkit scanned successfully',
       data: {
         ...result,
-        // Tell the mobile scanner exactly which variant was scanned
         scannedVariantId: scannedVariantId || null,
         metrics: {
           totalVariants,
@@ -366,16 +315,6 @@ const scanToolkitByBarcode = async (objectId) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Update
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Updates toolkit-level fields and recalculates totalStock / overallStatus.
- * @param {string} toolkitId
- * @param {object} updateData
- * @returns {Promise<object>}
- */
 const updateToolkit = async (toolkitId, updateData) => {
   try {
     const currentToolkit = await Toolkit.findById(toolkitId);
@@ -421,13 +360,6 @@ const updateToolkit = async (toolkitId, updateData) => {
   }
 };
 
-/**
- * Updates a specific variant within a toolkit, tracking any stock changes.
- * @param {string} toolkitId
- * @param {string} variantId
- * @param {object} updateData
- * @returns {Promise<object>}
- */
 const updateVariant = async (toolkitId, variantId, updateData) => {
   try {
     const toolkit = await Toolkit.findById(toolkitId);
@@ -493,18 +425,6 @@ const updateVariant = async (toolkitId, variantId, updateData) => {
   }
 };
 
-/**
- * Reduces variant stock by a given quantity and assigns items to a person.
- * @param {string} toolkitId
- * @param {string} variantId
- * @param {number} quantity
- * @param {string} [reason]
- * @param {string} [updatedBy]
- * @param {string} [person]
- * @param {string} [personId]
- * @param {Date}   [assignedDate]
- * @returns {Promise<object>}
- */
 const reduceStock = async (
   toolkitId,
   variantId,
@@ -555,7 +475,6 @@ const reduceStock = async (
       assignedDate
     );
 
-    // Resolve the assigned person across all person collections
     const [staffUser, operator, mechanic] = await Promise.all([
       User.findById(personId).catch(() => null),
       Operator.findById(personId)
@@ -605,15 +524,6 @@ const reduceStock = async (
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Delete
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Deletes an entire toolkit by ID.
- * @param {string} toolkitId
- * @returns {Promise<object>}
- */
 const deleteToolkit = async (toolkitId) => {
   try {
     const deleted = await Toolkit.findByIdAndDelete(toolkitId);
@@ -641,13 +551,6 @@ const deleteToolkit = async (toolkitId) => {
   }
 };
 
-/**
- * Deletes a specific variant from a toolkit.
- * Deletes the entire toolkit if no variants remain.
- * @param {string} toolkitId
- * @param {string} variantId
- * @returns {Promise<object>}
- */
 const deleteVariant = async (toolkitId, variantId) => {
   try {
     const toolkit = await Toolkit.findById(toolkitId);
@@ -696,16 +599,6 @@ const deleteVariant = async (toolkitId, variantId) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Stock History
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Returns stock history for a specific variant.
- * @param {string} toolkitId
- * @param {string} variantId
- * @returns {Promise<object>}
- */
 const getStockHistory = async (toolkitId, variantId) => {
   try {
     const toolkit = await Toolkit.findById(toolkitId);
@@ -753,11 +646,6 @@ const getStockHistory = async (toolkitId, variantId) => {
   }
 };
 
-/**
- * Returns stock history for all variants of a toolkit.
- * @param {string} toolkitId
- * @returns {Promise<object>}
- */
 const getToolkitStockHistory = async (toolkitId) => {
   try {
     const toolkit = await Toolkit.findById(toolkitId);
@@ -802,25 +690,16 @@ const getToolkitStockHistory = async (toolkitId) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Exports
-// ─────────────────────────────────────────────────────────────────────────────
-
 module.exports = {
-  // Insert / Add
   insertToolkit,
-  // Fetch / Search
   fetchToolkits,
   searchToolkits,
   scanToolkitByBarcode,
-  // Update
   updateToolkit,
   updateVariant,
   reduceStock,
-  // Delete
   deleteToolkit,
   deleteVariant,
-  // Stock History
   getStockHistory,
   getToolkitStockHistory,
 };

@@ -164,7 +164,7 @@ const renderPageToPdfInternal = async (path, user, options = {}) => {
 }
 
 const renderPageToPdf = (path, user, options = {}) => {
-  const key = `${path}::${options.width || ''}x${options.height || ''}`
+  const key = `${path}::${options.width || ''}x${options.height || ''}::${options.renderKey || ''}`
   const existing = inFlightRenders.get(key)
   if (existing) return existing
 

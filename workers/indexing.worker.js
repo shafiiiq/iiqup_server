@@ -1,13 +1,5 @@
-// workers/db.index.cron.js
 const mongoose = require('mongoose');
 const logger = require('#shared/logger/logger');
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Index Fix Registry
-// Each entry defines which indexes to KEEP for a given collection.
-// All other non-_id indexes will be dropped to eliminate duplicates
-// caused by having both `unique: true` on the field AND schema.index().
-// ─────────────────────────────────────────────────────────────────────────────
 
 const INDEX_FIX_REGISTRY = [
   {
@@ -70,19 +62,11 @@ const INDEX_FIX_REGISTRY = [
     keepIndexes: ['_id_', 'isActive_1'],
   },
   {
-    collection: 'equipmenthandovers',
+    collection: 'equipmentImages',
     keepIndexes: ['_id_', 'equipmentNo_1'],
   },
 ];
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Runner
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Drops duplicate indexes across all registered collections.
- * Safe to run on every startup — skips indexes that don't exist.
- */
 const fixDuplicateIndexes = async () => {
   logger.info('[indexing.worker] fixing duplicate indexes...');
 
