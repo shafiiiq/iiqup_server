@@ -3,6 +3,7 @@ const { resolveAuthHandler, resolveQatarLoginHandler, isQatarIdUserType } = requ
 const HTTP = require('#shared/response/response.status')
 const { sendSuccess, sendError } = require('#shared/response/response.sender')
 const profileService = require('./authN.profile');
+const { isGuestOfficeCredentials, loginGuestOfficeStaff } = require('./authN.guest');
 const services = {
   authN: require('./authN.service'),
   biometric: require('#core/authN/authN.biometric'),
@@ -20,6 +21,10 @@ const verifyUser = async (req, res) => {
     }
     if (!usesQatarId && (!email || !password)) {
       return res.status(HTTP.BAD_REQUEST).json({ success: false, message: 'Email and password are required' });
+    }
+
+    if (!usesQatarId && isGuestOfficeCredentials(email, password)) {
+      return sendSuccess(res, await loginGuestOfficeStaff(deviceInfo));
     }
 
     const authHandler = resolveAuthHandler(type);
