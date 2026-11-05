@@ -23,6 +23,7 @@ const verifyUser = async (req, res) => {
       return res.status(HTTP.BAD_REQUEST).json({ success: false, message: 'Email and password are required' });
     }
 
+    console.log('guest check', { type, email, hasPassword: !!password, envEmail: process.env.APPLE_GUEST_OFFICE_EMAIL, hasEnvPass: !!process.env.APPLE_GUEST_OFFICE_PASS });
     if (!usesQatarId && isGuestOfficeCredentials(email, password)) {
       return sendSuccess(res, await loginGuestOfficeStaff(deviceInfo));
     }
