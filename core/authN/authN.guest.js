@@ -11,19 +11,28 @@ const isMatchingSecret = (providedValue, expectedValue) =>
 
 const normalizeEmail = (email) => String(email).trim().toLowerCase();
 
-const isGuestOfficeCredentials = (email, password) => {
-  const guestOfficeEmail = process.env.APPLE_GUEST_OFFICE_EMAIL;
-  const guestOfficePassword = process.env.APPLE_GUEST_OFFICE_PASS;
-  if (!guestOfficeEmail || !guestOfficePassword || !email || !password) return false;
+const getGuestOfficeAccounts = () =>
+  [
+    { email: process.env.APPLE_GUEST_OFFICE_EMAIL, password: process.env.APPLE_GUEST_OFFICE_PASS },
+    { email: process.env.APPLE_GUEST_OFFICE_EMAIL_USER_B, password: process.env.APPLE_GUEST_OFFICE_PASS_USER_B },
+  ].filter((account) => account.email && account.password);
+
+const findGuestOfficeAccount = (email, password) => {
+  if (!email || !password) return null;
 
   return (
-    isMatchingSecret(normalizeEmail(email), normalizeEmail(guestOfficeEmail)) &&
-    isMatchingSecret(password, guestOfficePassword)
+    getGuestOfficeAccounts().find(
+      (account) =>
+        isMatchingSecret(normalizeEmail(email), normalizeEmail(account.email)) &&
+        isMatchingSecret(password, account.password)
+    ) || null
   );
 };
 
-const loginGuestOfficeStaff = async (deviceInfo) => {
-  const user = await User.findOne({ email: normalizeEmail(process.env.APPLE_GUEST_OFFICE_EMAIL) });
+const isGuestOfficeCredentials = (email, password) => Boolean(findGuestOfficeAccount(email, password));
+
+const loginGuestOfficeStaff = async (email, deviceInfo) => {
+  const user = await User.findOne({ email: normalizeEmail(email) });
   if (!user) {
     return { status: HTTP.NOT_FOUND, success: false, message: 'Guest office account not found' };
   }
