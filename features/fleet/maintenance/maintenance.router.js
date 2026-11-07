@@ -3,6 +3,7 @@ const controller = require('./maintenance.controller');
 const { paginationMiddleware } = require('#middlewares/pagination.middleware');
 
 require('./maintenance.signature.registration');
+require('./maintenance.list.signature.registration');
 
 const router = express.Router();
 router.post('/', controller.createMaintenance);
