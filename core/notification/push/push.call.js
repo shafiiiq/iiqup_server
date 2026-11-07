@@ -1,4 +1,5 @@
 const { buildApnsHeaders, dispatchMessageToUser } = require('./push.fcm');
+const { dispatchVoipCallPush } = require('./push.voip');
 
 const buildCallMessage = ({ callerName, callerId, chatId }) => {
   const title = `Incoming call from ${callerName}`;
@@ -26,7 +27,10 @@ const buildCallMessage = ({ callerName, callerId, chatId }) => {
   };
 };
 
-const dispatchVoipCallNotification = (uniqueCode, callerName, callerId, chatId) =>
-  dispatchMessageToUser(uniqueCode, buildCallMessage({ callerName, callerId, chatId }));
+const dispatchVoipCallNotification = async (uniqueCode, callerName, callerId, chatId) => {
+  const voipResult = await dispatchVoipCallPush(uniqueCode, { callerName, callerId, chatId });
+  if (voipResult.success) return voipResult;
+  return dispatchMessageToUser(uniqueCode, buildCallMessage({ callerName, callerId, chatId }));
+};
 
 module.exports = { dispatchVoipCallNotification };

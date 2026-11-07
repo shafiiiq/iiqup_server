@@ -117,7 +117,7 @@ const buildVoipPayload = (payload) => ({
   primaryAction: payload.primaryAction ? JSON.stringify(payload.primaryAction) : null,
 });
 
-const dispatchVoipNotificationPush = async (uniqueCode, payload) => {
+const dispatchVoipPayload = async (uniqueCode, voipPayload) => {
   if (!isConfigured()) {
     if (!hasWarnedAboutConfiguration) {
       hasWarnedAboutConfiguration = true;
@@ -131,7 +131,7 @@ const dispatchVoipNotificationPush = async (uniqueCode, payload) => {
     const voipToken = user?.voipPushToken;
     if (!voipToken) return { success: false, message: 'No VoIP token' };
 
-    const result = await sendToDevice(voipToken, buildVoipPayload(payload));
+    const result = await sendToDevice(voipToken, voipPayload);
     if (result.status === 200) return { success: true };
 
     if (INVALID_TOKEN_REASONS.includes(result.reason)) await tokenService.clearVoipToken(voipToken);
@@ -143,4 +143,17 @@ const dispatchVoipNotificationPush = async (uniqueCode, payload) => {
   }
 };
 
-module.exports = { dispatchVoipNotificationPush };
+const dispatchVoipNotificationPush = (uniqueCode, payload) =>
+  dispatchVoipPayload(uniqueCode, buildVoipPayload(payload));
+
+const dispatchVoipCallPush = (uniqueCode, { callerName, callerId, chatId }) =>
+  dispatchVoipPayload(uniqueCode, {
+    kind: 'call',
+    type: 'call',
+    callAction: 'incoming',
+    callerId: String(callerId),
+    callerName: String(callerName),
+    chatId: String(chatId),
+  });
+
+module.exports = { dispatchVoipNotificationPush, dispatchVoipCallPush };
