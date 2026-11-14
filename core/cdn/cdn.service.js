@@ -12,18 +12,16 @@ const {
 const { buildRenditionPlaybackKey } = require('./cdn.keys')
 const { enqueueSplitJob } = require('./cdn.scheduler')
 const { readObjectAsText, uploadTextToObject } = require('./cdn.storage')
-const { isDuplicateKeyError } = require('./cdn.utils')
+const { isDuplicateKeyError, isVideoFile } = require('./cdn.utils')
 
 const UploadSession = require('#core/upload/upload.model')
-
-const isVideoMimeType = (mimeType) => !!mimeType && mimeType.toLowerCase().startsWith('video/')
 
 const applyThumbnailToAsset = async (sourceSessionId, thumbnailData, thumbnailContentType) => {
   await VideoAsset.updateOne({ sourceSessionId }, { $set: { thumbnailData, thumbnailContentType } })
 }
 
 const registerVideoAsset = async (session) => {
-  if (!isVideoMimeType(session.mimeType)) return null
+  if (!isVideoFile(session.mimeType, session.originalName)) return null
 
   const sourceSessionId = String(session._id)
   const existingAsset = await VideoAsset.findOne({ sourceSessionId })
@@ -38,6 +36,11 @@ const registerVideoAsset = async (session) => {
       thumbnailContentType: sessionThumbnail?.thumbnailContentType,
       sourceKey: session.s3Key,
       sourceMimeType: session.mimeType,
+      sourceSizeBytes: session.fileSize,
+      uploadDurationMs:
+        session.completedAt && session.createdAt
+          ? new Date(session.completedAt).getTime() - new Date(session.createdAt).getTime()
+          : 0,
       sourceFileName: session.originalName,
       feature: session.feature,
       uploadedBy: session.uploadedBy,
@@ -67,10 +70,18 @@ const buildAssetSummary = (asset) => ({
   status: asset.status,
   durationSeconds: asset.durationSeconds,
   chunkCount: asset.chunkCount,
+  sourceSizeBytes: asset.sourceSizeBytes,
+  totalRenditionBytes: asset.totalRenditionBytes,
+  uploadDurationMs: asset.uploadDurationMs,
+  splitDurationMs: asset.splitDurationMs,
+  processingDurationMs: asset.processingDurationMs,
   error: asset.error,
   renditions: asset.renditions.map((rendition) => ({
     name: rendition.name,
     status: rendition.status,
+    sizeBytes: rendition.sizeBytes,
+    transcodeDurationMs: rendition.transcodeDurationMs,
+    combineDurationMs: rendition.combineDurationMs,
   })),
 })
 

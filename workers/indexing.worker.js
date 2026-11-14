@@ -42,7 +42,7 @@ const INDEX_FIX_REGISTRY = [
     ],
   },
   {
-    collection: 'purchaseOrder',
+    collection: 'purchaseorders',
     keepIndexes: ['_id_', 'purchaseorderRef_1', 'createdAt_-1'],
   },
   {
@@ -62,7 +62,7 @@ const INDEX_FIX_REGISTRY = [
     keepIndexes: ['_id_', 'isActive_1'],
   },
   {
-    collection: 'equipmentImages',
+    collection: 'equipmentimages',
     keepIndexes: ['_id_', 'equipmentNo_1'],
   },
 ];

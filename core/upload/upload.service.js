@@ -8,7 +8,7 @@ const {
   completeMultipartUpload,
   abortMultipartUpload,
 } = require('#core/s3/s3.config');
-const { PART_URL_BATCH_SIZE } = require('./upload.config');
+const { PART_URL_BATCH_SIZE, MAX_SIZE_LOOKUP_KEYS } = require('./upload.config');
 const { sanitizeFileName, buildS3Key, calculatePartPlan } = require('./upload.helper');
 const { registerVideoAsset, applyThumbnailToAsset } = require('#core/cdn/cdn.service');
 const liveActivityService = require('./liveactivity/liveactivity.service');
@@ -280,6 +280,21 @@ const getCompletedSessions = async ({ sessionIds, uploadedBy, feature }) => {
   return sessionIds.map((id) => bySessionId.get(id));
 };
 
+const getSizesByKeys = async ({ keys }) => {
+  if (!Array.isArray(keys) || keys.length === 0) throw new AppError('keys is required', HTTP.BAD_REQUEST);
+
+  const sessions = await UploadSession.find({
+    s3Key: { $in: keys.slice(0, MAX_SIZE_LOOKUP_KEYS) },
+    status: 'completed',
+  }).select('s3Key fileSize');
+
+  const sizes = {};
+  sessions.forEach((session) => {
+    sizes[session.s3Key] = session.fileSize;
+  });
+  return { sizes };
+};
+
 module.exports = {
   registerCompletionHandler,
   initiateUpload,
@@ -289,5 +304,6 @@ module.exports = {
   abortUpload,
   getSessionStatus,
   getCompletedSessions,
+  getSizesByKeys,
   saveSessionThumbnail,
 };

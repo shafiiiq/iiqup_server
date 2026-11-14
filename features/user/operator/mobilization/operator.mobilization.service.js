@@ -225,6 +225,7 @@ const syncOperatorDemobilizedFromEquipment = async ({
       rentRate: operator.rentRate || null,
       regNo,
       machine,
+      site: record.site,
       month,
       year,
       time,

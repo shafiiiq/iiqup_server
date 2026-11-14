@@ -39,6 +39,7 @@ const enqueueDelivery = async ({ uniqueCode, payload }) => {
     sequence,
     pushId: randomUUID(),
     notificationId: payload.notificationId,
+    replyId: payload.replyId || null,
     title: payload.title,
     body: payload.body,
     priority: payload.priority,

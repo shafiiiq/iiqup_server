@@ -3,7 +3,7 @@ const { paginate } = require('#shared/pagination/pagination')
 const { wrapServiceError } = require('./hire.helper')
 
 const HIRE_ORDER_LIST_FIELDS =
-  'hireOrderRef hireOrderCounter date company quoteNo complaintId items totalAmount totalDiscountAmount workflowStatus pmSigned managerSigned ceoSigned accountsSigned signatures isAmendmented'
+  'hireOrderRef hireOrderCounter date company quoteNo items totalAmount totalDiscountAmount workflowStatus pmSigned managerSigned ceoSigned accountsSigned signatures isAmendmented'
 
 const getHireOrders = async (pagination) => {
   try {

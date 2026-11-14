@@ -48,9 +48,25 @@ const processJob = async (job) => {
     )
   }, HEARTBEAT_INTERVAL_MS)
 
+  const startedAt = Date.now()
+  logger.info('[cdn.worker] job started', {
+    jobId: String(job._id),
+    type: job.type,
+    chunkIndex: job.chunkIndex,
+    renditionName: job.renditionName,
+    attempt: job.attempts,
+  })
+
   try {
     const result = await executeJob(asset, job)
     await completeJob(job, result)
+    logger.info('[cdn.worker] job completed', {
+      jobId: String(job._id),
+      type: job.type,
+      chunkIndex: job.chunkIndex,
+      renditionName: job.renditionName,
+      durationMs: Date.now() - startedAt,
+    })
   } catch (error) {
     logger.error('[cdn.worker] job failed', {
       jobId: String(job._id),

@@ -2,6 +2,14 @@ const fs = require('fs/promises')
 const os = require('os')
 const path = require('path')
 
+const VIDEO_FILE_EXTENSIONS = ['mp4', 'mov', 'm4v', 'mkv', 'webm', 'avi', '3gp', 'mpeg', 'mpg', 'wmv', 'flv', 'ts']
+
+const isVideoFile = (mimeType, fileName) => {
+  if (mimeType && mimeType.toLowerCase().startsWith('video/')) return true
+  const extension = path.extname(fileName || '').slice(1).toLowerCase()
+  return VIDEO_FILE_EXTENSIONS.includes(extension)
+}
+
 const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds))
 
 const createWorkDirectory = (prefix) => fs.mkdtemp(path.join(os.tmpdir(), `${prefix}-`))
@@ -36,6 +44,7 @@ const runWithConcurrency = async (items, concurrencyLimit, task) => {
 }
 
 module.exports = {
+  isVideoFile,
   wait,
   createWorkDirectory,
   removeDirectory,

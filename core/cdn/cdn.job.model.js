@@ -13,6 +13,7 @@ const videoJobSchema = new mongoose.Schema(
     startedAt: { type: Date },
     heartbeatAt: { type: Date },
     finishedAt: { type: Date },
+    durationMs: { type: Number, default: 0 },
     error: { type: String },
   },
   { timestamps: true }

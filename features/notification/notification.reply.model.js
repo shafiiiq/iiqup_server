@@ -13,6 +13,8 @@ const notificationReplySchema = new mongoose.Schema(
     parentReplyId: { type: mongoose.Schema.Types.ObjectId, default: null },
     likes: { type: [likeSchema], default: [] },
     viewedBy: { type: [viewReceiptSchema], default: [] },
+    deletedAt: { type: Date, default: null },
+    editedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

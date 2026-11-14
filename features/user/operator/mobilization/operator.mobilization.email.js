@@ -16,9 +16,12 @@ const ACTION_LABEL = {
   demobilized: 'DEMOBILIZATION',
 };
 
-const ACTION_SUBJECT = (operatorName, regNo) => ({
-  mobilized: `Operator Mobilized - ${operatorName}${regNo ? ` - ${regNo}` : ''}`,
-  demobilized: `Operator Demobilized - ${operatorName}${regNo ? ` - ${regNo}` : ''}`,
+const resolveDeploymentDestination = ({ deployType, clientCompany, site }) =>
+  deployType === 'company' ? clientCompany : site;
+
+const ACTION_SUBJECT = (operatorName, regNo, destination) => ({
+  mobilized: `Operator Mobilized - ${operatorName}${destination ? ` - ${destination}` : ''}${regNo ? ` - ${regNo}` : ''}`,
+  demobilized: `Operator Demobilized - ${operatorName}${destination ? ` - ${destination}` : ''}${regNo ? ` - ${regNo}` : ''}`,
 });
 
 const generateOperatorMobilizationTemplate = (recipientName = 'Team', data = {}) => {
@@ -126,7 +129,7 @@ const alertOperatorMobilizationViaEmail = async (data = {}) => {
   const to = toList.join(', ');
   const ccList = JSON.parse(process.env.OPERATOR_MOBILIZATION_CC || process.env.MOBILIZATION_CC || '[]');
   const cc = ccList.join(', ');
-  const subject = ACTION_SUBJECT(data.operatorName, data.regNo)[data.action] ?? `Operator Update – ${data.operatorName}`;
+  const subject = ACTION_SUBJECT(data.operatorName, data.regNo, resolveDeploymentDestination(data))[data.action] ?? `Operator Update – ${data.operatorName}`;
 
   const htmlContent = generateOperatorMobilizationTemplate('Team', data);
   const textContent = `Operator ${data.action}: ${data.operatorName}. ${data.regNo ? `Equipment: ${data.regNo}. ` : ''}Date: ${data.date}. Time: ${data.time}. Remarks: ${data.remarks || 'None'}.`;
@@ -181,8 +184,10 @@ const generateOperatorReplacementTemplate = (recipientName = 'Team', data = {}) 
   `;
 };
 
-const buildOperatorReplacementSubject = (data) =>
-  `Operator Replaced - ${data.outgoingOperatorName || ''} to ${data.incomingOperatorName || ''}${data.regNo ? ` - ${data.regNo}` : ''}`;
+const buildOperatorReplacementSubject = (data) => {
+  const destination = resolveDeploymentDestination(data);
+  return `Operator Replaced - ${data.outgoingOperatorName || ''} to ${data.incomingOperatorName || ''}${destination ? ` - ${destination}` : ''}${data.regNo ? ` - ${data.regNo}` : ''}`;
+};
 
 const alertOperatorReplacementViaEmail = async (data = {}) => {
   const toList = JSON.parse(process.env.OPERATOR_MOBILIZATION_TO || process.env.MOBILIZATION_TO || '[]');

@@ -6,13 +6,12 @@ const { MENTION_SEARCH_LIMIT, MENTION_TARGET_LIMIT } = require('./notification.c
 
 const searchMentionableActors = async ({ term, uniqueCode }) => {
   const trimmedTerm = String(term || '').trim();
-  if (!trimmedTerm) return [];
   return searchActorsByName({ term: trimmedTerm, excludeUniqueCode: uniqueCode, limit: MENTION_SEARCH_LIMIT });
 };
 
 const listUnreadMentionTargets = async (uniqueCode) => {
   const [replies, notifications] = await Promise.all([
-    NotificationReply.find({ mentions: uniqueCode, 'viewedBy.uniqueCode': { $ne: uniqueCode } })
+    NotificationReply.find({ mentions: uniqueCode, deletedAt: null, 'viewedBy.uniqueCode': { $ne: uniqueCode } })
       .select('notificationId createdAt')
       .sort({ createdAt: -1 })
       .limit(MENTION_TARGET_LIMIT)

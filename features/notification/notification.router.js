@@ -12,6 +12,7 @@ const replySummaryController = require('./notification.reply.summary.controller'
 const deliveryController = require('./notification.delivery.controller');
 const documentController = require('./notification.document.controller');
 const calendarController = require('./notification.calendar.controller');
+const manageController = require('./notification.manage.controller');
 
 const router = express.Router();
 
@@ -46,7 +47,13 @@ router.get('/attachment-features/:featureKey/documents', featureController.searc
 router.get('/:id/replies/summary', replySummaryController.getReplySummary);
 router.put('/read-all', controller.markAllRead);
 router.put('/replies/:replyId/like', replyController.setReplyLike);
+router.put('/replies/:replyId/text', manageController.editReply);
+router.put('/replies/:replyId/restore', manageController.restoreReply);
+router.delete('/replies/:replyId', manageController.deleteReply);
 
+router.put('/:notificationId/text', manageController.editNotification);
+router.put('/:notificationId/restore', manageController.restoreNotification);
+router.delete('/:notificationId', manageController.deleteNotification);
 router.put('/:notificationId/read', controller.markRead);
 router.put('/:notificationId/like', controller.setLike);
 router.get('/:notificationId/viewers', controller.listViewers);

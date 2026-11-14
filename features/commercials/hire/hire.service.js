@@ -2,6 +2,7 @@ const logger = require('#shared/logger/logger')
 const HTTP = require('#shared/response/response.status')
 const HireOrder = require('./hire.model')
 const { buildSignatures, resolveVendorCode, resolveTotal, wrapServiceError } = require('./hire.helper')
+const { buildAmendmentFields } = require('./hire.amendment')
 const { DEFAULT_TERMS } = require('./hire.constant')
 
 const UPLOAD_ALLOWED_STATUSES = [
@@ -31,17 +32,7 @@ const createHireOrder = async (hireOrderData) => {
       termsAndConditions: hireOrderData.termsAndConditions?.length ? hireOrderData.termsAndConditions : DEFAULT_TERMS,
     })
 
-    const saved = await hireOrder.save()
-
-    if (hireOrderData.normalHireOrder) {
-      await notifyStaffMain({
-        title: `Hire Order ${saved.hireOrderRef} Created`,
-        description: `Hire Order: ${saved.hireOrderRef} for ${hireOrderData.company.vendor}. Awaiting upload.`,
-        sourceId: 'hire_order_approval',
-      })
-    }
-
-    return saved
+    return await hireOrder.save()
   } catch (error) {
     throw wrapServiceError('createHireOrder', error)
   }
@@ -52,32 +43,26 @@ const updateHireOrder = async (refNo, updateData) => {
     const existing = await HireOrder.findOne({ hireOrderRef: refNo.trim() })
     if (!existing) throw new Error('Hire order not found')
 
+    if (updateData.isAmendmented === true && updateData.editLastAmendment === true) {
+      const lastAmendmentIndex = existing.amendments.length - 1
+      if (lastAmendmentIndex < 0) throw new Error('No amendment exists to edit')
+
+      const previousAmendment = existing.amendments[lastAmendmentIndex].toObject()
+      const editedAmendment = {
+        ...previousAmendment,
+        ...buildAmendmentFields(updateData, existing),
+        amendmentDate: previousAmendment.amendmentDate,
+      }
+
+      return await HireOrder.findOneAndUpdate(
+        { hireOrderRef: refNo.trim() },
+        { $set: { [`amendments.${lastAmendmentIndex}`]: editedAmendment } },
+        { new: true, runValidators: true }
+      )
+    }
+
     if (updateData.isAmendmented === true) {
-      const amendment = {
-        amendmentDate: new Date(),
-        amendedBy: updateData.amendedBy || 'System',
-        reason: updateData.amendmentReason || 'Amendment requested',
-      }
-
-      if (updateData.items?.length > 0) {
-        amendment.amendedItems = updateData.items
-        amendment.amendedColumns = updateData.columns || existing.columns
-        amendment.amendedTotalAmount = updateData.items.reduce((sum, item) => sum + (item.totalPrice || 0), 0)
-
-        if (updateData.showDiscountInTotal && updateData.discount) {
-          amendment.amendedTotalAmount -= updateData.discount
-          amendment.amendedDiscount = updateData.discount
-        }
-      }
-
-      if (updateData.company) amendment.amendedCompany = updateData.company
-      if (updateData.quoteNo) amendment.amendedQuoteNo = updateData.quoteNo
-      if (updateData.customFields) amendment.amendedCustomFields = updateData.customFields
-      if (updateData.manualTotal != null) amendment.amendedTotalAmount = updateData.manualTotal
-      amendment.amendedManualTotal = updateData.manualTotal ?? null
-      amendment.amendedShowTotalRow = updateData.showTotalRow ?? true
-      if (updateData.requestText) amendment.amendedRequestText = updateData.requestText
-      if (updateData.termsAndConditions) amendment.amendedTermsAndConditions = updateData.termsAndConditions
+      const amendment = buildAmendmentFields(updateData, existing)
 
       return await HireOrder.findOneAndUpdate(
         { hireOrderRef: refNo.trim() },

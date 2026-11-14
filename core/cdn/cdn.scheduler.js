@@ -18,6 +18,7 @@ const {
 const { buildMasterPlaylistKey } = require('./cdn.keys')
 const { uploadTextToObject } = require('./cdn.storage')
 const { isDuplicateKeyError } = require('./cdn.utils')
+const { calculateElapsedMs, sumDoneJobDurationMs } = require('./cdn.metrics')
 
 let schedulerTimer = null
 let isTickRunning = false
@@ -65,7 +66,15 @@ const finalizeAssetIfReady = async (assetId) => {
   await uploadTextToObject(masterKey, buildMasterPlaylist(asset.renditions), PLAYLIST_CONTENT_TYPE)
   await VideoAsset.updateOne(
     { _id: assetId },
-    { $set: { status: 'ready', masterKey, completedAt: new Date() } }
+    {
+      $set: {
+        status: 'ready',
+        masterKey,
+        completedAt: new Date(),
+        totalRenditionBytes: asset.renditions.reduce((total, rendition) => total + (rendition.sizeBytes || 0), 0),
+        processingDurationMs: Date.now() - new Date(asset.createdAt).getTime(),
+      },
+    }
   )
 
   logger.info('[cdn.scheduler] video asset ready', { assetId })
@@ -100,18 +109,25 @@ const advanceRendition = async (assetId, renditionName) => {
 
   await VideoAsset.updateOne(
     { _id: assetId, 'renditions.name': renditionName, 'renditions.status': 'waiting' },
-    { $set: { 'renditions.$.status': 'combining' } }
+    {
+      $set: {
+        'renditions.$.status': 'combining',
+        'renditions.$.transcodeDurationMs': await sumDoneJobDurationMs(assetId, 'transcode', renditionName),
+      },
+    }
   )
 }
 
 const handleSplitCompleted = async (assetId, result) => {
   const renditions = selectRenditionsForSource(Math.min(result.width, result.height))
+  const splitDurationMs = await sumDoneJobDurationMs(assetId, 'split', '')
 
   await VideoAsset.updateOne(
     { _id: assetId },
     {
       $set: {
         status: 'processing',
+        splitDurationMs,
         durationSeconds: result.durationSeconds,
         width: result.width,
         height: result.height,
@@ -158,6 +174,8 @@ const handleCombineCompleted = async (assetId, renditionName, result) => {
         'renditions.$.status': 'ready',
         'renditions.$.videoKey': result.videoKey,
         'renditions.$.indexKey': result.indexKey,
+        'renditions.$.sizeBytes': result.sizeBytes,
+        'renditions.$.combineDurationMs': await sumDoneJobDurationMs(assetId, 'combine', renditionName),
       },
     }
   )
@@ -202,7 +220,10 @@ const handleThumbnailCompleted = async (assetId, result) => {
 const completeJob = async (job, result = {}) => {
   await VideoJob.updateOne(
     { _id: job._id },
-    { $set: { status: 'done', finishedAt: new Date() }, $unset: { error: 1 } }
+    {
+      $set: { status: 'done', finishedAt: new Date(), durationMs: calculateElapsedMs(job.startedAt) },
+      $unset: { error: 1 },
+    }
   )
 
   if (job.type === 'split') {

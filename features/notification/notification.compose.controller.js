@@ -12,6 +12,7 @@ const composeMessage = handleNotificationRoute('composeMessage', async (req) => 
     categoryLabel: req.body.categoryLabel,
     attachments: req.body.attachments,
     featureLinks: req.body.featureLinks,
+    clientRequestId: req.body.clientRequestId,
   }),
 }));
 

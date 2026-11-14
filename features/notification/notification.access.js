@@ -9,7 +9,10 @@ const assertValidObjectId = (value, label) => {
 
 const findVisibleNotification = async (notificationId, uniqueCode, projection = null) => {
   assertValidObjectId(notificationId, 'notification id');
-  const notification = await Notification.findOne({ _id: notificationId, audience: uniqueCode }, projection).lean();
+  const notification = await Notification.findOne(
+    { _id: notificationId, audience: uniqueCode, deletedAt: null },
+    projection
+  ).lean();
   if (!notification) throw new AppError('Notification not found', HTTP.NOT_FOUND);
   return notification;
 };

@@ -1,7 +1,9 @@
 const fs = require('fs/promises')
 const path = require('path')
+const logger = require('#shared/logger/logger')
 const VideoAsset = require('./cdn.asset.model')
 const {
+  AUDIO_COPY_SOURCE_EXTENSIONS,
   TRANSFER_CONCURRENCY,
   THUMBNAIL_SEEK_SECONDS,
   THUMBNAIL_CONTENT_TYPE,
@@ -38,14 +40,25 @@ const runSplitJob = async (asset) => {
     const chunkDirectory = path.join(workDirectory, 'chunks')
     await fs.mkdir(chunkDirectory)
 
+    const splitStartedAt = Date.now()
     await downloadObjectToFile(asset.sourceKey, sourcePath)
+    logger.info('[cdn.split] source downloaded', { assetId, durationMs: Date.now() - splitStartedAt })
+
     const metadata = await probeVideo(sourcePath)
-    const chunkPaths = await splitIntoChunks(sourcePath, chunkDirectory)
+    const sourceExtension = path.extname(asset.sourceFileName).slice(1).toLowerCase()
+    const audioCodec = AUDIO_COPY_SOURCE_EXTENSIONS.includes(sourceExtension) ? 'copy' : 'aac'
+    const chunkPaths = await splitIntoChunks(sourcePath, chunkDirectory, audioCodec)
+    logger.info('[cdn.split] chunks created', {
+      assetId,
+      chunkCount: chunkPaths.length,
+      durationMs: Date.now() - splitStartedAt,
+    })
     await fs.rm(sourcePath, { force: true })
 
     await runWithConcurrency(chunkPaths, TRANSFER_CONCURRENCY, (chunkPath, chunkIndex) =>
       uploadFileToObject(chunkPath, buildSourceChunkKey(assetId, chunkIndex), VIDEO_CONTENT_TYPE)
     )
+    logger.info('[cdn.split] chunks uploaded', { assetId, durationMs: Date.now() - splitStartedAt })
 
     return { ...metadata, chunkCount: chunkPaths.length }
   } finally {
@@ -105,7 +118,9 @@ const runCombineJob = async (asset, job) => {
     const videoKey = buildRenditionVideoKey(assetId, job.renditionName)
     await uploadFileToObject(videoPath, videoKey, VIDEO_CONTENT_TYPE)
 
-    return { videoKey, indexKey: videoKey }
+    const { size: sizeBytes } = await fs.stat(videoPath)
+
+    return { videoKey, indexKey: videoKey, sizeBytes }
   } finally {
     await removeDirectory(workDirectory)
   }

@@ -96,10 +96,16 @@ const clearLiveActivity = handleRoute('clearLiveActivity', 'Failed to clear live
   return { status: HTTP.OK, message: 'Live activity cleared', data }
 })
 
+const getFileSizes = handleRoute('getFileSizes', 'Failed to retrieve file sizes', async (req) => {
+  const data = await uploadService.getSizesByKeys({ keys: req.body.keys })
+  return { status: HTTP.OK, message: 'File sizes retrieved', data }
+})
+
 module.exports = {
   saveLiveActivity,
   clearLiveActivity,
   saveThumbnail,
+  getFileSizes,
   initiateUpload,
   getPartUrls,
   acknowledgePart,

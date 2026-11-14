@@ -6,7 +6,12 @@ const purchaseOrderService = require('./purchase.service')
 const purchaseOrderQuery = require('./purchase.query')
 const { DEFAULT_SIGNATURES, DEFAULT_TERMS } = require('./purchase.constant')
 const { dispatchPurchaseOrderViaEmail } = require('./purchase.email')
-const { buildPurchaseOrderFileName, buildPurchaseOrderFileRecord } = require('./purchase.pdf')
+const {
+  buildPurchaseOrderFileName,
+  buildPurchaseOrderFileRecord,
+  readRequestedPurchaseOrderParts,
+  generatePurchaseOrderPdfBuffer,
+} = require('./purchase.pdf')
 const { purchaseOrderPdf } = require('./purchase.pdf.registration')
 const { readRequestedPdfVersion } = require('#core/pdf/document.pdf.version')
 const { purchaseOrderActivity } = require('./purchase.activity')
@@ -391,11 +396,15 @@ const downloadPurchaseOrder = async (req, res) => {
     const purchaseorder = await purchaseOrderQuery.getPurchaseOrderByRef(refNo)
     const fileName = buildPurchaseOrderFileName(purchaseorder, { isAmendment })
 
-    const pdfBytes = await purchaseOrderPdf.read({
-      documentId: refNo,
-      user: req.user,
-      version: readRequestedPdfVersion(req.query.version),
-    })
+    const parts = readRequestedPurchaseOrderParts(req.query.parts)
+    const pdfBuffer = parts
+      ? await generatePurchaseOrderPdfBuffer(refNo, req.user, parts)
+      : await purchaseOrderPdf.read({
+          documentId: refNo,
+          user: req.user,
+          version: readRequestedPdfVersion(req.query.version),
+        })
+    const pdfBytes = Buffer.isBuffer(pdfBuffer) ? pdfBuffer : Buffer.from(pdfBuffer)
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${fileName}"`,

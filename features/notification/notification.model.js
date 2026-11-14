@@ -40,6 +40,9 @@ const notificationSchema = new mongoose.Schema(
     likes: { type: [likeSchema], default: [] },
     replyCount: { type: Number, default: 0 },
     lastActivityAt: { type: Date, default: Date.now },
+    clientRequestId: { type: String, default: null },
+    deletedAt: { type: Date, default: null },
+    editedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
@@ -47,6 +50,10 @@ const notificationSchema = new mongoose.Schema(
 notificationSchema.index({ audience: 1, lastActivityAt: -1, _id: -1 });
 notificationSchema.index({ audience: 1, categoryKey: 1, lastActivityAt: -1, _id: -1 });
 notificationSchema.index({ recipients: 1 });
+notificationSchema.index(
+  { 'actor.uniqueCode': 1, clientRequestId: 1 },
+  { unique: true, partialFilterExpression: { clientRequestId: { $type: 'string' } } }
+);
 notificationSchema.index({ mentions: 1, lastActivityAt: -1, _id: -1 });
 notificationSchema.index({ 'source.modelKey': 1, 'source.documentId': 1 });
 

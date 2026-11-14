@@ -4,6 +4,7 @@ const PurchaseOrder = require('./purchase.model')
 const wsUtils = require('#core/socket/socket.io')
 const dashboardServices = require('#features/dashboard/dashboard.service')
 const { buildSignatures, resolveVendorCode, calculateTotal, wrapServiceError } = require('./purchase.helper')
+const { buildAmendmentFields } = require('./purchase.amendment')
 
 const UPLOAD_ALLOWED_STATUSES = [
   'purchaseorder_uploaded',
@@ -105,30 +106,26 @@ const updatePurchaseOrder = async (refNo, updateData) => {
     const existingPurchaseOrder = await PurchaseOrder.findOne({ purchaseorderRef: refNo.trim() })
     if (!existingPurchaseOrder) throw new Error('Purchase Order not found')
 
+    if (updateData.isAmendmented === true && updateData.editLastAmendment === true) {
+      const lastAmendmentIndex = existingPurchaseOrder.amendments.length - 1
+      if (lastAmendmentIndex < 0) throw new Error('No amendment exists to edit')
+
+      const previousAmendment = existingPurchaseOrder.amendments[lastAmendmentIndex].toObject()
+      const editedAmendment = {
+        ...previousAmendment,
+        ...buildAmendmentFields(updateData),
+        amendmentDate: previousAmendment.amendmentDate,
+      }
+
+      return await PurchaseOrder.findOneAndUpdate(
+        { purchaseorderRef: refNo.trim() },
+        { $set: { [`amendments.${lastAmendmentIndex}`]: editedAmendment } },
+        { new: true, runValidators: true }
+      )
+    }
+
     if (updateData.isAmendmented === true) {
-      const amendment = {
-        amendmentDate: new Date(),
-        amendedBy: updateData.amendedBy || 'System',
-        reason: updateData.amendmentReason || 'Amendment requested',
-      }
-
-      if (updateData.items?.length > 0) {
-        amendment.amendedItems = updateData.items
-        amendment.amendedTotalAmount = updateData.items.reduce((sum, item) => sum + (item.totalPrice || 0), 0)
-
-        if (updateData.showDiscountInTotal && updateData.discount) {
-          amendment.amendedTotalAmount -= updateData.discount
-          amendment.amendedDiscount = updateData.discount
-        }
-      }
-
-      if (updateData.company) amendment.amendedCompany = updateData.company
-      if (updateData.equipments) amendment.amendedEquipments = updateData.equipments
-      if (updateData.workingHrs !== undefined) amendment.amendedWorkingHrs = updateData.workingHrs
-      if (updateData.runningKm !== undefined) amendment.amendedRunningKm = updateData.runningKm
-      if (updateData.quoteNo) amendment.amendedQuoteNo = updateData.quoteNo
-      if (updateData.requestText) amendment.amendedRequestText = updateData.requestText
-      if (updateData.termsAndConditions) amendment.amendedTermsAndConditions = updateData.termsAndConditions
+      const amendment = buildAmendmentFields(updateData)
 
       return await PurchaseOrder.findOneAndUpdate(
         { purchaseorderRef: refNo.trim() },

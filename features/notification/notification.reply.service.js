@@ -129,6 +129,7 @@ const createReply = async ({ notificationId, featureLinks, uniqueCode, text = ''
 const countRepliesUpTo = (notificationId, targetReply) =>
   NotificationReply.countDocuments({
     notificationId,
+    deletedAt: null,
     $or: [
       { createdAt: { $lt: targetReply.createdAt } },
       { createdAt: targetReply.createdAt, _id: { $lte: targetReply._id } },
@@ -155,7 +156,7 @@ const listReplies = async ({ notificationId, uniqueCode, after, limit, aroundRep
 
   const { items, pagination } = await paginateByCursor(
     NotificationReply,
-    { notificationId },
+    { notificationId, deletedAt: null },
     { cursor: after, direction: 'asc', limit: pageLimit }
   );
   return { items: await withParentPreviews(items), pagination };

@@ -1,3 +1,6 @@
+const { renderPageToPdf } = require('#core/pdf/pdf.service')
+const { PDF_PAPER_WIDTH_MM, PDF_PAPER_HEIGHT_MM } = require('#core/pdf/document.pdf.constant')
+
 const sanitizeFileNamePart = (value) =>
   String(value || '').replace(/[^\x20-\x7E]/g, '').replace(/[\\/:*?"<>|]/g, '').trim()
 
@@ -8,19 +11,24 @@ const buildPurchaseOrderFileName = (purchaseorder, { isAmendment = false } = {})
   return `PurchaseOrder-${purchaseorder.purchaseorderCounter}-${vendor}-PurchaseOrder For - ${equipment}${suffix}.pdf`
 }
 
-const buildPurchaseOrderDocumentPath = (refNo, { isAmendment = false, complaintId } = {}) => {
+const buildPurchaseOrderDocumentPath = (refNo, { isAmendment = false, parts } = {}) => {
   const encodedRef = encodeURIComponent(refNo)
 
-  if (isAmendment) {
-    return `/order/purchase/report/${encodedRef}/amendment/true/${complaintId || ''}`
-  }
+  if (parts) return `/order/purchase/report/${encodedRef}/parts/${encodeURIComponent(parts)}`
 
-  if (complaintId) {
-    return `/order/purchase/report/${encodedRef}/${complaintId}`
-  }
+  if (isAmendment) return `/order/purchase/report/${encodedRef}/amendment/true`
 
   return `/order/purchase/report/${encodedRef}`
 }
+
+const readRequestedPurchaseOrderParts = (rawParts) =>
+  typeof rawParts === 'string' && /^[A-Za-z0-9,]+$/.test(rawParts) ? rawParts : null
+
+const generatePurchaseOrderPdfBuffer = (refNo, user, parts) =>
+  renderPageToPdf(buildPurchaseOrderDocumentPath(refNo, { parts }), user, {
+    width: PDF_PAPER_WIDTH_MM,
+    height: PDF_PAPER_HEIGHT_MM,
+  })
 
 const buildPurchaseOrderFileRecord = (fileName, storedPdf) => ({
   fileName,
@@ -34,4 +42,6 @@ module.exports = {
   buildPurchaseOrderFileName,
   buildPurchaseOrderDocumentPath,
   buildPurchaseOrderFileRecord,
+  readRequestedPurchaseOrderParts,
+  generatePurchaseOrderPdfBuffer,
 }

@@ -3,19 +3,22 @@ const HTTP = require('#shared/response/response.status');
 const NotificationReply = require('./notification.reply.model');
 const { NOTIFICATION_TABS } = require('./notification.constant');
 
-const buildAudienceQuery = (uniqueCode) => ({ audience: uniqueCode });
+const buildAudienceQuery = (uniqueCode) => ({ audience: uniqueCode, deletedAt: null });
 
 const buildUnreadQuery = (uniqueCode) => ({
   recipients: uniqueCode,
+  deletedAt: null,
   'readBy.uniqueCode': { $ne: uniqueCode },
 });
 
 const buildMentionsQuery = async (uniqueCode) => {
   const notificationIdsMentionedInReplies = await NotificationReply.distinct('notificationId', {
     mentions: uniqueCode,
+    deletedAt: null,
   });
   return {
     audience: uniqueCode,
+    deletedAt: null,
     $or: [{ mentions: uniqueCode }, { _id: { $in: notificationIdsMentionedInReplies } }],
   };
 };
@@ -30,7 +33,7 @@ const buildTabQuery = async ({ uniqueCode, tab, categoryKey }) => {
       return buildMentionsQuery(uniqueCode);
     case NOTIFICATION_TABS.CATEGORY:
       if (typeof categoryKey !== 'string' || !categoryKey) throw new AppError('categoryKey is required', HTTP.BAD_REQUEST);
-      return { audience: uniqueCode, categoryKey };
+      return { audience: uniqueCode, categoryKey, deletedAt: null };
     default:
       throw new AppError('Unknown tab', HTTP.BAD_REQUEST);
   }

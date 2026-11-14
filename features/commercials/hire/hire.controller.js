@@ -1,12 +1,12 @@
-const logger = require('#shared/logger/logger')
-const HTTP = require('#shared/response/response.status')
-const { sendSuccess, sendError } = require('#shared/response/response.sender')
+const { sendSuccess } = require('#shared/response/response.sender')
 
 const hireOrderService = require('./hire.service')
 const hireOrderQuery = require('./hire.query')
-const hireOrderSigning = require('./hire.signing')
-const authZService = require('#core/authZ/authZ.service')
-const { buildHireOrderFileName } = require('./hire.pdf')
+const {
+  buildHireOrderFileName,
+  readRequestedHireOrderParts,
+  generateHireOrderPdfBuffer,
+} = require('./hire.pdf')
 const { hireOrderPdf } = require('./hire.pdf.registration')
 const { readRequestedPdfVersion } = require('#core/pdf/document.pdf.version')
 const { hireOrderActivity } = require('./hire.activity')
@@ -242,11 +242,14 @@ const downloadHireOrder = async (req, res) => {
 
     const hireOrder = await hireOrderQuery.getHireOrderByRef(refNo)
     const fileName = buildHireOrderFileName(hireOrder)
-    const pdfBuffer = await hireOrderPdf.read({
-      documentId: refNo,
-      user: req.user,
-      version: readRequestedPdfVersion(req.query.version),
-    })
+    const parts = readRequestedHireOrderParts(req.query.parts)
+    const pdfBuffer = parts
+      ? await generateHireOrderPdfBuffer(refNo, req.user, parts)
+      : await hireOrderPdf.read({
+          documentId: refNo,
+          user: req.user,
+          version: readRequestedPdfVersion(req.query.version),
+        })
 
     const pdfBytes = Buffer.isBuffer(pdfBuffer) ? pdfBuffer : Buffer.from(pdfBuffer)
     res.set({

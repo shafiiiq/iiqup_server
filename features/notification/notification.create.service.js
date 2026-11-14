@@ -39,6 +39,7 @@ const createNotification = async ({
   categoryKey = null,
   attachments = [],
   featureLinks = [],
+  clientRequestId = null,
 }) => {
   if (!title) throw new AppError('title is required', HTTP.BAD_REQUEST);
   assertValidSource(source);
@@ -71,6 +72,7 @@ const createNotification = async ({
     categoryKey: categoryKey || source?.modelKey || null,
     attachments,
     featureLinks,
+    clientRequestId,
     audience,
     recipients: recipientCodes,
     mentions: mentionCodes,

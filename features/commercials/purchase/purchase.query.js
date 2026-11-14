@@ -4,7 +4,7 @@ const { paginate } = require('#shared/pagination/pagination')
 const { wrapServiceError } = require('./purchase.helper')
 
 const PurchaseOrder_LIST_FIELDS =
-  'purchaseorderRef date company equipments totalAmount totalDiscountAmount workflowStatus pmSigned managerSigned ceoSigned accountsSigned signatures items quotation quoteNo workingHrs runningKm complaintId isAmendmented purchaseorderCounter purchaseorderDetails.purchaseorderFile'
+  'purchaseorderRef date company equipments totalAmount totalDiscountAmount workflowStatus pmSigned managerSigned ceoSigned accountsSigned signatures items quotation quoteNo workingHrs runningKm isAmendmented purchaseorderCounter purchaseorderDetails.purchaseorderFile'
 
 const getPurchaseOrders = async (pagination) => {
   try {

@@ -30,6 +30,7 @@ const notificationDeliverySchema = new mongoose.Schema(
     sequence: { type: Number, required: true },
     pushId: { type: String, required: true, unique: true },
     notificationId: { type: mongoose.Schema.Types.ObjectId, required: true },
+    replyId: { type: mongoose.Schema.Types.ObjectId, default: null },
     title: { type: String, required: true },
     body: { type: String, default: '' },
     priority: { type: String, enum: NOTIFICATION_PRIORITIES, default: DEFAULT_PRIORITY },

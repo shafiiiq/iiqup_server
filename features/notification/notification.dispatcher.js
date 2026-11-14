@@ -16,6 +16,7 @@ const buildPushPayload = (notification, counts, overrides = {}) => {
   return {
     kind: 'notification',
     notificationId: String(notification._id),
+    replyId: overrides.replyId ? String(overrides.replyId) : null,
     notificationKind: notification.kind,
     title: overrides.title ?? notification.title,
     body: overrides.body ?? notification.body,
@@ -82,9 +83,9 @@ const syncCountsForUsers = (uniqueCodes) =>
     })
   );
 
-const pushNotificationActivity = async (notification, uniqueCodes, { title, body, actorUniqueCode }) => {
+const pushNotificationActivity = async (notification, uniqueCodes, { title, body, actorUniqueCode, replyId = null }) => {
   const avatarActor = actorUniqueCode ? await resolveActorByUniqueCode(actorUniqueCode) : notification.actor;
-  await pushToUsers(notification, uniqueCodes, { title, body, primaryAction: null }, avatarActor);
+  await pushToUsers(notification, uniqueCodes, { title, body, primaryAction: null, replyId }, avatarActor);
   const silentAudience = notification.audience.filter((uniqueCode) => !uniqueCodes.includes(uniqueCode));
   await syncCountsForUsers(silentAudience);
 };

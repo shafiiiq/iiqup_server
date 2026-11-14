@@ -33,13 +33,14 @@ const probeVideo = (inputPath) =>
       const videoLine = diagnosticOutput.split('\n').find((line) => /Stream #.*Video:/.test(line))
       const dimensionMatch = videoLine ? videoLine.match(/[,\s](\d{2,5})x(\d{2,5})[,\s[]/) : null
 
-      if (!durationMatch || !dimensionMatch) {
+      if (!dimensionMatch) {
         reject(new Error('Unable to read video metadata'))
         return
       }
 
-      const durationSeconds =
-        Number(durationMatch[1]) * 3600 + Number(durationMatch[2]) * 60 + Number(durationMatch[3])
+      const durationSeconds = durationMatch
+        ? Number(durationMatch[1]) * 3600 + Number(durationMatch[2]) * 60 + Number(durationMatch[3])
+        : 0
 
       resolve({
         durationSeconds,
@@ -50,7 +51,7 @@ const probeVideo = (inputPath) =>
     })
   })
 
-const splitIntoChunks = async (inputPath, outputDirectory) => {
+const splitIntoChunks = async (inputPath, outputDirectory, audioCodec) => {
   const outputPattern = path.join(outputDirectory, 'chunk-%06d.mp4')
 
   await runFfmpegCommand(
@@ -59,7 +60,8 @@ const splitIntoChunks = async (inputPath, outputDirectory) => {
         '-map', '0:v:0',
         '-map', '0:a:0?',
         '-sn',
-        '-c', 'copy',
+        '-c:v', 'copy',
+        '-c:a', audioCodec,
         '-f', 'segment',
         '-segment_time', String(CHUNK_SECONDS),
         '-reset_timestamps', '1',

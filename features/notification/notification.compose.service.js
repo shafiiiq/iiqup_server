@@ -6,9 +6,36 @@ const { notify } = require('./notification.dispatcher');
 const { ensureCategory } = require('./notification.category.service');
 const { normalizeAttachmentInputs } = require('./notification.attachment.input');
 const { resolveFeatureLinks } = require('./notification.feature.service');
+const Notification = require('./notification.model');
 const { MAX_REPLY_TEXT_LENGTH } = require('./notification.constant');
 
-const composeMessage = async ({ uniqueCode, text, mentions, categoryLabel, attachments, featureLinks }) => {
+const DUPLICATE_KEY_ERROR_CODE = 11000;
+
+const findExistingComposedNotification = (uniqueCode, clientRequestId) =>
+  clientRequestId
+    ? Notification.findOne({ 'actor.uniqueCode': uniqueCode, clientRequestId }).select('_id').lean()
+    : null;
+
+const notifyOnce = async (uniqueCode, clientRequestId, notificationInput) => {
+  try {
+    return await notify(notificationInput);
+  } catch (error) {
+    if (error.code !== DUPLICATE_KEY_ERROR_CODE || !clientRequestId) throw error;
+    return findExistingComposedNotification(uniqueCode, clientRequestId);
+  }
+};
+
+const composeMessage = async ({
+  uniqueCode,
+  text,
+  mentions,
+  categoryLabel,
+  attachments,
+  featureLinks,
+  clientRequestId,
+}) => {
+  const existingNotification = await findExistingComposedNotification(uniqueCode, clientRequestId);
+  if (existingNotification) return { notificationId: String(existingNotification._id) };
   const trimmedText = String(text || '').trim();
   const messageAttachments = normalizeAttachmentInputs(attachments);
   const links = await resolveFeatureLinks(featureLinks);
@@ -25,7 +52,7 @@ const composeMessage = async ({ uniqueCode, text, mentions, categoryLabel, attac
   const mentionCodes = mentionedActors.map((actor) => actor.uniqueCode).filter((code) => code !== uniqueCode);
   const category = categoryLabel ? await ensureCategory({ label: categoryLabel, uniqueCode }) : null;
 
-  const notification = await notify({
+  const notification = await notifyOnce(uniqueCode, clientRequestId, {
     actorUniqueCode: uniqueCode,
     recipients: mentionCodes,
     mentions: mentionCodes,
@@ -34,6 +61,7 @@ const composeMessage = async ({ uniqueCode, text, mentions, categoryLabel, attac
     categoryKey: category ? category.key : null,
     attachments: messageAttachments,
     featureLinks: links,
+    clientRequestId: clientRequestId || null,
   });
   if (!notification) throw new AppError('Mention at least one person', HTTP.BAD_REQUEST);
 

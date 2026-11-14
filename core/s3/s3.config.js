@@ -13,6 +13,7 @@ const {
 } = require('@aws-sdk/client-s3')
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner')
 const { Upload } = require('@aws-sdk/lib-storage')
+const { acceleratedS3Client } = require('./s3.accelerated.client')
 require('dotenv').config()
 
 const AUTH_SIGN_EXPIRY_SECONDS = 100
@@ -53,13 +54,13 @@ const getObjectUrl = async (key, isLong, isAuthSign = false, downloadFileName = 
 }
 
 const getObjectStream = async (key) => {
-  const response = await s3Client.send(new GetObjectCommand({ Bucket: process.env.BUCKET_NAME, Key: key }))
+  const response = await acceleratedS3Client.send(new GetObjectCommand({ Bucket: process.env.BUCKET_NAME, Key: key }))
   return response.Body
 }
 
 const uploadStream = async (key, bodyStream, contentType) => {
   const upload = new Upload({
-    client: s3Client,
+    client: acceleratedS3Client,
     params: { Bucket: process.env.BUCKET_NAME, Key: key, Body: bodyStream, ContentType: contentType },
     queueSize: 4,
     partSize: 8 * 1024 * 1024,
@@ -106,7 +107,7 @@ const createMultipartUpload = async (key, contentType) => {
 
 const getUploadPartUrl = async (key, uploadId, partNumber) => {
   const command = new UploadPartCommand({ Bucket: process.env.BUCKET_NAME, Key: key, UploadId: uploadId, PartNumber: partNumber })
-  return getSignedUrl(s3Client, command, { expiresIn: DEFAULT_EXPIRY_SECONDS })
+  return getSignedUrl(acceleratedS3Client, command, { expiresIn: DEFAULT_EXPIRY_SECONDS })
 }
 
 const listUploadedParts = async (key, uploadId) => {

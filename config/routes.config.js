@@ -2,6 +2,7 @@ const { authMiddleware } = require('#middlewares/jwt.middleware');
 
 const ztechRouter = require('#features/attendance/hardware/ztech.router');
 const staffRouter = require('#features/user/staff/staff.router');
+const directoryRouter = require('#features/user/directory/directory.router');
 const otpRouter = require('#features/otp/otp.router');
 const equipmentRouter = require('#features/fleet/equipment/equipment.router');
 const maintenanceRouter = require('#features/fleet/maintenance/maintenance.router');
@@ -39,6 +40,7 @@ const publicRoutes = [
   { path: '/notification/sync', router: notificationSyncRouter },
   { path: '/api/v1/ztech', router: ztechRouter },
   { path: '/api/v1/users/staff', router: staffRouter },
+  { path: '/api/v1/users/directory', router: directoryRouter },
   { path: '/api/v1/otp', router: otpRouter },
   { path: '/api/v1/equipments', router: equipmentRouter },
   { path: '/api/v1/stocks', router: partsRouter },

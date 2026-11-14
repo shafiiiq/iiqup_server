@@ -7,17 +7,22 @@ const countUnreadNotifications = (uniqueCode) => Notification.countDocuments(bui
 
 const countUnreadMentions = async (uniqueCode) => {
   const [unreadReplyMentions, unreadNotificationMentions] = await Promise.all([
-    NotificationReply.countDocuments({ mentions: uniqueCode, 'viewedBy.uniqueCode': { $ne: uniqueCode } }),
+    NotificationReply.countDocuments({
+      mentions: uniqueCode,
+      deletedAt: null,
+      'viewedBy.uniqueCode': { $ne: uniqueCode },
+    }),
     Notification.countDocuments({ ...buildUnreadQuery(uniqueCode), mentions: uniqueCode }),
   ]);
   return unreadReplyMentions + unreadNotificationMentions;
 };
 
 const countUnreadReplies = async (uniqueCode) => {
-  const visibleNotificationIds = await Notification.distinct('_id', { audience: uniqueCode });
+  const visibleNotificationIds = await Notification.distinct('_id', { audience: uniqueCode, deletedAt: null });
   if (visibleNotificationIds.length === 0) return 0;
   return NotificationReply.countDocuments({
     notificationId: { $in: visibleNotificationIds },
+    deletedAt: null,
     'author.uniqueCode': { $ne: uniqueCode },
     mentions: { $ne: uniqueCode },
     'viewedBy.uniqueCode': { $ne: uniqueCode },

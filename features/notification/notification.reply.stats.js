@@ -7,6 +7,7 @@ const countUnseenRepliesByNotification = async (notificationIds, uniqueCode) => 
     {
       $match: {
         notificationId: { $in: notificationIds },
+        deletedAt: null,
         'author.uniqueCode': { $ne: uniqueCode },
         'viewedBy.uniqueCode': { $ne: uniqueCode },
       },
@@ -19,9 +20,10 @@ const countUnseenRepliesByNotification = async (notificationIds, uniqueCode) => 
 
 const getReplySummary = async (notificationId, uniqueCode) => {
   const [total, unseen] = await Promise.all([
-    NotificationReply.countDocuments({ notificationId }),
+    NotificationReply.countDocuments({ notificationId, deletedAt: null }),
     NotificationReply.countDocuments({
       notificationId,
+      deletedAt: null,
       'author.uniqueCode': { $ne: uniqueCode },
       'viewedBy.uniqueCode': { $ne: uniqueCode },
     }),

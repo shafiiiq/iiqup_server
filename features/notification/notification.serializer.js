@@ -33,6 +33,7 @@ const serializeNotification = (
     isRead: !isRecipient || hasReadReceipt(notification, uniqueCode),
     createdAt: notification.createdAt,
     lastActivityAt: notification.lastActivityAt || notification.createdAt,
+    editedAt: notification.editedAt || null,
     sourceAttachments: [
       ...(notification.source ? attachmentsBySource.get(buildSourceKey(notification.source)) || [] : []),
       ...(notification.attachments || []),
@@ -54,6 +55,7 @@ const serializeReply = (reply, uniqueCode) => ({
   likeCount: (reply.likes || []).length,
   likedByMe: (reply.likes || []).some((like) => like.uniqueCode === uniqueCode),
   createdAt: reply.createdAt,
+  editedAt: reply.editedAt || null,
 });
 
 const serializeQueuedDelivery = (delivery, actorAvatarUrl) => ({

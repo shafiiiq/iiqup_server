@@ -158,9 +158,6 @@ const updateMaintenance = async ({ id, body, uploadedBy }) => {
 
   const existing = await MaintenanceModel.findById(id).lean();
   if (!existing) throw new AppError('Maintenance record not found', HTTP.NOT_FOUND);
-  if (existing.serviceType !== body.serviceType) {
-    throw new AppError('Service type cannot be changed', HTTP.BAD_REQUEST);
-  }
 
   const attachments = await resolveAttachments({
     requestedSessionIds: body.attachmentSessionIds,

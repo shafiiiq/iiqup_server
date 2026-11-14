@@ -13,6 +13,8 @@ const RENDITIONS = [
   { name: '4k', height: 2160, videoBitrate: '14000k', maxRate: '15000k', bufferSize: '28000k', audioBitrate: '192k', bandwidth: 15200000, priority: 10 },
 ]
 
+const AUDIO_COPY_SOURCE_EXTENSIONS = ['mp4', 'mov', 'm4v', '3gp']
+
 const SPLIT_JOB_PRIORITY = 1000
 const THUMBNAIL_JOB_PRIORITY = 900
 const THUMBNAIL_WIDTH = 480
@@ -48,6 +50,7 @@ const selectRenditionsForSource = (sourceShortSide) => {
 }
 
 module.exports = {
+  AUDIO_COPY_SOURCE_EXTENSIONS,
   CHUNK_SECONDS,
   RENDITIONS,
   SPLIT_JOB_PRIORITY,

@@ -74,7 +74,6 @@ const hireOrderSchema = new mongoose.Schema(
     hireOrderRef: { type: String, required: true, unique: true },
     date: { type: String, required: true },
     hireOrderCounter: { type: Number },
-    complaintId: { type: String, default: null },
 
     company: {
       vendor: { type: String, required: true },

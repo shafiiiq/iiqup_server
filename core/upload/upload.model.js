@@ -35,7 +35,7 @@ const uploadSessionSchema = new mongoose.Schema({
   mimeType: { type: String, required: true },
   fileSize: { type: Number, required: true },
 
-  s3Key: { type: String, required: true },
+  s3Key: { type: String, required: true, index: true },
   s3UploadId: { type: String, required: true },
   partSize: { type: Number, required: true },
   totalParts: { type: Number, required: true },
