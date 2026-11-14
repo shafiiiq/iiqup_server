@@ -7,6 +7,9 @@ const { announceMaintenanceCreated } = require('./maintenance.notification');
 const { markDocumentsViewedSafely } = require('#core/document/document.view.service');
 const { buildMaintenanceFileName } = require('./maintenance.pdf');
 const { parseFilterQuery } = require('./maintenance.helper');
+const Maintenance = require('./maintenance.model');
+const { appendFleetRecordActors } = require('../shared/fleet.record.actor.service');
+const { FLEET_RECORD_ACTIVITY_TYPE } = require('../shared/fleet.record.actor.constant');
 
 const handleRoute = (logTag, handler) => async (req, res) => {
   try {
@@ -32,12 +35,24 @@ const createMaintenance = handleRoute('createMaintenance', async (req) => {
     sourceKey: 'maintenance',
     documentIds: result.data.map((record) => String(record._id)),
   });
+  appendFleetRecordActors({
+    model: Maintenance,
+    recordIds: result.data.map((record) => record._id),
+    actorUniqueCode: req.user.uniqueCode,
+    activityType: FLEET_RECORD_ACTIVITY_TYPE.CREATED,
+  });
   return result;
 });
 
 const updateMaintenance = handleRoute('updateMaintenance', async (req) => {
   const result = await maintenanceService.updateMaintenance({ id: req.params.id, body: req.body, uploadedBy: req.userId });
   maintenancePdf.requestInBackground({ documentId: req.params.id, user: req.user });
+  appendFleetRecordActors({
+    model: Maintenance,
+    recordIds: [req.params.id],
+    actorUniqueCode: req.user.uniqueCode,
+    activityType: FLEET_RECORD_ACTIVITY_TYPE.EDITED,
+  });
   return result;
 });
 

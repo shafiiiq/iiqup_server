@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { documentViewSchema } = require('#core/document/document.actor.schema');
+const { fleetRecordActorSchema } = require('../shared/fleet.record.actor.schema');
 
 const replacementSchema = new mongoose.Schema(
   {
@@ -109,6 +110,7 @@ const replacementSchema = new mongoose.Schema(
     remarks: { type: String, default: '' },
     chainId: { type: mongoose.Schema.Types.ObjectId, default: null },
     viewedBy: { type: [documentViewSchema], default: [] },
+    actors: { type: [fleetRecordActorSchema], default: [] },
   },
   {
     timestamps: true,

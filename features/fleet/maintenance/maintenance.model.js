@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const { buildDocumentPdfSchemaDefinition } = require('../../../core/pdf/document.pdf.schema');
 const { documentViewSchema } = require('../../../core/document/document.actor.schema');
+const { fleetRecordActorSchema } = require('../shared/fleet.record.actor.schema');
 const { SERVICE_TYPES, CHECKLIST_STATUSES } = require('./maintenance.constant');
 
 const checklistItemSchema = new mongoose.Schema(
@@ -62,6 +63,7 @@ const maintenanceSchema = new mongoose.Schema(
     },
     pdf: buildDocumentPdfSchemaDefinition(),
     viewedBy: { type: [documentViewSchema], default: [] },
+    actors: { type: [fleetRecordActorSchema], default: [] },
   },
   { timestamps: true }
 );

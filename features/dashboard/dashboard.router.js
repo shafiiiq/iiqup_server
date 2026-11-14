@@ -1,5 +1,6 @@
 const express = require('express');
 const controller = require('./dashboard.controller');
+const participantsRouter = require('./participants/dashboard.participants.router');
 
 const router = express.Router();
 
@@ -10,6 +11,7 @@ router.get('/breakdown/:key', controller.getBreakdown);
 router.get('/records/:key', controller.getRecords);
 router.get('/recent', controller.getRecentActivity);
 router.get('/recent/by-collection', controller.getRecentActivityByCollection);
+router.use('/recent/participants', participantsRouter);
 router.get('/schema', controller.getSchema);
 router.post('/clear-cache', controller.clearCache);
 

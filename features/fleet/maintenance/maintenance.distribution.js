@@ -5,6 +5,9 @@ const { maintenancePdf } = require('./maintenance.pdf.registration');
 const { announceMaintenanceCreated } = require('./maintenance.notification');
 const { markDocumentsViewedSafely } = require('#core/document/document.view.service');
 const { rectifyComplaintFromMaintenance } = require('#features/fleet/complaint/complaint.rectification');
+const Maintenance = require('./maintenance.model');
+const { appendFleetRecordActors } = require('../shared/fleet.record.actor.service');
+const { FLEET_RECORD_ACTIVITY_TYPE } = require('../shared/fleet.record.actor.constant');
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const DEFAULT_MIME_TYPE = 'application/octet-stream';
@@ -71,6 +74,13 @@ const submitMaintenanceDistribution = async ({ payload, notificationId, user, us
     uniqueCode: user.uniqueCode,
     sourceKey: 'maintenance',
     documentIds: result.data.map((record) => String(record._id)),
+  });
+
+  appendFleetRecordActors({
+    model: Maintenance,
+    recordIds: result.data.map((record) => record._id),
+    actorUniqueCode: user.uniqueCode,
+    activityType: FLEET_RECORD_ACTIVITY_TYPE.CREATED,
   });
 
   await rectifyComplaintFromMaintenance({

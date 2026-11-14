@@ -3,6 +3,19 @@ const HTTP = require('#shared/response/response.status');
 const { respond } = require('#shared/response/response.respond');
 const mobilizationService = require('./mobilization.service');
 const { markDocumentsViewedSafely } = require('#core/document/document.view.service');
+const Mobilization = require('./mobilization.model');
+const { appendFleetRecordActors } = require('../shared/fleet.record.actor.service');
+const { FLEET_RECORD_ACTIVITY_TYPE } = require('../shared/fleet.record.actor.constant');
+
+const recordOwnRecordActor = (req, record) => {
+  if (!record?._id) return;
+  appendFleetRecordActors({
+    model: Mobilization,
+    recordIds: [record._id],
+    actorUniqueCode: req.user?.uniqueCode,
+    activityType: FLEET_RECORD_ACTIVITY_TYPE.CREATED,
+  });
+};
 
 const markOwnRecordViewed = (req, record) => {
   if (!record?._id) return;
@@ -116,6 +129,7 @@ const mobilizeEquipment = async (req, res) => {
       remarks: req.body.remarks || '',
     });
     markOwnRecordViewed(req, result.data?.mobilization);
+    recordOwnRecordActor(req, result.data?.mobilization);
     respond(res, result);
   } catch (error) {
     logger.error('[mobilization.controller] mobilizeEquipment:', error);
@@ -145,6 +159,7 @@ const demobilizeEquipment = async (req, res) => {
       targetOperatorId: req.body.targetOperatorId || '',
     });
     markOwnRecordViewed(req, result.data?.demobilization);
+    recordOwnRecordActor(req, result.data?.demobilization);
     respond(res, result);
   } catch (error) {
     logger.error('[mobilization.controller] demobilizeEquipment:', error);
@@ -185,6 +200,7 @@ const changeEquipmentStatus = async (req, res) => {
 
     const result = await mobilizationService.changeEquipmentStatus({ ...req.body, remarks: req.body.remarks || '' });
     markOwnRecordViewed(req, result.data?.statusChange);
+    recordOwnRecordActor(req, result.data?.statusChange);
     respond(res, result);
   } catch (error) {
     logger.error('[mobilization.controller] changeEquipmentStatus:', error);

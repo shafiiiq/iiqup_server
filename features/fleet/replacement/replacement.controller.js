@@ -3,6 +3,19 @@ const HTTP = require('#shared/response/response.status');
 const { respond } = require('#shared/response/response.respond');
 const replacementService = require('./replacement.service');
 const { markDocumentsViewedSafely } = require('#core/document/document.view.service');
+const Replacement = require('./replacement.model');
+const { appendFleetRecordActors } = require('../shared/fleet.record.actor.service');
+const { FLEET_RECORD_ACTIVITY_TYPE } = require('../shared/fleet.record.actor.constant');
+
+const recordOwnRecordActor = (req, record) => {
+  if (!record?._id) return;
+  appendFleetRecordActors({
+    model: Replacement,
+    recordIds: [record._id],
+    actorUniqueCode: req.user?.uniqueCode,
+    activityType: FLEET_RECORD_ACTIVITY_TYPE.CREATED,
+  });
+};
 
 const markOwnRecordViewed = (req, record) => {
   if (!record?._id) return;
@@ -92,6 +105,7 @@ const replaceOperator = async (req, res) => {
       replaceAll: replaceAll || false,
     });
     markOwnRecordViewed(req, result.data?.replacement);
+    recordOwnRecordActor(req, result.data?.replacement);
     respond(res, result);
   } catch (error) {
     logger.error('[replacement.controller] replaceOperator:', error);
@@ -141,6 +155,7 @@ const replaceEquipment = async (req, res) => {
       operatorId: req.body.operatorId || '',
     });
     markOwnRecordViewed(req, result.data?.replacement);
+    recordOwnRecordActor(req, result.data?.replacement);
     respond(res, result);
   } catch (error) {
     logger.error('[replacement.controller] replaceEquipment:', error);
