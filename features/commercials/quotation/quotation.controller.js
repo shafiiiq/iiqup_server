@@ -132,12 +132,17 @@ const getCompanyDetails = async (req, res) => {
 
 const getItemDescriptions = async (req, res) => {
   try {
-    const descriptions = await searchItemDescriptions(req.query.search || '')
+    const { items: descriptions, hasMore } = await searchItemDescriptions(
+      req.query.search || '',
+      req.query.offset,
+      req.query.limit
+    )
 
     sendSuccess(res, {
       success: true,
       message: 'Item descriptions retrieved successfully',
       data: descriptions,
+      hasMore,
       count: descriptions.length,
     })
   } catch (error) {

@@ -6,6 +6,9 @@ const statisticsController = require('./quotation.statistics.controller')
 require('./quotation.signature.registration')
 const quotationTasks = require('./quotation.tasks')
 const { createTaskHandler } = require('#shared/tasks/task.handler')
+const { warmItemDescriptionCache } = require('./quotation.item.description.cache')
+
+warmItemDescriptionCache().catch(() => undefined)
 
 const router = express.Router()
 const upload = multer({ storage: multer.memoryStorage() })
