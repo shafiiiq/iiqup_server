@@ -1,11 +1,8 @@
-const logger = require('#shared/logger/logger')
-const HTTP = require('#shared/response/response.status')
-const { sendSuccess, sendError } = require('#shared/response/response.sender')
-const quotationSigning = require('./quotation.signing')
-const authZService = require('#core/authZ/authZ.service')
+const { sendSuccess } = require('#shared/response/response.sender')
 
 const quotationService = require('./quotation.service')
 const quotationQuery = require('./quotation.query')
+const { searchItemDescriptions, invalidateItemDescriptionCache } = require('./quotation.item.description.cache')
 const { sendQuotationViaEmail: sendQuotationEmail } = require('./quotation.email')
 const { buildQuotationFileName, generateQuotationPdfBuffer, buildQuotationFileRecord } = require('./quotation.pdf')
 const { quotationPdf } = require('./quotation.pdf.registration')
@@ -37,6 +34,7 @@ const createQuotation = async (req, res) => {
     if (!quotationData.termsAndConditions?.length) quotationData.termsAndConditions = DEFAULT_TERMS
 
     const quotation = await quotationService.createQuotation(quotationData)
+    invalidateItemDescriptionCache()
     quotationPdf.requestInBackground({ documentId: quotation.quotationRef, user: req.user })
     quotationActivity.announceCreated({ document: quotation, actorUniqueCode: req.user?.uniqueCode })
 
@@ -84,6 +82,7 @@ const updateQuotation = async (req, res) => {
 
     const decodedRefNo = decodeURIComponent(refNo)
     const quotation = await quotationService.updateQuotation(decodedRefNo, updateData)
+    invalidateItemDescriptionCache()
     quotationPdf.requestInBackground({ documentId: decodedRefNo, user: req.user })
     notifyDocumentTasksChanged({ sourceKey: QUOTATION_ACTIVITY_SOURCE_KEY, documentId: decodedRefNo })
     quotationActivity.announceActivity({
@@ -108,6 +107,7 @@ const deleteQuotation = async (req, res) => {
     if (!refNo) return badRequest(res, 'Reference number is required')
 
     const quotation = await quotationService.deleteQuotation(refNo)
+    invalidateItemDescriptionCache()
 
     sendSuccess(res, { success: true, message: 'Quotation deleted successfully', data: quotation })
   } catch (error) {
@@ -132,7 +132,7 @@ const getCompanyDetails = async (req, res) => {
 
 const getItemDescriptions = async (req, res) => {
   try {
-    const descriptions = await quotationQuery.getAllItemDescriptions()
+    const descriptions = await searchItemDescriptions(req.query.search || '')
 
     sendSuccess(res, {
       success: true,
