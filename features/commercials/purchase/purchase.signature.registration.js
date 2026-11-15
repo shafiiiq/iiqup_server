@@ -10,6 +10,7 @@ const { purchaseOrderPdf } = require('./purchase.pdf.registration')
 const { purchaseOrderActivity } = require('./purchase.activity')
 const { DOCUMENT_ACTIVITY_TYPE } = require('#core/document/document.activity.constant')
 const { notifyDocumentTasksChanged } = require('#core/document/document.task.notification')
+const { resolvePendingSlotLabels } = require('#features/notification/notification.document.pending.slots')
 
 const PURCHASE_ORDER_SOURCE_KEY = 'purchase_order'
 const MANAGING_DIRECTOR_TITLE = 'MANAGING DIRECTOR'
@@ -114,7 +115,15 @@ const applyPurchaseOrderSignature = async ({ document, slot, signer, event, wasO
     document,
     actorUniqueCode: signer.uniqueCode,
     activityType: DOCUMENT_ACTIVITY_TYPE.SIGNED,
-    detail: `signed as ${slot.label}`,
+    signing: {
+      slotLabel: slot.label,
+      pendingSlotLabels: resolvePendingSlotLabels({
+        document,
+        slots: buildSlots(document),
+        signedSlotId: slot.slotId,
+        isSlotSigned: (purchaseorder, slotId) => purchaseorder[resolveSlotEffect(slotId, purchaseorder).flagField] === true,
+      }),
+    },
   })
   notifyDocumentTasksChanged({ sourceKey: PURCHASE_ORDER_SOURCE_KEY, documentId: document.purchaseorderRef })
 }

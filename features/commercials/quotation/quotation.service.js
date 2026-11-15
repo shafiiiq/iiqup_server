@@ -151,6 +151,7 @@ const getPendingSignatures = async (uniqueCode) => {
     if (!isCeo && !isMd) return []
 
     return await Quotation.find({
+      status: { $ne: STATUS.DRAFT },
       authorizedSigned: { $ne: true },
       'signatures.authorizedSignatoryTitle': isMd ? 'MANAGING DIRECTOR' : { $ne: 'MANAGING DIRECTOR' },
     })

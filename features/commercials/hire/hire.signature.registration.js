@@ -10,6 +10,7 @@ const { hireOrderPdf } = require('./hire.pdf.registration')
 const { hireOrderActivity } = require('./hire.activity')
 const { DOCUMENT_ACTIVITY_TYPE } = require('#core/document/document.activity.constant')
 const { notifyDocumentTasksChanged } = require('#core/document/document.task.notification')
+const { resolvePendingSlotLabels } = require('#features/notification/notification.document.pending.slots')
 
 const HIRE_ORDER_SOURCE_KEY = 'hire_order'
 const MANAGING_DIRECTOR_TITLE = 'MANAGING DIRECTOR'
@@ -114,7 +115,15 @@ const applyHireOrderSignature = async ({ document, slot, signer, event, wasOverr
     document,
     actorUniqueCode: signer.uniqueCode,
     activityType: DOCUMENT_ACTIVITY_TYPE.SIGNED,
-    detail: `signed as ${slot.label}`,
+    signing: {
+      slotLabel: slot.label,
+      pendingSlotLabels: resolvePendingSlotLabels({
+        document,
+        slots: buildSlots(document),
+        signedSlotId: slot.slotId,
+        isSlotSigned: (hireOrder, slotId) => hireOrder[resolveSlotEffect(slotId, hireOrder).flagField] === true,
+      }),
+    },
   })
   notifyDocumentTasksChanged({ sourceKey: HIRE_ORDER_SOURCE_KEY, documentId: document.hireOrderRef })
 }

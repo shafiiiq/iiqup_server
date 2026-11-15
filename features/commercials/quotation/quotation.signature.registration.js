@@ -2,6 +2,8 @@ const { registerSignatureSource } = require('#core/signature/signature.registry'
 const { AppError } = require('#shared/errors/error.http')
 const HTTP = require('#shared/response/response.status')
 const { USER_ROLES } = require('#features/user/staff/staff.constant')
+const { SIGNATURE_ERROR_CODE } = require('#core/signature/signature.constant')
+const { STATUS } = require('./quotation.constant')
 const Quotation = require('./quotation.model')
 const { resolveEffectiveContent } = require('./quotation.content')
 const { quotationPdf } = require('./quotation.pdf.registration')
@@ -34,7 +36,13 @@ const loadQuotation = async (documentId) => {
   return quotation
 }
 
-const applyQuotationSignature = async ({ document, signer, event, ipAddress, userAgent }) => {
+const assertQuotationSignable = (quotation) => {
+  if (quotation.status === STATUS.DRAFT) {
+    throw new AppError('QUOTATION_NOT_SENT', HTTP.FORBIDDEN, { code: SIGNATURE_ERROR_CODE.DOCUMENT_NOT_READY })
+  }
+}
+
+const applyQuotationSignature = async ({ document, slot, signer, event, ipAddress, userAgent }) => {
   await Quotation.updateOne(
     { _id: document._id },
     {
@@ -56,6 +64,7 @@ const applyQuotationSignature = async ({ document, signer, event, ipAddress, use
     document,
     actorUniqueCode: signer.uniqueCode,
     activityType: DOCUMENT_ACTIVITY_TYPE.SIGNED,
+    signing: { slotLabel: slot.label, pendingSlotLabels: [] },
   })
   notifyDocumentTasksChanged({ sourceKey: QUOTATION_SOURCE_KEY, documentId: document.quotationRef })
 }
@@ -65,7 +74,7 @@ registerSignatureSource(QUOTATION_SOURCE_KEY, {
   getSlots: buildSlots,
   getRevision: (quotation) => quotation.amendments?.length || 0,
   buildCanonicalContent: resolveEffectiveContent,
-  assertSignable: () => undefined,
+  assertSignable: assertQuotationSignable,
   canViewDocument: (requester) => Boolean(requester?.id),
   isLegacySigned: (quotation) => quotation.authorizedSigned === true && (quotation.amendments?.length || 0) === 0,
   onSigned: applyQuotationSignature,

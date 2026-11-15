@@ -9,6 +9,7 @@ const { backchargePdf } = require('./backcharge.pdf.registration')
 const { backchargeActivity } = require('./backcharge.activity')
 const { DOCUMENT_ACTIVITY_TYPE } = require('#core/document/document.activity.constant')
 const { notifyDocumentTasksChanged } = require('#core/document/document.task.notification')
+const { resolvePendingSlotLabels } = require('#features/notification/notification.document.pending.slots')
 
 const BACKCHARGE_SOURCE_KEY = 'backcharge'
 const MANAGING_DIRECTOR_MODE = 'MANAGING DIRECTOR'
@@ -90,7 +91,15 @@ const applyBackchargeSignature = async ({ document, slot, signer, event, wasOver
     document,
     actorUniqueCode: signer.uniqueCode,
     activityType: DOCUMENT_ACTIVITY_TYPE.SIGNED,
-    detail: `signed as ${slot.label}`,
+    signing: {
+      slotLabel: slot.label,
+      pendingSlotLabels: resolvePendingSlotLabels({
+        document,
+        slots: buildSlots(document),
+        signedSlotId: slot.slotId,
+        isSlotSigned: (backcharge, slotId) => backcharge.signatures?.[SLOT_FIELD[slotId]]?.signed === true,
+      }),
+    },
   })
   notifyDocumentTasksChanged({ sourceKey: BACKCHARGE_SOURCE_KEY, documentId: document.refNo })
 }

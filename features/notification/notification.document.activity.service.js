@@ -1,7 +1,7 @@
 const logger = require('#shared/logger/logger');
 require('#core/document/document.activity.sources');
 const { resolveDocumentActivitySource } = require('#core/document/document.activity.registry');
-const { DOCUMENT_ACTIVITY_TEXT } = require('#core/document/document.activity.constant');
+const { buildCreatedMessage, buildActivityText } = require('./notification.document.message');
 const { buildDocumentActors, ensureDocumentActors } = require('#core/document/document.actor.service');
 const Notification = require('./notification.model');
 const { notifySafely } = require('./notification.dispatcher');
@@ -34,8 +34,7 @@ const announceDocumentCreated = async ({ sourceKey, document, actorUniqueCode })
     return await notifySafely({
       actorUniqueCode,
       recipients: actors.map((actor) => actor.uniqueCode),
-      title: `${featureLink.title} created`,
-      body: featureLink.subtitle,
+      ...buildCreatedMessage(featureLink),
       source: { modelKey: featureLink.modelKey, documentId: String(document._id) },
       actions: [
         {
@@ -53,7 +52,7 @@ const announceDocumentCreated = async ({ sourceKey, document, actorUniqueCode })
   }
 };
 
-const announceDocumentActivity = async ({ sourceKey, document, actorUniqueCode, activityType, detail }) => {
+const announceDocumentActivity = async ({ sourceKey, document, actorUniqueCode, activityType, signing }) => {
   try {
     if (!actorUniqueCode) return null;
     const definition = resolveDocumentActivitySource(sourceKey);
@@ -76,7 +75,7 @@ const announceDocumentActivity = async ({ sourceKey, document, actorUniqueCode, 
     return await postSystemReply({
       notificationId: notification._id,
       actorUniqueCode,
-      text: detail || DOCUMENT_ACTIVITY_TEXT[activityType],
+      text: buildActivityText({ activityType, featureLink, signing }),
       notifyCodes: actorCodes,
       pushBody: featureLink.title,
       featureLinks: [featureLink],
