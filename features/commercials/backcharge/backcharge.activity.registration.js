@@ -15,6 +15,7 @@ registerDocumentActivitySource(BACKCHARGE_ACTIVITY_SOURCE_KEY, {
   model: Backcharge,
   referenceField: 'refNo',
   buildParticipantCodes: buildBackchargeParticipantCodes,
+  buildPartyName: (backcharge) => backcharge.supplierName,
 })
 
 module.exports = { BACKCHARGE_ACTIVITY_SOURCE_KEY }

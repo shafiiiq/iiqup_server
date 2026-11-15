@@ -15,6 +15,7 @@ registerDocumentActivitySource(PURCHASE_ORDER_ACTIVITY_SOURCE_KEY, {
   model: PurchaseOrder,
   referenceField: 'purchaseorderRef',
   buildParticipantCodes: buildPurchaseOrderParticipantCodes,
+  buildPartyName: (purchaseorder) => purchaseorder.company?.vendor,
 })
 
 module.exports = { PURCHASE_ORDER_ACTIVITY_SOURCE_KEY }

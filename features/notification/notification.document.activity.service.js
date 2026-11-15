@@ -1,7 +1,8 @@
 const logger = require('#shared/logger/logger');
 require('#core/document/document.activity.sources');
 const { resolveDocumentActivitySource } = require('#core/document/document.activity.registry');
-const { buildCreatedMessage, buildActivityText } = require('./notification.document.message');
+const { buildCreatedMessage, buildActivityMessage } = require('./notification.document.message');
+const { resolveActorByUniqueCode } = require('./notification.actor.resolver');
 const { buildDocumentActors, ensureDocumentActors } = require('#core/document/document.actor.service');
 const Notification = require('./notification.model');
 const { notifySafely } = require('./notification.dispatcher');
@@ -34,7 +35,7 @@ const announceDocumentCreated = async ({ sourceKey, document, actorUniqueCode })
     return await notifySafely({
       actorUniqueCode,
       recipients: actors.map((actor) => actor.uniqueCode),
-      ...buildCreatedMessage(featureLink),
+      ...buildCreatedMessage({ featureLink, partyName: definition.buildPartyName(document) }),
       source: { modelKey: featureLink.modelKey, documentId: String(document._id) },
       actions: [
         {
@@ -72,12 +73,22 @@ const announceDocumentActivity = async ({ sourceKey, document, actorUniqueCode, 
       .lean();
     if (!notification) return null;
 
+    const actor = await resolveActorByUniqueCode(actorUniqueCode);
+    const message = buildActivityMessage({
+      activityType,
+      actorName: actor?.name || 'Someone',
+      featureLink,
+      partyName: definition.buildPartyName(document),
+      signing,
+    });
+
     return await postSystemReply({
       notificationId: notification._id,
       actorUniqueCode,
-      text: buildActivityText({ activityType, featureLink, signing }),
+      text: message.body,
       notifyCodes: actorCodes,
-      pushBody: featureLink.title,
+      pushTitle: message.title,
+      pushBody: message.body,
       featureLinks: [featureLink],
     });
   } catch (error) {

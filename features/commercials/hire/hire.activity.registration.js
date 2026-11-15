@@ -15,6 +15,7 @@ registerDocumentActivitySource(HIRE_ORDER_ACTIVITY_SOURCE_KEY, {
   model: HireOrder,
   referenceField: 'hireOrderRef',
   buildParticipantCodes: buildHireOrderParticipantCodes,
+  buildPartyName: (hireOrder) => hireOrder.company?.vendor,
 })
 
 module.exports = { HIRE_ORDER_ACTIVITY_SOURCE_KEY }

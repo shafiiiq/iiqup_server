@@ -12,6 +12,7 @@ registerDocumentActivitySource(QUOTATION_ACTIVITY_SOURCE_KEY, {
   model: Quotation,
   referenceField: 'quotationRef',
   buildParticipantCodes: buildQuotationParticipantCodes,
+  buildPartyName: (quotation) => quotation.company?.vendor,
 })
 
 module.exports = { QUOTATION_ACTIVITY_SOURCE_KEY }
