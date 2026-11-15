@@ -34,9 +34,7 @@ const generateAndSendOTP = async (email) => {
       return { status: HTTP.NOT_FOUND, success: false, message: 'No user found with this email address' };
     }
 
-    const otp = generateSecureOTP();
-    console.log("otp", otp);
-        
+    const otp = generateSecureOTP();        
     const hashedOTP = await hashOTP(otp);
 
     const expiresAt = new Date();
