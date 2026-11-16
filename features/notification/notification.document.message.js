@@ -3,10 +3,10 @@ const { DOCUMENT_ACTIVITY_TYPE } = require('#core/document/document.activity.con
 const buildDocumentTitle = ({ featureLink, partyName }) =>
   `${featureLink.label} ${featureLink.reference} for ${partyName}`
 
-const buildCreatedMessage = ({ featureLink, partyName }) => ({
-  title: buildDocumentTitle({ featureLink, partyName }),
-  body: 'Draft created. Wait until it is sent for approval.',
-})
+const buildCreatedMessage = ({ featureLink, partyName }) => {
+  const title = buildDocumentTitle({ featureLink, partyName })
+  return { title, body: `${title}\nDraft created. Wait until it is sent for approval.` }
+}
 
 const buildSignedBody = ({ actorName, signing }) => {
   const signedPart = `${actorName} signed as ${signing.slotLabel}.`
@@ -29,9 +29,10 @@ const buildActivityBody = ({ activityType, actorName, signing }) => {
   }
 }
 
-const buildActivityMessage = ({ activityType, actorName, featureLink, partyName, signing }) => ({
-  title: buildDocumentTitle({ featureLink, partyName }),
-  body: buildActivityBody({ activityType, actorName, signing }),
-})
+const buildActivityMessage = ({ activityType, actorName, featureLink, partyName, signing }) => {
+  const title = buildDocumentTitle({ featureLink, partyName })
+  const activityBody = buildActivityBody({ activityType, actorName, signing })
+  return { title, activityBody, body: `${title}\n${activityBody}` }
+}
 
 module.exports = { buildCreatedMessage, buildActivityMessage }

@@ -35,7 +35,8 @@ const announceDocumentCreated = async ({ sourceKey, document, actorUniqueCode })
     return await notifySafely({
       actorUniqueCode,
       recipients: actors.map((actor) => actor.uniqueCode),
-      ...buildCreatedMessage({ featureLink, partyName: definition.buildPartyName(document) }),
+      title: `${featureLink.label} created`,
+      body: buildCreatedMessage({ featureLink, partyName: definition.buildPartyName(document) }).body,
       source: { modelKey: featureLink.modelKey, documentId: String(document._id) },
       actions: [
         {
@@ -85,9 +86,9 @@ const announceDocumentActivity = async ({ sourceKey, document, actorUniqueCode, 
     return await postSystemReply({
       notificationId: notification._id,
       actorUniqueCode,
-      text: message.body,
+      text: message.activityBody,
       notifyCodes: actorCodes,
-      pushTitle: message.title,
+      pushTitle: actor?.name || 'Someone',
       pushBody: message.body,
       featureLinks: [featureLink],
     });
