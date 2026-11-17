@@ -8,7 +8,8 @@ const serializeNotification = (
   uniqueCode,
   attachmentsBySource = new Map(),
   unseenReplyCounts = new Map(),
-  categoryLabels = new Map()
+  categoryLabels = new Map(),
+  receiptSummaries = new Map()
 ) => {
   const isRecipient = (notification.recipients || []).includes(uniqueCode);
 
@@ -34,6 +35,7 @@ const serializeNotification = (
     createdAt: notification.createdAt,
     lastActivityAt: notification.lastActivityAt || notification.createdAt,
     editedAt: notification.editedAt || null,
+    receipts: receiptSummaries.get(String(notification._id)) || null,
     sourceAttachments: [
       ...(notification.source ? attachmentsBySource.get(buildSourceKey(notification.source)) || [] : []),
       ...(notification.attachments || []),

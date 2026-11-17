@@ -17,7 +17,7 @@ const announceFleetRecordActivity = async ({ actorUniqueCode, modelKey, record, 
       title: message.title,
       body: message.body,
       source: { modelKey, documentId },
-      actions: [{ text: 'Open Activity', modelKey, documentId, screenKey: FLEET_ACTIVITY_SCREEN_KEY }],
+      actions: [{ text: 'View Email', modelKey, documentId, screenKey: FLEET_ACTIVITY_SCREEN_KEY }],
     });
   } catch (error) {
     logger.error(`[fleet.activity.notification] announceFleetRecordActivity failed: ${error.stack || error.message}`);

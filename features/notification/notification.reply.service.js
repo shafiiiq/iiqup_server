@@ -19,6 +19,7 @@ const {
   COMPLAINT_RECTIFY_DEFAULT_TEXT,
 } = require('#features/fleet/complaint/complaint.constant');
 const { withParentPreviews } = require('./notification.reply.preview');
+const { buildReplyReceiptSummaries } = require('./notification.receipt.service');
 const {
   REPLY_LIST_LIMIT,
   REPLIES_AFTER_MENTION,
@@ -151,7 +152,7 @@ const resolveReplyPageLimit = async ({ notificationId, limit, after, aroundReply
 };
 
 const listReplies = async ({ notificationId, uniqueCode, after, limit, aroundReplyId }) => {
-  await findVisibleNotification(notificationId, uniqueCode, '_id');
+  const notification = await findVisibleNotification(notificationId, uniqueCode, 'audience');
   const pageLimit = await resolveReplyPageLimit({ notificationId, limit, after, aroundReplyId });
 
   const { items, pagination } = await paginateByCursor(
@@ -159,7 +160,14 @@ const listReplies = async ({ notificationId, uniqueCode, after, limit, aroundRep
     { notificationId, deletedAt: null },
     { cursor: after, direction: 'asc', limit: pageLimit }
   );
-  return { items: await withParentPreviews(items), pagination };
+  const [previewedItems, receiptSummaries] = await Promise.all([
+    withParentPreviews(items),
+    buildReplyReceiptSummaries({ replyIds: items.map((reply) => reply._id), audience: notification.audience || [] }),
+  ]);
+  return {
+    items: previewedItems.map((reply) => ({ ...reply, receipts: receiptSummaries.get(String(reply._id)) || null })),
+    pagination,
+  };
 };
 
 const markRepliesViewed = async ({ notificationId, uniqueCode, replyIds = [] }) => {

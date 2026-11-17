@@ -10,6 +10,8 @@ const replacementRouter = require('../replacement/replacement.router');
 const chainRouter = require('../chain/chain.router');
 const idleRosterRouter = require('../idle-roster/idle-roster.router');
 const activityRouter = require('../activity/activity.router');
+const { attachUserIfPresent } = require('#middlewares/jwt.optional.middleware');
+const { MOBILIZATION_ACTOR_PATHS, REPLACEMENT_ACTOR_PATHS } = require('./equipment.actor.paths');
 
 router.get('/', paginationMiddleware, controller.getEquipments);
 router.get('/export', controller.getEquipmentsForExport);
@@ -25,6 +27,8 @@ router.post('/', controller.addEquipment);
 router.post('/mark-sold', controller.markEquipmentSold);
 
 router.use(imagesRouter);
+router.use(MOBILIZATION_ACTOR_PATHS, attachUserIfPresent);
+router.use(REPLACEMENT_ACTOR_PATHS, attachUserIfPresent);
 router.use(mobilizationRouter);
 router.use(replacementRouter);
 router.use(chainRouter);

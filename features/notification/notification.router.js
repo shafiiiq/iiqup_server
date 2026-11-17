@@ -13,6 +13,7 @@ const deliveryController = require('./notification.delivery.controller');
 const documentController = require('./notification.document.controller');
 const calendarController = require('./notification.calendar.controller');
 const manageController = require('./notification.manage.controller');
+const receiptController = require('./notification.receipt.controller');
 
 const router = express.Router();
 
@@ -50,6 +51,7 @@ router.put('/replies/:replyId/like', replyController.setReplyLike);
 router.put('/replies/:replyId/text', manageController.editReply);
 router.put('/replies/:replyId/restore', manageController.restoreReply);
 router.delete('/replies/:replyId', manageController.deleteReply);
+router.get('/replies/:replyId/receipts', receiptController.getReplyReceipts);
 
 router.put('/:notificationId/text', manageController.editNotification);
 router.put('/:notificationId/restore', manageController.restoreNotification);
@@ -57,6 +59,7 @@ router.delete('/:notificationId', manageController.deleteNotification);
 router.put('/:notificationId/read', controller.markRead);
 router.put('/:notificationId/like', controller.setLike);
 router.get('/:notificationId/viewers', controller.listViewers);
+router.get('/:notificationId/receipts', receiptController.getNotificationReceipts);
 router.get('/:notificationId/replies', replyController.listReplies);
 router.post('/:notificationId/replies', replyController.createReply);
 router.put('/:notificationId/replies/viewed', replyController.markRepliesViewed);

@@ -6,6 +6,7 @@ const { serializeNotification } = require('./notification.serializer');
 const { countUnseenRepliesByNotification } = require('./notification.reply.stats');
 const { countUnreadNotifications, countUnreadMentions, countUnreadByCategory } = require('./notification.count.service');
 const { resolveCategoryLabels } = require('./notification.category.service');
+const { buildNotificationReceiptSummaries } = require('./notification.receipt.service');
 const { NOTIFICATION_LIST_LIMIT, NOTIFICATION_TABS } = require('./notification.constant');
 
 const listNotifications = async ({ uniqueCode, tab, categoryKey, before, limit }) => {
@@ -15,7 +16,8 @@ const listNotifications = async ({ uniqueCode, tab, categoryKey, before, limit }
     limit: clampLimit(limit, NOTIFICATION_LIST_LIMIT.DEFAULT, NOTIFICATION_LIST_LIMIT.MAX),
     sortField: 'lastActivityAt',
   });
-  const [attachmentsBySource, unseenReplyCounts, categoryLabels] = await Promise.all([
+  const [receiptSummaries, attachmentsBySource, unseenReplyCounts, categoryLabels] = await Promise.all([
+    buildNotificationReceiptSummaries(items),
     resolveSourceAttachments(items),
     countUnseenRepliesByNotification(
       items.map((notification) => notification._id),
@@ -26,7 +28,14 @@ const listNotifications = async ({ uniqueCode, tab, categoryKey, before, limit }
 
   return {
     items: items.map((notification) =>
-      serializeNotification(notification, uniqueCode, attachmentsBySource, unseenReplyCounts, categoryLabels)
+      serializeNotification(
+        notification,
+        uniqueCode,
+        attachmentsBySource,
+        unseenReplyCounts,
+        categoryLabels,
+        receiptSummaries
+      )
     ),
     pagination,
   };
