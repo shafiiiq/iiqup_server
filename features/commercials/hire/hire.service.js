@@ -7,6 +7,8 @@ const { DEFAULT_TERMS } = require('./hire.constant')
 
 const UPLOAD_ALLOWED_STATUSES = [
   'hire_order_uploaded',
+  'supervisor_approved',
+  'prepared_by_approved',
   'manager_approved',
   'purchase_approved',
   'accounts_approved',
@@ -69,6 +71,8 @@ const updateHireOrder = async (refNo, updateData) => {
         {
           $set: {
             isAmendmented: true,
+            supervisorSigned: false,
+            preparedBySigned: false,
             pmSigned: false,
             accountsSigned: false,
             managerSigned: false,

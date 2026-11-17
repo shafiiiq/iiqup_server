@@ -1,7 +1,10 @@
 const User = require('#features/user/staff/staff.model')
 
 const resolveSlotOwners = (slot) =>
-  User.find({ role: { $in: slot.allowedRoles }, isActive: true })
+  User.find({
+    $or: [{ role: { $in: slot.allowedRoles } }, { uniqueCode: { $in: slot.allowedUniqueCodes || [] } }],
+    isActive: true,
+  })
     .select('name uniqueCode role')
     .sort({ createdAt: 1 })
     .lean()

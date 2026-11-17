@@ -9,6 +9,7 @@ const { resolveSignatureSource } = require('./signature.registry')
 const { resolveSlotOwners } = require('./signature.slot.owner')
 const { notifyDelegationRequest, notifyDelegationOutcome } = require('./signature.delegation.notification')
 const { DELEGATION_STATUS, SIGNATURE_ERROR_CODE } = require('./signature.constant')
+const { isUserAllowedForSlot } = require('./signature.slot.access')
 
 const buildPersonMap = async (userIds) => {
   const people = await User.find({ _id: { $in: userIds } }).select('name role uniqueCode').lean()
@@ -106,7 +107,7 @@ const requestDelegationForSlot = async ({ requester, sourceKey, documentId, slot
 
   const delegate = await User.findById(requester.id).select('name role uniqueCode isActive').lean()
   if (!delegate || !delegate.isActive) throw new AppError('Account is not active', HTTP.UNAUTHORIZED)
-  const delegateHasOwnSlot = source.getSlots(document).some((candidate) => candidate.allowedRoles.includes(delegate.role))
+  const delegateHasOwnSlot = source.getSlots(document).some((candidate) => isUserAllowedForSlot(candidate, delegate))
   if (delegateHasOwnSlot) {
     throw new AppError('You already have a signing position on this document. Please sign your own position', HTTP.BAD_REQUEST)
   }

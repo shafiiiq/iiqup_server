@@ -11,6 +11,7 @@ const { loadSignatureImage } = require('./signature.storage')
 const { loadViewerDelegationRoles } = require('./signature.delegation.service')
 const { recordSignatureRead } = require('./signature.readlog.service')
 const { resolveSlotOwners } = require('./signature.slot.owner')
+const { isUserAllowedForSlot } = require('./signature.slot.access')
 const logger = require('#shared/logger/logger')
 
 const assertCanView = (source, requester, document) => {
@@ -32,14 +33,14 @@ const getDocumentSignatures = async ({ sourceKey, documentId, requester }) => {
   const signerIds = events.flatMap((event) => [event.userId, event.delegatedFromUserId].filter(Boolean))
   const [signers, viewer, delegationRoles, slotOwners] = await Promise.all([
     User.find({ _id: { $in: signerIds } }).select('name').lean(),
-    User.findById(requester.id).select('role').lean(),
+    User.findById(requester.id).select('role uniqueCode').lean(),
     loadViewerDelegationRoles(requester.id),
     Promise.all(slots.map((slot) => resolveSlotOwners(slot))),
   ])
   const assignedNameBySlotId = new Map(slots.map((slot, index) => [slot.slotId, slotOwners[index][0]?.name || '']))
   const signerNameById = new Map(signers.map((signer) => [String(signer._id), signer.name]))
   const eventBySlotId = new Map(events.map((event) => [event.slotId, event]))
-  const viewerHasOwnSlot = Boolean(viewer) && slots.some((slot) => slot.allowedRoles.includes(viewer.role))
+    const viewerHasOwnSlot = Boolean(viewer) && slots.some((slot) => isUserAllowedForSlot(slot, viewer))
 
   const slotViews = slots
     .slice()
@@ -48,7 +49,7 @@ const getDocumentSignatures = async ({ sourceKey, documentId, requester }) => {
       const event = eventBySlotId.get(slot.slotId)
       const isLegacySigned = !event && source.isLegacySigned(document, slot.slotId)
       const isSigned = Boolean(event) || isLegacySigned
-      const isRoleAllowed = Boolean(viewer) && slot.allowedRoles.includes(viewer.role)
+      const isRoleAllowed = Boolean(viewer) && isUserAllowedForSlot(slot, viewer)
       const hasActiveDelegation = slot.allowedRoles.some((role) => delegationRoles.activeRoles.has(role))
       const hasPendingDelegation =
         !isSigned && slot.allowedRoles.some((role) => delegationRoles.pendingRoles.has(role))

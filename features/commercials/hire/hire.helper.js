@@ -21,6 +21,8 @@ const buildSignatures = (signatures) => ({
   accountsDept: signatures?.accountsDept || DEFAULT_SIGNATURES.accountsDept,
   purchasingManager: signatures?.purchasingManager || DEFAULT_SIGNATURES.purchasingManager,
   operationsManager: signatures?.operationsManager || DEFAULT_SIGNATURES.operationsManager,
+  operationsSupervisor: signatures?.operationsSupervisor || DEFAULT_SIGNATURES.operationsSupervisor,
+  preparedBy: signatures?.preparedBy || DEFAULT_SIGNATURES.preparedBy,
   authorizedSignatory: signatures?.authorizedSignatory || DEFAULT_SIGNATURES.authorizedSignatory,
   authorizedSignatoryTitle: signatures?.authorizedSignatoryTitle || DEFAULT_SIGNATURES.authorizedSignatoryTitle,
 })

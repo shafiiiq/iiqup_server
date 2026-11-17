@@ -2,6 +2,13 @@ const logger = require('#shared/logger/logger');
 const HTTP = require('#shared/response/response.status');
 const { respond } = require('#shared/response/response.respond');
 const service = require('./operator.mobilization.service');
+const { announceFleetRecordActivity } = require('#features/fleet/shared/fleet.activity.notification.service');
+const { FLEET_ACTIVITY_MODEL_KEY } = require('#features/fleet/shared/fleet.activity.notification.constant');
+const {
+  buildOperatorMobilizationMessage,
+  buildOperatorDemobilizationMessage,
+  buildOperatorSwapMessage,
+} = require('#features/fleet/shared/fleet.activity.notification.message');
 
 const getAllOperatorMobilizations = async (req, res) => {
   try {
@@ -43,6 +50,12 @@ const mobilizeOperator = async (req, res) => {
     }
 
     const result = await service.mobilizeOperator(req.body);
+    announceFleetRecordActivity({
+      actorUniqueCode: req.user?.uniqueCode,
+      modelKey: FLEET_ACTIVITY_MODEL_KEY.OPERATOR_MOBILIZATION,
+      record: result.data?.mobilization,
+      buildMessage: buildOperatorMobilizationMessage,
+    });
     respond(res, result);
   } catch (error) {
     logger.error('[operator.mobilization.controller] mobilizeOperator:', error);
@@ -58,6 +71,12 @@ const demobilizeOperator = async (req, res) => {
     }
 
     const result = await service.demobilizeOperator(req.body);
+    announceFleetRecordActivity({
+      actorUniqueCode: req.user?.uniqueCode,
+      modelKey: FLEET_ACTIVITY_MODEL_KEY.OPERATOR_MOBILIZATION,
+      record: result.data?.demobilization,
+      buildMessage: buildOperatorDemobilizationMessage,
+    });
     respond(res, result);
   } catch (error) {
     logger.error('[operator.mobilization.controller] demobilizeOperator:', error);
@@ -73,6 +92,12 @@ const replaceOperator = async (req, res) => {
     }
 
     const result = await service.replaceOperator(req.body);
+    announceFleetRecordActivity({
+      actorUniqueCode: req.user?.uniqueCode,
+      modelKey: FLEET_ACTIVITY_MODEL_KEY.OPERATOR_MOBILIZATION,
+      record: result.data?.replacementRecord,
+      buildMessage: buildOperatorSwapMessage,
+    });
     respond(res, result);
   } catch (error) {
     logger.error('[operator.mobilization.controller] replaceOperator:', error);

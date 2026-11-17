@@ -14,6 +14,8 @@ const resolveEffectiveContent = (hireOrder) => {
     hireOrderRef: hireOrder.hireOrderRef,
     date: hireOrder.date,
     authorizedSignatoryTitle: hireOrder.signatures?.authorizedSignatoryTitle ?? null,
+    operationsSupervisor: hireOrder.signatures?.operationsSupervisor ?? null,
+    preparedBy: hireOrder.signatures?.preparedBy ?? null,
     vendor: amendment?.amendedCompany?.vendor ?? company.vendor ?? null,
     attention: amendment?.amendedCompany?.attention ?? company.attention ?? null,
     designation: amendment?.amendedCompany?.designation ?? company.designation ?? null,

@@ -9,6 +9,7 @@ const { verifyDeviceToken } = require('./signature.device.service')
 const { assertDeviceProof } = require('./signature.challenge.service')
 const { SIGNATURE_ERROR_CODE } = require('./signature.constant')
 const { findActiveGrantForSlot, notifyOwnerOfDelegatedSigning } = require('./signature.delegation.service')
+const { isUserAllowedForSlot } = require('./signature.slot.access')
 
 const DUPLICATE_KEY_ERROR_CODE = 11000
 
@@ -22,7 +23,7 @@ const loadActiveSigner = async (requesterId) => {
 }
 
 const resolveSigningDelegation = async ({ signer, slot }) => {
-  if (slot.allowedRoles.includes(signer.role)) return null
+  if (isUserAllowedForSlot(slot, signer)) return null
   const delegation = await findActiveGrantForSlot({ delegateUserId: signer._id, slot })
   if (!delegation) {
     throw new AppError('You are not allowed to sign this position', HTTP.FORBIDDEN, {

@@ -6,6 +6,12 @@ const { markDocumentsViewedSafely } = require('#core/document/document.view.serv
 const Replacement = require('./replacement.model');
 const { appendFleetRecordActors } = require('../shared/fleet.record.actor.service');
 const { FLEET_RECORD_ACTIVITY_TYPE } = require('../shared/fleet.record.actor.constant');
+const { announceFleetRecordActivity } = require('../shared/fleet.activity.notification.service');
+const { FLEET_ACTIVITY_MODEL_KEY } = require('../shared/fleet.activity.notification.constant');
+const {
+  buildOperatorReplacementMessage,
+  buildEquipmentReplacementMessage,
+} = require('../shared/fleet.activity.notification.message');
 
 const recordOwnRecordActor = (req, record) => {
   if (!record?._id) return;
@@ -106,6 +112,12 @@ const replaceOperator = async (req, res) => {
     });
     markOwnRecordViewed(req, result.data?.replacement);
     recordOwnRecordActor(req, result.data?.replacement);
+    announceFleetRecordActivity({
+      actorUniqueCode: req.user?.uniqueCode,
+      modelKey: FLEET_ACTIVITY_MODEL_KEY.REPLACEMENT,
+      record: result.data?.replacement,
+      buildMessage: buildOperatorReplacementMessage,
+    });
     respond(res, result);
   } catch (error) {
     logger.error('[replacement.controller] replaceOperator:', error);
@@ -156,6 +168,12 @@ const replaceEquipment = async (req, res) => {
     });
     markOwnRecordViewed(req, result.data?.replacement);
     recordOwnRecordActor(req, result.data?.replacement);
+    announceFleetRecordActivity({
+      actorUniqueCode: req.user?.uniqueCode,
+      modelKey: FLEET_ACTIVITY_MODEL_KEY.REPLACEMENT,
+      record: result.data?.replacement,
+      buildMessage: buildEquipmentReplacementMessage,
+    });
     respond(res, result);
   } catch (error) {
     logger.error('[replacement.controller] replaceEquipment:', error);

@@ -482,7 +482,7 @@ const replaceOperator = async (data) => {
 
   const { month, year, time } = getCurrentDateTime(selectedDate);
 
-  await OperatorMobilizationModel.create({
+  const replacementRecord = await OperatorMobilizationModel.create({
     operatorId: newOperator._id,
     operatorName: newOperator.name,
     qatarId: newOperator.qatarId,
@@ -529,7 +529,7 @@ const replaceOperator = async (data) => {
     status: HTTP.CREATED,
     ok: true,
     message: 'Operator replaced successfully',
-    data: { currentOperator: updatedCurrentOperator, newOperator: updatedNewOperator, mobilizationRecord },
+    data: { currentOperator: updatedCurrentOperator, newOperator: updatedNewOperator, mobilizationRecord, replacementRecord },
   };
 };
 

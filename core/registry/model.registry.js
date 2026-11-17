@@ -37,6 +37,30 @@ const modelRegistry = {
       quotationList: { platform: 'app', purpose: 'read', documentParam: 'quotationId' },
     },
   },
+  mobilization: {
+    model: require('#features/fleet/mobilization/mobilization.model'),
+    tabLabel: 'Mobilization',
+    attachmentFields: [],
+    screens: {
+      mobilizationActivities: { platform: 'app', purpose: 'read', documentParam: 'activityId' },
+    },
+  },
+  replacement: {
+    model: require('#features/fleet/replacement/replacement.model'),
+    tabLabel: 'Replacement',
+    attachmentFields: [],
+    screens: {
+      mobilizationActivities: { platform: 'app', purpose: 'read', documentParam: 'activityId' },
+    },
+  },
+  operator_mobilization: {
+    model: require('#features/user/operator/mobilization/operator.mobilization.model'),
+    tabLabel: 'Operator Mobilization',
+    attachmentFields: [],
+    screens: {
+      mobilizationActivities: { platform: 'app', purpose: 'read', documentParam: 'activityId' },
+    },
+  },
   backcharges: {
     model: require('#features/commercials/backcharge/backcharge.model'),
     tabLabel: 'Backcharges',

@@ -23,6 +23,8 @@ const buildHireOrderPdfVersion = (hireOrder) =>
     amendmentCount: hireOrder.amendments?.length || 0,
     signatures: hireOrder.signatures,
     signedState: {
+      supervisor: hireOrder.supervisorSigned,
+      preparedBy: hireOrder.preparedBySigned,
       manager: hireOrder.managerSigned,
       purchaseManager: hireOrder.pmSigned,
       accounts: hireOrder.accountsSigned,

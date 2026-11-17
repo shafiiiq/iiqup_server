@@ -4,7 +4,7 @@ const HTTP = require('#shared/response/response.status')
 const { USER_ROLES } = require('#features/user/staff/staff.constant')
 const { SIGNATURE_ERROR_CODE } = require('#core/signature/signature.constant')
 const HireOrder = require('./hire.model')
-const { WORKFLOW_STATUS } = require('./hire.constant')
+const { WORKFLOW_STATUS, resolvePreparedByUniqueCode } = require('./hire.constant')
 const { resolveEffectiveContent } = require('./hire.content')
 const { hireOrderPdf } = require('./hire.pdf.registration')
 const { hireOrderActivity } = require('./hire.activity')
@@ -16,6 +16,8 @@ const HIRE_ORDER_SOURCE_KEY = 'hire_order'
 const MANAGING_DIRECTOR_TITLE = 'MANAGING DIRECTOR'
 
 const SLOT_ID = {
+  OPERATIONS_SUPERVISOR: 'operations_supervisor',
+  PREPARED_BY: 'prepared_by',
   OPERATIONS_MANAGER: 'operations_manager',
   PURCHASE_MANAGER: 'purchase_manager',
   ACCOUNTS: 'accounts',
@@ -28,13 +30,27 @@ const isManagingDirectorDocument = (hireOrder) =>
 const buildSlots = (hireOrder) => {
   const isManagingDirector = isManagingDirectorDocument(hireOrder)
   return [
-    { slotId: SLOT_ID.OPERATIONS_MANAGER, label: 'Operations Manager', order: 1, allowedRoles: [USER_ROLES.MANAGER] },
-    { slotId: SLOT_ID.PURCHASE_MANAGER, label: 'Purchase Manager', order: 2, allowedRoles: [USER_ROLES.PURCHASE_MANAGER] },
-    { slotId: SLOT_ID.ACCOUNTS, label: 'Accounts Dept', order: 3, allowedRoles: [USER_ROLES.ACCOUNTANT] },
+    {
+      slotId: SLOT_ID.OPERATIONS_SUPERVISOR,
+      label: 'Operations Supervisor',
+      order: 1,
+      allowedRoles: [],
+      allowedUniqueCodes: [process.env.OPERATIONS_SUPERVISOR].filter(Boolean),
+    },
+    {
+      slotId: SLOT_ID.PREPARED_BY,
+      label: 'Prepared By',
+      order: 2,
+      allowedRoles: [],
+      allowedUniqueCodes: [resolvePreparedByUniqueCode(hireOrder.signatures?.preparedBy)].filter(Boolean),
+    },
+    { slotId: SLOT_ID.OPERATIONS_MANAGER, label: 'Operations Manager', order: 3, allowedRoles: [USER_ROLES.MANAGER] },
+    { slotId: SLOT_ID.PURCHASE_MANAGER, label: 'Purchase Manager', order: 4, allowedRoles: [USER_ROLES.PURCHASE_MANAGER] },
+    { slotId: SLOT_ID.ACCOUNTS, label: 'Accounts Dept', order: 5, allowedRoles: [USER_ROLES.ACCOUNTANT] },
     {
       slotId: SLOT_ID.AUTHORIZED_SIGNATORY,
       label: isManagingDirector ? 'Managing Director' : 'CEO',
-      order: 4,
+      order: 6,
       allowedRoles: [isManagingDirector ? USER_ROLES.MD : USER_ROLES.CEO],
     },
   ]
@@ -43,6 +59,16 @@ const buildSlots = (hireOrder) => {
 const resolveSlotEffect = (slotId, hireOrder) => {
   const isManagingDirector = isManagingDirectorDocument(hireOrder)
   const effects = {
+    [SLOT_ID.OPERATIONS_SUPERVISOR]: {
+      flagField: 'supervisorSigned',
+      detailsKey: 'SUPERVISOR',
+      workflowStatus: WORKFLOW_STATUS.SUPERVISOR_APPROVED,
+    },
+    [SLOT_ID.PREPARED_BY]: {
+      flagField: 'preparedBySigned',
+      detailsKey: 'PREPARED_BY',
+      workflowStatus: WORKFLOW_STATUS.PREPARED_BY_APPROVED,
+    },
     [SLOT_ID.OPERATIONS_MANAGER]: {
       flagField: 'managerSigned',
       detailsKey: 'MANAGER',

@@ -1,10 +1,13 @@
 const { registerDocumentActivitySource } = require('#core/document/document.activity.registry')
 const { resolveAuthorizedSignatory } = require('#shared/tasks/task.signer')
 const HireOrder = require('./hire.model')
+const { resolvePreparedByUniqueCode } = require('./hire.constant')
 
 const HIRE_ORDER_ACTIVITY_SOURCE_KEY = 'hire_order'
 
 const buildHireOrderParticipantCodes = (hireOrder) => [
+  process.env.OPERATIONS_SUPERVISOR,
+  resolvePreparedByUniqueCode(hireOrder.signatures?.preparedBy),
   process.env.MANAGER,
   process.env.PURCHASE_MANAGER,
   process.env.ACCOUNTS,

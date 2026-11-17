@@ -2,6 +2,7 @@ const express = require('express')
 const controller = require('./operator.controller')
 const { paginationMiddleware } = require('#middlewares/pagination.middleware')
 const mobilizationRouter = require('./mobilization/operator.mobilization.router')
+const { authMiddleware } = require('#middlewares/jwt.middleware')
 
 const router = express.Router()
 
@@ -10,7 +11,11 @@ router.post('/', controller.createOperator)
 router.post('/profile', controller.uploadProfilePic)
 router.get('/designations', controller.getDesignations)
 
-router.use(mobilizationRouter)
+router.use(
+  ['/all-mobilizations', '/mobilization-history', '/mobilize-operator', '/demobilize-operator', '/replace-operator'],
+  authMiddleware,
+  mobilizationRouter
+)
 
 router.get('/:qatarId', controller.getOperatorByQatarId)
 router.put('/:id', controller.updateOperator)

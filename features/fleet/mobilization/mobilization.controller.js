@@ -6,6 +6,14 @@ const { markDocumentsViewedSafely } = require('#core/document/document.view.serv
 const Mobilization = require('./mobilization.model');
 const { appendFleetRecordActors } = require('../shared/fleet.record.actor.service');
 const { FLEET_RECORD_ACTIVITY_TYPE } = require('../shared/fleet.record.actor.constant');
+const { announceFleetRecordActivity } = require('../shared/fleet.activity.notification.service');
+const { FLEET_ACTIVITY_MODEL_KEY } = require('../shared/fleet.activity.notification.constant');
+const {
+  buildMobilizationMessage,
+  buildDemobilizationMessage,
+  buildShiftsAddedMessage,
+} = require('../shared/fleet.activity.notification.message');
+const { MOBILIZATION_ACTIONS } = require('./mobilization.constant');
 
 const recordOwnRecordActor = (req, record) => {
   if (!record?._id) return;
@@ -130,6 +138,12 @@ const mobilizeEquipment = async (req, res) => {
     });
     markOwnRecordViewed(req, result.data?.mobilization);
     recordOwnRecordActor(req, result.data?.mobilization);
+    announceFleetRecordActivity({
+      actorUniqueCode: req.user?.uniqueCode,
+      modelKey: FLEET_ACTIVITY_MODEL_KEY.MOBILIZATION,
+      record: result.data?.mobilization,
+      buildMessage: buildMobilizationMessage,
+    });
     respond(res, result);
   } catch (error) {
     logger.error('[mobilization.controller] mobilizeEquipment:', error);
@@ -160,6 +174,12 @@ const demobilizeEquipment = async (req, res) => {
     });
     markOwnRecordViewed(req, result.data?.demobilization);
     recordOwnRecordActor(req, result.data?.demobilization);
+    announceFleetRecordActivity({
+      actorUniqueCode: req.user?.uniqueCode,
+      modelKey: FLEET_ACTIVITY_MODEL_KEY.MOBILIZATION,
+      record: result.data?.demobilization,
+      buildMessage: buildDemobilizationMessage,
+    });
     respond(res, result);
   } catch (error) {
     logger.error('[mobilization.controller] demobilizeEquipment:', error);
@@ -177,6 +197,20 @@ const addShifts = async (req, res) => {
 
     const result = await mobilizationService.addShifts(req.body);
     respond(res, result);
+
+    if (result.ok) {
+      const latestMobilization = await Mobilization.findOne({ equipmentId, action: MOBILIZATION_ACTIONS.MOBILIZED })
+        .sort({ date: -1 })
+        .select('_id')
+        .lean()
+        .catch(() => null);
+      announceFleetRecordActivity({
+        actorUniqueCode: req.user?.uniqueCode,
+        modelKey: FLEET_ACTIVITY_MODEL_KEY.MOBILIZATION,
+        record: latestMobilization,
+        buildMessage: () => buildShiftsAddedMessage(req.body),
+      });
+    }
   } catch (error) {
     logger.error('[mobilization.controller] addShifts:', error);
     respond(res, { status: HTTP.INTERNAL_SERVER_ERROR, ok: false, message: error.message });

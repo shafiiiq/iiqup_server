@@ -1,4 +1,20 @@
+const PREPARED_BY_OPTIONS = [
+  { name: 'SANA SALIM', envKey: 'PREPARED_BY_SANA' },
+  { name: 'SHAHEEN', envKey: 'PREPARED_BY_SHAHEEN' },
+  { name: 'NAJIYA', envKey: 'PREPARED_BY_NAJIYA' },
+  { name: 'SHYMA AMEENA', envKey: 'PREPARED_BY_SHYMA' },
+]
+
+const PREPARED_BY_NAMES = PREPARED_BY_OPTIONS.map((option) => option.name)
+
+const resolvePreparedByUniqueCode = (name) => {
+  const matchedOption = PREPARED_BY_OPTIONS.find((option) => option.name === name) || PREPARED_BY_OPTIONS[0]
+  return process.env[matchedOption.envKey]
+}
+
 const DEFAULT_SIGNATURES = {
+  operationsSupervisor: 'SALIH BASHEER',
+  preparedBy: PREPARED_BY_NAMES[0],
   accountsDept: 'ROSHAN SHA',
   purchasingManager: 'ABDUL MALIK',
   operationsManager: 'SURESHKANTH',
@@ -21,6 +37,8 @@ const ROLE = {
 
 const WORKFLOW_STATUS = {
   CREATED: 'hire_order_created',
+  SUPERVISOR_APPROVED: 'supervisor_approved',
+  PREPARED_BY_APPROVED: 'prepared_by_approved',
   MANAGER_APPROVED: 'manager_approved',
   PURCHASE_APPROVED: 'purchase_approved',
   ACCOUNTS_APPROVED: 'accounts_approved',
@@ -67,6 +85,9 @@ const roleSignConfig = () => ({
 })
 
 module.exports = {
+  PREPARED_BY_OPTIONS,
+  PREPARED_BY_NAMES,
+  resolvePreparedByUniqueCode,
   DEFAULT_SIGNATURES,
   DEFAULT_TERMS,
   ROLE,

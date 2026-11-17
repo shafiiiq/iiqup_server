@@ -3,9 +3,12 @@ const { TASK_KIND, TASK_LIST_LIMIT } = require('#shared/tasks/task.constant')
 const { buildTaskFilter } = require('#shared/tasks/task.window')
 const { buildSignerSlot, resolveAuthorizedSignatory } = require('#shared/tasks/task.signer')
 const { buildTaskEntry } = require('#shared/tasks/task.entry')
+const { resolvePreparedByUniqueCode } = require('./hire.constant')
 
 const INCOMPLETE_FILTER = {
   $or: [
+    { supervisorSigned: { $ne: true } },
+    { preparedBySigned: { $ne: true } },
     { managerSigned: { $ne: true } },
     { pmSigned: { $ne: true } },
     { accountsSigned: { $ne: true } },
@@ -16,13 +19,25 @@ const INCOMPLETE_FILTER = {
 const SENT_FOR_APPROVAL_FILTER = { workflowStatus: { $ne: 'hire_order_created' } }
 
 const TASK_FIELDS =
-  'hireOrderRef company.vendor totalAmount totalDiscountAmount managerSigned pmSigned accountsSigned ceoSigned signatures.authorizedSignatoryTitle hireOrderDetails amendments.amendmentDate createdAt updatedAt'
+  'hireOrderRef company.vendor totalAmount totalDiscountAmount supervisorSigned preparedBySigned managerSigned pmSigned accountsSigned ceoSigned signatures.authorizedSignatoryTitle signatures.preparedBy hireOrderDetails amendments.amendmentDate createdAt updatedAt'
 
 const buildSigners = (hireOrder) => {
   const details = hireOrder.hireOrderDetails || {}
   const authorized = resolveAuthorizedSignatory(hireOrder.signatures?.authorizedSignatoryTitle)
 
   return [
+    buildSignerSlot({
+      label: 'Operations Supervisor',
+      signed: hireOrder.supervisorSigned,
+      signedBy: details.SUPERVISOR?.approvedBy,
+      fallbackCode: process.env.OPERATIONS_SUPERVISOR,
+    }),
+    buildSignerSlot({
+      label: 'Prepared By',
+      signed: hireOrder.preparedBySigned,
+      signedBy: details.PREPARED_BY?.approvedBy,
+      fallbackCode: resolvePreparedByUniqueCode(hireOrder.signatures?.preparedBy),
+    }),
     buildSignerSlot({
       label: 'Operations Manager',
       signed: hireOrder.managerSigned,

@@ -1,6 +1,7 @@
 const mongoose = require('mongoose')
 const { buildDocumentPdfSchemaDefinition } = require('#core/pdf/document.pdf.schema')
 const { documentActorSchema, documentViewSchema } = require('#core/document/document.actor.schema')
+const { PREPARED_BY_NAMES, DEFAULT_SIGNATURES } = require('./hire.constant')
 
 const documentFileSchema = new mongoose.Schema(
   {
@@ -105,6 +106,8 @@ const hireOrderSchema = new mongoose.Schema(
     },
 
     signatures: {
+      operationsSupervisor: { type: String, default: DEFAULT_SIGNATURES.operationsSupervisor },
+      preparedBy: { type: String, enum: PREPARED_BY_NAMES, default: DEFAULT_SIGNATURES.preparedBy },
       accountsDept: { type: String, default: 'ROSHAN SHA' },
       purchasingManager: { type: String, default: 'ABDUL MALIK' },
       operationsManager: { type: String, default: 'SURESHKANTH' },
@@ -116,6 +119,8 @@ const hireOrderSchema = new mongoose.Schema(
       },
     },
 
+    supervisorSigned: { type: Boolean, default: false },
+    preparedBySigned: { type: Boolean, default: false },
     pmSigned: { type: Boolean, default: false },
     accountsSigned: { type: Boolean, default: false },
     managerSigned: { type: Boolean, default: false },
@@ -138,6 +143,8 @@ const hireOrderSchema = new mongoose.Schema(
         'hire_order_created',
         'hire_order_uploaded',
         'hire_order_amended',
+        'supervisor_approved',
+        'prepared_by_approved',
         'manager_approved',
         'purchase_approved',
         'accounts_approved',

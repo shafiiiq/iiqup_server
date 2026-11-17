@@ -1,9 +1,10 @@
 const HireOrder = require('./hire.model')
 const { paginate } = require('#shared/pagination/pagination')
 const { wrapServiceError } = require('./hire.helper')
+const { PREPARED_BY_OPTIONS } = require('./hire.constant')
 
 const HIRE_ORDER_LIST_FIELDS =
-  'hireOrderRef hireOrderCounter date company quoteNo items totalAmount totalDiscountAmount workflowStatus pmSigned managerSigned ceoSigned accountsSigned signatures isAmendmented'
+  'hireOrderRef hireOrderCounter date company quoteNo items totalAmount totalDiscountAmount workflowStatus supervisorSigned preparedBySigned pmSigned managerSigned ceoSigned accountsSigned signatures isAmendmented'
 
 const getHireOrders = async (pagination) => {
   try {
@@ -57,7 +58,17 @@ const getNextHireOrderCounter = async () => {
 }
 
 const PENDING_SIGNATURE_RULES = () => [
-  { envKey: process.env.MANAGER, query: { managerSigned: { $ne: true }, workflowStatus: { $in: ['hire_order_uploaded', 'hire_order_amended'] } } },
+  { envKey: process.env.OPERATIONS_SUPERVISOR, query: { supervisorSigned: { $ne: true }, workflowStatus: { $in: ['hire_order_uploaded', 'hire_order_amended'] } } },
+  ...PREPARED_BY_OPTIONS.map((option) => ({
+    envKey: process.env[option.envKey],
+    query: {
+      supervisorSigned: true,
+      preparedBySigned: { $ne: true },
+      'signatures.preparedBy': option.name,
+      workflowStatus: { $in: ['supervisor_approved'] },
+    },
+  })),
+  { envKey: process.env.MANAGER, query: { preparedBySigned: true, managerSigned: { $ne: true }, workflowStatus: { $in: ['prepared_by_approved'] } } },
   { envKey: process.env.PURCHASE_MANAGER, query: { managerSigned: true, pmSigned: { $ne: true }, workflowStatus: { $in: ['manager_approved'] } } },
   { envKey: process.env.WORKSHOP_MANAGER, query: { managerSigned: true, pmSigned: { $ne: true }, workflowStatus: { $in: ['manager_approved'] } } },
   {
@@ -93,6 +104,11 @@ const getPendingSignatures = async (uniqueCode) => {
 }
 
 const SIGNED_BY_USER_RULES = () => [
+  { envKey: process.env.OPERATIONS_SUPERVISOR, query: { supervisorSigned: true } },
+  ...PREPARED_BY_OPTIONS.map((option) => ({
+    envKey: process.env[option.envKey],
+    query: { preparedBySigned: true, 'signatures.preparedBy': option.name },
+  })),
   { envKey: process.env.PURCHASE_MANAGER, query: { pmSigned: true } },
   { envKey: process.env.WORKSHOP_MANAGER, query: { pmSigned: true } },
   { envKey: process.env.MANAGER, query: { managerSigned: true } },
