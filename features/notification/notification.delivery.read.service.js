@@ -1,6 +1,7 @@
 const { findQueuedDeliveries } = require('./notification.delivery.queue.service');
 const { serializeQueuedDelivery } = require('./notification.serializer');
 const { resolveActorAvatarUrl } = require('./notification.actor.avatar');
+const { resolveImageUrls } = require('./notification.image.urls');
 
 const readAvatarUrl = (actor, avatarByActorCode) => {
   if (!actor) return Promise.resolve(null);
@@ -15,7 +16,11 @@ const listQueuedDeliveryPayloads = async (uniqueCode) => {
   const avatarByActorCode = new Map();
   return Promise.all(
     deliveries.map(async (delivery) =>
-      serializeQueuedDelivery(delivery, await readAvatarUrl(delivery.actor, avatarByActorCode))
+      serializeQueuedDelivery(
+        delivery,
+        await readAvatarUrl(delivery.actor, avatarByActorCode),
+        await resolveImageUrls(delivery.imagePaths)
+      )
     )
   );
 };

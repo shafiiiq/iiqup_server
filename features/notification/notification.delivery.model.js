@@ -36,6 +36,7 @@ const notificationDeliverySchema = new mongoose.Schema(
     priority: { type: String, enum: NOTIFICATION_PRIORITIES, default: DEFAULT_PRIORITY },
     actor: { type: deliveryActorSchema, default: null },
     primaryAction: { type: deliveryPrimaryActionSchema, default: null },
+    imagePaths: { type: [String], default: [] },
     status: {
       type: String,
       enum: Object.values(NOTIFICATION_DELIVERY_STATUSES),

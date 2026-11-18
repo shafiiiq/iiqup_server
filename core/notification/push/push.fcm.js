@@ -81,6 +81,7 @@ const buildNotificationMessage = (payload, uniqueCode) => {
     primaryAction,
     actor,
     actorAvatarUrl,
+    imageUrls,
   } = payload;
   return {
     data: toStringMap({
@@ -117,6 +118,7 @@ const buildNotificationMessage = (payload, uniqueCode) => {
             }
           : {}),
         ...(actorAvatarUrl ? { actorAvatarUrl } : {}),
+        ...(imageUrls?.length ? { imageUrls } : {}),
       },
     },
     android: { priority: 'high' },

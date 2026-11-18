@@ -60,7 +60,7 @@ const serializeReply = (reply, uniqueCode) => ({
   editedAt: reply.editedAt || null,
 });
 
-const serializeQueuedDelivery = (delivery, actorAvatarUrl) => ({
+const serializeQueuedDelivery = (delivery, actorAvatarUrl, imageUrls = []) => ({
   kind: 'notification',
   notificationId: String(delivery.notificationId),
   pushId: delivery.pushId,
@@ -78,6 +78,7 @@ const serializeQueuedDelivery = (delivery, actorAvatarUrl) => ({
       }
     : null,
   actorAvatarUrl: actorAvatarUrl || null,
+  imageUrls,
   createdAt: delivery.createdAt,
 });
 

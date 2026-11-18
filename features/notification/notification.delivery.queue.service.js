@@ -51,6 +51,7 @@ const enqueueDelivery = async ({ uniqueCode, payload }) => {
         }
       : null,
     primaryAction: payload.primaryAction,
+    imagePaths: payload.imagePaths || [],
   });
   return delivery.toObject();
 };

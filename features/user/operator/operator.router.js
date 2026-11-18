@@ -13,9 +13,9 @@ router.get('/designations', controller.getDesignations)
 
 router.use(
   ['/all-mobilizations', '/mobilization-history', '/mobilize-operator', '/demobilize-operator', '/replace-operator'],
-  authMiddleware,
-  mobilizationRouter
+  authMiddleware
 )
+router.use(mobilizationRouter)
 
 router.get('/:qatarId', controller.getOperatorByQatarId)
 router.put('/:id', controller.updateOperator)

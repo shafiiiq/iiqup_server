@@ -201,7 +201,7 @@ const addShifts = async (req, res) => {
     if (result.ok) {
       const latestMobilization = await Mobilization.findOne({ equipmentId, action: MOBILIZATION_ACTIONS.MOBILIZED })
         .sort({ date: -1 })
-        .select('_id')
+        .select('_id regNo')
         .lean()
         .catch(() => null);
       announceFleetRecordActivity({

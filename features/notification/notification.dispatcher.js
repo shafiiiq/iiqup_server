@@ -1,6 +1,7 @@
 const logger = require('#shared/logger/logger');
 const { createNotification } = require('./notification.create.service');
 const { resolveActorAvatarUrl } = require('./notification.actor.avatar');
+const { resolveImageUrls } = require('./notification.image.urls');
 const { resolveActorByUniqueCode } = require('./notification.actor.resolver');
 const { getNotificationCounts } = require('./notification.count.service');
 const { enqueueDelivery, claimWakePush } = require('./notification.delivery.queue.service');
@@ -34,6 +35,7 @@ const buildPushPayload = (notification, counts, overrides = {}) => {
       : null,
     primaryAction: Object.hasOwn(overrides, 'primaryAction') ? overrides.primaryAction : defaultPrimaryAction,
     actorAvatarUrl: overrides.actorAvatarUrl ?? null,
+    imagePaths: overrides.imagePaths ?? [],
     createdAt: new Date(notification.createdAt).toISOString(),
   };
 };
@@ -53,6 +55,7 @@ const logPushOutcome = (uniqueCode, result) => {
 
 const pushToUsers = async (notification, uniqueCodes, overrides, avatarActor = notification.actor) => {
   const actorAvatarUrl = await resolveActorAvatarUrl(avatarActor);
+  const imageUrls = await resolveImageUrls(overrides?.imagePaths);
   const results = await Promise.allSettled(
     uniqueCodes.map(async (uniqueCode) => {
       const counts = await getNotificationCounts(uniqueCode);
@@ -66,7 +69,7 @@ const pushToUsers = async (notification, uniqueCodes, overrides, avatarActor = n
       if (!shouldPush) logger.info(`[notification.dispatcher] wake push suppressed for ${uniqueCode}`);
       return dispatchNotificationToUser(
         uniqueCode,
-        { ...queuedPayload, pushId: delivery.pushId, sequence: delivery.sequence },
+        { ...queuedPayload, imageUrls, pushId: delivery.pushId, sequence: delivery.sequence },
         { shouldPush }
       );
     })
@@ -96,7 +99,7 @@ const notifyWithStage = async (notificationInput, setStage = () => {}) => {
   if (!notification) return null;
 
   setStage('dispatching notification');
-  await pushToUsers(notification, notification.recipients);
+  await pushToUsers(notification, notification.recipients, { imagePaths: notificationInput.pushImagePaths || [] });
   return notification;
 };
 

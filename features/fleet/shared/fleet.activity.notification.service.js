@@ -1,6 +1,7 @@
 const logger = require('#shared/logger/logger');
 const { notifySafely } = require('#features/notification/notification.dispatcher');
 const { FLEET_ACTIVITY_SCREEN_KEY } = require('./fleet.activity.notification.constant');
+const { collectFleetActivityImagePaths } = require('./fleet.activity.notification.images');
 
 const readActivityRecipientCodes = () => JSON.parse(process.env.STAFF_MAIN || '[]');
 
@@ -16,6 +17,7 @@ const announceFleetRecordActivity = async ({ actorUniqueCode, modelKey, record, 
       recipients: readActivityRecipientCodes(),
       title: message.title,
       body: message.body,
+      pushImagePaths: await collectFleetActivityImagePaths(modelKey, record),
       source: { modelKey, documentId },
       actions: [{ text: 'View Email', modelKey, documentId, screenKey: FLEET_ACTIVITY_SCREEN_KEY }],
     });
