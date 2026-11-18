@@ -101,13 +101,11 @@ const updateBackcharge = handleRoute('updateBackcharge', async (req) => {
   const report = await backchargeService.updateBackcharge(req.params.id, req.body)
   if (!report) throw httpError('Backcharge report not found', HTTP.NOT_FOUND)
   backchargePdf.requestInBackground({ documentId: report.refNo, user: req.user })
-  if (req.body.status === 'submitted') {
-    backchargeActivity.announceActivity({
-      document: report,
-      actorUniqueCode: req.user?.uniqueCode,
-      activityType: DOCUMENT_ACTIVITY_TYPE.SUBMITTED,
-    })
-  }
+  backchargeActivity.announceActivity({
+    document: report,
+    actorUniqueCode: req.user?.uniqueCode,
+    activityType: req.body.status === 'submitted' ? DOCUMENT_ACTIVITY_TYPE.SUBMITTED : DOCUMENT_ACTIVITY_TYPE.EDITED,
+  })
   notifyDocumentTasksChanged({ sourceKey: BACKCHARGE_ACTIVITY_SOURCE_KEY, documentId: report.refNo })
   return { message: 'Backcharge report updated successfully', data: report }
 })

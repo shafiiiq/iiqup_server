@@ -43,6 +43,7 @@ router.get('/categories', summaryController.searchCategories);
 router.get('/categories/:categoryKey/members', categoryController.listMembers);
 router.post('/categories/:categoryKey/members', categoryController.addMembers);
 router.delete('/categories/:categoryKey/members/:uniqueCode', categoryController.removeMember);
+router.put('/categories/:categoryKey/avatar', categoryController.setAvatar);
 router.get('/attachment-features', featureController.listFeatures);
 router.get('/attachment-features/:featureKey/documents', featureController.searchDocuments);
 router.get('/:id/replies/summary', replySummaryController.getReplySummary);

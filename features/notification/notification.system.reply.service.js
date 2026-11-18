@@ -4,6 +4,7 @@ const { resolveActorByUniqueCode } = require('./notification.actor.resolver');
 const { recordNotificationActivity } = require('./notification.activity.service');
 
 const postSystemReply = async ({
+  isSilent = false,
   notificationId,
   actorUniqueCode,
   text,
@@ -36,6 +37,7 @@ const postSystemReply = async ({
     title: pushTitle,
     body: pushBody,
     pushBodyByUniqueCode,
+    isSilent,
     activityType: 'reply',
     replyId: reply._id,
   });

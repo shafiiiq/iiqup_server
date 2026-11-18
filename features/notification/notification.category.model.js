@@ -7,6 +7,7 @@ const notificationCategorySchema = new mongoose.Schema(
     createdBy: { type: String, default: '' },
     usageCount: { type: Number, default: 0 },
     members: { type: [String], default: [] },
+    avatarPath: { type: String, default: '' },
   },
   { timestamps: true }
 );

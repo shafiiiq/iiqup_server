@@ -5,7 +5,7 @@ const { resolveSourceAttachments } = require('./notification.attachment.resolver
 const { serializeNotification } = require('./notification.serializer');
 const { countUnseenRepliesByNotification } = require('./notification.reply.stats');
 const { countUnreadNotifications, countUnreadMentions, countUnreadByCategory } = require('./notification.count.service');
-const { resolveCategoryLabels } = require('./notification.category.service');
+const { resolveCategoryLabels, resolveCategoryAvatars } = require('./notification.category.service');
 const { buildNotificationReceiptSummaries } = require('./notification.receipt.service');
 const { NOTIFICATION_LIST_LIMIT, NOTIFICATION_TABS } = require('./notification.constant');
 
@@ -48,7 +48,10 @@ const listAvailableTabs = async (uniqueCode) => {
     countUnreadMentions(uniqueCode),
     countUnreadByCategory(uniqueCode),
   ]);
-  const labels = await resolveCategoryLabels(categoryKeys);
+  const [labels, avatars] = await Promise.all([
+    resolveCategoryLabels(categoryKeys),
+    resolveCategoryAvatars(categoryKeys),
+  ]);
 
   const categoryTabs = categoryKeys
     .map((categoryKey) => ({
@@ -56,6 +59,7 @@ const listAvailableTabs = async (uniqueCode) => {
       tab: NOTIFICATION_TABS.CATEGORY,
       categoryKey,
       label: labels.get(categoryKey),
+      avatarPath: avatars.get(categoryKey) || '',
       pendingCount: unreadByCategory.get(categoryKey) || 0,
     }))
     .sort((first, second) => first.label.localeCompare(second.label));

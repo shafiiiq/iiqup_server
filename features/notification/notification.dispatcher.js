@@ -108,6 +108,11 @@ const notifyWithStage = async (notificationInput, setStage = () => {}) => {
   const notification = await createNotification(notificationInput);
   if (!notification) return null;
 
+  if (notificationInput.isSilent) {
+    await syncCountsForUsers(notification.recipients);
+    return notification;
+  }
+
   setStage('dispatching notification');
   await pushToUsers(notification, notification.recipients, {
     imagePaths: notificationInput.pushImagePaths || [],
@@ -137,4 +142,4 @@ const syncNotificationCounts = async (uniqueCode) => {
   return counts;
 };
 
-module.exports = { notify, notifySafely, pushNotificationActivity, syncNotificationCounts };
+module.exports = { notify, notifySafely, pushNotificationActivity, syncNotificationCounts, syncCountsForUsers };

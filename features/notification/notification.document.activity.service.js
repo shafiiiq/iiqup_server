@@ -1,7 +1,11 @@
 const logger = require('#shared/logger/logger');
 require('#core/document/document.activity.sources');
 const { resolveDocumentActivitySource } = require('#core/document/document.activity.registry');
-const { buildActivityMessage } = require('./notification.document.message');
+const {
+  DOCUMENT_ACTIVITY_TYPE,
+  DOCUMENT_SILENT_ACTIVITY_TYPES,
+} = require('#core/document/document.activity.constant');
+const { buildCreatedMessage, buildActivityMessage } = require('./notification.document.message');
 const { resolveActorByUniqueCode } = require('./notification.actor.resolver');
 const { buildDocumentActors, ensureDocumentActors } = require('#core/document/document.actor.service');
 const Notification = require('./notification.model');
@@ -10,14 +14,21 @@ const { buildFeatureLinkFromDocument } = require('./notification.feature.service
 const { postSystemReply } = require('./notification.system.reply.service');
 const { resolveCurrentPdfVersion } = require('./notification.feature.version');
 const { resolveNextSigner, buildRecipientBodies } = require('./notification.document.turn');
-const { DOCUMENT_ACTIVITY_TYPE } = require('#core/document/document.activity.constant');
+
+const WITHOUT_TIMESTAMP_UPDATE = { timestamps: false };
+const NO_NEXT_SIGNER = { slot: null, ownerCodes: [], name: '' };
 
 const buildVersionedFeatureLink = async (sourceKey, document) => ({
   ...buildFeatureLinkFromDocument(sourceKey, document),
   pdfVersion: await resolveCurrentPdfVersion(sourceKey, document),
 });
 
-const WITHOUT_TIMESTAMP_UPDATE = { timestamps: false };
+const buildOpenAction = (featureLink) => ({
+  text: `Open ${featureLink.label}`,
+  modelKey: featureLink.modelKey,
+  documentId: featureLink.reference,
+  screenKey: featureLink.screenKey,
+});
 
 const recordDocumentCreated = async ({ sourceKey, document, actorUniqueCode }) => {
   try {
@@ -32,7 +43,18 @@ const recordDocumentCreated = async ({ sourceKey, document, actorUniqueCode }) =
       { $set: { actors, viewedBy: [{ uniqueCode: actorUniqueCode, viewedAt: new Date() }] } },
       WITHOUT_TIMESTAMP_UPDATE
     );
-    return actors;
+
+    const featureLink = await buildVersionedFeatureLink(sourceKey, document);
+    return await notifySafely({
+      isSilent: true,
+      actorUniqueCode,
+      recipients: actors.map((actor) => actor.uniqueCode),
+      title: `${featureLink.label} created`,
+      body: buildCreatedMessage({ featureLink, partyName: definition.buildPartyName(document) }).body,
+      source: { modelKey: featureLink.modelKey, documentId: String(document._id) },
+      actions: [buildOpenAction(featureLink)],
+      featureLinks: [featureLink],
+    });
   } catch (error) {
     logger.error(`[notification.document.activity] recordDocumentCreated failed: ${error.stack || error.message}`);
     return null;
@@ -42,9 +64,12 @@ const recordDocumentCreated = async ({ sourceKey, document, actorUniqueCode }) =
 const announceDocumentActivity = async ({ sourceKey, document, actorUniqueCode, activityType, signing }) => {
   try {
     if (!actorUniqueCode) return null;
+    const isSilent = DOCUMENT_SILENT_ACTIVITY_TYPES.includes(activityType);
     const definition = resolveDocumentActivitySource(sourceKey);
     const featureLink = await buildVersionedFeatureLink(sourceKey, document);
-    const nextSigner = await resolveNextSigner({ sourceKey, document, activityType, signing });
+    const nextSigner = isSilent
+      ? NO_NEXT_SIGNER
+      : await resolveNextSigner({ sourceKey, document, activityType, signing });
     const isAmendment = document.isAmendmented === true;
 
     const actorCodes = await ensureDocumentActors({
@@ -89,19 +114,13 @@ const announceDocumentActivity = async ({ sourceKey, document, actorUniqueCode, 
         body: message.body,
         pushBodyByUniqueCode,
         source,
-        actions: [
-          {
-            text: `Open ${featureLink.label}`,
-            modelKey: featureLink.modelKey,
-            documentId: featureLink.reference,
-            screenKey: featureLink.screenKey,
-          },
-        ],
+        actions: [buildOpenAction(featureLink)],
         featureLinks: [featureLink],
       });
     }
 
     return await postSystemReply({
+      isSilent,
       notificationId: notification._id,
       actorUniqueCode,
       text: message.activityBody,

@@ -78,4 +78,12 @@ const resolveCategoryLabels = async (categoryKeys) => {
   return labels;
 };
 
-module.exports = { ensureCategory, searchCategories, resolveCategoryLabels };
+const resolveCategoryAvatars = async (categoryKeys) => {
+  if (categoryKeys.length === 0) return new Map();
+  const categories = await NotificationCategory.find({ key: { $in: categoryKeys } })
+    .select('key avatarPath')
+    .lean();
+  return new Map(categories.map((category) => [category.key, category.avatarPath || '']));
+};
+
+module.exports = { ensureCategory, searchCategories, resolveCategoryLabels, resolveCategoryAvatars };

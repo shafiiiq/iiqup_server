@@ -1,6 +1,7 @@
 const HTTP = require('#shared/response/response.status');
 const { handleNotificationRoute } = require('./notification.route.handler');
 const membersService = require('./notification.category.members.service');
+const avatarService = require('./notification.category.avatar.service');
 
 const listMembers = handleNotificationRoute('listCategoryMembers', async (req) => ({
   status: HTTP.OK,
@@ -31,4 +32,15 @@ const removeMember = handleNotificationRoute('removeCategoryMember', async (req)
   }),
 }));
 
-module.exports = { listMembers, addMembers, removeMember };
+const setAvatar = handleNotificationRoute('setCategoryAvatar', async (req) => ({
+  status: HTTP.OK,
+  message: 'Category image updated',
+  data: await avatarService.setCategoryAvatar({
+    categoryKey: req.params.categoryKey,
+    requesterCode: req.user.uniqueCode,
+    filePath: req.body.filePath,
+    mimeType: req.body.mimeType,
+  }),
+}));
+
+module.exports = { listMembers, addMembers, removeMember, setAvatar };

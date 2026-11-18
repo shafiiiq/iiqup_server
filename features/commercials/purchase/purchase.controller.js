@@ -114,6 +114,11 @@ const updatePurchaseOrder = async (req, res) => {
     const purchaseorder = await purchaseOrderService.updatePurchaseOrder(decodedRefNo, updateData)
     purchaseOrderPdf.requestInBackground({ documentId: decodedRefNo, user: req.user })
     notifyDocumentTasksChanged({ sourceKey: PURCHASE_ORDER_ACTIVITY_SOURCE_KEY, documentId: decodedRefNo })
+    purchaseOrderActivity.announceActivity({
+      document: purchaseorder,
+      actorUniqueCode: req.user?.uniqueCode,
+      activityType: updateData.isAmendmented ? DOCUMENT_ACTIVITY_TYPE.AMENDED : DOCUMENT_ACTIVITY_TYPE.EDITED,
+    })
 
     sendSuccess(res, {
       success: true,

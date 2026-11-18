@@ -1,7 +1,7 @@
 const logger = require('#shared/logger/logger');
 const Notification = require('./notification.model');
 const { toUniqueCodes } = require('./notification.create.service');
-const { pushNotificationActivity } = require('./notification.dispatcher');
+const { pushNotificationActivity, syncCountsForUsers } = require('./notification.dispatcher');
 const { dispatchNotificationActivityToUser } = require('#core/notification/push/push.dispatcher');
 
 const broadcastNotificationActivity = async ({ notificationId, activityType, replyId = null, audience = null }) => {
@@ -29,6 +29,7 @@ const recordNotificationActivity = async ({
   title,
   body = '',
   pushBodyByUniqueCode = {},
+  isSilent = false,
   activityType,
   replyId = null,
 }) => {
@@ -44,7 +45,10 @@ const recordNotificationActivity = async ({
     const notification = await Notification.findByIdAndUpdate(notificationId, update, { new: true }).lean();
     if (!notification) return null;
 
-    if (codesToNotify.length > 0) {
+    if (codesToNotify.length > 0 && isSilent) {
+      await syncCountsForUsers(codesToNotify);
+    }
+    if (codesToNotify.length > 0 && !isSilent) {
       await pushNotificationActivity(notification, codesToNotify, {
         title,
         body,

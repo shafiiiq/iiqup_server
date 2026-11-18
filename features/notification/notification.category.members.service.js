@@ -106,6 +106,7 @@ const removeCategoryMember = async ({ categoryKey, requesterCode, uniqueCode }) 
 };
 
 module.exports = {
+  broadcastChange,
   getCategoryMemberCodes,
   registerCategoryParticipants,
   listCategoryMembers,
