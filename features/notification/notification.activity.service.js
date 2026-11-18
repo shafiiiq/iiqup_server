@@ -28,6 +28,7 @@ const recordNotificationActivity = async ({
   notifyCodes = [],
   title,
   body = '',
+  pushBodyByUniqueCode = {},
   activityType,
   replyId = null,
 }) => {
@@ -44,7 +45,13 @@ const recordNotificationActivity = async ({
     if (!notification) return null;
 
     if (codesToNotify.length > 0) {
-      await pushNotificationActivity(notification, codesToNotify, { title, body, actorUniqueCode, replyId });
+      await pushNotificationActivity(notification, codesToNotify, {
+        title,
+        body,
+        pushBodyByUniqueCode,
+        actorUniqueCode,
+        replyId,
+      });
     }
     await broadcastNotificationActivity({
       notificationId,

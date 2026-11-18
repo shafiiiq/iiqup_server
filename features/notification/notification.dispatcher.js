@@ -61,6 +61,7 @@ const pushToUsers = async (notification, uniqueCodes, overrides, avatarActor = n
       const counts = await getNotificationCounts(uniqueCode);
       const queuedPayload = buildPushPayload(notification, counts, {
         ...overrides,
+        body: overrides?.pushBodyByUniqueCode?.[uniqueCode] ?? overrides?.body,
         actorAvatarUrl,
         actor: avatarActor,
       });
@@ -86,9 +87,18 @@ const syncCountsForUsers = (uniqueCodes) =>
     })
   );
 
-const pushNotificationActivity = async (notification, uniqueCodes, { title, body, actorUniqueCode, replyId = null }) => {
+const pushNotificationActivity = async (
+  notification,
+  uniqueCodes,
+  { title, body, pushBodyByUniqueCode = {}, actorUniqueCode, replyId = null }
+) => {
   const avatarActor = actorUniqueCode ? await resolveActorByUniqueCode(actorUniqueCode) : notification.actor;
-  await pushToUsers(notification, uniqueCodes, { title, body, primaryAction: null, replyId }, avatarActor);
+  await pushToUsers(
+    notification,
+    uniqueCodes,
+    { title, body, pushBodyByUniqueCode, primaryAction: null, replyId },
+    avatarActor
+  );
   const silentAudience = notification.audience.filter((uniqueCode) => !uniqueCodes.includes(uniqueCode));
   await syncCountsForUsers(silentAudience);
 };
@@ -99,7 +109,10 @@ const notifyWithStage = async (notificationInput, setStage = () => {}) => {
   if (!notification) return null;
 
   setStage('dispatching notification');
-  await pushToUsers(notification, notification.recipients, { imagePaths: notificationInput.pushImagePaths || [] });
+  await pushToUsers(notification, notification.recipients, {
+    imagePaths: notificationInput.pushImagePaths || [],
+    pushBodyByUniqueCode: notificationInput.pushBodyByUniqueCode,
+  });
   return notification;
 };
 

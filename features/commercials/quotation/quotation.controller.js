@@ -36,7 +36,7 @@ const createQuotation = async (req, res) => {
     const quotation = await quotationService.createQuotation(quotationData)
     invalidateItemDescriptionCache()
     quotationPdf.requestInBackground({ documentId: quotation.quotationRef, user: req.user })
-    quotationActivity.announceCreated({ document: quotation, actorUniqueCode: req.user?.uniqueCode })
+    quotationActivity.recordCreated({ document: quotation, actorUniqueCode: req.user?.uniqueCode })
 
     sendSuccess(res, { success: true, message: 'Quotation created successfully', data: quotation })
   } catch (error) {
@@ -85,11 +85,6 @@ const updateQuotation = async (req, res) => {
     invalidateItemDescriptionCache()
     quotationPdf.requestInBackground({ documentId: decodedRefNo, user: req.user })
     notifyDocumentTasksChanged({ sourceKey: QUOTATION_ACTIVITY_SOURCE_KEY, documentId: decodedRefNo })
-    quotationActivity.announceActivity({
-      document: quotation,
-      actorUniqueCode: req.user?.uniqueCode,
-      activityType: updateData.isAmendmented ? DOCUMENT_ACTIVITY_TYPE.AMENDED : DOCUMENT_ACTIVITY_TYPE.EDITED,
-    })
 
     sendSuccess(res, {
       success: true,

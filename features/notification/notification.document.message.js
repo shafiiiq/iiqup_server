@@ -1,38 +1,50 @@
 const { DOCUMENT_ACTIVITY_TYPE } = require('#core/document/document.activity.constant')
 
-const buildDocumentTitle = ({ featureLink, partyName }) =>
-  `${featureLink.label} ${featureLink.reference} for ${partyName}`
+const AMENDMENT_TITLE_SUFFIX = ' (Amendment)'
 
-const buildCreatedMessage = ({ featureLink, partyName }) => {
-  const title = buildDocumentTitle({ featureLink, partyName })
-  return { title, body: `${title}\nDraft created. Wait until it is sent for approval.` }
+const buildDocumentTitle = ({ featureLink, partyName, isAmendment }) =>
+  `${featureLink.label} ${featureLink.reference} for ${partyName}${isAmendment ? AMENDMENT_TITLE_SUFFIX : ''}`
+
+const buildSubmittedBody = ({ actorName, isAmendment }) =>
+  isAmendment ? `${actorName} sent the amendment for approval.` : `${actorName} sent it for approval.`
+
+const buildSignedBody = ({ actorName, signing, isAmendment, nextSignerName }) => {
+  const signedPart = `${actorName} signed ${isAmendment ? 'the amendment ' : ''}as ${signing.slotLabel}.`
+  return `${signedPart} Next to sign: ${signing.pendingSlots[0].label} (${nextSignerName}).`
 }
 
-const buildSignedBody = ({ actorName, signing }) => {
-  const signedPart = `${actorName} signed as ${signing.slotLabel}.`
-  if (signing.pendingSlotLabels.length === 0) return `${signedPart} All signatures complete. Approved.`
-  return `${signedPart} Next to sign: ${signing.pendingSlotLabels[0]}.`
-}
+const buildApprovedBody = ({ actorName, featureLink, partyName, isAmendment }) =>
+  `${actorName} approved ${featureLink.label.toLowerCase()}${isAmendment ? ' amendment' : ''} ${featureLink.reference}, for ${partyName}`
 
-const buildActivityBody = ({ activityType, actorName, signing }) => {
+const buildActivityBody = ({ activityType, actorName, signing, isAmendment, nextSignerName }) => {
   switch (activityType) {
     case DOCUMENT_ACTIVITY_TYPE.SUBMITTED:
-      return `${actorName} sent it for approval. Signing is now open.`
+      return buildSubmittedBody({ actorName, isAmendment })
     case DOCUMENT_ACTIVITY_TYPE.SIGNED:
-      return buildSignedBody({ actorName, signing })
-    case DOCUMENT_ACTIVITY_TYPE.AMENDED:
-      return `${actorName} amended it.`
-    case DOCUMENT_ACTIVITY_TYPE.EDITED:
-      return `${actorName} edited it.`
+      return buildSignedBody({ actorName, signing, isAmendment, nextSignerName })
     default:
-      return `${actorName} updated it.`
+      throw new Error(`Unsupported document notification type: ${activityType}`)
   }
 }
 
-const buildActivityMessage = ({ activityType, actorName, featureLink, partyName, signing }) => {
-  const title = buildDocumentTitle({ featureLink, partyName })
-  const activityBody = buildActivityBody({ activityType, actorName, signing })
+const buildActivityMessage = ({
+  activityType,
+  actorName,
+  featureLink,
+  partyName,
+  signing,
+  isAmendment,
+  nextSignerName,
+}) => {
+  const isApproval = activityType === DOCUMENT_ACTIVITY_TYPE.SIGNED && signing.pendingSlots.length === 0
+  if (isApproval) {
+    const approvedBody = buildApprovedBody({ actorName, featureLink, partyName, isAmendment })
+    return { title: approvedBody, activityBody: approvedBody, body: approvedBody }
+  }
+
+  const title = buildDocumentTitle({ featureLink, partyName, isAmendment })
+  const activityBody = buildActivityBody({ activityType, actorName, signing, isAmendment, nextSignerName })
   return { title, activityBody, body: `${title}\n${activityBody}` }
 }
 
-module.exports = { buildCreatedMessage, buildActivityMessage }
+module.exports = { buildActivityMessage }

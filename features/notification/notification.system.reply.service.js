@@ -10,6 +10,7 @@ const postSystemReply = async ({
   notifyCodes,
   pushTitle,
   pushBody,
+  pushBodyByUniqueCode = {},
   featureLinks = [],
   attachments = [],
 }) => {
@@ -34,6 +35,7 @@ const postSystemReply = async ({
     notifyCodes,
     title: pushTitle,
     body: pushBody,
+    pushBodyByUniqueCode,
     activityType: 'reply',
     replyId: reply._id,
   });

@@ -64,7 +64,7 @@ const applyQuotationSignature = async ({ document, slot, signer, event, ipAddres
     document,
     actorUniqueCode: signer.uniqueCode,
     activityType: DOCUMENT_ACTIVITY_TYPE.SIGNED,
-    signing: { slotLabel: slot.label, pendingSlotLabels: [] },
+    signing: { slotLabel: slot.label, pendingSlots: [] },
   })
   notifyDocumentTasksChanged({ sourceKey: QUOTATION_SOURCE_KEY, documentId: document.quotationRef })
 }

@@ -65,7 +65,7 @@ const createPurchaseOrder = async (req, res) => {
 
     const purchaseorder = await purchaseOrderService.createPurchaseOrder(purchaseorderData)
     purchaseOrderPdf.requestInBackground({ documentId: purchaseorder.purchaseorderRef, user: req.user })
-    purchaseOrderActivity.announceCreated({ document: purchaseorder, actorUniqueCode: req.user?.uniqueCode })
+    purchaseOrderActivity.recordCreated({ document: purchaseorder, actorUniqueCode: req.user?.uniqueCode })
 
     sendSuccess(res, { success: true, message: 'Purchase Order created successfully', data: purchaseorder })
   } catch (error) {
@@ -114,11 +114,6 @@ const updatePurchaseOrder = async (req, res) => {
     const purchaseorder = await purchaseOrderService.updatePurchaseOrder(decodedRefNo, updateData)
     purchaseOrderPdf.requestInBackground({ documentId: decodedRefNo, user: req.user })
     notifyDocumentTasksChanged({ sourceKey: PURCHASE_ORDER_ACTIVITY_SOURCE_KEY, documentId: decodedRefNo })
-    purchaseOrderActivity.announceActivity({
-      document: purchaseorder,
-      actorUniqueCode: req.user?.uniqueCode,
-      activityType: updateData.isAmendmented ? DOCUMENT_ACTIVITY_TYPE.AMENDED : DOCUMENT_ACTIVITY_TYPE.EDITED,
-    })
 
     sendSuccess(res, {
       success: true,

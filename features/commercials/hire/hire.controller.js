@@ -45,7 +45,7 @@ const addHireOrder = async (req, res) => {
 
     const hireOrder = await hireOrderService.createHireOrder(hireOrderData)
     hireOrderPdf.requestInBackground({ documentId: hireOrder.hireOrderRef, user: req.user })
-    hireOrderActivity.announceCreated({ document: hireOrder, actorUniqueCode: req.user?.uniqueCode })
+    hireOrderActivity.recordCreated({ document: hireOrder, actorUniqueCode: req.user?.uniqueCode })
 
     sendSuccess(res, { success: true, message: 'Hire order created successfully', data: hireOrder })
   } catch (error) {
@@ -118,11 +118,6 @@ const updateHireOrder = async (req, res) => {
     const hireOrder = await hireOrderService.updateHireOrder(decodedRefNo, updateData)
     hireOrderPdf.requestInBackground({ documentId: decodedRefNo, user: req.user })
     notifyDocumentTasksChanged({ sourceKey: HIRE_ORDER_ACTIVITY_SOURCE_KEY, documentId: decodedRefNo })
-    hireOrderActivity.announceActivity({
-      document: hireOrder,
-      actorUniqueCode: req.user?.uniqueCode,
-      activityType: updateData.isAmendmented ? DOCUMENT_ACTIVITY_TYPE.AMENDED : DOCUMENT_ACTIVITY_TYPE.EDITED,
-    })
     sendSuccess(res, {
       success: true,
       message: updateData.isAmendmented ? 'Hire order amended successfully' : 'Hire order updated successfully',
