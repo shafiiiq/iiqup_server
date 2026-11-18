@@ -175,8 +175,7 @@ const syncOperatorDemobilizedFromEquipment = async ({
   if (!operatorId) return null;
 
   try {
-    const stillAssigned = await isOperatorAssignedElsewhere(operatorId, regNo);
-    if (stillAssigned) return null;
+    if (regNo && await isOperatorAssignedElsewhere(operatorId, regNo)) return null;
 
     const operator = await OperatorModel.findById(operatorId);
     if (!operator) return null;
